@@ -1,0 +1,26 @@
+{
+	"name": "@thoth/types",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsc -w",
+		"lint:tsc": "tsc --noEmit",
+		"format:biome": "biome check --write --config-path=biome.json .",
+		"lint:biome": "biome check --config-path=biome.json .",
+		"clean": "rimraf dist"
+	},
+	"exports": {
+		"./database": {
+			"import": "./dist/database/index.js",
+			"types": "./dist/database/index.d.ts"
+		},
+		"./api": {
+			"import": "./dist/api/index.js",
+			"types": "./dist/api/index.d.ts"
+		}
+	},
+	"dependencies": {
+		"zod": "^4.1.12"
+	}
+}
