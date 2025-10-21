@@ -2,6 +2,7 @@
   "name": "thoth-monorepo",
   "private": true,
   "scripts": {
+    "build": "pnpm -r build",
     "lint:biome": "pnpm -r lint:biome",
     "lint:management": "pnpm --filter @genie-nexus/management lint",
     "lint": "concurrently --kill-others-on-fail \"pnpm:lint:*\"",
