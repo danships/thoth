@@ -2,16 +2,12 @@
   "name": "thoth-monorepo",
   "private": true,
   "scripts": {
-    "lint:biome": "pnpm -r lint:biome",
-    "lint:management": "pnpm --filter @genie-nexus/management lint",
-    "lint": "concurrently --kill-others-on-fail \"pnpm:lint:*\"",
-    "format": "concurrently \"pnpm:format:*\"",
-    "format:biome": "pnpm -r format:biome",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
     "clean": "pnpm -r clean",
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.6",
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
     "@tsconfig/node22": "^22.0.2",
