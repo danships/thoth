@@ -4,8 +4,9 @@ globs:
 alwaysApply: true
 ---
 
-This is a monorepo, managed with pnpm.
+This is a Next.js application, managed with pnpm.
 
-packages/web is the web application, using Vite, React and Mantine UI 8 as the UI framework.
-It uses the Atomic Design Methodology for the UI components. Routes are managed with React Router.
-Preferred is using types of interfaces in typescript.
+The application uses Next.js 15 with React 19, Mantine UI 8 as the UI framework, and TypeScript.
+It uses the Atomic Design Methodology for the UI components. Routes are managed with Next.js App Router.
+API routes are implemented using Next.js API routes in the `src/app/api/` directory.
+Preferred is using types instead interfaces in TypeScript.

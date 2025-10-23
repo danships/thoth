@@ -1,152 +1,155 @@
-# API Route Creation Guide
+# Next.js API Route Creation Guide
 
-This document outlines the pattern for creating new API routes in the Thoth backend, based on the `get-pages-tree` implementation.
+This document outlines the pattern for creating new API routes in the Thoth Next.js application.
 
 ## Overview
 
-API routes in Thoth follow a structured pattern with three main components:
+API routes in Thoth follow Next.js App Router conventions with these main components:
 
-1. **Type definitions** in `packages/types/src/api/endpoints/`
-2. **Route implementation** in `packages/backend/src/modules/{module}/api/`
-3. **Route registration** in `packages/backend/src/core/api/initialize-http-api.ts`
+1. **Type definitions** in `src/types/`
+2. **Route implementation** in `src/app/api/{route}/route.ts`
+3. **Request/Response handling** using Next.js Request/Response objects
 
-## 1. Type Definitions (`packages/types/src/api/endpoints/`)
+## 1. Type Definitions (`src/types/`)
 
-Create a new file for your endpoint (e.g., `get-pages-tree.ts`):
+Create type definitions for your API endpoint:
 
 ```typescript
-import z from "zod";
-import { withIdSchema } from "../../schemas/utils.js";
-import { pageSchema } from "../entities.js";
-import type { DataWrapper } from "../utils.js";
+import { z } from 'zod';
 
-// Define the endpoint path
-export const GET_PAGES_TREE_ENDPOINT = "/pages/tree";
-
-// Define response schema
-const pagesTreeBranchSchema = z.array(
-  z.object({
-    page: pageSchema.extend(withIdSchema.shape),
-    children: z.array(
-      z.object({
-        page: pageSchema,
-      })
-    ),
-  })
-);
+// Define request schema
+export const getPagesTreeQuerySchema = z.object({
+  parentId: z.string().min(1).optional(),
+});
 
 export const getPagesTreeResponseSchema = z.object({
-  branches: pagesTreeBranchSchema,
+  branches: z.array(
+    z.object({
+      page: z.object({
+        id: z.string(),
+        title: z.string(),
+        // ... other page fields
+      }),
+      children: z.array(
+        z.object({
+          page: z.object({
+            id: z.string(),
+            title: z.string(),
+            // ... other page fields
+          }),
+        })
+      ),
+    })
+  ),
 });
 
 // Export types
+export type GetPagesTreeQuery = z.infer<typeof getPagesTreeQuerySchema>;
 export type GetPagesTreeResponse = z.infer<typeof getPagesTreeResponseSchema>;
-export type GetPagesTreeResponseData = DataWrapper<GetPagesTreeResponse>;
-
-// Define query/body/params schemas
-export const getPagesTreeQueryVariablesSchema = z.object({
-  parentId: z.string().min(1).optional(),
-});
-export type GetPagesTreeQueryVariables = z.infer<
-  typeof getPagesTreeQueryVariablesSchema
->;
 ```
 
-Then export from `packages/types/src/api/endpoints/index.ts`:
+## 2. Route Implementation (`src/app/api/{route}/route.ts`)
+
+Create the route handler the route-wrapper:
 
 ```typescript
-export * from "./get-pages-tree.js";
-```
-
-## 2. Route Implementation (`packages/backend/src/modules/{module}/api/`)
-
-Create the route handler using the `apiRoute` wrapper:
-
-```typescript
-import {
-  type GetPagesTreeQueryVariables,
-  type GetPagesTreeResponse,
-  getPagesTreeQueryVariablesSchema,
-} from "@thoth/types/api";
-import { apiRoute } from "../../../core/api/api-route.js";
-import { addUserIdToQuery } from "../../database/helpers.js";
-import { getContainerRepository } from "../../database/index.js";
-
-export const getPagesTree = apiRoute<
-  GetPagesTreeResponse,
-  GetPagesTreeQueryVariables
->(
+export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}>(
   {
     expectedQuerySchema: getPagesTreeQueryVariablesSchema,
-    // expectedBodySchema: getPagesTreeBodySchema, // if needed
-    // expectedParamsSchema: getPagesTreeParamsSchema, // if needed
   },
   async ({ query }, session) => {
-    // Your route logic here
-    const containerRepository = getContainerRepository();
-    const dbQuery = addUserIdToQuery(
-      containerRepository.createQuery(),
-      session.user.id
-    ).sort("lastUpdated", "desc");
+    const containerRepository = await getContainerRepository();
+    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id).sort(
+      'lastUpdated',
+      'desc'
+    );
 
     if (query?.parentId) {
-      dbQuery.eq("parentId", query.parentId);
+      databaseQuery.eq('parentId', query.parentId);
     }
 
-    const containers = await containerRepository.getByQuery(dbQuery);
-    // ... more logic
+    // TODO: SuperSave does not return any result if we set parentId to null
+    // eslint-disable-next-line unicorn/no-await-expression-member
+    const containers = (await containerRepository.getByQuery(databaseQuery)).filter(
+      (container) => query?.parentId || !container.parentId
+    );
+
+    const parentIds = containers.map((container) => container.id).filter(Boolean);
+
+    const databaseChildren =
+      parentIds.length > 0
+        ? await containerRepository.getByQuery(
+            addUserIdToQuery(containerRepository.createQuery(), session.user.id).in('parentId', parentIds)
+          )
+        : [];
 
     return {
       branches: containers.map((container) => ({
-        page: container,
-        children: [], // your response structure
+        page: {
+          id: container.id,
+          name: container.name,
+          emoji: container.emoji || null,
+          type: container.type as 'page',
+          lastUpdated: container.lastUpdated,
+          createdAt: container.createdAt,
+          parentId: container.parentId || null,
+        },
+        children: databaseChildren
+          .filter((child) => child.parentId === container.id)
+          .map((child) => ({
+            page: {
+              id: child.id,
+              name: child.name,
+              emoji: child.emoji || null,
+              type: child.type as 'page',
+              lastUpdated: child.lastUpdated,
+              createdAt: child.createdAt,
+              parentId: child.parentId || null,
+            },
+          })),
       })),
     };
   }
 );
 ```
 
-## 3. Route Registration (`packages/backend/src/core/api/initialize-http-api.ts`)
+## 3. Route Structure
 
-Register your route in the HTTP API router:
+Next.js App Router automatically handles routing based on file structure:
 
-```typescript
-import { getPagesTree } from "../../modules/containers/api/get-pages-tree.js";
-
-export function initializeHttpApi(): Router {
-  const router = express.Router();
-
-  router.use("/api/v1/", middleware, express.json());
-
-  // Register your route
-  router.get("/api/v1/pages/tree", getPagesTree);
-
-  return router;
-}
+```
+src/app/api/
+├── pages/
+│   └── tree/
+│       └── route.ts          # Handles /api/pages/tree
+├── users/
+│   └── route.ts              # Handles /api/users
+└── auth/
+    └── login/
+        └── route.ts          # Handles /api/auth/login
 ```
 
 ## Key Points
 
-- **Type Safety**: All input/output types are defined with Zod schemas and TypeScript types
-- **Validation**: The `apiRoute` wrapper automatically validates query parameters, body, and params
-- **Session Access**: The handler receives a `session` object with the authenticated user
-- **Error Handling**: Validation errors are automatically handled and returned as 400 responses
-- **Response Format**: All responses are wrapped in `{ data: ... }` format
-- **Authentication**: All routes are protected by the auth middleware
+- **Type Safety**: Use Zod schemas for request/response validation
+- **Error Handling**: Implement proper error handling with appropriate HTTP status codes
+- **Authentication**: Integrate with your auth system (better-auth, etc.)
+- **Validation**: Validate both request and response data
+- **Next.js Conventions**: Use NextRequest/NextResponse objects
+- **HTTP Methods**: Export functions named after HTTP methods (GET, POST, PUT, DELETE, etc.)
 
 ## File Structure
 
 ```
-packages/
-├── types/src/api/endpoints/
-│   ├── get-pages-tree.ts          # Type definitions
-│   └── index.ts                   # Export all endpoints
-└── backend/src/
-    ├── core/api/
-    │   ├── api-route.ts           # Core apiRoute wrapper
-    │   └── initialize-http-api.ts # Route registration
-    └── modules/{module}/api/
-        └── get-pages-tree.ts      # Route implementation
+src/
+├── app/api/
+│   └── {route}/
+│       └── route.ts          # Route implementation
+├── types/
+│   └── api.ts                # API type definitions
+└── lib/
+    ├── auth.ts               # Authentication utilities
+    └── db.ts                 # Database utilities
 ```
 
 ## Example Usage
@@ -154,28 +157,36 @@ packages/
 The route can be called as:
 
 ```
-GET /api/v1/pages/tree?parentId=some-id
+GET /api/pages/tree?parentId=some-id
 ```
 
 And will return:
 
 ```json
 {
-  "data": {
-    "branches": [
-      {
-        "page": {
-          /* page data */
-        },
-        "children": [
-          {
-            "page": {
-              /* child page data */
-            }
+  "branches": [
+    {
+      "page": {
+        "id": "page-1",
+        "title": "Page 1"
+      },
+      "children": [
+        {
+          "page": {
+            "id": "page-1-1",
+            "title": "Child Page"
           }
-        ]
-      }
-    ]
-  }
+        }
+      ]
+    }
+  ]
 }
 ```
+
+## Additional Considerations
+
+- **Middleware**: Use Next.js middleware for cross-cutting concerns
+- **Rate Limiting**: Implement rate limiting if needed
+- **CORS**: Configure CORS headers if serving external clients
+- **Caching**: Use Next.js caching strategies for better performance
+- **Streaming**: Use streaming responses for large datasets
