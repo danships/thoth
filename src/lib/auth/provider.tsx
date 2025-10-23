@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await refreshSession();
       setLoading(false);
     };
-    
+
     initializeAuth();
   }, []);
 

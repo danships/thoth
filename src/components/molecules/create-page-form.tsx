@@ -9,18 +9,15 @@ import { CreatePageBody, CreatePageResponse } from '@/types/api';
 type CreatePageFormProperties = {
   parentId?: string | null;
   title?: string;
-}
+};
 
-export function CreatePageForm({
-  parentId = null,
-  title = 'Create New Page',
-}: CreatePageFormProperties) {
+export function CreatePageForm({ parentId = null, title = 'Create New Page' }: CreatePageFormProperties) {
   const router = useRouter();
   const { post, inProgress, error } = useCudApi();
 
   const form = useForm({
     initialValues: {
-      name: '',      
+      name: '',
     },
     validate: {
       name: (value) => (value.length === 0 ? 'Page name is required' : null),
@@ -29,7 +26,7 @@ export function CreatePageForm({
 
   const handleSubmit = async (values: typeof form.values) => {
     const page = await post<CreatePageResponse, CreatePageBody>('/pages', {
-      name: values.name,      
+      name: values.name,
       emoji: null,
       parentId: parentId,
     });
@@ -40,7 +37,7 @@ export function CreatePageForm({
   return (
     <Container size="md" py="xl">
       <Stack gap="lg">
-        <Title order={1}>{title}</Title>        
+        <Title order={1}>{title}</Title>
 
         {error && (
           <Alert color="red" title="Error">
@@ -50,17 +47,12 @@ export function CreatePageForm({
 
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
-            <TextInput 
-              label="Page Name" 
-              placeholder="Enter page name" 
-              {...form.getInputProps('name')} 
-              required 
-            />
+            <TextInput label="Page Name" placeholder="Enter page name" {...form.getInputProps('name')} required />
 
             <Group>
               <Button type="submit" loading={inProgress}>
                 Create Page
-              </Button>              
+              </Button>
             </Group>
           </Stack>
         </form>

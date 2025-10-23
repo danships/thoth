@@ -7,9 +7,5 @@ export default function CreateSubpagePage() {
   const parameters = useParams();
   const parentId = parameters.id as string;
 
-  return (
-    <CreatePageForm
-      parentId={parentId}      
-    />
-  );
+  return <CreatePageForm parentId={parentId} />;
 }
