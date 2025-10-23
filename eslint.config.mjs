@@ -24,6 +24,7 @@ const eslintConfig = [
           case: 'kebabCase',
         },
       ],
+      '@typescript-eslint/no-empty-object-type': 'off',
     },
   },
   {
@@ -35,6 +36,7 @@ const eslintConfig = [
       'next-env.d.ts',
       '**/.next/**',
       '**/node_modules/**',
+      'commitlint.config.js',
     ],
   },
 ];

@@ -5,7 +5,6 @@ import { useDisclosure } from '@mantine/hooks';
 import { useRouter } from 'next/navigation';
 import { type PropsWithChildren, type ReactNode, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/provider';
-import appIcon from '@/app/icons/favicon-32x32.png'
 import Image from 'next/image';
 
 type LayoutProperties = PropsWithChildren & {
@@ -45,7 +44,7 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
         <Group h="100%" px="md" justify="space-between" style={{ width: '100%' }}>
           <Group>
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Image src={appIcon} width="21" height="21" alt="Thoth Logo" />
+            <Image src="/icons/favicon-32x32.png" width="21" height="21" alt="Thoth Logo" />
             <Title order={5}>Thoth</Title>
           </Group>
           <a

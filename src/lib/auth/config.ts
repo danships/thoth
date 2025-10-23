@@ -38,7 +38,7 @@ export const auth = betterAuth({
             lastUpdated: new Date().toISOString(),
           } satisfies WorkspaceCreate);
 
-          const containerRepository = getContainerRepository();
+          const containerRepository = await getContainerRepository();
           await containerRepository.create({
             name: 'Welcome',
             type: 'page',

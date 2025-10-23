@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "humao.rest-client",
+    "editorconfig.editorconfig",
+    "esbenp.prettier-vscode"
+  ]
+}

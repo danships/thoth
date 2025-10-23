@@ -32,7 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    refreshSession().finally(() => setLoading(false));
+    const initializeAuth = async () => {
+      await refreshSession();
+      setLoading(false);
+    };
+    
+    initializeAuth();
   }, []);
 
   const signOut = async () => {

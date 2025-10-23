@@ -1,10 +1,9 @@
 'use client';
 
-import { Alert, Button, Container, Group, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Alert, Button, Container, Group, Stack, TextInput, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useRouter } from 'next/navigation';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
-import { useAuth } from '@/lib/auth/provider';
 import { CreatePageBody, CreatePageResponse } from '@/types/api';
 
 type CreatePageFormProperties = {

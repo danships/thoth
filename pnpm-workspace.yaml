@@ -1,7 +1,2 @@
-packages:
-  - packages/*
+minimumReleaseAge: 1440
 
-minimumReleaseAge: 14400
-
-overrides:
-  '@types/node@24.8.0': '24.9.1'

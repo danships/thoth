@@ -4,7 +4,7 @@ import { addUserIdToQuery } from '@/lib/database/helpers';
 import type { GetPagesTreeQueryVariables, GetPagesTreeResponse } from '@/types/api';
 import { getPagesTreeQueryVariablesSchema } from '@/types/api';
 
-export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables>(
+export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}>(
   {
     expectedQuerySchema: getPagesTreeQueryVariablesSchema,
   },
@@ -20,6 +20,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables>(
     }
 
     // TODO: SuperSave does not return any result if we set parentId to null
+    // eslint-disable-next-line unicorn/no-await-expression-member
     const containers = (await containerRepository.getByQuery(databaseQuery)).filter(
       (container) => query?.parentId || !container.parentId
     );

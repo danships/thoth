@@ -1,7 +1,7 @@
 'use client';
 import '@mantine/core/styles.css';
 import { MantineProvider } from '@mantine/core';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AuthProvider } from '@/lib/auth/provider';
 import { theme } from '@/lib/theme';
 
@@ -15,14 +15,14 @@ export default function RootClientLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark' | 'auto'>('auto');
-
-  useEffect(() => {
-    const storedColorScheme = localStorage.getItem('mantine-color-scheme') as 'light' | 'dark' | null;
-    if (storedColorScheme) {
-      setColorScheme(storedColorScheme);
+  // Initialize state with localStorage value to avoid synchronous setState in effect
+  const [colorScheme] = useState<'light' | 'dark' | 'auto'>(() => {
+    if (globalThis.window !== undefined) {
+      const storedColorScheme = localStorage.getItem('mantine-color-scheme') as 'light' | 'dark' | null;
+      return storedColorScheme || 'auto';
     }
-  }, []);
+    return 'auto';
+  });
 
   return (
     <html lang="en">
