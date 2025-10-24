@@ -5,7 +5,7 @@ import { CreatePageForm } from '@/components/molecules/create-page-form';
 
 export default function CreateSubpagePage() {
   const parameters = useParams();
-  const parentId = parameters.id as string;
+  const parentId = `${parameters['id']}`;
 
   return <CreatePageForm parentId={parentId} />;
 }

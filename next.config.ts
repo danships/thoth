@@ -1,7 +1,8 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["mysql2"],
+  output: 'standalone',
+  serverExternalPackages: ['mysql2'],
 };
 
 export default nextConfig;

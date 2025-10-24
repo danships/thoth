@@ -6,6 +6,7 @@ import {
   withUserIdSchema,
   withWorkspaceIdSchema,
 } from '../utilities';
+import { blockSchema } from '../blocks';
 
 export const containerSchema = z
   .object({
@@ -20,5 +21,7 @@ export const pageContainerSchema = containerSchema
   .extend({
     type: z.literal('page'),
     emoji: z.string().min(1).nullable(),
+    // TODO generate/get block validation schemas for blocks
+    blocks: z.array(blockSchema).optional(),
   })
   .extend(withParentIdSchema.shape);
