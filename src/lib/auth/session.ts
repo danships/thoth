@@ -1,9 +1,10 @@
 import { headers } from 'next/headers';
-import { auth } from './config';
+import { getAuth } from './config';
 import { NotAuthorizedError } from '@/lib/errors/not-authorized-error';
 
 export async function getSession() {
   const headersList = await headers();
+  const auth = await getAuth();
   const session = await auth.api.getSession({
     headers: headersList,
   });

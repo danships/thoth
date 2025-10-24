@@ -1,9 +1,9 @@
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { connection, NextResponse } from 'next/server';
 import type { User } from 'better-auth';
 import type { z } from 'zod';
 import { getSession } from '../auth/session';
-import { logger } from '../logger';
+import { getLogger } from '../logger';
 import { HttpError } from '@/lib/errors/http-error';
 
 type ApiRouteOptions<ExpectedQuery = unknown, ExpectedParameters = unknown, ExpectedBody = unknown> = {
@@ -30,6 +30,7 @@ export function apiRoute<
   ) => ResponseType | Promise<ResponseType>
 ) {
   return async (request: NextRequest, { params }: { params: Promise<ExpectedParameters> }) => {
+    await connection();
     try {
       // Get session
       const session = await getSession();
@@ -111,6 +112,7 @@ export function apiRoute<
       // Return the result
       return NextResponse.json({ data: result });
     } catch (error) {
+      const logger = await getLogger();
       logger.error('API route error:', error);
 
       if (error instanceof HttpError) {

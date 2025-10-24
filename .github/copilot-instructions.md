@@ -9,7 +9,7 @@ High level
 
 Key components and patterns
 
-- Auth: server-side session lookup is used in `src/app/layout.tsx` via `auth.api.getSession`. Client-side auth lives in `src/lib/auth/provider.tsx` and `src/lib/auth/client.ts` (use `useAuth()` to access user/session on client).
+- Auth: server-side session lookup is used in `src/app/layout.tsx` via `(await getAuth()).api.getSession`. Client-side auth lives in `src/lib/auth/provider.tsx` and `src/lib/auth/client.ts` (use `useAuth()` to access user/session on client).
 - Data layer: simple repository pattern under `src/lib/database` with helper `addUserIdToQuery` for per-user scoping. API route handlers typically call `getWorkspaceRepository()` and `getContainerRepository()`.
 - API routes: use `apiRoute` wrapper from `src/lib/api/route-wrapper` which enforces schema validation (Zod) and provides typed session. See `src/app/api/v1/pages/*.ts` for examples (GET, POST, tree endpoints).
 - Types & schemas: API shapes and validation live in `src/types/api` and `src/types/schemas`. Prefer reading those files for exact shapes when adding or changing endpoints.

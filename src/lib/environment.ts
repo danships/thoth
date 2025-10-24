@@ -18,7 +18,7 @@ type Environment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;
 
 let cachedEnvironment: Environment | null = null;
 
-export function getEnvironment(): Environment {
+export async function getEnvironment(): Promise<Environment> {
   if (cachedEnvironment === null) {
     cachedEnvironment = cleanEnv(process.env, environmentSchema);
   }

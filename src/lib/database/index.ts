@@ -10,7 +10,8 @@ export async function getDatabase() {
     return database;
   }
 
-  database = await SuperSave.create(getEnvironment().DB);
+  const environment = await getEnvironment();
+  database = await SuperSave.create(environment.DB);
 
   await database.addEntity(entities.Container);
   await database.addEntity(entities.Workspace);
