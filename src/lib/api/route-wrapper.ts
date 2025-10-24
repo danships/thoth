@@ -4,6 +4,7 @@ import type { User } from 'better-auth';
 import type { z } from 'zod';
 import { getSession } from '../auth/session';
 import { logger } from '../logger';
+import { HttpError } from '@/lib/errors/http-error';
 
 type ApiRouteOptions<ExpectedQuery = unknown, ExpectedParameters = unknown, ExpectedBody = unknown> = {
   expectedBodySchema?: z.ZodType<ExpectedBody>;
@@ -104,13 +105,19 @@ export function apiRoute<
         request
       );
 
+      if (result === undefined) {
+        return new Response(null, { status: 204 });
+      }
       // Return the result
       return NextResponse.json({ data: result });
     } catch (error) {
       logger.error('API route error:', error);
 
-      if (error instanceof Error && error.message === 'Session not found') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      if (error instanceof HttpError) {
+        return NextResponse.json(
+          { error: error.visibleError ? error.message : 'Something went wrong' },
+          { status: error.httpErrorCode }
+        );
       }
 
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

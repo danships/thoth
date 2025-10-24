@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { PropsWithChildren, ReactNode } from 'react';
 import RootClientLayout from './layout-client';
 import Layout from '@/components/layout';
+import './globals.css';
 
 type Properties = PropsWithChildren & {
   sidebar: ReactNode;

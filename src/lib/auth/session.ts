@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { auth } from './config';
+import { NotAuthorizedError } from '@/lib/errors/not-authorized-error';
 
 export async function getSession() {
   const headersList = await headers();
@@ -8,7 +9,7 @@ export async function getSession() {
   });
 
   if (!session) {
-    throw new Error('Session not found');
+    throw new NotAuthorizedError('Session not found');
   }
 
   return session;

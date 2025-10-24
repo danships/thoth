@@ -46,7 +46,7 @@ export function TreeNode({ page, childPages = [], level = 0 }: TreeNodePropertie
         }}
       >
         <TreeToggle isExpanded={isExpanded} onToggle={handleToggle} hasChildren={hasChildren} />
-        <TreeItem name={page.name} emoji={page.emoji} to={`/pages/${page.id}`} />
+        <TreeItem name={page.name} emoji={page.emoji ?? null} to={`/pages/${page.id}`} />
         <ActionIcon
           variant="subtle"
           size="xs"
@@ -71,7 +71,7 @@ export function TreeNode({ page, childPages = [], level = 0 }: TreeNodePropertie
               page={{
                 id: child.page.id,
                 name: child.page.name,
-                emoji: child.page.emoji,
+                emoji: child.page.emoji ?? null,
               }}
               level={level + 1}
             />

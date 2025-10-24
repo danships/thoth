@@ -1,35 +1,49 @@
 'use client';
 
-import { Alert, Badge, Card, Container, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Alert, Container, Group, Loader, Stack, Text, Title } from '@mantine/core';
 import { useStore } from '@nanostores/react';
 import { useParams } from 'next/navigation';
-import { useEffect } from 'react';
-import { useAuth } from '@/lib/auth/provider';
+import { useCallback, useEffect } from 'react';
 import { $currentPage, $currentPageId } from '@/lib/store/query/get-page-details';
+import { PageDetailEditor } from '@/components/organisms/page-detail-editor';
+import { $currentPageBlocks, $currentPageBlocksId } from '@/lib/store/query/get-page-blocks';
+import { Block } from '@blocknote/core';
+import { useCudApi } from '@/lib/hooks/use-cud-api';
+import { SetPageBlocksBody } from '@/types/api/endpoints/set-page-blocks';
 
 export default function PageDetailsPage() {
-  const { user } = useAuth();
   const parameters = useParams();
-  const pageId = parameters.id as string;
+  const pageId = `${parameters['id']}`;
 
   const { data: page, loading, error } = useStore($currentPage);
+  const { data: pageBlocks } = useStore($currentPageBlocks);
 
   useEffect(() => {
     if (pageId) {
       $currentPageId.set(pageId);
+      $currentPageBlocksId.set(pageId);
     } else {
-      $currentPageId.set('');
+      $currentPageId.set(null);
+      $currentPageBlocksId.set(null);
     }
-    return () => $currentPageId.set(null);
+    return () => {
+      $currentPageId.set(null);
+      $currentPageBlocksId.set(null);
+    };
   }, [pageId]);
 
-  if (!user) {
-    return (
-      <Container size="md" py="xl">
-        <Text>Please log in to view pages.</Text>
-      </Container>
-    );
-  }
+  const { post } = useCudApi();
+
+  const updateBlocks = useCallback(
+    async (blocks: Block[]) => {
+      if (!pageId) {
+        return;
+      }
+
+      await post<unknown, SetPageBlocksBody>(`/pages/${pageId}/blocks`, { blocks });
+    },
+    [pageId, post]
+  );
 
   if (loading) {
     return (
@@ -58,39 +72,14 @@ export default function PageDetailsPage() {
   }
 
   return (
-    <Container size="md" py="xl">
-      <Stack gap="lg">
+    <Container size="md" py="xl" h="100vh">
+      <Stack gap="lg" h="100vh">
         <Group gap="sm">
           <Text size="xl">{page?.page.emoji}</Text>
           <Title order={1}>{page?.page.name ?? <Loader />}</Title>
         </Group>
 
-        <Card p="md" withBorder>
-          <Stack gap="sm">
-            <Group gap="xs">
-              <Badge variant="light">Type</Badge>
-              <Text>{page?.page.type}</Text>
-            </Group>
-            <Group gap="xs">
-              <Badge variant="light">Created</Badge>
-              <Text>{page?.page.createdAt ? new Date(page.page.createdAt).toLocaleString() : ''}</Text>
-            </Group>
-            <Group gap="xs">
-              <Badge variant="light">Last Updated</Badge>
-              <Text>{page?.page.lastUpdated ? new Date(page.page.lastUpdated).toLocaleString() : ''}</Text>
-            </Group>
-            {page?.page.parentId && (
-              <Group gap="xs">
-                <Badge variant="light">Parent</Badge>
-                <Text>{page.page.parentId}</Text>
-              </Group>
-            )}
-          </Stack>
-        </Card>
-
-        <Card p="md" withBorder>
-          <Text c="dimmed">Page content will go here...</Text>
-        </Card>
+        {pageBlocks && <PageDetailEditor initialContent={pageBlocks.blocks} onUpdate={updateBlocks} />}
       </Stack>
     </Container>
   );
