@@ -72,8 +72,8 @@ export default function PageDetailsPage() {
   }
 
   return (
-    <Container size="md" py="xl" h="100vh">
-      <Stack gap="lg" h="100vh">
+    <Container size="md" py="xl">
+      <Stack gap="lg">
         <Group gap="sm">
           <Text size="xl">{page?.page.emoji}</Text>
           <Title order={1}>{page?.page.name ?? <Loader />}</Title>
