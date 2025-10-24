@@ -3,28 +3,28 @@ import { genericOAuth } from 'better-auth/plugins';
 import { createPool } from 'mysql2/promise';
 import type { ContainerCreate, WorkspaceCreate } from '@/types/database';
 import { getContainerRepository, getDatabase, getWorkspaceRepository } from '../database';
-import { environment } from '../environment';
+import { getEnvironment } from '../environment';
 
 await getDatabase();
 
 export const auth = betterAuth({
-  database: createPool(environment.DB),
+  database: createPool(getEnvironment().DB),
   plugins: [
     genericOAuth({
       config: [
         {
           providerId: 'oidc',
-          clientId: environment.OIDC_CLIENT_ID,
-          clientSecret: environment.OIDC_CLIENT_SECRET,
-          authorizationUrl: environment.OIDC_AUTHORIZATION_URL,
-          discoveryUrl: environment.OIDC_DISCOVERY_URL,
+          clientId: getEnvironment().OIDC_CLIENT_ID,
+          clientSecret: getEnvironment().OIDC_CLIENT_SECRET,
+          authorizationUrl: getEnvironment().OIDC_AUTHORIZATION_URL,
+          discoveryUrl: getEnvironment().OIDC_DISCOVERY_URL,
           scopes: ['openid', 'profile', 'email'],
         },
       ],
     }),
   ],
-  trustedOrigins: environment.NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
-  secret: environment.BETTER_AUTH_SECRET,
+  trustedOrigins: getEnvironment().NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
+  secret: getEnvironment().BETTER_AUTH_SECRET,
   hooks: {},
   databaseHooks: {
     user: {

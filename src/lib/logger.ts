@@ -1,8 +1,8 @@
 import winston from 'winston';
-import { environment } from './environment';
+import { getEnvironment } from './environment';
 
 export const logger = winston.createLogger({
-  level: environment.LOG_LEVEL,
+  level: getEnvironment().LOG_LEVEL,
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),

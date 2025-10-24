@@ -1,6 +1,6 @@
 import { SuperSave } from 'supersave';
 import type { Container, Workspace } from '@/types/database';
-import { environment } from '../environment';
+import { getEnvironment } from '../environment';
 import * as entities from './entities';
 
 let database: SuperSave;
@@ -10,7 +10,7 @@ export async function getDatabase() {
     return database;
   }
 
-  database = await SuperSave.create(environment.DB);
+  database = await SuperSave.create(getEnvironment().DB);
 
   await database.addEntity(entities.Container);
   await database.addEntity(entities.Workspace);
