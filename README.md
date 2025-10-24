@@ -23,8 +23,8 @@ This project is a pnpm‑managed monorepo. Notable packages:
 Prerequisites: pnpm 10+
 
 ```bash
-pnpm install
-pnpm -r dev
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
 Open the web app package during development:
