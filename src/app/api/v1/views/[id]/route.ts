@@ -21,7 +21,7 @@ export const GET = apiRoute<GetDataViewResponse, undefined, GetDataViewParameter
     );
 
     if (!dataView) {
-      throw new Error('Data view not found');
+      throw new NotFoundError('Data view not found', true);
     }
 
     return {

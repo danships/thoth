@@ -1,6 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
+import { NotFoundError } from '@/lib/errors/not-found-error';
 import type {
   GetDataSourceResponse,
   GetDataSourceParameters,
@@ -25,7 +26,7 @@ export const GET = apiRoute<GetDataSourceResponse, undefined, GetDataSourceParam
     );
 
     if (!dataSource) {
-      throw new Error('Data source not found');
+      throw new NotFoundError('Data source not found', true);
     }
 
     return {

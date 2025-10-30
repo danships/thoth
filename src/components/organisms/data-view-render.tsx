@@ -1,8 +1,8 @@
 'use client';
 
-import { Alert, Anchor, Loader, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, Anchor, Loader, Stack, Table, TextInput } from '@mantine/core';
 import { usePagesByDataSource } from '@/lib/hooks/api/use-pages';
-import { CREATE_PAGE_ENDPOINT, DataView, type CreatePageBody, type CreatePageResponse } from '@/types/api';
+import { CREATE_PAGE_ENDPOINT, type DataView, type CreatePageBody, type CreatePageResponse } from '@/types/api';
 import Link from 'next/link';
 import { useCallback, useState } from 'react';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
@@ -35,9 +35,6 @@ export function DataViewRender({ view }: DataViewRenderProperties) {
     return (
       <Stack align="center" py="xl">
         <Loader />
-        <Text size="sm" c="dimmed">
-          <Loader />
-        </Text>
       </Stack>
     );
   }

@@ -36,12 +36,9 @@ export function DataSourceSelector({ onSelect }: Properties) {
         inputProps: {
           ...payload.inputProps,
           onChange: (event: ChangeEvent<HTMLInputElement>) => {
-            dataSourceForm.setFieldValue('name', event.target.value);
-            if (event.target.value) {
-              setDataSourceSelectorEnabled(true);
-            } else {
-              setDataSourceSelectorEnabled(false);
-            }
+            const { value } = event.target;
+            dataSourceForm.setFieldValue('name', value);
+            setDataSourceSelectorEnabled(value === '');
           },
         },
       };
