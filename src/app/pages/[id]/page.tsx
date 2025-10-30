@@ -109,7 +109,7 @@ export default function PageDetailsPage() {
               <Tabs.Tab value="contents">Contents</Tabs.Tab>
             </Tabs.List>
             <Tabs.Panel value="contents">
-              <PageDetailEditor initialContent={pageDetails.page.blocks ?? []} onUpdate={updateBlocks} />
+              <PageDetailEditor initialContent={pageDetails.blocks ?? []} onUpdate={updateBlocks} />
             </Tabs.Panel>
 
             {pageDetails.views?.map((view) => (

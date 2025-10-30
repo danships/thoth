@@ -5,6 +5,7 @@ import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateDataSourceBody, CreateDataSourceResponse, GetDataSourcesResponse } from '@/types/api';
 import { createDataSourceBodySchema } from '@/types/api';
 import { DataSourceContainerCreate } from '@/types/database';
+import { randomUUID } from 'node:crypto';
 
 export const GET = apiRoute<GetDataSourcesResponse, {}, {}>({}, async (_, session) => {
   const containerRepository = await getContainerRepository();
@@ -13,12 +14,15 @@ export const GET = apiRoute<GetDataSourcesResponse, {}, {}>({}, async (_, sessio
     addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('type', 'data-source').sort('name')
   );
 
-  return dataSources.map((dataSource) => ({
-    id: dataSource.id,
-    name: dataSource.name,
-    createdAt: dataSource.createdAt,
-    lastUpdated: dataSource.lastUpdated,
-  }));
+  return dataSources
+    .filter((container) => container.type === 'data-source')
+    .map((dataSource) => ({
+      id: dataSource.id,
+      name: dataSource.name,
+      createdAt: dataSource.createdAt,
+      lastUpdated: dataSource.lastUpdated,
+      columns: dataSource.columns ?? [],
+    }));
 });
 
 export const POST = apiRoute<CreateDataSourceResponse, {}, {}, CreateDataSourceBody>(
@@ -26,10 +30,6 @@ export const POST = apiRoute<CreateDataSourceResponse, {}, {}, CreateDataSourceB
     expectedBodySchema: createDataSourceBodySchema,
   },
   async ({ body }, session) => {
-    if (!body) {
-      throw new Error('Body is required');
-    }
-
     const workspaceRepository = await getWorkspaceRepository();
     const workspace = await workspaceRepository.getOneByQuery(
       addUserIdToQuery(workspaceRepository.createQuery(), session.user.id)
@@ -49,6 +49,7 @@ export const POST = apiRoute<CreateDataSourceResponse, {}, {}, CreateDataSourceB
       createdAt: new Date().toISOString(),
       parentId: null,
       type: 'data-source',
+      columns: body.columns?.map((column) => ({ id: randomUUID(), ...column })) ?? [],
     };
 
     const createdDataSource = await containerRepository.create(dataSourceData);
@@ -58,6 +59,7 @@ export const POST = apiRoute<CreateDataSourceResponse, {}, {}, CreateDataSourceB
       name: createdDataSource.name,
       createdAt: createdDataSource.createdAt,
       lastUpdated: createdDataSource.lastUpdated,
+      columns: 'columns' in createdDataSource ? createdDataSource.columns : [],
     } satisfies CreateDataSourceResponse;
   }
 );

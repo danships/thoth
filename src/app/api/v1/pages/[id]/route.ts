@@ -50,7 +50,10 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
     }
 
     if (query.includeBlocks) {
-      returnValue.page.blocks = page.blocks ?? [];
+      returnValue.blocks = page.blocks ?? [];
+    }
+    if (query.includeValues) {
+      returnValue.values = page.values ?? {};
     }
 
     return returnValue;

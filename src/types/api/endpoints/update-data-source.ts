@@ -17,6 +17,7 @@ export const updateDataSourceResponseSchema = dataSourceContainerSchema.pick({
   name: true,
   lastUpdated: true,
   createdAt: true,
+  columns: true,
 });
 export type UpdateDataSourceBody = z.infer<typeof updateDataSourceBodySchema>;
 export type UpdateDataSourceResponse = z.infer<typeof updateDataSourceResponseSchema>;

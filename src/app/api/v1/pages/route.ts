@@ -26,15 +26,22 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
 
     return pages
       .filter((page) => page.type === 'page')
-      .map((page) => ({
-        id: page.id,
-        name: page.name,
-        emoji: page.emoji || null,
-        type: page.type as 'page',
-        parentId: page.parentId || null,
-        createdAt: page.createdAt,
-        lastUpdated: page.lastUpdated,
-      }));
+      .map((page) => {
+        const returnValue: GetPagesResponse[number] = {
+          page: {
+            id: page.id,
+            name: page.name,
+            emoji: page.emoji || null,
+            parentId: page.parentId || null,
+            createdAt: page.createdAt,
+            lastUpdated: page.lastUpdated,
+          },
+        };
+        if (query.includeValues) {
+          returnValue.values = page.values;
+        }
+        return returnValue;
+      });
   }
 );
 
