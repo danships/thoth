@@ -25,7 +25,7 @@ export const GET = apiRoute<GetPageBlocksResponse, undefined, GetPageBlocksParam
     }
 
     return {
-      blocks: page.blocks ?? [],
+      blocks: 'blocks' in page ? (page.blocks ?? []) : [],
     };
   }
 );

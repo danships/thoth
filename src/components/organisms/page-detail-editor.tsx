@@ -24,7 +24,7 @@ export function PageDetailEditor({ initialContent, onUpdate }: PageDetailEditorP
       },
       [onUpdate]
     ),
-    { delay: 5000, flushOnUnmount: true }
+    { delay: 1500, flushOnUnmount: true }
   );
 
   // @ts-expect-error We except the issue, BlockNote editor gives an error if we provide it with an empty array

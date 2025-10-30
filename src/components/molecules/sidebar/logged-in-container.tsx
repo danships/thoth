@@ -1,13 +1,12 @@
 'use client';
 import { PagesTree } from '../pages-tree';
-import { $rootPagesTree } from '@/lib/store/query/get-pages-tree';
+import { usePagesTree } from '@/lib/hooks/api/use-pages-tree';
 import { ActionIcon, Box, Group, Loader, Title } from '@mantine/core';
-import { useStore } from '@nanostores/react';
 import { IconPlus } from '@tabler/icons-react';
 import Link from 'next/link';
 
 export function LoggedInContainer() {
-  const { loading, data: rootPagesTree } = useStore($rootPagesTree);
+  const { isLoading, data: rootPagesTree } = usePagesTree();
 
   return (
     <Box>
@@ -17,8 +16,8 @@ export function LoggedInContainer() {
           <IconPlus size={16} />
         </ActionIcon>
       </Group>
-      {loading && <Loader size="sm" />}
-      {!loading && rootPagesTree && <PagesTree branches={rootPagesTree.branches} />}
+      {isLoading && <Loader size="sm" />}
+      {!isLoading && rootPagesTree && <PagesTree branches={rootPagesTree.branches} />}
     </Box>
   );
 }

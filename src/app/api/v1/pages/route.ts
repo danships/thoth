@@ -1,8 +1,42 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getWorkspaceRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
-import type { CreatePageBody, CreatePageResponse } from '@/types/api';
-import { createPageBodySchema } from '@/types/api';
+import { BadRequestError } from '@/lib/errors/bad-request-error';
+import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
+import { createPageBodySchema, getPagesQuerySchema } from '@/types/api';
+
+export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
+  {
+    expectedQuerySchema: getPagesQuerySchema,
+  },
+  async ({ query }, session) => {
+    const containerRepository = await getContainerRepository();
+
+    // Use either parentId or dataSourceId as the parentId in the query
+    const parentId = query.parentId || query.dataSourceId;
+
+    if (!parentId) {
+      throw new BadRequestError('Either parentId or dataSourceId must be provided.');
+    }
+
+    // Get all pages that have this parentId
+    const pages = await containerRepository.getByQuery(
+      addUserIdToQuery(containerRepository.createQuery().eq('parentId', parentId).eq('type', 'page'), session.user.id)
+    );
+
+    return pages
+      .filter((page) => page.type === 'page')
+      .map((page) => ({
+        id: page.id,
+        name: page.name,
+        emoji: page.emoji || null,
+        type: page.type as 'page',
+        parentId: page.parentId || null,
+        createdAt: page.createdAt,
+        lastUpdated: page.lastUpdated,
+      }));
+  }
+);
 
 export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
   {
@@ -57,14 +91,15 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
 
     const createdPage = await containerRepository.create(pageData);
 
-    return {
+    const returnValue: CreatePageResponse = {
       id: createdPage.id,
       name: createdPage.name,
-      emoji: createdPage.emoji || null,
-      type: createdPage.type as 'page',
+      emoji: 'emoji' in createdPage ? createdPage.emoji : null,
       parentId: createdPage.parentId || null,
       createdAt: createdPage.createdAt,
       lastUpdated: createdPage.lastUpdated,
     };
+
+    return returnValue;
   }
 );
