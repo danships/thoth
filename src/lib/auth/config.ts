@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { genericOAuth } from 'better-auth/plugins';
 import { createPool } from 'mysql2/promise';
-import type { ContainerCreate, WorkspaceCreate } from '@/types/database';
+import type { PageContainerCreate, WorkspaceCreate } from '@/types/database';
 import { getContainerRepository, getDatabase, getWorkspaceRepository } from '../database';
 import { getEnvironment } from '../environment';
 import { connection } from 'next/server';
@@ -46,7 +46,7 @@ async function initializeAuth() {
               } satisfies WorkspaceCreate);
 
               const containerRepository = await getContainerRepository();
-              await containerRepository.create({
+              const pageData: PageContainerCreate = {
                 name: 'Welcome',
                 type: 'page',
                 userId: user.id,
@@ -55,7 +55,9 @@ async function initializeAuth() {
                 workspaceId: workspace.id,
                 emoji: '👋',
                 parentId: null,
-              } satisfies ContainerCreate);
+              };
+
+              await containerRepository.create(pageData);
             },
           },
         },

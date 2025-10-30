@@ -9,3 +9,7 @@
 .bn-editor {
   height: 100%;
 }
+
+.is-pulled-right {
+  float: right;
+}

@@ -44,7 +44,7 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
         <Group h="100%" px="md" justify="space-between" style={{ width: '100%' }}>
           <Group>
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <Image src="/icons/favicon-32x32.png" width="21" height="21" alt="Thoth Logo" />
+            <Image src="/icons/favicon-32x32.png" width={21} height={21} alt="Thoth Logo" loading="eager" />
             <Title order={5}>Thoth</Title>
           </Group>
           <a

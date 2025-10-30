@@ -1,7 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
-import type { GetPagesTreeQueryVariables, GetPagesTreeResponse } from '@/types/api';
+import type { GetPagesTreeQueryVariables, GetPagesTreeResponse, Page } from '@/types/api';
 import { getPagesTreeQueryVariablesSchema } from '@/types/api';
 
 export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}>(
@@ -39,7 +39,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
         page: {
           id: container.id,
           name: container.name,
-          emoji: container.emoji || null,
+          emoji: 'emoji' in container ? container.emoji || null : null,
           type: container.type as 'page',
           lastUpdated: container.lastUpdated,
           createdAt: container.createdAt,
@@ -47,12 +47,11 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
         },
         children: databaseChildren
           .filter((child) => child.parentId === container.id)
-          .map((child) => ({
+          .map((child): { page: Page } => ({
             page: {
               id: child.id,
               name: child.name,
-              emoji: child.emoji || null,
-              type: child.type as 'page',
+              emoji: 'emoji' in child ? child.emoji || null : null,
               lastUpdated: child.lastUpdated,
               createdAt: child.createdAt,
               parentId: child.parentId || null,

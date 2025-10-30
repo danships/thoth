@@ -22,7 +22,6 @@
     "@mantine/core": "^8.3.4",
     "@mantine/form": "^8.3.5",
     "@mantine/hooks": "^8.3.4",
-    "@nanostores/query": "^0.3.4",
     "@nanostores/react": "^1.0.0",
     "@tabler/icons-react": "^3.35.0",
     "axios": "^1.12.2",
@@ -35,6 +34,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "supersave": "^0.20.0",
+    "swr": "^2.3.6",
     "winston": "^3.18.3",
     "zod": "^4.1.12"
   },
@@ -55,6 +55,7 @@
     "eslint-plugin-unicorn": "^61.0.2",
     "express": "^5.1.0",
     "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
     "typescript": "^5.9.3"

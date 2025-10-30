@@ -23,5 +23,12 @@ export const pageContainerSchema = containerSchema
     emoji: z.string().min(1).nullable(),
     // TODO generate/get block validation schemas for blocks
     blocks: z.array(blockSchema).optional(),
+    views: z.array(z.string()).optional(),
+  })
+  .extend(withParentIdSchema.shape);
+
+export const dataSourceContainerSchema = containerSchema
+  .extend({
+    type: z.literal('data-source'),
   })
   .extend(withParentIdSchema.shape);
