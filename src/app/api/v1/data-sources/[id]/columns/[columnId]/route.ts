@@ -47,20 +47,25 @@ export const PATCH = apiRoute<
   }
 );
 
-export const DELETE = apiRoute<void, undefined, { id: string; columnId: string }>({}, async ({ params }, session) => {
-  const containerRepository = await getContainerRepository();
-  const dataSource = await containerRepository.getOneByQuery(
-    addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
-  );
+export const DELETE = apiRoute<void, undefined, UpdateDataSourceColumnParameters>(
+  {
+    expectedParamsSchema: updateDataSourceColumnParametersSchema,
+  },
+  async ({ params }, session) => {
+    const containerRepository = await getContainerRepository();
+    const dataSource = await containerRepository.getOneByQuery(
+      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
+    );
 
-  if (!dataSource || dataSource.type !== 'data-source') {
-    throw new NotFoundError('Data source not found', true);
+    if (!dataSource || dataSource.type !== 'data-source') {
+      throw new NotFoundError('Data source not found', true);
+    }
+
+    const nextColumns = (dataSource.columns ?? []).filter((c) => c.id !== params.columnId);
+    if (nextColumns.length === (dataSource.columns ?? []).length) {
+      throw new NotFoundError('Column not found', true);
+    }
+
+    await containerRepository.update({ ...dataSource, columns: nextColumns, lastUpdated: new Date().toISOString() });
   }
-
-  const nextColumns = (dataSource.columns ?? []).filter((c) => c.id !== params.columnId);
-  if (nextColumns.length === (dataSource.columns ?? []).length) {
-    throw new NotFoundError('Column not found', true);
-  }
-
-  await containerRepository.update({ ...dataSource, columns: nextColumns, lastUpdated: new Date().toISOString() });
-});
+);

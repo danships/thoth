@@ -9,10 +9,20 @@ export function EditableTextCell({ value, onBlur, disabled = false, type }: Edit
   const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
     const text = event.currentTarget.textContent ?? '';
     if (type === 'number') {
-      const numberValue = Number(text);
-      if (Number.isNaN(numberValue)) {
+      const previousDisplay = value == null ? '' : String(value);
+
+      if (text.trim() === '') {
+        event.currentTarget.textContent = previousDisplay;
         return;
       }
+
+      const numberValue = Number(text);
+
+      if (Number.isNaN(numberValue)) {
+        event.currentTarget.textContent = previousDisplay;
+        return;
+      }
+
       onBlur(numberValue);
     } else {
       onBlur(text);

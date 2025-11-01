@@ -3,13 +3,14 @@ import { getContainerRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
 import { z } from 'zod';
 
 const bodySchema = z.record(z.string(), pageValueSchema);
 
-export const PATCH = apiRoute<void, undefined, { id: string }, z.infer<typeof bodySchema>>(
-  { expectedBodySchema: bodySchema },
+export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.infer<typeof bodySchema>>(
+  { expectedBodySchema: bodySchema, expectedParamsSchema: updatePageValuesParametersSchema },
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
     const page = await containerRepository.getOneByQuery(
