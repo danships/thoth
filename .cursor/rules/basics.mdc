@@ -10,3 +10,8 @@ The application uses Next.js 15 with React 19, Mantine UI 8 as the UI framework,
 It uses the Atomic Design Methodology for the UI components. Routes are managed with Next.js App Router.
 API routes are implemented using Next.js API routes in the `src/app/api/` directory.
 Preferred is using types instead interfaces in TypeScript.
+
+## Styling
+
+- Always use CSS modules (`.module.css` files) for component-specific styles instead of inline `<style>` tags.
+- CSS module files should be named after their corresponding component file (e.g., `component-name.module.css` for `component-name.tsx`).

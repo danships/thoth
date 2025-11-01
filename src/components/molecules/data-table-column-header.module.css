@@ -1,0 +1,8 @@
+.columnHeaderHover .columnHeaderActions {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.columnHeaderHover:hover .columnHeaderActions {
+  opacity: 1;
+}
