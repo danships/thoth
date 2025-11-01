@@ -28,5 +28,6 @@ export const dataSourceSchema = dataSourceContainerSchema.pick({
   name: true,
   createdAt: true,
   lastUpdated: true,
+  columns: true,
 });
 export type DataSource = z.infer<typeof dataSourceSchema>;

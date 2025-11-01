@@ -1,0 +1,30 @@
+.editablePageNameCell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editablePageNameCell .pageLinkButton {
+  opacity: 0;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.editablePageNameCell:hover .pageLinkButton {
+  opacity: 1;
+}
+
+.editablePageNameContent {
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.editablePageNameContentDisabled {
+  cursor: default;
+}
+
+.editablePageNameContentEnabled {
+  cursor: text;
+}

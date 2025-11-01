@@ -2,13 +2,14 @@ import { z } from 'zod';
 import { pageSchema, dataViewSchema } from '../entities';
 import type { DataWrapper } from '../utilities';
 import { getPageBlocksResponseSchema } from './get-page-blocks';
+import { pageContainerSchema } from '@/types/database';
 
 export const GET_PAGE_DETAILS_ENDPOINT = '/pages/:id';
 
 export const getPageDetailsResponseSchema = z.object({
-  page: pageSchema.extend({
-    blocks: getPageBlocksResponseSchema.shape.blocks.optional(),
-  }),
+  page: pageSchema,
+  blocks: getPageBlocksResponseSchema.shape.blocks.optional(),
+  values: pageContainerSchema.shape.values.optional(),
   views: z.array(dataViewSchema).optional(),
 });
 
@@ -22,5 +23,6 @@ export type GetPageDetailsParameters = z.infer<typeof getPageDetailsParametersSc
 
 export const getPageDetailsQuerySchema = z.object({
   includeBlocks: z.coerce.boolean().default(false),
+  includeValues: z.coerce.boolean().default(false),
 });
 export type GetPageDetailsQuery = z.infer<typeof getPageDetailsQuerySchema>;

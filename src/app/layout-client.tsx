@@ -1,6 +1,7 @@
 'use client';
 import '@mantine/core/styles.css';
 import { MantineProvider } from '@mantine/core';
+import { ModalsProvider } from '@mantine/modals';
 import { useState } from 'react';
 import { AuthProvider } from '@/lib/auth/provider';
 import { theme } from '@/lib/theme';
@@ -28,7 +29,9 @@ export default function RootClientLayout({
     <html lang="en">
       <body>
         <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
-          <AuthProvider>{children}</AuthProvider>
+          <ModalsProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ModalsProvider>
         </MantineProvider>
       </body>
     </html>

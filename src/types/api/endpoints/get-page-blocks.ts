@@ -1,7 +1,7 @@
 import z from 'zod';
 import { Block } from '@blocknote/core';
 
-export const GET_PAGE_BLOCKS_ENDPOINT = '/api/v1/pages/:pageId/blocks';
+export const GET_PAGE_BLOCKS_ENDPOINT = '/pages/:id/blocks';
 
 export const getPageBlocksParametersSchema = z.object({
   id: z.string().min(1),

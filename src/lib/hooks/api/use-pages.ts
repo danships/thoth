@@ -16,9 +16,14 @@ export function usePagesByParent(parentId: string | null) {
   };
 }
 
-export function usePagesByDataSource(dataSourceId: string | null) {
+type UsePagesByDataSourceOptions = { includeValues?: boolean };
+const defaultOptions: UsePagesByDataSourceOptions = { includeValues: false };
+export function usePagesByDataSource(dataSourceId: string | null, options?: UsePagesByDataSourceOptions) {
+  const selectedOptions = { ...defaultOptions, ...options };
   const { data, error, isLoading, mutate } = useSWR<GetPagesResponse>(
-    dataSourceId ? `${GET_PAGES_ENDPOINT}?dataSourceId=${dataSourceId}` : null,
+    dataSourceId
+      ? `${GET_PAGES_ENDPOINT}?dataSourceId=${dataSourceId}${selectedOptions.includeValues ? '&includeValues=true' : ''}`
+      : null,
     swrFetcher
   );
 

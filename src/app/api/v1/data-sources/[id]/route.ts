@@ -34,7 +34,8 @@ export const GET = apiRoute<GetDataSourceResponse, undefined, GetDataSourceParam
       name: dataSource.name,
       createdAt: dataSource.createdAt,
       lastUpdated: dataSource.lastUpdated,
-    };
+      columns: 'columns' in dataSource ? dataSource.columns : [],
+    } satisfies GetDataSourceResponse;
   }
 );
 
@@ -73,6 +74,7 @@ export const PATCH = apiRoute<UpdateDataSourceResponse, undefined, UpdateDataSou
       name: updatedDataSource.name,
       createdAt: updatedDataSource.createdAt,
       lastUpdated: updatedDataSource.lastUpdated,
+      columns: 'columns' in updatedDataSource ? updatedDataSource.columns : [],
     } satisfies UpdateDataSourceResponse;
   }
 );

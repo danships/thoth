@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import type { GetDataSourcesResponse } from '@/types/api';
+import { GET_DATA_SOURCES_ENDPOINT, type GetDataSourcesResponse } from '@/types/api';
 import { swrFetcher } from '@/lib/swr/fetcher';
 
-export const useDataSources = () => useSWR<GetDataSourcesResponse>('/data-sources', swrFetcher);
+export const useDataSources = () => useSWR<GetDataSourcesResponse>(GET_DATA_SOURCES_ENDPOINT, swrFetcher);
