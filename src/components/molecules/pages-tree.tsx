@@ -17,9 +17,16 @@ export function PagesTree({ branches }: PagesTreeProperties) {
 
   return (
     <Box>
-      {branches.map((branch) => (
-        <TreeNode key={branch.page.id} page={branch.page} childPages={branch.children} />
-      ))}
+      {branches.map((branch) => {
+        const treeNodeProperties = {
+          page: branch.page,
+          childPages: branch.children,
+          ...(branch.views && {
+            views: branch.views.map((view) => ({ id: view.id, name: view.name })),
+          }),
+        };
+        return <TreeNode key={branch.page.id} {...treeNodeProperties} />;
+      })}
     </Box>
   );
 }
