@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { withIdSchema } from '../../schemas/utilities';
-import { pageSchema } from '../entities';
+import { pageSchema, dataViewSchema } from '../entities';
 import type { DataWrapper } from '../utilities';
 
 export const GET_PAGES_TREE_ENDPOINT = '/pages/tree';
@@ -13,6 +13,7 @@ const pagesTreeBranchSchema = z.array(
         page: pageSchema,
       })
     ),
+    views: z.array(dataViewSchema).optional(),
   })
 );
 

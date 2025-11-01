@@ -20,18 +20,32 @@ type TreeNodeProperties = {
       emoji?: string | null;
     };
   }>;
+  views?: Array<{
+    id: string;
+    name: string;
+  }>;
   level?: number;
+  parentPageId?: string;
+  isView?: boolean;
 };
 
-export function TreeNode({ page, childPages = [], level = 0 }: TreeNodeProperties) {
+export function TreeNode({ page, childPages = [], views = [], level = 0, parentPageId, isView }: TreeNodeProperties) {
   const $isExpanded = computed($expandedPages, (expandedPages) => expandedPages.get(page.id) ?? false);
 
   const isExpanded = useStore($isExpanded);
 
-  const hasChildren = childPages.length > 0;
+  const hasChildren = childPages.length > 0 || views.length > 0;
 
   const handleToggle = () => {
     togglePageExpanded(page.id);
+  };
+
+  // Determine the link URL - if this is a view, link to parent page with view query param
+  const getPageUrl = () => {
+    if (isView && parentPageId) {
+      return `/pages/${parentPageId}?v=${page.id}`;
+    }
+    return `/pages/${page.id}`;
   };
 
   return (
@@ -46,24 +60,47 @@ export function TreeNode({ page, childPages = [], level = 0 }: TreeNodePropertie
         }}
       >
         <TreeToggle isExpanded={isExpanded} onToggle={handleToggle} hasChildren={hasChildren} />
-        <TreeItem name={page.name} emoji={page.emoji ?? null} to={`/pages/${page.id}`} />
-        <ActionIcon
-          variant="subtle"
-          size="xs"
-          component={Link}
-          href={`/pages/${page.id}/create`}
-          aria-label="Add child page"
-          style={{ marginLeft: 'auto' }}
-          onClick={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <IconPlus size={12} />
-        </ActionIcon>
+        <TreeItem name={page.name} emoji={page.emoji ?? null} to={getPageUrl()} />
+        {level === 0 && !isView && (
+          <ActionIcon
+            variant="subtle"
+            size="xs"
+            component={Link}
+            href={`/pages/${page.id}/create`}
+            aria-label="Add child page"
+            style={{ marginLeft: 'auto' }}
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            <IconPlus size={12} />
+          </ActionIcon>
+        )}
       </Box>
 
-      {/* Children */}
-      {isExpanded && hasChildren && (
+      {/* Views (shown as children when expanded) */}
+      {isExpanded && views.length > 0 && (
+        <Box>
+          {views.map((view) => (
+            <TreeNode
+              key={view.id}
+              page={{
+                id: view.id,
+                name: view.name,
+                emoji: null,
+              }}
+              childPages={[]}
+              views={[]}
+              level={level + 1}
+              parentPageId={page.id}
+              isView={true}
+            />
+          ))}
+        </Box>
+      )}
+
+      {/* Children (actual child pages) */}
+      {isExpanded && childPages.length > 0 && (
         <Box>
           {childPages.map((child) => (
             <TreeNode
@@ -73,7 +110,10 @@ export function TreeNode({ page, childPages = [], level = 0 }: TreeNodePropertie
                 name: child.page.name,
                 emoji: child.page.emoji ?? null,
               }}
+              childPages={[]}
+              views={[]}
               level={level + 1}
+              parentPageId={page.id}
             />
           ))}
         </Box>
