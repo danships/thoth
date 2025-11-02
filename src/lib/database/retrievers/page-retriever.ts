@@ -10,7 +10,6 @@ class PageRetriever {
     const existingPage = await containerRepository.getOneByQuery(
       addUserIdToQuery(containerRepository.createQuery().eq('id', id), userId).eq('type', 'page')
     );
-    console.log('!!', existingPage, id, userId);
 
     if (!existingPage || existingPage.type !== 'page') {
       throw new NotFoundError('Page not found', true);
