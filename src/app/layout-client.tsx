@@ -1,15 +1,12 @@
 'use client';
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
 import { MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
+import { Notifications } from '@mantine/notifications';
 import { useState } from 'react';
 import { AuthProvider } from '@/lib/auth/provider';
 import { theme } from '@/lib/theme';
-
-// export const metadata: Metadata = {
-//   title: "Thoth",
-//   description: "Knowledge management system",
-// };
 
 export default function RootClientLayout({
   children,
@@ -30,6 +27,7 @@ export default function RootClientLayout({
       <body>
         <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
           <ModalsProvider>
+            <Notifications position="top-right" />
             <AuthProvider>{children}</AuthProvider>
           </ModalsProvider>
         </MantineProvider>

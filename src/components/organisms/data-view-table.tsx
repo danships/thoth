@@ -8,6 +8,7 @@ import { DataTableRow } from '@/components/molecules/data-table-row';
 import { DataTableColumnHeader } from '@/components/molecules/data-table-column-header';
 import { ColumnFormModal } from '@/components/molecules/column-form-modal';
 import { NewPageRow } from '@/components/molecules/new-page-row';
+import { useNotification } from '@/lib/hooks/use-notification';
 import { useDataViewColumns } from '@/lib/hooks/api/use-data-view-columns';
 import { usePageValueUpdate } from '@/lib/hooks/api/use-page-value-update';
 import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
@@ -57,10 +58,16 @@ export function DataViewTable({
 
   const { updateValue, inProgress: valueUpdateInProgress } = usePageValueUpdate({ mutatePages });
   const { updatePage, inProgress: pageUpdateInProgress } = useUpdatePage({ mutatePages });
+  const { showError } = useNotification();
 
   const handleColumnSubmit = async (values: { name: string; type: 'string' | 'number' | 'boolean' }) => {
     await (editingColumn ? updateColumn(editingColumn.id, values) : createColumn(values.name, values.type));
     mutateDataSource();
+  };
+
+  const handleColumnError = (error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to save column';
+    showError(errorMessage);
   };
 
   const handleEditColumn = (column: Column) => {
@@ -166,6 +173,7 @@ export function DataViewTable({
         {...(editingColumn ? { initialValues: editingColumn } : {})}
         title={editingColumn ? 'Edit Column' : 'Add Column'}
         inProgress={columnOperationInProgress}
+        onError={handleColumnError}
       />
     </>
   );

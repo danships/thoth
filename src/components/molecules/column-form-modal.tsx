@@ -15,6 +15,7 @@ type ColumnFormModalProperties = {
   initialValues?: Column;
   title?: string;
   inProgress?: boolean;
+  onError?: (error: unknown) => void;
 };
 
 export function ColumnFormModal({
@@ -24,6 +25,7 @@ export function ColumnFormModal({
   initialValues,
   title = 'Add Column',
   inProgress = false,
+  onError,
 }: ColumnFormModalProperties) {
   const form = useForm<ColumnFormValues>({
     initialValues: {
@@ -66,7 +68,9 @@ export function ColumnFormModal({
       await onSubmit(values);
       handleClose();
     } catch (error) {
-      console.error('Failed to save column:', error);
+      if (onError) {
+        onError(error);
+      }
     }
   };
 

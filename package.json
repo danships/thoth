@@ -23,6 +23,7 @@
     "@mantine/form": "^8.3.5",
     "@mantine/hooks": "^8.3.4",
     "@mantine/modals": "^8.3.6",
+    "@mantine/notifications": "^8.3.6",
     "@nanostores/react": "^1.0.0",
     "@tabler/icons-react": "^3.35.0",
     "axios": "^1.12.2",

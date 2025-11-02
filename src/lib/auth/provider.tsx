@@ -3,6 +3,7 @@
 import type { User } from 'better-auth';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { authClient } from '@/lib/auth/client';
+import { useNotification } from '@/lib/hooks/use-notification';
 
 interface AuthContextType {
   user: User | null;
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const { showError } = useNotification();
 
   const refreshSession = async () => {
     try {
@@ -26,7 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
     } catch (error) {
-      console.error('Failed to get session:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get session';
+      showError(errorMessage);
       setUser(null);
     }
   };
@@ -38,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signOut = async () => {
@@ -45,7 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authClient.signOut();
       setUser(null);
     } catch (error) {
-      console.error('Failed to sign out:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
+      showError(errorMessage);
     }
   };
 
