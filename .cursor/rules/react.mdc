@@ -1,0 +1,18 @@
+---
+globs: *.tsx
+alwaysApply: false
+---
+
+## Styling
+
+- Always use CSS modules (`.module.css` files) for component-specific styles instead of inline `<style>` tags.
+- CSS module files should be named after their corresponding component file (e.g., `component-name.module.css` for `component-name.tsx`).
+
+## Error Handling
+
+- Never use `console.log()`, `console.error()`, or `console.warn()` for user-facing error messages in TSX/TS files.
+- Always use the notification system for displaying errors to users:
+  - Use the `useNotification()` hook from `@/lib/hooks/use-notification` to get notification functions (`showError`, `showSuccess`, `showWarning`, `showInfo`).
+  - Display notifications using the `NotificationContainer` component from `@/components/atoms/notification-container`.
+  - For child components that need to report errors, pass an `onError` callback prop to the parent component, which will handle displaying the notification.
+  - Error notifications should be shown in the parent component, not in the component where the error occurs.
