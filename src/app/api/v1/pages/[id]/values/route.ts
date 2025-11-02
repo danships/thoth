@@ -1,8 +1,8 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
+import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
-import { NotFoundError } from '@/lib/errors/not-found-error';
 import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
 import { z } from 'zod';
@@ -13,28 +13,13 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
   { expectedBodySchema: bodySchema, expectedParamsSchema: updatePageValuesParametersSchema },
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
-    const page = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'page')
-    );
-
-    if (!page || page.type !== 'page') {
-      throw new NotFoundError('Page not found', true);
-    }
+    const page = await pageRetriever.retrievePage(params.id, session.user.id);
 
     if (!page.parentId) {
       throw new BadRequestError('Page does not have a data source parent');
     }
 
-    const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', page.parentId), session.user.id).eq(
-        'type',
-        'data-source'
-      )
-    );
-
-    if (!dataSource || dataSource.type !== 'data-source') {
-      throw new NotFoundError('Parent data source not found', true);
-    }
+    const dataSource = await dataSourceRetriever.retrieveDataSource(page.parentId, session.user.id);
 
     const columns = dataSource.columns ?? [];
     const columnMap = new Map(columns.map((c) => [c.id, c] as const));

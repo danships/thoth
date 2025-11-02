@@ -1,7 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
-import { NotFoundError } from '@/lib/errors/not-found-error';
+import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import {
   GetPageBlocksParameters,
   getPageBlocksParametersSchema,
@@ -14,15 +13,7 @@ export const GET = apiRoute<GetPageBlocksResponse, undefined, GetPageBlocksParam
     expectedParamsSchema: getPageBlocksParametersSchema,
   },
   async ({ params }, session): Promise<GetPageBlocksResponse> => {
-    const containerRepository = await getContainerRepository();
-
-    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('id', params.id);
-
-    const page = await containerRepository.getOneByQuery(databaseQuery);
-
-    if (!page) {
-      throw new NotFoundError('Page not found', true);
-    }
+    const page = await pageRetriever.retrievePage(params.id, session.user.id);
 
     return {
       blocks: 'blocks' in page ? (page.blocks ?? []) : [],
@@ -38,13 +29,7 @@ export const POST = apiRoute(
   async ({ params, body }, session) => {
     const containerRepository = await getContainerRepository();
 
-    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('id', params.id);
-
-    const page = await containerRepository.getOneByQuery(databaseQuery);
-
-    if (!page) {
-      throw new NotFoundError('Page not found', true);
-    }
+    const page = await pageRetriever.retrievePage(params.id, session.user.id);
 
     const updatedPage = { ...page, blocks: body.blocks };
     await containerRepository.update(updatedPage);
