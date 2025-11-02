@@ -1,7 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository, getDataViewRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
-import { NotFoundError } from '@/lib/errors/not-found-error';
+import { getDataViewRepository } from '@/lib/database';
+import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
+import { dataViewRetriever } from '@/lib/database/retrievers/data-view-retriever';
 import type {
   GetDataViewResponse,
   GetDataViewParameters,
@@ -15,14 +15,7 @@ export const GET = apiRoute<GetDataViewResponse, undefined, GetDataViewParameter
     expectedParamsSchema: getDataViewParametersSchema,
   },
   async ({ params }, session) => {
-    const dataViewRepository = await getDataViewRepository();
-    const dataView = await dataViewRepository.getOneByQuery(
-      addUserIdToQuery(dataViewRepository.createQuery().eq('id', params.id), session.user.id)
-    );
-
-    if (!dataView) {
-      throw new NotFoundError('Data view not found', true);
-    }
+    const dataView = await dataViewRetriever.retrieveDataView(params.id, session.user.id);
 
     return {
       id: dataView.id,
@@ -43,27 +36,11 @@ export const PATCH = apiRoute<UpdateDataViewResponse, undefined, UpdateDataViewP
     const dataViewRepository = await getDataViewRepository();
 
     // Verify the data view exists and belongs to the user
-    const existingDataView = await dataViewRepository.getOneByQuery(
-      addUserIdToQuery(dataViewRepository.createQuery().eq('id', params.id), session.user.id)
-    );
-
-    if (!existingDataView) {
-      throw new NotFoundError('Data view not found');
-    }
+    const existingDataView = await dataViewRetriever.retrieveDataView(params.id, session.user.id);
 
     // If dataSourceId is being updated, verify the new data source exists and belongs to user
     if (body.dataSourceId && body.dataSourceId !== existingDataView.dataSourceId) {
-      const containerRepository = await getContainerRepository();
-      const dataSource = await containerRepository.getOneByQuery(
-        addUserIdToQuery(containerRepository.createQuery().eq('id', body.dataSourceId), session.user.id).eq(
-          'type',
-          'data-source'
-        )
-      );
-
-      if (!dataSource) {
-        throw new NotFoundError('Data source not found or access denied.');
-      }
+      await dataSourceRetriever.retrieveDataSource(body.dataSourceId, session.user.id);
     }
 
     const filteredBody = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));

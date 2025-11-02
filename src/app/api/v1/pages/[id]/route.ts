@@ -1,7 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
-import { NotFoundError } from '@/lib/errors/not-found-error';
+import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import type {
   GetPageDetailsParameters,
   GetPageDetailsQuery,
@@ -23,17 +23,7 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
     expectedQuerySchema: getPageDetailsQuerySchema,
   },
   async ({ params, query }, session): Promise<GetPageDetailsResponse> => {
-    const containerRepository = await getContainerRepository();
-
-    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id)
-      .eq('id', params.id)
-      .eq('type', 'page');
-
-    const page = await containerRepository.getOneByQuery(databaseQuery);
-
-    if (!page || page.type !== 'page') {
-      throw new NotFoundError('Page not found', true);
-    }
+    const page = await pageRetriever.retrievePage(params.id, session.user.id);
 
     // fetch the linked views
     const dataViewRepository = await getDataViewRepository();
@@ -81,13 +71,7 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
     const containerRepository = await getContainerRepository();
 
     // Verify the page exists and belongs to the user
-    const existingPage = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'page')
-    );
-
-    if (!existingPage || existingPage.type !== 'page') {
-      throw new NotFoundError('Page not found', true);
-    }
+    const existingPage = await pageRetriever.retrievePage(params.id, session.user.id);
 
     const filteredBody: Partial<typeof existingPage> = {};
     if (body.name !== undefined) {

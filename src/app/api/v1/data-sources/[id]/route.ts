@@ -1,7 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
-import { NotFoundError } from '@/lib/errors/not-found-error';
+import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import type {
   GetDataSourceResponse,
   GetDataSourceParameters,
@@ -20,14 +19,7 @@ export const GET = apiRoute<GetDataSourceResponse, undefined, GetDataSourceParam
     expectedParamsSchema: getDataSourceParametersSchema,
   },
   async ({ params }, session) => {
-    const containerRepository = await getContainerRepository();
-    const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
-    );
-
-    if (!dataSource) {
-      throw new NotFoundError('Data source not found', true);
-    }
+    const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
 
     return {
       id: dataSource.id,
@@ -52,13 +44,7 @@ export const PATCH = apiRoute<UpdateDataSourceResponse, undefined, UpdateDataSou
     const containerRepository = await getContainerRepository();
 
     // Verify the data source exists and belongs to the user
-    const existingDataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
-    );
-
-    if (!existingDataSource) {
-      throw new Error('Data source not found');
-    }
+    const existingDataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
 
     // Update the data source with provided fields
     const filteredBody = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));

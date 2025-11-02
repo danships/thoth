@@ -10,10 +10,9 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
   },
   async ({ query }, session) => {
     const containerRepository = await getContainerRepository();
-    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id).sort(
-      'lastUpdated',
-      'desc'
-    );
+    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id)
+      .eq('type', 'page')
+      .sort('lastUpdated', 'desc');
 
     if (query?.parentId) {
       databaseQuery.eq('parentId', query.parentId);

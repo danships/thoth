@@ -1,7 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
-import { NotFoundError } from '@/lib/errors/not-found-error';
+import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { z } from 'zod';
 import { Column, columnSchema } from '@/types/schemas/entities/container';
 import { randomUUID } from 'node:crypto';
@@ -12,13 +11,7 @@ export const POST = apiRoute<z.infer<typeof columnSchema>, undefined, { id: stri
   { expectedBodySchema: createDataSourceColumnBodySchema },
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
-    const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
-    );
-
-    if (!dataSource || dataSource.type !== 'data-source') {
-      throw new NotFoundError('Data source not found', true);
-    }
+    const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
 
     const newColumn: Column = { id: randomUUID(), name: body.name, type: body.type };
     await containerRepository.update({
