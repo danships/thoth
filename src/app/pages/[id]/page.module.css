@@ -1,0 +1,10 @@
+.editableTitle {
+  cursor: text;
+  outline: none;
+}
+
+.editableTitle:focus {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

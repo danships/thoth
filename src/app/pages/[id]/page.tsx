@@ -2,17 +2,19 @@
 
 import { Alert, Box, Button, Container, Group, Loader, Modal, Stack, Tabs, Text, Title } from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
 import { PageDetailEditor } from '@/components/organisms/page-detail-editor';
 import { Block } from '@blocknote/core';
-import { useCudApi } from '@/lib/hooks/use-cud-api';
-import { SetPageBlocksBody } from '@/types/api/endpoints/set-page-blocks';
 import { IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
 import { DataViewRender } from '@/components/organisms/data-view-render';
 import { GetDataViewsResponse } from '@/types/api';
 import { useSearchParams } from 'next/navigation';
+import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
+import { useSetPageBlocks } from '@/lib/hooks/api/use-set-page-blocks';
+import { useNotification } from '@/lib/hooks/use-notification';
+import styles from './page.module.css';
 
 export default function PageDetailsPage() {
   const parameters = useParams();
@@ -26,8 +28,11 @@ export default function PageDetailsPage() {
   const { data: pageDetails, isLoading, error, mutate } = usePageDetails(pageId);
 
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);
+  const titleReference = useRef<HTMLHeadingElement>(null);
 
-  const { post } = useCudApi();
+  const { showError } = useNotification();
+  const { updatePage } = useUpdatePage({ mutatePageDetails: mutate });
+  const { setPageBlocks } = useSetPageBlocks({ mutatePageDetails: mutate });
 
   // Auto-select first view if views exist and no view is selected
   useEffect(() => {
@@ -39,15 +44,26 @@ export default function PageDetailsPage() {
     }
   }, [pageDetails, searchParameters, router]);
 
+  // Sync the contentEditable title when pageDetails changes (e.g., after update)
+  useEffect(() => {
+    if (titleReference.current && pageDetails?.page.name && document.activeElement !== titleReference.current) {
+      titleReference.current.textContent = pageDetails.page.name;
+    }
+  }, [pageDetails?.page.name]);
+
   const updateBlocks = useCallback(
     async (blocks: Block[]) => {
       if (!pageId) {
         return;
       }
 
-      await post<unknown, SetPageBlocksBody>(`/pages/${pageId}/blocks`, { blocks });
+      try {
+        await setPageBlocks(pageId, blocks);
+      } catch {
+        showError('Failed to update page content');
+      }
     },
-    [pageId, post]
+    [pageId, setPageBlocks, showError]
   );
 
   const doViewCreated = useCallback(
@@ -59,6 +75,45 @@ export default function PageDetailsPage() {
     },
     [mutate, router]
   );
+
+  const handleTitleBlur = useCallback(
+    async (event: React.FocusEvent<HTMLHeadingElement>) => {
+      if (!pageDetails || !pageId) {
+        return;
+      }
+
+      const newName = event.currentTarget.textContent?.trim() ?? '';
+      const originalName = pageDetails.page.name;
+
+      // Only update if the name actually changed
+      if (newName === originalName || newName === '') {
+        // Restore original name if empty
+        if (newName === '' && titleReference.current) {
+          titleReference.current.textContent = originalName;
+        }
+        return;
+      }
+
+      try {
+        await updatePage(pageId, { name: newName });
+      } catch {
+        // Restore original name on error
+        if (titleReference.current) {
+          titleReference.current.textContent = originalName;
+        }
+        showError('Failed to update page name');
+      }
+    },
+    [pageDetails, pageId, updatePage, showError]
+  );
+
+  const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLHeadingElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      // Enter alone: confirm the value (blur the element)
+      event.preventDefault();
+      event.currentTarget.blur();
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -97,7 +152,17 @@ export default function PageDetailsPage() {
         <Stack gap="lg">
           <Group gap="sm">
             <Text size="xl">{pageDetails?.page.emoji}</Text>
-            <Title order={1}>{pageDetails?.page.name ?? <Loader />}</Title>
+            <Title
+              ref={titleReference}
+              order={1}
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={handleTitleBlur}
+              onKeyDown={handleTitleKeyDown}
+              className={styles['editableTitle'] ?? ''}
+            >
+              {pageDetails?.page.name ?? <Loader />}
+            </Title>
           </Group>
           <Tabs value={selectedView} onChange={(value) => router.replace(`?v=${value}`)}>
             <Tabs.List>
