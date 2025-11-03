@@ -16,3 +16,4 @@ export * from './update-data-source-column';
 export * from './delete-data-source-column';
 export * from './update-page-values';
 export * from './update-page';
+export * from './set-page-blocks';
