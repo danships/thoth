@@ -60,8 +60,17 @@ export function DataViewTable({
   const { updatePage, inProgress: pageUpdateInProgress } = useUpdatePage({ mutatePages });
   const { showError } = useNotification();
 
-  const handleColumnSubmit = async (values: { name: string; type: 'string' | 'number' | 'boolean' }) => {
-    await (editingColumn ? updateColumn(editingColumn.id, values) : createColumn(values.name, values.type));
+  const handleColumnSubmit = async (values: {
+    name: string;
+    type: 'string' | 'number' | 'boolean' | 'date';
+    options?: {
+      dateFormat?: string;
+      includeTime?: boolean;
+    };
+  }) => {
+    await (editingColumn
+      ? updateColumn(editingColumn.id, values)
+      : createColumn(values.name, values.type, values.options));
     mutateDataSource();
   };
 
