@@ -3,6 +3,7 @@ import { Table } from '@mantine/core';
 import { EditablePageNameCell } from '@/components/atoms/editable-page-name-cell';
 import { EditableTextCell } from '@/components/atoms/editable-text-cell';
 import { EditableBooleanCell } from '@/components/atoms/editable-boolean-cell';
+import { EditableDateCell } from '@/components/atoms/editable-date-cell';
 import type { Column } from '@/types/schemas/entities/container';
 import type { Page } from '@/types/api';
 import type { PageValue } from '@/types/schemas/entities/container';
@@ -44,6 +45,26 @@ export function DataTableRow({
                 value={current?.type === 'boolean' ? current.value : false}
                 onChange={(checked) => onCellUpdate(col.id, { type: 'boolean', value: checked })}
                 disabled={disabled}
+              />
+            </Table.Td>
+          );
+        }
+
+        if (col.type === 'date') {
+          const dateOptions =
+            col.options && (col.options.dateFormat || col.options.includeTime !== undefined)
+              ? {
+                  ...(col.options.dateFormat ? { dateFormat: col.options.dateFormat } : {}),
+                  ...(col.options.includeTime === undefined ? {} : { includeTime: col.options.includeTime }),
+                }
+              : undefined;
+          return (
+            <Table.Td key={col.id}>
+              <EditableDateCell
+                value={current?.type === 'date' ? current.value : null}
+                onBlur={(value) => onCellUpdate(col.id, { type: 'date', value })}
+                disabled={disabled}
+                {...(dateOptions ? { options: dateOptions } : {})}
               />
             </Table.Td>
           );
