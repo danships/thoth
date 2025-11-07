@@ -14,6 +14,8 @@ import { useSearchParams } from 'next/navigation';
 import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
 import { useSetPageBlocks } from '@/lib/hooks/api/use-set-page-blocks';
 import { useNotification } from '@/lib/hooks/use-notification';
+import { usePageBreadcrumbs } from '@/lib/hooks/api/use-page-breadcrumbs';
+import { PageBreadcrumb } from '@/components/molecules/page-breadcrumb';
 import styles from './page.module.css';
 
 export default function PageDetailsPage() {
@@ -26,6 +28,7 @@ export default function PageDetailsPage() {
   const selectedView = searchParameters.get('v') ?? 'contents';
 
   const { data: pageDetails, isLoading, error, mutate } = usePageDetails(pageId);
+  const { data: breadcrumbs, isLoading: isLoadingBreadcrumbs } = usePageBreadcrumbs(pageId);
 
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);
   const titleReference = useRef<HTMLHeadingElement>(null);
@@ -150,6 +153,7 @@ export default function PageDetailsPage() {
           </Button>
         </Box>
         <Stack gap="lg">
+          {!isLoadingBreadcrumbs && breadcrumbs && breadcrumbs.length > 0 && <PageBreadcrumb pages={breadcrumbs} />}
           <Group gap="sm">
             <Text size="xl">{pageDetails?.page.emoji}</Text>
             <Title
