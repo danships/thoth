@@ -7,6 +7,7 @@ export * from './get-data-view';
 export * from './get-data-views';
 export * from './get-page-details';
 export * from './get-page-blocks';
+export * from './get-page-breadcrumbs';
 export * from './get-pages';
 export * from './get-pages-tree';
 export * from './update-data-source';
