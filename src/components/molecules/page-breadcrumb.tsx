@@ -1,6 +1,6 @@
 'use client';
 
-import { Breadcrumbs, Anchor, Text } from '@mantine/core';
+import { Breadcrumbs, Anchor, Text, Group } from '@mantine/core';
 import Link from 'next/link';
 import type { Page } from '@/types/api';
 
@@ -17,10 +17,10 @@ export function PageBreadcrumb({ pages }: PageBreadcrumbProperties) {
       {pages.map((page, index) => {
         const isLast = index === pages.length - 1;
         const content = (
-          <>
+          <Group gap="xs" wrap="nowrap">
             {page.emoji && <span>{page.emoji}</span>}
             <span>{page.name}</span>
-          </>
+          </Group>
         );
 
         if (isLast) {

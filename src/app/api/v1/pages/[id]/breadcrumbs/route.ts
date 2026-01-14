@@ -1,7 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
+import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { GetPageBreadcrumbsParameters, GetPageBreadcrumbsResponse, Page } from '@/types/api';
 import { getPageBreadcrumbsParametersSchema } from '@/types/api';
 
@@ -10,7 +9,6 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
     expectedParamsSchema: getPageBreadcrumbsParametersSchema,
   },
   async ({ params }, session): Promise<GetPageBreadcrumbsResponse> => {
-    const containerRepository = await getContainerRepository();
     const breadcrumbs: Page[] = [];
     const visitedIds = new Set<string>();
 
@@ -40,19 +38,16 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
         break;
       }
 
-      // Fetch the parent page
-      const parentPage = await containerRepository.getOneByQuery(
-        addUserIdToQuery(containerRepository.createQuery().eq('id', currentPage.parentId), session.user.id).eq(
-          'type',
-          'page'
-        )
-      );
-
-      if (!parentPage || parentPage.type !== 'page') {
-        break;
+      // Fetch the parent page using the centralized retriever
+      try {
+        currentPage = await pageRetriever.retrievePage(currentPage.parentId, session.user.id);
+      } catch (error) {
+        // If parent page not found, we've reached as far as we can go
+        if (error instanceof NotFoundError) {
+          break;
+        }
+        throw error;
       }
-
-      currentPage = parentPage;
     }
 
     // Reverse to get root -> current order
