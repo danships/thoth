@@ -19,9 +19,6 @@ importers:
       '@mantine/core':
         specifier: ^8.3.4
         version: 8.3.5(@mantine/hooks@8.3.5(react@19.1.0))(@types/react@19.2.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@mantine/dates':
-        specifier: ^8.3.6
-        version: 8.3.6(@mantine/core@8.3.5(@mantine/hooks@8.3.5(react@19.1.0))(@types/react@19.2.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@mantine/hooks@8.3.5(react@19.1.0))(dayjs@1.11.19)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@mantine/form':
         specifier: ^8.3.5
         version: 8.3.5(react@19.1.0)
@@ -708,16 +705,6 @@ packages:
       { integrity: sha512-PdVNLMgOS2vFhOujRi6/VC9ic8w3UDyKX7ftwDeJ7yQT8CiepUxfbWWYpVpnq23bdWh/7fIT2Pn1EY8r8GOk7g== }
     peerDependencies:
       '@mantine/hooks': 8.3.5
-      react: ^18.x || ^19.x
-      react-dom: ^18.x || ^19.x
-
-  '@mantine/dates@8.3.6':
-    resolution:
-      { integrity: sha512-lSi1zvyL86SKeePH0J3vOjAR7ZIVNOrZm6ja7jAH6IBdcpQOKH8TXbrcAi5okEStvmvkne7pVaGu0VkdE8KnAw== }
-    peerDependencies:
-      '@mantine/core': 8.3.6
-      '@mantine/hooks': 8.3.6
-      dayjs: '>=1.0.0'
       react: ^18.x || ^19.x
       react-dom: ^18.x || ^19.x
 
@@ -5437,15 +5424,6 @@ snapshots:
       type-fest: 4.41.0
     transitivePeerDependencies:
       - '@types/react'
-
-  '@mantine/dates@8.3.6(@mantine/core@8.3.5(@mantine/hooks@8.3.5(react@19.1.0))(@types/react@19.2.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@mantine/hooks@8.3.5(react@19.1.0))(dayjs@1.11.19)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
-    dependencies:
-      '@mantine/core': 8.3.5(@mantine/hooks@8.3.5(react@19.1.0))(@types/react@19.2.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@mantine/hooks': 8.3.5(react@19.1.0)
-      clsx: 2.1.1
-      dayjs: 1.11.19
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
 
   '@mantine/form@8.3.5(react@19.1.0)':
     dependencies:

@@ -20,7 +20,6 @@
     "@blocknote/mantine": "^0.41.1",
     "@blocknote/react": "^0.41.1",
     "@mantine/core": "^8.3.4",
-    "@mantine/dates": "^8.3.6",
     "@mantine/form": "^8.3.5",
     "@mantine/hooks": "^8.3.4",
     "@mantine/modals": "^8.3.6",

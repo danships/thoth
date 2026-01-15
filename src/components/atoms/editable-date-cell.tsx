@@ -1,10 +1,6 @@
-/* eslint-disable unicorn/no-nested-ternary */
 'use client';
 
-import { DatePicker, DateTimePicker } from '@mantine/dates';
-import { Popover } from '@mantine/core';
 import dayjs from 'dayjs';
-import { useState } from 'react';
 
 type EditableDateCellProperties = {
   value: string | null | undefined;
@@ -17,102 +13,59 @@ type EditableDateCellProperties = {
 };
 
 export function EditableDateCell({ value, onBlur, disabled = false, options }: EditableDateCellProperties) {
-  const [opened, setOpened] = useState(false);
   const includeTime = options?.includeTime ?? false;
-  const dateFormat = options?.dateFormat;
 
-  // Parse ISO string to Date object for value prop, or null if empty
-  const dateValue = value ? dayjs(value).toDate() : null;
+  // Convert ISO string to format expected by native inputs
+  const getInputValue = () => {
+    if (!value) return '';
+    const parsed = dayjs(value);
+    if (!parsed.isValid()) return '';
 
-  // Convert to string format for DatePicker/DateTimePicker (they expect Date or string)
-  const dateValueString = value || null;
-
-  // Format display value
-  const displayValue =
-    dateValue && dateFormat
-      ? dayjs(dateValue).format(dateFormat)
-      : dateValue
-        ? includeTime
-          ? dayjs(dateValue).format('YYYY-MM-DD HH:mm')
-          : dayjs(dateValue).format('YYYY-MM-DD')
-        : '';
-
-  const handleChange = (value: string | null) => {
-    if (!value) {
-      // If date is cleared, send empty string
-      onBlur('');
-      setOpened(false);
-      return;
-    }
-
-    // Parse the string value (could be formatted date string from picker)
-    const parsedDate = dayjs(value);
-    if (!parsedDate.isValid()) {
-      // If invalid, try to use the value as-is
-      onBlur(value);
-      setOpened(false);
-      return;
-    }
-
-    // Convert to ISO string format
-    // If includeTime is false, only include date part (YYYY-MM-DD)
     if (includeTime) {
-      const dateTime = parsedDate.toISOString();
-      onBlur(dateTime);
+      // datetime-local expects "YYYY-MM-DDTHH:mm"
+      return parsed.format('YYYY-MM-DDTHH:mm');
+    }
+    // date input expects "YYYY-MM-DD"
+    return parsed.format('YYYY-MM-DD');
+  };
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = event.target.value;
+
+    if (!newValue) {
+      onBlur('');
+      return;
+    }
+
+    const parsedDate = dayjs(newValue);
+    if (!parsedDate.isValid()) {
+      onBlur(newValue);
+      return;
+    }
+
+    // Convert to appropriate format
+    if (includeTime) {
+      onBlur(parsedDate.toISOString());
     } else {
-      const dateOnly = parsedDate.format('YYYY-MM-DD');
-      onBlur(dateOnly);
-    }
-    setOpened(false);
-  };
-
-  const handleClick = () => {
-    if (!disabled) {
-      setOpened(true);
+      onBlur(parsedDate.format('YYYY-MM-DD'));
     }
   };
-
-  if (includeTime) {
-    return (
-      <Popover opened={opened} onChange={setOpened} position="bottom-start" withArrow disabled={disabled}>
-        <Popover.Target>
-          <div
-            onClick={handleClick}
-            style={{
-              minWidth: 120,
-              outline: 'none',
-              cursor: disabled ? 'default' : 'pointer',
-              padding: '4px 8px',
-            }}
-          >
-            {displayValue}
-          </div>
-        </Popover.Target>
-        <Popover.Dropdown p={0}>
-          <DateTimePicker value={dateValueString} onChange={handleChange} clearable />
-        </Popover.Dropdown>
-      </Popover>
-    );
-  }
 
   return (
-    <Popover opened={opened} onChange={setOpened} position="bottom-start" withArrow disabled={disabled}>
-      <Popover.Target>
-        <div
-          onClick={handleClick}
-          style={{
-            minWidth: 120,
-            outline: 'none',
-            cursor: disabled ? 'default' : 'pointer',
-            padding: '4px 8px',
-          }}
-        >
-          {displayValue}
-        </div>
-      </Popover.Target>
-      <Popover.Dropdown p={0}>
-        <DatePicker value={dateValueString} onChange={handleChange} />
-      </Popover.Dropdown>
-    </Popover>
+    <input
+      type={includeTime ? 'datetime-local' : 'date'}
+      value={getInputValue()}
+      onChange={handleChange}
+      disabled={disabled}
+      style={{
+        minWidth: 120,
+        padding: '4px 8px',
+        border: 'none',
+        background: 'transparent',
+        outline: 'none',
+        fontSize: 'inherit',
+        fontFamily: 'inherit',
+      }}
+    />
   );
 }
