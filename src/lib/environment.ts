@@ -8,10 +8,11 @@ const environmentSchema = {
     default: 'info',
   }),
   BETTER_AUTH_SECRET: str(),
-  OIDC_CLIENT_ID: str(),
-  OIDC_CLIENT_SECRET: str(),
-  OIDC_DISCOVERY_URL: url(),
-  OIDC_AUTHORIZATION_URL: url(),
+  // OIDC variables are optional - if not set, credentials auth will be used
+  OIDC_CLIENT_ID: str({ default: undefined }),
+  OIDC_CLIENT_SECRET: str({ default: undefined }),
+  OIDC_DISCOVERY_URL: url({ default: undefined }),
+  OIDC_AUTHORIZATION_URL: url({ default: undefined }),
 } as const;
 
 type Environment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;

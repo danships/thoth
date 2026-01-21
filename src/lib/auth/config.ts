@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/prefer-ternary */
 import { betterAuth } from 'better-auth';
 import { genericOAuth } from 'better-auth/plugins';
 import { createPool } from 'mysql2/promise';
@@ -8,61 +9,93 @@ import { connection } from 'next/server';
 
 let authInstance: ReturnType<typeof betterAuth> | null = null;
 
+/**
+ * Checks if all OIDC environment variables are configured.
+ * If all are present, OIDC authentication will be used.
+ * If any are missing, credentials (email/password) authentication will be used.
+ */
+function hasOidcConfig(environment: Awaited<ReturnType<typeof getEnvironment>>): boolean {
+  return Boolean(
+    environment.OIDC_CLIENT_ID &&
+      environment.OIDC_CLIENT_SECRET &&
+      environment.OIDC_DISCOVERY_URL &&
+      environment.OIDC_AUTHORIZATION_URL
+  );
+}
+
 async function initializeAuth() {
   if (authInstance === null) {
     await connection().then(getDatabase);
 
     const environment = await getEnvironment();
+    const useOidc = hasOidcConfig(environment);
 
-    authInstance = betterAuth({
-      database: createPool(environment.DB),
-      plugins: [
-        genericOAuth({
-          config: [
-            {
-              providerId: 'oidc',
-              clientId: environment.OIDC_CLIENT_ID,
-              clientSecret: environment.OIDC_CLIENT_SECRET,
-              authorizationUrl: environment.OIDC_AUTHORIZATION_URL,
-              discoveryUrl: environment.OIDC_DISCOVERY_URL,
-              scopes: ['openid', 'profile', 'email'],
-            },
-          ],
-        }),
-      ],
-      trustedOrigins: environment.NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
-      secret: environment.BETTER_AUTH_SECRET,
-      hooks: {},
-      databaseHooks: {
-        user: {
-          create: {
-            after: async (user) => {
-              const workspaceRepository = await getWorkspaceRepository();
-              const workspace = await workspaceRepository.create({
-                name: 'Default Workspace',
-                userId: user.id,
-                createdAt: new Date().toISOString(),
-                lastUpdated: new Date().toISOString(),
-              } satisfies WorkspaceCreate);
+    const databaseHooks = {
+      user: {
+        create: {
+          after: async (user: { id: string }) => {
+            const workspaceRepository = await getWorkspaceRepository();
+            const workspace = await workspaceRepository.create({
+              name: 'Default Workspace',
+              userId: user.id,
+              createdAt: new Date().toISOString(),
+              lastUpdated: new Date().toISOString(),
+            } satisfies WorkspaceCreate);
 
-              const containerRepository = await getContainerRepository();
-              const pageData: PageContainerCreate = {
-                name: 'Welcome',
-                type: 'page',
-                userId: user.id,
-                createdAt: new Date().toISOString(),
-                lastUpdated: new Date().toISOString(),
-                workspaceId: workspace.id,
-                emoji: '👋',
-                parentId: null,
-              };
+            const containerRepository = await getContainerRepository();
+            const pageData: PageContainerCreate = {
+              name: 'Welcome',
+              type: 'page',
+              userId: user.id,
+              createdAt: new Date().toISOString(),
+              lastUpdated: new Date().toISOString(),
+              workspaceId: workspace.id,
+              emoji: '👋',
+              parentId: null,
+            };
 
-              await containerRepository.create(pageData);
-            },
+            await containerRepository.create(pageData);
           },
         },
       },
-    });
+    };
+
+    if (useOidc) {
+      // OIDC authentication mode
+      authInstance = betterAuth({
+        database: createPool(environment.DB),
+        plugins: [
+          genericOAuth({
+            config: [
+              {
+                providerId: 'oidc',
+                clientId: environment.OIDC_CLIENT_ID!,
+                clientSecret: environment.OIDC_CLIENT_SECRET!,
+                authorizationUrl: environment.OIDC_AUTHORIZATION_URL!,
+                discoveryUrl: environment.OIDC_DISCOVERY_URL!,
+                scopes: ['openid', 'profile', 'email'],
+              },
+            ],
+          }),
+        ],
+        trustedOrigins: environment.NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
+        secret: environment.BETTER_AUTH_SECRET,
+        hooks: {},
+        databaseHooks,
+      });
+    } else {
+      // Credentials (email/password) authentication mode
+      authInstance = betterAuth({
+        database: createPool(environment.DB),
+        emailAndPassword: {
+          enabled: true,
+        },
+        trustedOrigins: environment.NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
+        secret: environment.BETTER_AUTH_SECRET,
+        hooks: {},
+        databaseHooks,
+      });
+    }
   }
   return authInstance;
 }
