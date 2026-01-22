@@ -2,6 +2,7 @@ import { SuperSave } from 'supersave';
 import type { Container, Workspace, DataView } from '@/types/database';
 import { getEnvironment } from '../environment';
 import * as entities from './entities';
+import { migrations } from './migrations';
 
 let database: SuperSave;
 
@@ -11,11 +12,21 @@ export async function getDatabase() {
   }
 
   const environment = await getEnvironment();
-  database = await SuperSave.create(environment.DB);
+  const skipSync = environment.SUPERSAVE_SKIP_SYNC;
+
+  database = await SuperSave.create(environment.DB, {
+    migrations,
+    skipSync,
+  });
 
   await database.addEntity(entities.Container);
   await database.addEntity(entities.Workspace);
   await database.addEntity(entities.DataView);
+
+  if (!skipSync) {
+    await database.runMigrations();
+  }
+
   return database;
 }
 

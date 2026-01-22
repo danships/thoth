@@ -4,7 +4,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 
-const DEFAULT_DB = 'mysql://root@localhost:3306/thoth';
+const DEFAULT_DB_FILENAME = 'thoth.db';
 const SECRET_FILENAME = 'secret';
 
 /**
@@ -31,15 +31,19 @@ function ensureHomeDirectory(homeDirectory) {
 
 /**
  * Resolves the database connection string.
- * Uses DB env var if set, otherwise returns default MySQL connection.
+ * Uses DB env var if set, otherwise defaults to SQLite file in home directory.
  */
-function resolveDatabase() {
+function resolveDatabase(homeDirectory) {
   const database = process.env.DB;
   if (database) {
     return database;
   }
-  console.log(`DB not set, using default: ${DEFAULT_DB}`);
-  return DEFAULT_DB;
+
+  // Default to SQLite file in home directory
+  const sqlitePath = path.join(homeDirectory, DEFAULT_DB_FILENAME);
+  const defaultDatabase = `sqlite://${sqlitePath}`;
+  console.log(`DB not set, using default SQLite: ${defaultDatabase}`);
+  return defaultDatabase;
 }
 
 /**
@@ -69,15 +73,14 @@ function resolveSecret(homeDirectory) {
 }
 
 /**
- * Starts the Next.js server with the resolved environment variables.
+ * Starts the Next.js standalone server with the resolved environment variables.
  */
 function startServer(environment) {
-  console.log('Starting server with pnpm start...');
+  console.log('Starting standalone server...');
 
-  const child = spawn('pnpm', ['start'], {
+  const child = spawn('node', ['.next/standalone/server.js'], {
     stdio: 'inherit',
     env: { ...process.env, ...environment },
-    shell: true,
   });
 
   child.on('error', (error) => {
@@ -97,8 +100,10 @@ const homeDirectory = resolveHomeDirectory();
 ensureHomeDirectory(homeDirectory);
 
 const environment = {
-  DB: resolveDatabase(),
+  DB: resolveDatabase(homeDirectory),
   BETTER_AUTH_SECRET: resolveSecret(homeDirectory),
+  // In production (start-server), skip auto-sync and use migrations
+  SUPERSAVE_SKIP_SYNC: 'true',
 };
 
 startServer(environment);

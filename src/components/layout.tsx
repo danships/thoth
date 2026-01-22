@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { type PropsWithChildren, type ReactNode, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/provider';
 import Image from 'next/image';
+import Link from 'next/link';
 
 type LayoutProperties = PropsWithChildren & {
   sidebar: ReactNode;
@@ -47,7 +48,7 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
             <Image src="/icons/favicon-32x32.png" width={21} height={21} alt="Thoth Logo" loading="eager" />
             <Title order={5}>Thoth</Title>
           </Group>
-          <a
+          <Link
             href="/logout"
             style={{
               textDecoration: 'none',
@@ -57,7 +58,7 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
             }}
           >
             Logout
-          </a>
+          </Link>
         </Group>
       </AppShell.Header>
 

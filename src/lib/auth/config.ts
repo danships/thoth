@@ -1,13 +1,26 @@
 /* eslint-disable unicorn/prefer-ternary */
 import { betterAuth } from 'better-auth';
 import { genericOAuth } from 'better-auth/plugins';
+import Database from 'better-sqlite3';
 import { createPool } from 'mysql2/promise';
+import { connection } from 'next/server';
 import type { PageContainerCreate, WorkspaceCreate } from '@/types/database';
 import { getContainerRepository, getDatabase, getWorkspaceRepository } from '../database';
 import { getEnvironment } from '../environment';
-import { connection } from 'next/server';
 
 let authInstance: ReturnType<typeof betterAuth> | null = null;
+
+/**
+ * Creates a database adapter based on the connection string.
+ * Supports both SQLite (sqlite://) and MySQL (mysql://) connection strings.
+ */
+function createDatabaseAdapter(connectionString: string) {
+  if (connectionString.startsWith('sqlite://')) {
+    const databasePath = connectionString.replace('sqlite://', '');
+    return new Database(databasePath);
+  }
+  return createPool(connectionString);
+}
 
 /**
  * Checks if all OIDC environment variables are configured.
@@ -25,7 +38,7 @@ function hasOidcConfig(environment: Awaited<ReturnType<typeof getEnvironment>>):
 
 async function initializeAuth() {
   if (authInstance === null) {
-    await connection().then(getDatabase);
+    await getDatabase();
 
     const environment = await getEnvironment();
     const useOidc = hasOidcConfig(environment);
@@ -63,7 +76,7 @@ async function initializeAuth() {
     if (useOidc) {
       // OIDC authentication mode
       authInstance = betterAuth({
-        database: createPool(environment.DB),
+        database: createDatabaseAdapter(environment.DB),
         plugins: [
           genericOAuth({
             config: [
@@ -86,7 +99,7 @@ async function initializeAuth() {
     } else {
       // Credentials (email/password) authentication mode
       authInstance = betterAuth({
-        database: createPool(environment.DB),
+        database: createDatabaseAdapter(environment.DB),
         emailAndPassword: {
           enabled: true,
         },
@@ -100,7 +113,9 @@ async function initializeAuth() {
   return authInstance;
 }
 
-export async function getAuth() {
-  await connection();
+export async function getAuth(outsideRequest = false) {
+  if (!outsideRequest) {
+    await connection();
+  }
   return await initializeAuth();
 }
