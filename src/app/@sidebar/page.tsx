@@ -1,5 +1,5 @@
 import { LoggedInContainer } from '@/components/molecules/sidebar/logged-in-container';
 
-export default function Sidebar() {
+export default function SidebarRoot() {
   return <LoggedInContainer />;
 }

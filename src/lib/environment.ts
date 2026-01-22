@@ -1,4 +1,4 @@
-import { cleanEnv, str, url } from 'envalid';
+import { bool, cleanEnv, str, url } from 'envalid';
 
 const environmentSchema = {
   NODE_ENV: str({ choices: ['development', 'production', 'test'] }),
@@ -8,6 +8,8 @@ const environmentSchema = {
     default: 'info',
   }),
   BETTER_AUTH_SECRET: str(),
+  // If true, skip automatic schema sync and use migrations instead (for production)
+  SUPERSAVE_SKIP_SYNC: bool({ default: false }),
   // OIDC variables are optional - if not set, credentials auth will be used
   OIDC_CLIENT_ID: str({ default: undefined }),
   OIDC_CLIENT_SECRET: str({ default: undefined }),

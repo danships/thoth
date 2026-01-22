@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['mysql2'],
+  serverExternalPackages: ['better-sqlite3', 'mysql2'],
 };
 
 export default nextConfig;

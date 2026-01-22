@@ -17,7 +17,7 @@ export function PageBreadcrumb({ pages }: PageBreadcrumbProperties) {
       {pages.map((page, index) => {
         const isLast = index === pages.length - 1;
         const content = (
-          <Group gap="xs" wrap="nowrap">
+          <Group gap="xs" wrap="nowrap" component="span">
             {page.emoji && <span>{page.emoji}</span>}
             <span>{page.name}</span>
           </Group>
@@ -25,14 +25,14 @@ export function PageBreadcrumb({ pages }: PageBreadcrumbProperties) {
 
         if (isLast) {
           return (
-            <Text key={page.id} size="sm" fw={500}>
+            <Text key={page.id} size="xs" fw={500} component="span">
               {content}
             </Text>
           );
         }
 
         return (
-          <Anchor key={page.id} component={Link} href={`/pages/${page.id}`} size="sm">
+          <Anchor key={page.id} component={Link} href={`/pages/${page.id}`} size="xs">
             {content}
           </Anchor>
         );

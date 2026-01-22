@@ -1,6 +1,7 @@
 export * from './create-page';
 export * from './create-data-source';
 export * from './create-data-view';
+export * from './get-auth-config';
 export * from './get-data-source';
 export * from './get-data-sources';
 export * from './get-data-view';
