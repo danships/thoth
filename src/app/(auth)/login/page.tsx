@@ -19,6 +19,7 @@ import { useForm } from '@mantine/form';
 import { zodResolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
 import type { GetAuthConfigResponse } from '@/types/api';
+import { apiClient } from '@/lib/api/client';
 import { authClient } from '@/lib/auth/client';
 import { useNotification } from '@/lib/hooks/use-notification';
 
@@ -48,9 +49,8 @@ export default function LoginPage() {
   useEffect(() => {
     const fetchAuthConfig = async () => {
       try {
-        const response = await fetch('/api/v1/config');
-        const data: GetAuthConfigResponse = await response.json();
-        setAuthMode(data.authMode);
+        const response = await apiClient.get<GetAuthConfigResponse>('/config');
+        setAuthMode(response.data.authMode);
       } catch {
         // Default to credentials if we can't fetch config
         setAuthMode('credentials');
@@ -82,12 +82,17 @@ export default function LoginPage() {
     }
   };
 
-  const handleOidcLogin = () => {
+  const handleOidcLogin = async () => {
     setIsOidcLoading(true);
-    authClient.signIn.social({
-      provider: 'oidc',
-      callbackURL: `${globalThis.location.origin}/`,
-    });
+    try {
+      await authClient.signIn.social({
+        provider: 'oidc',
+        callbackURL: `${globalThis.location.origin}/`,
+      });
+    } catch (error) {
+      console.error('OIDC sign-in failed:', error);
+      setIsOidcLoading(false);
+    }
   };
 
   if (authMode === null) {
