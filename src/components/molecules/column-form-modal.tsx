@@ -1,11 +1,14 @@
 import { Button, Group, Modal, Select, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useEffect } from 'react';
-import type { Column } from '@/types/schemas/entities/container';
+import type { Column, DateMode } from '@/types/schemas/entities/container';
+import { getPresetsForMode, getDefaultFormatForMode } from '@/lib/data-source/date-format';
 
 type ColumnFormValues = {
   name: string;
-  type: 'string' | 'number' | 'boolean';
+  type: 'string' | 'number' | 'boolean' | 'date';
+  mode: DateMode;
+  displayFormat: string;
 };
 
 type ColumnFormModalProperties = {
@@ -31,20 +34,16 @@ export function ColumnFormModal({
     initialValues: {
       name: initialValues?.name ?? '',
       type: initialValues?.type ?? 'string',
+      mode: initialValues?.type === 'date' ? initialValues.mode : 'date',
+      displayFormat:
+        initialValues?.type === 'date' ? initialValues.displayFormat : getDefaultFormatForMode('date'),
     },
     validate: {
       name: (value) => (value.trim() ? null : 'Column name is required'),
-      type: (value) => {
-        if (!value) {
-          return 'Column type is required';
-        }
-        // TODO move this to a separate enum in the schema definition
-        const allowedTypes: ('string' | 'number' | 'boolean')[] = ['string', 'number', 'boolean'];
-        if (!allowedTypes.includes(value)) {
-          return 'Column type must be one of: string, number, boolean';
-        }
-        return null;
-      },
+      type: (value) => (value ? null : 'Column type is required'),
+      mode: (value, values) => (values.type === 'date' && !value ? 'Mode is required for date columns' : null),
+      displayFormat: (value, values) =>
+        values.type === 'date' && !value ? 'Display format is required for date columns' : null,
     },
   });
 
@@ -53,6 +52,9 @@ export function ColumnFormModal({
       form.setValues({
         name: initialValues?.name ?? '',
         type: initialValues?.type ?? 'string',
+        mode: initialValues?.type === 'date' ? initialValues.mode : 'date',
+        displayFormat:
+          initialValues?.type === 'date' ? initialValues.displayFormat : getDefaultFormatForMode('date'),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,6 +76,26 @@ export function ColumnFormModal({
     }
   };
 
+  const handleTypeChange = (value: string | null) => {
+    const newType = (value ?? 'string') as ColumnFormValues['type'];
+    form.setFieldValue('type', newType);
+    if (newType === 'date') {
+      const currentMode = form.values.mode ?? 'date';
+      form.setFieldValue('displayFormat', getDefaultFormatForMode(currentMode));
+    }
+  };
+
+  const handleModeChange = (value: string | null) => {
+    const newMode = (value ?? 'date') as DateMode;
+    form.setFieldValue('mode', newMode);
+    form.setFieldValue('displayFormat', getDefaultFormatForMode(newMode));
+  };
+
+  const formatPresets = getPresetsForMode(form.values.mode ?? 'date').map((p) => ({
+    value: p.value,
+    label: p.label,
+  }));
+
   return (
     <Modal opened={opened} onClose={handleClose} title={title} centered closeButtonProps={{ 'aria-label': 'Close' }}>
       <form onSubmit={form.onSubmit(handleSubmit)}>
@@ -85,10 +107,33 @@ export function ColumnFormModal({
               { value: 'string', label: 'Text' },
               { value: 'number', label: 'Number' },
               { value: 'boolean', label: 'Checkbox' },
+              { value: 'date', label: 'Date' },
             ]}
             {...form.getInputProps('type')}
+            onChange={handleTypeChange}
             required
           />
+          {form.values.type === 'date' && (
+            <>
+              <Select
+                label="Date Mode"
+                data={[
+                  { value: 'date', label: 'Date' },
+                  { value: 'time', label: 'Time' },
+                  { value: 'datetime', label: 'Date & Time' },
+                ]}
+                {...form.getInputProps('mode')}
+                onChange={handleModeChange}
+                required
+              />
+              <Select
+                label="Display Format"
+                data={formatPresets}
+                {...form.getInputProps('displayFormat')}
+                required
+              />
+            </>
+          )}
           <Group justify="flex-end" mt="md">
             <Button variant="subtle" onClick={handleClose}>
               Cancel

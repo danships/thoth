@@ -60,8 +60,35 @@ export function DataViewTable({
   const { updatePage, inProgress: pageUpdateInProgress } = useUpdatePage({ mutatePages });
   const { showError } = useNotification();
 
-  const handleColumnSubmit = async (values: { name: string; type: 'string' | 'number' | 'boolean' }) => {
-    await (editingColumn ? updateColumn(editingColumn.id, values) : createColumn(values.name, values.type));
+  const handleColumnSubmit = async (values: {
+    name: string;
+    type: 'string' | 'number' | 'boolean' | 'date';
+    mode?: 'date' | 'time' | 'datetime';
+    displayFormat?: string;
+  }) => {
+    if (editingColumn) {
+      const updateBody =
+        values.type === 'date'
+          ? {
+              name: values.name,
+              type: 'date' as const,
+              mode: values.mode,
+              displayFormat: values.displayFormat,
+            }
+          : { name: values.name, type: values.type as 'string' | 'number' | 'boolean' };
+      await updateColumn(editingColumn.id, updateBody);
+    } else {
+      const createBody =
+        values.type === 'date'
+          ? {
+              name: values.name.trim(),
+              type: 'date' as const,
+              mode: values.mode ?? 'date',
+              displayFormat: values.displayFormat ?? '',
+            }
+          : { name: values.name.trim(), type: values.type as 'string' | 'number' | 'boolean' };
+      await createColumn(createBody);
+    }
     mutateDataSource();
   };
 

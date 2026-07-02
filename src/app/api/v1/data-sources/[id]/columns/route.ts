@@ -13,7 +13,10 @@ export const POST = apiRoute<z.infer<typeof columnSchema>, undefined, { id: stri
     const containerRepository = await getContainerRepository();
     const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
 
-    const newColumn: Column = { id: randomUUID(), name: body.name, type: body.type };
+    const newColumn: Column =
+      body.type === 'date'
+        ? { id: randomUUID(), name: body.name, type: body.type, mode: body.mode, displayFormat: body.displayFormat }
+        : { id: randomUUID(), name: body.name, type: body.type };
     await containerRepository.update({
       ...dataSource,
       columns: [...(dataSource.columns ?? []), newColumn],
