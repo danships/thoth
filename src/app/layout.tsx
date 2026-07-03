@@ -11,7 +11,7 @@ type Properties = PropsWithChildren & {
 
 export default async function RootLayout({ children, sidebar }: Properties) {
   const auth = await getAuth();
-  const session = await auth.api.getSession({
+  const session = await auth!.api.getSession({
     headers: await headers(),
   });
 

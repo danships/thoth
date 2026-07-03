@@ -10,7 +10,6 @@ import { randomUUID } from 'node:crypto';
 export const GET = apiRoute<GetDataSourcesResponse, {}, {}>({}, async (_, session) => {
   const containerRepository = await getContainerRepository();
   const dataSources = await containerRepository.getByQuery(
-    // eslint-disable-next-line unicorn/no-array-sort
     addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('type', 'data-source').sort('name')
   );
 
