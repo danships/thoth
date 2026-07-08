@@ -111,6 +111,9 @@ async function initializeAuth() {
       }) as unknown as Auth<BetterAuthOptions>;
     }
   }
+  if (authInstance === null) {
+    throw new Error('Auth instance failed to initialize');
+  }
   return authInstance;
 }
 
