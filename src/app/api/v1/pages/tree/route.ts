@@ -82,15 +82,13 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
           views = containerViewIds
             .map((viewId) => viewsMap.get(viewId))
             .filter((view): view is NonNullable<typeof view> => view !== undefined)
-            .map(
-              (view): DataView => ({
-                id: view.id,
-                name: view.name,
-                lastUpdated: view.lastUpdated,
-                createdAt: view.createdAt,
-                dataSourceId: view.dataSourceId,
-              })
-            );
+            .map((view): DataView => ({
+              id: view.id,
+              name: view.name,
+              lastUpdated: view.lastUpdated,
+              createdAt: view.createdAt,
+              dataSourceId: view.dataSourceId,
+            }));
         }
 
         return {

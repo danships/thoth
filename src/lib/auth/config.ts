@@ -1,5 +1,6 @@
 /* eslint-disable unicorn/prefer-ternary */
 import { betterAuth } from 'better-auth';
+import type { Auth, BetterAuthOptions } from 'better-auth';
 import { genericOAuth } from 'better-auth/plugins';
 import Database from 'better-sqlite3';
 import { createPool } from 'mysql2/promise';
@@ -8,7 +9,7 @@ import type { PageContainerCreate, WorkspaceCreate } from '@/types/database';
 import { getContainerRepository, getDatabase, getWorkspaceRepository } from '../database';
 import { getEnvironment } from '../environment';
 
-let authInstance: ReturnType<typeof betterAuth> | null = null;
+let authInstance: Auth<BetterAuthOptions> | null = null;
 
 /**
  * Creates a database adapter based on the connection string.
@@ -30,9 +31,9 @@ function createDatabaseAdapter(connectionString: string) {
 function hasOidcConfig(environment: Awaited<ReturnType<typeof getEnvironment>>): boolean {
   return Boolean(
     environment.OIDC_CLIENT_ID &&
-      environment.OIDC_CLIENT_SECRET &&
-      environment.OIDC_DISCOVERY_URL &&
-      environment.OIDC_AUTHORIZATION_URL
+    environment.OIDC_CLIENT_SECRET &&
+    environment.OIDC_DISCOVERY_URL &&
+    environment.OIDC_AUTHORIZATION_URL
   );
 }
 
@@ -95,7 +96,7 @@ async function initializeAuth() {
         secret: environment.BETTER_AUTH_SECRET,
         hooks: {},
         databaseHooks,
-      });
+      }) as unknown as Auth<BetterAuthOptions>;
     } else {
       // Credentials (email/password) authentication mode
       authInstance = betterAuth({
@@ -107,8 +108,11 @@ async function initializeAuth() {
         secret: environment.BETTER_AUTH_SECRET,
         hooks: {},
         databaseHooks,
-      });
+      }) as unknown as Auth<BetterAuthOptions>;
     }
+  }
+  if (authInstance === null) {
+    throw new Error('Auth instance failed to initialize');
   }
   return authInstance;
 }

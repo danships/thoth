@@ -12,9 +12,9 @@ export async function GET(): Promise<NextResponse<GetAuthConfigResponse>> {
 
   const hasOidcConfig = Boolean(
     environment.OIDC_CLIENT_ID &&
-      environment.OIDC_CLIENT_SECRET &&
-      environment.OIDC_DISCOVERY_URL &&
-      environment.OIDC_AUTHORIZATION_URL
+    environment.OIDC_CLIENT_SECRET &&
+    environment.OIDC_DISCOVERY_URL &&
+    environment.OIDC_AUTHORIZATION_URL
   );
 
   return NextResponse.json({
