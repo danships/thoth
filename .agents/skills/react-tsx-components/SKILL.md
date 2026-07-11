@@ -1,6 +1,6 @@
 ---
-globs: *.tsx
-alwaysApply: false
+name: react-tsx-components
+description: Use when editing or creating React TSX component files (*.tsx) in the Thoth project. Covers styling conventions and error-handling patterns specific to TSX components.
 ---
 
 ## Styling

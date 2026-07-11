@@ -38,7 +38,7 @@ Conventions & gotchas
 - Use types from `src/types/api` for API input/output. API route handlers validate inputs via Zod schemas exported alongside the types.
 - Database queries must be scoped by user using `addUserIdToQuery(...)` to avoid leaking data across users — most API routes rely on this pattern.
 - The repo uses `better-auth` and an OIDC flow. Secrets are expected via env variables validated in `src/lib/environment.ts` (envalid). When running locally, provide env vars (e.g., `BETTER_AUTH_SECRET`, `OIDC_*`).
-- Prefers `type` aliases over `interface` (see `.cursor/rules/basics.mdc`). Follow existing file style (strict TypeScript settings in package.json devDeps).
+- Prefers `type` aliases over `interface` (see `AGENTS.md`). Follow existing file style (strict TypeScript settings in package.json devDeps).
 
 Where to look first (quick navigation)
 

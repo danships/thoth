@@ -109,24 +109,6 @@ src/app/api/
 - Use NextRequest/NextResponse objects
 - Export functions named after HTTP methods (GET, POST, PUT, DELETE, etc.)
 
-## React/TSX Component Guidelines
-
-### Styling
-
-- Always use CSS modules (`.module.css` files) for component-specific styles
-- Never use inline `<style>` tags
-- Name CSS module files after their component: `component-name.module.css` for `component-name.tsx`
-
-### Error Handling
-
-- Never use `console.log()`, `console.error()`, or `console.warn()` for user-facing errors
-- Always use the notification system via `useNotification()` hook from `@/lib/hooks/use-notification.tsx`
-- The hook provides: `showError`, `showSuccess`, `showWarning`, `showInfo`
-- Notifications auto-display in top-right corner and dismiss after 5 seconds
-- Usage: `showError(message: string, title?: string)`
-- For child components: pass an `onError` callback prop to the parent, which handles the notification
-- Error notifications should be triggered in parent components, not where errors occur
-
 ## General TypeScript Rules
 
 - Use types instead of interfaces: `type MyType = { ... }` over `interface MyType { ... }`
@@ -159,3 +141,11 @@ Before completing tasks, run available lint and typecheck commands:
 - Check package.json for scripts like `npm run lint`, `npm run typecheck`, `npm run test`
 - Fix any issues found
 - Only commit changes when explicitly requested by the user
+
+## Skills
+
+The following agent skills provide targeted guidance for specific tasks:
+
+| Skill | Path | Purpose |
+|-------|------|---------|
+| `react-tsx-components` | `.agents/skills/react-tsx-components/SKILL.md` | Styling and error-handling conventions when editing `*.tsx` component files |
