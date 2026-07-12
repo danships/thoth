@@ -42,3 +42,8 @@ next-env.d.ts
 
 db.sqlite
 db.sqlite-*
+
+/playwright-report/
+/test-results/
+/tests/e2e/.auth/
+e2e-test.db
