@@ -158,3 +158,8 @@ The following agent skills provide targeted guidance for specific tasks:
 | Skill | Path | Purpose |
 |-------|------|---------|
 | `react-tsx-components` | `.agents/skills/react-tsx-components/SKILL.md` | Styling and error-handling conventions when editing `*.tsx` component files |
+| `pnpm-workflow` | `.agents/skills/pnpm-workflow/SKILL.md` | pnpm commands, available scripts, quality-gate workflow, and env-var setup |
+| `api-route-definition` | `.agents/skills/api-route-definition/SKILL.md` | Creating API routes with the `apiRoute` wrapper, file placement, HTTP exports, error handling, and the client helper pattern |
+| `zod-types-schemas` | `.agents/skills/zod-types-schemas/SKILL.md` | Defining Zod schemas and TypeScript types for API endpoints, naming conventions, and `DataWrapper` usage |
+| `securing-routes` | `.agents/skills/securing-routes/SKILL.md` | Session enforcement, per-user data scoping with `addUserIdToQuery`, resource ownership checks, and error types |
+| `database-repositories` | `.agents/skills/database-repositories/SKILL.md` | Using SuperSave repositories, query building, entity definitions, retrievers, and migration patterns |
