@@ -16,7 +16,8 @@
     "scripts:clear-auth": "tsx scripts/clear-auth.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "db:seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
     "@blocknote/core": "^0.51.4",
