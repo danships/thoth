@@ -88,7 +88,7 @@ throw new HttpError('Specific internal detail', 422, false); // never shown to c
 For server components or utility functions that run outside an API route, call `getSession()` directly:
 
 ```typescript
-import { getSession } from '@/lib/api/session';
+import { getSession } from '@/lib/auth/session';
 
 // Throws NotAuthorizedError (→ 401) if no session exists
 const session = await getSession();

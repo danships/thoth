@@ -7,7 +7,7 @@ description: Use when creating or modifying API route handlers in the Thoth proj
 
 All versioned API routes live under `src/app/api/v1/<resource>/route.ts`. Next.js App Router maps the file path to the URL:
 
-```
+```text
 src/app/api/v1/pages/route.ts              → GET/POST  /api/v1/pages
 src/app/api/v1/pages/[id]/route.ts         → GET/PATCH  /api/v1/pages/:id
 src/app/api/v1/pages/[id]/blocks/route.ts  → GET/POST  /api/v1/pages/:id/blocks

@@ -16,7 +16,7 @@ pnpm remove <pkg>     # remove a dependency
 
 ## Available Scripts
 
-Run all scripts from the repository root (`/workspace`).
+Run all scripts from the repository root (the directory containing `package.json`).
 
 | Script | Command | Purpose |
 |--------|---------|---------|
@@ -41,6 +41,8 @@ pnpm build       # ensures the app compiles without errors
 ```
 
 Fix TypeScript errors with `pnpm lint:tsc` first — they are the most blocking.
+
+> **Note:** No test script is currently configured in this repository. If a `test` script is added in the future, include it in the quality gate workflow.
 
 ## Workspace Structure
 

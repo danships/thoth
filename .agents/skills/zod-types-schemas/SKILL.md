@@ -7,7 +7,7 @@ description: Use when defining API request/response types, Zod validation schema
 
 Each endpoint gets its own file under `src/types/api/endpoints/`:
 
-```
+```text
 src/types/api/
 ├── endpoints/
 │   ├── create-page.ts         # POST /pages
@@ -48,8 +48,8 @@ export const getPageDetailsParametersSchema = z.object({
 
 // Query string parameters
 export const getPageDetailsQuerySchema = z.object({
-  includeBlocks: z.coerce.boolean().optional(),
-  includeValues: z.coerce.boolean().optional(),
+  includeBlocks: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+  includeValues: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
 });
 
 // Request body (POST / PATCH)

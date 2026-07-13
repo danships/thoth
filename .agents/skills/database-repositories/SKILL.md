@@ -47,25 +47,16 @@ await repository.delete(record.id);
 
 ## Building Queries
 
-Start from `repository.createQuery()` and chain filter methods:
-
-```typescript
-const query = repository.createQuery()
-  .eq('userId', session.user.id)       // equality
-  .eq('type', 'page')
-  .in('id', ['id1', 'id2'])            // IN clause
-  .sort('lastUpdated', 'desc')          // order by
-  .limit(50);                           // row limit
-```
-
-Always add the user scope via the helper from `@/lib/database/helpers` — never filter by `userId` manually:
+Start from `repository.createQuery()` and chain filter methods. Always add the user scope via the helper from `@/lib/database/helpers` — never filter by `userId` manually:
 
 ```typescript
 import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
 
-const query = addUserIdToQuery(repository.createQuery(), session.user.id);
-// chain additional filters:
-query.eq('type', 'page').sort('createdAt', 'desc');
+const query = addUserIdToQuery(repository.createQuery(), session.user.id)
+  .eq('type', 'page')
+  .in('id', ['id1', 'id2'])            // IN clause
+  .sort('lastUpdated', 'desc')          // order by
+  .limit(50);                           // row limit
 ```
 
 ## Entities
