@@ -14,7 +14,7 @@ test('shows error notification on invalid credentials', async ({ page }) => {
   await page.getByLabel('Email').fill('nobody@example.com');
   await page.getByLabel('Password').fill('wrongpassword');
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page.getByRole('alert')).toBeVisible({ timeout: 6_000 });
+  await expect(page.getByRole('alert')).toBeVisible({ timeout: 6000 });
 });
 
 test('shows link to sign-up page', async ({ page }) => {

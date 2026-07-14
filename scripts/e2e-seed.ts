@@ -9,27 +9,27 @@ const DB_PATH = process.env.DB!.replace('sqlite://', '');
 
 // ── 1. Seed better-auth tables directly via raw SQLite ─────────────────────────
 function seedAuthTables() {
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
+  const database = new Database(DB_PATH);
+  database.pragma('journal_mode = WAL');
   const now = new Date().toISOString();
-  const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60 * 1_000).toISOString();
+  const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
-  db.prepare(
+  database.prepare(
     `INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
      VALUES (?, ?, ?, 1, ?, ?)`
   ).run(SEED.user.id, SEED.user.name, SEED.user.email, now, now);
 
-  db.prepare(
+  database.prepare(
     `INSERT OR REPLACE INTO account (id, accountId, providerId, userId, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run('e2e-account-00000000', SEED.user.id, 'credential', SEED.user.id, now, now);
 
-  db.prepare(
+  database.prepare(
     `INSERT OR REPLACE INTO session (id, expiresAt, token, createdAt, updatedAt, userId)
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(SEED.session.id, farFuture, SEED.session.token, now, now, SEED.user.id);
 
-  db.close();
+  database.close();
 }
 
 // ── 2. Seed SuperSave entities via the app repository layer ────────────────────
@@ -47,7 +47,13 @@ async function seedAppData() {
   const existingWorkspace = await workspaceRepository.getOneByQuery(
     workspaceRepository.createQuery().eq('id', SEED.workspace.id)
   );
-  if (!existingWorkspace) {
+  if (existingWorkspace) {
+    await workspaceRepository.update({
+      ...existingWorkspace,
+      name: 'E2E Workspace',
+      lastUpdated: now,
+    });
+  } else {
     await workspaceRepository.create({
       id: SEED.workspace.id,
       name: 'E2E Workspace',
@@ -63,7 +69,11 @@ async function seedAppData() {
     const existing = await containerRepository.getOneByQuery(
       containerRepository.createQuery().eq('id', data.id)
     );
-    if (!existing) await containerRepository.create(data);
+    if (existing) {
+      await containerRepository.update({ ...existing, ...data, lastUpdated: now });
+    } else {
+      await containerRepository.create(data);
+    }
   }
 
   await upsertPage({
@@ -106,7 +116,14 @@ async function seedAppData() {
   const existingDs = await containerRepository.getOneByQuery(
     containerRepository.createQuery().eq('id', SEED.dataSource.id)
   );
-  if (!existingDs) {
+  if (existingDs) {
+    await containerRepository.update({
+      ...existingDs,
+      name: SEED.dataSource.name,
+      columns: [...SEED.dataSource.columns],
+      lastUpdated: now,
+    });
+  } else {
     await containerRepository.create({
       id: SEED.dataSource.id,
       name: SEED.dataSource.name,
@@ -139,7 +156,14 @@ async function seedAppData() {
   const existingView = await dataViewRepository.getOneByQuery(
     dataViewRepository.createQuery().eq('id', SEED.dataView.id)
   );
-  if (!existingView) {
+  if (existingView) {
+    await dataViewRepository.update({
+      ...existingView,
+      name: SEED.dataView.name,
+      columns: SEED.dataSource.columns.map((c) => c.id),
+      lastUpdated: now,
+    });
+  } else {
     await dataViewRepository.create({
       id: SEED.dataView.id,
       name: SEED.dataView.name,
@@ -154,6 +178,7 @@ async function seedAppData() {
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────
+await getDatabase(); // ensures Better Auth tables exist via runMigrations
 await seedAuthTables();
 await seedAppData();
 console.log('✅  E2E database seeded');
