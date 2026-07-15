@@ -3,6 +3,7 @@ export const SEED = {
     id: 'e2e-user-00000000-0000-0000-0000-000000000001',
     email: 'e2e@test.local',
     name: 'E2E Test User',
+    password: 'e2e-test-password',
   },
   session: {
     id: 'e2e-session-0000-0000-0000-000000000001',
