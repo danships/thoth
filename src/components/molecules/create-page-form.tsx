@@ -45,7 +45,7 @@ export function CreatePageForm({ parentId = null, title = 'Create New Page' }: C
           </Alert>
         )}
 
-        <form onSubmit={form.onSubmit(handleSubmit)}>
+        <form noValidate onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
             <TextInput label="Page Name" placeholder="Enter page name" {...form.getInputProps('name')} required />
 

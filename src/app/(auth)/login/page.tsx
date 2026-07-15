@@ -16,7 +16,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
 import type { GetAuthConfigResponse } from '@/types/api';
 import { apiClient } from '@/lib/api/client';
@@ -43,7 +43,7 @@ export default function LoginPage() {
       email: '',
       password: '',
     },
-    validate: zodResolver(loginSchema),
+    validate: zod4Resolver(loginSchema),
   });
 
   useEffect(() => {

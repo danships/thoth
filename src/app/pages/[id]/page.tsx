@@ -130,7 +130,7 @@ export default function PageDetailsPage() {
     return (
       <Container size="md" py="xl">
         <Alert color="red" title="Error">
-          {error}
+          {error instanceof Error ? error.message : String(error)}
         </Alert>
       </Container>
     );

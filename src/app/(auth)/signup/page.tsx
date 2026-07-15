@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Anchor, Button, Center, Container, Paper, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { zodResolver } from 'mantine-form-zod-resolver';
+import { zod4Resolver } from 'mantine-form-zod-resolver';
 import { z } from 'zod';
 import { authClient } from '@/lib/auth/client';
 import { useNotification } from '@/lib/hooks/use-notification';
@@ -36,7 +36,7 @@ export default function SignupPage() {
       password: '',
       confirmPassword: '',
     },
-    validate: zodResolver(signupSchema),
+    validate: zod4Resolver(signupSchema),
   });
 
   const handleSignup = async (values: SignupFormValues) => {

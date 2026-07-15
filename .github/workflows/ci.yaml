@@ -68,7 +68,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: 1
       NODE_ENV: test
       DB: sqlite:///tmp/thoth-e2e.db
-      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || 'e2e-test-secret-not-for-production' }}
       SUPERSAVE_SKIP_SYNC: false
       LOG_LEVEL: error
       PLAYWRIGHT_BASE_URL: http://localhost:3000
