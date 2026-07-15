@@ -1,24 +1,27 @@
 import Database from 'better-sqlite3';
-import path from 'path';
+import path from 'node:path';
 
 const DB_PATH = process.env['DB'] ?? path.join(process.cwd(), 'db.sqlite3');
-const db = new Database(DB_PATH);
+const database = new Database(DB_PATH);
 
-db.exec(`CREATE TABLE IF NOT EXISTS _seed_marker (id INTEGER PRIMARY KEY)`);
+database.exec(`CREATE TABLE IF NOT EXISTS _seed_marker (id INTEGER PRIMARY KEY)`);
 
-const alreadySeeded = db.prepare('SELECT id FROM _seed_marker LIMIT 1').get();
+const alreadySeeded = database.prepare('SELECT id FROM _seed_marker LIMIT 1').get();
 if (alreadySeeded) {
   console.log('Database already seeded, skipping.');
-  db.close();
+  database.close();
+  // eslint-disable-next-line unicorn/no-process-exit
   process.exit(0);
 }
 
-db.prepare(
-  `
+database
+  .prepare(
+    `
   INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
   VALUES ('preview-user-1', 'Preview User', 'preview@example.com', 1, datetime('now'), datetime('now'))
 `
-).run();
+  )
+  .run();
 
 const samplePages = [
   { id: 'seed-page-1', title: 'Welcome', emoji: '👋', parentId: null },
@@ -26,7 +29,7 @@ const samplePages = [
   { id: 'seed-page-3', title: 'Architecture', emoji: '🏗️', parentId: null },
 ];
 
-const insertPage = db.prepare(`
+const insertPage = database.prepare(`
   INSERT OR IGNORE INTO container (id, name, emoji, parentId, userId, lastUpdated)
   VALUES (@id, @title, @emoji, @parentId, 'preview-user-1', datetime('now'))
 `);
@@ -35,7 +38,7 @@ for (const page of samplePages) {
   insertPage.run(page);
 }
 
-db.prepare('INSERT INTO _seed_marker (id) VALUES (1)').run();
+database.prepare('INSERT INTO _seed_marker (id) VALUES (1)').run();
 
 console.log(`Seeded ${samplePages.length} sample pages.`);
-db.close();
+database.close();
