@@ -37,34 +37,35 @@ setup('seed database and write auth storage state', async () => {
   const cookies = setCookieHeaders.flatMap((header) => {
     const parts = header.split(';').map((p) => p.trim());
     const nameValue = parts[0];
+    if (!nameValue) return [];
     const eqIdx = nameValue.indexOf('=');
     if (eqIdx === -1) return [];
 
-    const name = nameValue.substring(0, eqIdx);
-    const value = nameValue.substring(eqIdx + 1);
+    const name = nameValue.slice(0, eqIdx);
+    const value = nameValue.slice(eqIdx + 1);
 
-    const attrs: Record<string, string | boolean> = {};
-    for (const attr of parts.slice(1)) {
-      const attrEqIdx = attr.indexOf('=');
-      if (attrEqIdx === -1) {
-        attrs[attr.toLowerCase()] = true;
+    const attributes: Record<string, string | boolean> = {};
+    for (const attribute of parts.slice(1)) {
+      const attributeEqIndex = attribute.indexOf('=');
+      if (attributeEqIndex === -1) {
+        attributes[attribute.toLowerCase()] = true;
       } else {
-        attrs[attr.substring(0, attrEqIdx).toLowerCase()] = attr.substring(attrEqIdx + 1);
+        attributes[attribute.slice(0, attributeEqIndex).toLowerCase()] = attribute.slice(attributeEqIndex + 1);
       }
     }
 
-    const maxAge = attrs['max-age'] !== undefined ? Number(attrs['max-age']) : undefined;
+    const maxAge = attributes['max-age'] === undefined ? undefined : Number(attributes['max-age']);
 
     return [
       {
         name,
         value,
         domain: hostname,
-        path: (attrs['path'] as string) ?? '/',
-        expires: maxAge != null ? Math.floor(Date.now() / 1000) + maxAge : -1,
-        httpOnly: attrs['httponly'] === true,
-        secure: attrs['secure'] === true,
-        sameSite: ((attrs['samesite'] as string) ?? 'Lax') as 'Lax' | 'Strict' | 'None',
+        path: (attributes['path'] as string) ?? '/',
+        expires: maxAge == null ? -1 : Math.floor(Date.now() / 1000) + maxAge,
+        httpOnly: attributes['httponly'] === true,
+        secure: attributes['secure'] === true,
+        sameSite: ((attributes['samesite'] as string) ?? 'Lax') as 'Lax' | 'Strict' | 'None',
       },
     ];
   });
