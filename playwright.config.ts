@@ -9,7 +9,10 @@ export default defineConfig({
   outputDir: './test-results',
   timeout: 30_000,
   retries: process.env['CI'] ? 2 : 0,
-  ...(process.env['CI'] ? { workers: 1 } : {}),
+  // Always run with a single worker: all specs share one seeded SQLite database and one
+  // auth session, so running them concurrently across multiple workers causes race
+  // conditions (e.g. a test that renames a shared seeded page racing with tests reading it).
+  workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:3000',

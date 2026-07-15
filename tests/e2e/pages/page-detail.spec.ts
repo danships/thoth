@@ -18,12 +18,22 @@ test('shows Add View button', async ({ page }) => {
 
 test('can inline-edit the page title', async ({ page }) => {
   await page.goto(`/pages/${SEED.pages.root.id}`);
-  const heading = page.getByRole('heading', { name: SEED.pages.root.name });
+  // Use a name-agnostic locator: the title's accessible name changes as soon as we start
+  // typing, so a locator filtered by the original name would stop matching mid-interaction.
+  const heading = page.getByRole('heading', { level: 1 });
   await heading.click();
   await heading.press('Control+A');
-  await heading.type('Renamed E2E Page');
+  await heading.pressSequentially('Renamed E2E Page');
   await heading.press('Enter');
   await expect(page.getByRole('heading', { name: 'Renamed E2E Page' })).toBeVisible();
+
+  // Restore the seeded name afterwards so other specs that rely on SEED.pages.root.name
+  // (a shared, pre-seeded page) keep working regardless of test execution order.
+  await heading.click();
+  await heading.press('Control+A');
+  await heading.pressSequentially(SEED.pages.root.name);
+  await heading.press('Enter');
+  await expect(page.getByRole('heading', { name: SEED.pages.root.name })).toBeVisible();
 });
 
 test('block editor is visible on the Contents tab', async ({ page }) => {

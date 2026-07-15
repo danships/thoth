@@ -190,7 +190,14 @@ export default function PageDetailsPage() {
         </Stack>
       </Container>
       {showCreateViewForm && (
-        <Modal opened onClose={() => setShowCreateViewForm(false)} title="Create View" centered size="lg">
+        <Modal
+          opened
+          onClose={() => setShowCreateViewForm(false)}
+          title="Create View"
+          centered
+          size="lg"
+          closeButtonProps={{ 'aria-label': 'Close' }}
+        >
           <ViewCreator pageId={pageId} onCreated={doViewCreated} />
         </Modal>
       )}

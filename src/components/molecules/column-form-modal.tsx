@@ -75,7 +75,7 @@ export function ColumnFormModal({
   };
 
   return (
-    <Modal opened={opened} onClose={handleClose} title={title} centered>
+    <Modal opened={opened} onClose={handleClose} title={title} centered closeButtonProps={{ 'aria-label': 'Close' }}>
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <TextInput label="Column Name" placeholder="Enter column name" {...form.getInputProps('name')} required />
