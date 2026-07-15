@@ -10,7 +10,9 @@ setup('seed database and write auth storage state', async () => {
   execSync('pnpm tsx --env-file=.env.test scripts/end-to-end-seed.ts', { stdio: 'inherit' });
 
   const baseUrl = process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:3000';
-  const { hostname } = new URL(baseUrl);
+  const parsedBaseUrl = new URL(baseUrl);
+  const { hostname } = parsedBaseUrl;
+  const isHttps = parsedBaseUrl.protocol === 'https:';
 
   // Log in via the HTTP API to get a real better-auth session cookie.
   // This avoids manually replicating the internal cookie-signing format.
@@ -64,7 +66,9 @@ setup('seed database and write auth storage state', async () => {
         path: (attributes['path'] as string) ?? '/',
         expires: maxAge == null ? -1 : Math.floor(Date.now() / 1000) + maxAge,
         httpOnly: attributes['httponly'] === true,
-        secure: attributes['secure'] === true,
+        // Force secure: false for HTTP environments (e.g. local dev and CI) so the browser
+        // sends the cookie even though the server may have returned a Secure flag in test mode.
+        secure: isHttps && attributes['secure'] === true,
         sameSite: ((attributes['samesite'] as string) ?? 'Lax') as 'Lax' | 'Strict' | 'None',
       },
     ];
