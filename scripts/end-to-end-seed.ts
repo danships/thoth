@@ -19,9 +19,9 @@ function hashPassword(password: string): Promise<string> {
       password.normalize('NFKC'),
       salt,
       64,
-      { N: 16384, r: 16, p: 1, maxmem: 128 * 16384 * 16 * 2 },
-      (err, key) => {
-        if (err) reject(err);
+      { N: 16_384, r: 16, p: 1, maxmem: 128 * 16_384 * 16 * 2 },
+      (error, key) => {
+        if (error) reject(error);
         else resolve(`${salt}:${(key as Buffer).toString('hex')}`);
       }
     );

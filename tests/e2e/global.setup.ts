@@ -38,11 +38,11 @@ setup('seed database and write auth storage state', async () => {
     const parts = header.split(';').map((p) => p.trim());
     const nameValue = parts[0];
     if (!nameValue) return [];
-    const eqIdx = nameValue.indexOf('=');
-    if (eqIdx === -1) return [];
+    const eqIndex = nameValue.indexOf('=');
+    if (eqIndex === -1) return [];
 
-    const name = nameValue.slice(0, eqIdx);
-    const value = nameValue.slice(eqIdx + 1);
+    const name = nameValue.slice(0, eqIndex);
+    const value = nameValue.slice(eqIndex + 1);
 
     const attributes: Record<string, string | boolean> = {};
     for (const attribute of parts.slice(1)) {
