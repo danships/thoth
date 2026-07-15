@@ -21,17 +21,11 @@ export function EditableDateCell({
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const iso = toIsoFromInput(event.target.value, mode);
-    if (iso) {
-      onChange(iso);
-    }
+    onChange(iso);
   };
 
   if (disabled) {
-    return (
-      <div style={{ minWidth: 120, padding: '2px 0' }}>
-        {value ? formatDateValue(value, displayFormat) : ''}
-      </div>
-    );
+    return <div style={{ minWidth: 120, padding: '2px 0' }}>{value ? formatDateValue(value, displayFormat) : ''}</div>;
   }
 
   return (

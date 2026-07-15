@@ -54,7 +54,7 @@ export function toInputValue(iso: string, mode: DateMode): string {
   if (!iso) return '';
   try {
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return '';
+    if (Number.isNaN(d.getTime())) return '';
 
     if (mode === 'date') {
       const y = d.getFullYear();
@@ -95,10 +95,13 @@ export function toIsoFromInput(inputValue: string, mode: DateMode): string {
       const minutes = parts[1] ?? 0;
       d = new Date();
       d.setHours(hours, minutes, 0, 0);
+    } else if (mode === 'date') {
+      const [year, month, day] = inputValue.split('-').map(Number);
+      d = new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);
     } else {
       d = new Date(inputValue);
     }
-    if (isNaN(d.getTime())) return '';
+    if (Number.isNaN(d.getTime())) return '';
     return d.toISOString();
   } catch {
     return '';
@@ -124,7 +127,7 @@ export function formatDateValue(iso: string, format: string): string {
   if (!iso) return '';
   try {
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
+    if (Number.isNaN(d.getTime())) return iso;
 
     const y = d.getFullYear();
     const mo = d.getMonth();
@@ -133,15 +136,17 @@ export function formatDateValue(iso: string, format: string): string {
     const min = d.getMinutes();
     const { hour: h12, ampm } = to12Hour(h);
 
-    return format
-      .replace('YYYY', String(y))
-      .replace('MM', pad(mo + 1))
-      .replace('MMM', MONTH_SHORT[mo] ?? '')
-      .replace('DD', pad(day))
-      .replace('HH', pad(h))
-      .replace('h', String(h12))
-      .replace('mm', pad(min))
-      .replace('A', ampm);
+    const tokens: Record<string, string> = {
+      YYYY: String(y),
+      MMM: MONTH_SHORT[mo] ?? '',
+      MM: pad(mo + 1),
+      DD: pad(day),
+      HH: pad(h),
+      mm: pad(min),
+      h: String(h12),
+      A: ampm,
+    };
+    return format.replaceAll(/YYYY|MMM|MM|DD|HH|mm|h|A/g, (match) => tokens[match] ?? match);
   } catch {
     return iso;
   }

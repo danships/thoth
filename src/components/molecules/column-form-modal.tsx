@@ -35,8 +35,7 @@ export function ColumnFormModal({
       name: initialValues?.name ?? '',
       type: initialValues?.type ?? 'string',
       mode: initialValues?.type === 'date' ? initialValues.mode : 'date',
-      displayFormat:
-        initialValues?.type === 'date' ? initialValues.displayFormat : getDefaultFormatForMode('date'),
+      displayFormat: initialValues?.type === 'date' ? initialValues.displayFormat : getDefaultFormatForMode('date'),
     },
     validate: {
       name: (value) => (value.trim() ? null : 'Column name is required'),
@@ -53,8 +52,7 @@ export function ColumnFormModal({
         name: initialValues?.name ?? '',
         type: initialValues?.type ?? 'string',
         mode: initialValues?.type === 'date' ? initialValues.mode : 'date',
-        displayFormat:
-          initialValues?.type === 'date' ? initialValues.displayFormat : getDefaultFormatForMode('date'),
+        displayFormat: initialValues?.type === 'date' ? initialValues.displayFormat : getDefaultFormatForMode('date'),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,12 +124,7 @@ export function ColumnFormModal({
                 onChange={handleModeChange}
                 required
               />
-              <Select
-                label="Display Format"
-                data={formatPresets}
-                {...form.getInputProps('displayFormat')}
-                required
-              />
+              <Select label="Display Format" data={formatPresets} {...form.getInputProps('displayFormat')} required />
             </>
           )}
           <Group justify="flex-end" mt="md">

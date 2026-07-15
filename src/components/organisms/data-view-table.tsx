@@ -70,12 +70,12 @@ export function DataViewTable({
       const updateBody =
         values.type === 'date'
           ? {
-              name: values.name,
+              name: values.name.trim(),
               type: 'date' as const,
               mode: values.mode,
               displayFormat: values.displayFormat,
             }
-          : { name: values.name, type: values.type as 'string' | 'number' | 'boolean' };
+          : { name: values.name.trim(), type: values.type as 'string' | 'number' | 'boolean' };
       await updateColumn(editingColumn.id, updateBody);
     } else {
       const createBody =
