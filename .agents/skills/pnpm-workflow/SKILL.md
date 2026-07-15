@@ -42,8 +42,6 @@ pnpm build       # ensures the app compiles without errors
 
 Fix TypeScript errors with `pnpm lint:tsc` first — they are the most blocking.
 
-> **Note:** No test script is currently configured in this repository. If a `test` script is added in the future, include it in the quality gate workflow.
-
 ## Workspace Structure
 
 The root `pnpm-workspace.yaml` defines workspace packages. The main application lives in the repo root (not a nested `packages/` folder). There is a single `package.json` at the root.
