@@ -7,6 +7,7 @@ export const test = base.extend<{
   seedData: typeof SEED;
 }>({
   seedData: async ({}, use) => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(SEED);
   },
 });

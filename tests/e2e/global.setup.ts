@@ -7,9 +7,9 @@ import { SEED } from './constants';
 const AUTH_FILE = path.join(import.meta.dirname, '.auth/user.json');
 
 setup('seed database and write auth storage state', async () => {
-  execSync('pnpm tsx --env-file=.env.test scripts/e2e-seed.ts', { stdio: 'inherit' });
+  execSync('pnpm tsx --env-file=.env.test scripts/end-to-end-seed.ts', { stdio: 'inherit' });
 
-  const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
+  const baseUrl = process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:3000';
   const { hostname } = new URL(baseUrl);
 
   fs.mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
@@ -23,7 +23,7 @@ setup('seed database and write auth storage state', async () => {
             value: SEED.session.token,
             domain: hostname,
             path: '/',
-            expires: Math.floor(Date.now() / 1_000) + 365 * 24 * 60 * 60,
+            expires: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
             httpOnly: true,
             secure: false,
             sameSite: 'Lax',

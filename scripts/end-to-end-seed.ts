@@ -1,11 +1,11 @@
-// scripts/e2e-seed.ts
+// scripts/end-to-end-seed.ts
 import 'dotenv/config';
 import Database from 'better-sqlite3';
 import { getContainerRepository, getDatabase, getDataViewRepository, getWorkspaceRepository } from '../src/lib/database/index.js';
 import { SEED } from '../tests/e2e/constants.js';
-import type { DataSourceContainerCreate, PageContainerCreate, WorkspaceCreate, DataViewCreate } from '../src/types/database/index.js';
+import type { DataSourceContainer, DataSourceContainerCreate, PageContainerCreate, WorkspaceCreate, DataViewCreate } from '../src/types/database/index.js';
 
-const DB_PATH = process.env.DB!.replace('sqlite://', '');
+const DB_PATH = process.env['DB']!.replace('sqlite://', '');
 
 // ── 1. Seed better-auth tables directly via raw SQLite ─────────────────────────
 function seedAuthTables() {
@@ -47,21 +47,19 @@ async function seedAppData() {
   const existingWorkspace = await workspaceRepository.getOneByQuery(
     workspaceRepository.createQuery().eq('id', SEED.workspace.id)
   );
-  if (existingWorkspace) {
-    await workspaceRepository.update({
-      ...existingWorkspace,
-      name: 'E2E Workspace',
-      lastUpdated: now,
-    });
-  } else {
-    await workspaceRepository.create({
-      id: SEED.workspace.id,
-      name: 'E2E Workspace',
-      userId: uid,
-      createdAt: now,
-      lastUpdated: now,
-    } satisfies WorkspaceCreate & { id: string });
-  }
+  await (existingWorkspace
+    ? workspaceRepository.update({
+        ...existingWorkspace,
+        name: 'E2E Workspace',
+        lastUpdated: now,
+      })
+    : workspaceRepository.create({
+        id: SEED.workspace.id,
+        name: 'E2E Workspace',
+        userId: uid,
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as WorkspaceCreate));
 
   const wsId = SEED.workspace.id;
 
@@ -69,11 +67,9 @@ async function seedAppData() {
     const existing = await containerRepository.getOneByQuery(
       containerRepository.createQuery().eq('id', data.id)
     );
-    if (existing) {
-      await containerRepository.update({ ...existing, ...data, lastUpdated: now });
-    } else {
-      await containerRepository.create(data);
-    }
+    await (existing
+      ? containerRepository.update({ ...existing, ...data, lastUpdated: now })
+      : containerRepository.create(data as unknown as PageContainerCreate));
   }
 
   await upsertPage({
@@ -116,26 +112,24 @@ async function seedAppData() {
   const existingDs = await containerRepository.getOneByQuery(
     containerRepository.createQuery().eq('id', SEED.dataSource.id)
   );
-  if (existingDs) {
-    await containerRepository.update({
-      ...existingDs,
-      name: SEED.dataSource.name,
-      columns: [...SEED.dataSource.columns],
-      lastUpdated: now,
-    });
-  } else {
-    await containerRepository.create({
-      id: SEED.dataSource.id,
-      name: SEED.dataSource.name,
-      type: 'data-source',
-      userId: uid,
-      workspaceId: wsId,
-      parentId: null,
-      columns: [...SEED.dataSource.columns],
-      createdAt: now,
-      lastUpdated: now,
-    } satisfies DataSourceContainerCreate & { id: string });
-  }
+  await (existingDs
+    ? containerRepository.update({
+        ...(existingDs as DataSourceContainer),
+        name: SEED.dataSource.name,
+        columns: [...SEED.dataSource.columns],
+        lastUpdated: now,
+      })
+    : containerRepository.create({
+        id: SEED.dataSource.id,
+        name: SEED.dataSource.name,
+        type: 'data-source',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: null,
+        columns: [...SEED.dataSource.columns],
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as DataSourceContainerCreate));
 
   await upsertPage({
     id: SEED.dataSourcePage.id,
@@ -156,25 +150,23 @@ async function seedAppData() {
   const existingView = await dataViewRepository.getOneByQuery(
     dataViewRepository.createQuery().eq('id', SEED.dataView.id)
   );
-  if (existingView) {
-    await dataViewRepository.update({
-      ...existingView,
-      name: SEED.dataView.name,
-      columns: SEED.dataSource.columns.map((c) => c.id),
-      lastUpdated: now,
-    });
-  } else {
-    await dataViewRepository.create({
-      id: SEED.dataView.id,
-      name: SEED.dataView.name,
-      dataSourceId: SEED.dataSource.id,
-      userId: uid,
-      workspaceId: wsId,
-      columns: SEED.dataSource.columns.map((c) => c.id),
-      createdAt: now,
-      lastUpdated: now,
-    } satisfies DataViewCreate & { id: string });
-  }
+  await (existingView
+    ? dataViewRepository.update({
+        ...existingView,
+        name: SEED.dataView.name,
+        columns: SEED.dataSource.columns.map((c) => c.id),
+        lastUpdated: now,
+      })
+    : dataViewRepository.create({
+        id: SEED.dataView.id,
+        name: SEED.dataView.name,
+        dataSourceId: SEED.dataSource.id,
+        userId: uid,
+        workspaceId: wsId,
+        columns: SEED.dataSource.columns.map((c) => c.id),
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as DataViewCreate));
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────

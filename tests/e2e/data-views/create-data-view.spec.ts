@@ -20,6 +20,6 @@ test('can create a data view through the UI and the new tab appears', async ({ p
 
   await dialog.getByRole('button', { name: /create/i }).click();
 
-  await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
   await expect(page.getByRole('tab', { name: 'UI-Created View' })).toBeVisible();
 });
