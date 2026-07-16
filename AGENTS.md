@@ -142,6 +142,15 @@ Before completing tasks, run available lint and typecheck commands:
 - Fix any issues found
 - Only commit changes when explicitly requested by the user
 
+## E2E Tests (Playwright)
+
+Every feature — new or modified — **must** ship with Playwright E2E tests.
+
+- Tests live in `tests/e2e/` grouped by domain (auth, pages, data-sources, data-views, page-values).
+- Use seeded data from `tests/e2e/constants.ts` (`SEED.*`) — never hardcode IDs.
+- Run: `pnpm test:e2e` (local) · `pnpm test:e2e:ui` (interactive) · `pnpm test:e2e:report` (report).
+- See `.agents/commands/e2e-test.md` for full conventions, auth setup, and selector guidance.
+
 ## Skills
 
 The following agent skills provide targeted guidance for specific tasks:

@@ -1,3 +1,8 @@
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
 minimumReleaseAge: 1440
 onlyBuiltDependencies:
   - better-sqlite3
@@ -6,3 +11,5 @@ overrides:
   body-parser@>=2.2.0 <2.2.1: '>=2.2.1'
   mdast-util-to-hast@>=13.0.0 <13.2.1: '>=13.2.1'
   qs@<6.14.1: '>=6.14.1'
+  postcss: '>=8.5.10'
+  short-uuid: ^6.0.3

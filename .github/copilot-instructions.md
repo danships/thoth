@@ -58,6 +58,8 @@ Examples to copy/paste
 Quality gates
 
 - Run `pnpm build` and `pnpm lint` after making significant changes. Fix TypeScript errors (`pnpm lint:tsc`) before opening PRs.
+- Run `pnpm test:e2e` after implementing any user-facing feature. Every feature must
+  have a Playwright spec in `tests/e2e/`. See `.agents/commands/e2e-test.md` for full conventions.
 
 If uncertain
 

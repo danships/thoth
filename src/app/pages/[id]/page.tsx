@@ -130,7 +130,7 @@ export default function PageDetailsPage() {
     return (
       <Container size="md" py="xl">
         <Alert color="red" title="Error">
-          {error}
+          {error instanceof Error ? error.message : String(error)}
         </Alert>
       </Container>
     );
@@ -190,7 +190,14 @@ export default function PageDetailsPage() {
         </Stack>
       </Container>
       {showCreateViewForm && (
-        <Modal opened onClose={() => setShowCreateViewForm(false)} title="Create View" centered size="lg">
+        <Modal
+          opened
+          onClose={() => setShowCreateViewForm(false)}
+          title="Create View"
+          centered
+          size="lg"
+          closeButtonProps={{ 'aria-label': 'Close' }}
+        >
           <ViewCreator pageId={pageId} onCreated={doViewCreated} />
         </Modal>
       )}
