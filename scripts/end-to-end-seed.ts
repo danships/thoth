@@ -166,6 +166,7 @@ async function seedAppData() {
     values: {
       [SEED.dataSource.columns[0].id]: { type: 'string', value: 'Seeded note' },
       [SEED.dataSource.columns[1].id]: { type: 'boolean', value: false },
+      [SEED.dataSource.columns[2].id]: { type: 'date', value: '2026-01-31T00:00:00.000Z' },
     },
   });
 
