@@ -10,8 +10,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 env:
   REGISTRY: ghcr.io
@@ -42,6 +41,9 @@ jobs:
     name: Build and push image
     needs: validate-tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -79,6 +81,8 @@ jobs:
     name: Create GitHub release
     needs: [validate-tag, build-and-push-image]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
