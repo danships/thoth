@@ -1,0 +1,99 @@
+name: Release
+
+# Triggered by pushing a semver tag (vX.Y.Z) or pre-release tag (vX.Y.Z-betaN).
+# This is intentionally branch-agnostic: tags can be pushed from `main`, a
+# `hotfix/*` branch, or any other ref, since hotfix releases are a valid,
+# expected flow.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-tag:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      is-prerelease: ${{ steps.check.outputs.is-prerelease }}
+    steps:
+      - name: Validate tag format
+        id: check
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta[0-9]+$ ]]; then
+            echo "is-prerelease=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "is-prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Tag '$TAG' does not match the required format vX.Y.Z or vX.Y.Z-betaN"
+            exit 1
+          fi
+
+  build-and-push-image:
+    name: Build and push image
+    needs: validate-tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image tags
+        id: meta
+        env:
+          IS_PRERELEASE: ${{ needs.validate-tag.outputs.is-prerelease }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          TAGS="${IMAGE}:${TAG}"
+          if [[ "$IS_PRERELEASE" == "false" ]]; then
+            TAGS="${TAGS},${IMAGE}:latest"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+  create-release:
+    name: Create GitHub release
+    needs: [validate-tag, build-and-push-image]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          IS_PRERELEASE: ${{ needs.validate-tag.outputs.is-prerelease }}
+        run: |
+          PRERELEASE_FLAG=""
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            $PRERELEASE_FLAG

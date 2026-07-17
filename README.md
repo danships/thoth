@@ -38,6 +38,10 @@ pnpm dev
 
 Issues and PRs are welcome. Please follow TypeScript best practices and the existing Atomic Design conventions in `packages/web`.
 
+### Releasing
+
+Releases and production Docker images are published automatically when a `vX.Y.Z` (or `vX.Y.Z-betaN` pre-release) tag is pushed. See [`docs/RELEASING.md`](docs/RELEASING.md) for the full process.
+
 ### License
 
 MIT
