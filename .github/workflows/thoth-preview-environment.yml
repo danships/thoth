@@ -57,11 +57,10 @@ jobs:
           host: ${{ secrets.THOTH_PREVIEW_VM_HOST }}
           username: ${{ secrets.THOTH_PREVIEW_VM_USER }}
           key: ${{ secrets.THOTH_PREVIEW_VM_SSH_KEY }}
-          envs: IMAGE
           timeout: 120s
           command_timeout: 10m
           script_stop: true
-          script: /srv/http/webapps/preview.dbgdan.com/scripts/deploy.sh ${{ github.event.pull_request.number }} $IMAGE
+          script: /srv/http/webapps/preview.dbgdan.com/scripts/deploy.sh ${{ github.event.pull_request.number }} ${{ env.IMAGE }}
 
       - name: Skip deploy (VM secrets not configured)
         if: steps.check-secrets.outputs.configured != 'true'
