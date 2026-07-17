@@ -61,7 +61,7 @@ jobs:
           timeout: 120s
           command_timeout: 10m
           script_stop: true
-          script: deploy ${{ github.event.pull_request.number }} $IMAGE
+          script: /srv/http/webapps/preview.dbgdan.com/scripts/deploy.sh ${{ github.event.pull_request.number }} $IMAGE
 
       - name: Skip deploy (VM secrets not configured)
         if: steps.check-secrets.outputs.configured != 'true'
@@ -133,7 +133,7 @@ jobs:
           timeout: 120s
           command_timeout: 10m
           script_stop: true
-          script: teardown ${{ github.event.pull_request.number }}
+          script: /srv/http/webapps/preview.dbgdan.com/scripts/teardown.sh ${{ github.event.pull_request.number }}
 
       - name: Skip teardown (VM secrets not configured)
         if: steps.check-secrets.outputs.configured != 'true'
