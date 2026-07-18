@@ -18,6 +18,10 @@ RUN pnpm build
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Ensure pnpm never prompts interactively (e.g. to purge node_modules) when
+# `pnpm run db:seed` is executed non-interactively via `docker exec` during
+# preview environment provisioning, since no TTY is attached in that context.
+ENV CI=true
 
 RUN apk add --no-cache wget && \
     addgroup --system --gid 1001 nodejs && \
