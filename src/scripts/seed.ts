@@ -1,3 +1,11 @@
+// Load environment variables from a `.env` file (if present) before anything
+// else runs. Next.js loads `.env` files automatically for the `node server.js`
+// process, but this script is executed directly via `tsx` (e.g. `docker exec`
+// during preview environment provisioning), which does not load `.env` files
+// on its own, so `DB` and other required variables would otherwise be
+// undefined even though they are configured for the running container.
+import 'dotenv/config';
+
 import type BetterSqlite3 from 'better-sqlite3';
 import type { PageContainerCreate, WorkspaceCreate } from '@/types/database';
 import { getContainerRepository, getDatabase, getWorkspaceRepository } from '@/lib/database';
