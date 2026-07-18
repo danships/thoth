@@ -55,6 +55,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-worksp
 # container. Without it, tsx has no path-mapping config and fails with
 # ERR_MODULE_NOT_FOUND for aliased imports like `@/lib`.
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
+# Persist the container's runtime env vars to /app/.env on startup (see
+# docker-entrypoint.sh) so a later `docker exec ... pnpm run db:seed` can
+# load them via `dotenv/config`, even though that separate exec session
+# does not reliably inherit the runtime environment on its own.
+COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 USER nextjs
 
@@ -65,4 +71,5 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "server.js"]
