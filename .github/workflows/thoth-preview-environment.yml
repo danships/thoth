@@ -15,7 +15,17 @@ jobs:
   # ── Deploy (opened / synchronize / reopened) ─────────────────────────
   deploy:
     name: Deploy Thoth preview
-    if: github.event.action != 'closed'
+    # Only deploy preview environments for PRs opened by trusted contributors
+    # (repo owner/members/collaborators, per GitHub's `author_association`),
+    # since the workflow builds and deploys arbitrary PR code to a real VM.
+    # As a fallback (e.g. if `author_association` is ever unavailable or
+    # unreliable), also explicitly allow known trusted accounts.
+    if: |
+      github.event.action != 'closed' &&
+      (
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) ||
+        contains(fromJSON('["danships", "danshipsbot"]'), github.event.pull_request.user.login)
+      )
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -48,6 +58,7 @@ jobs:
             --platform linux/amd64 \
             --push \
             --tag "${IMAGE}" \
+            --file Dockerfile.preview \
             .
 
       - name: Deploy preview on VM
@@ -105,7 +116,14 @@ jobs:
   # ── Teardown (closed) ─────────────────────────────────────────────────
   teardown:
     name: Teardown Thoth preview
-    if: github.event.action == 'closed'
+    # Mirror the deploy gate: only tear down previews for PRs that were
+    # eligible to have one deployed in the first place.
+    if: |
+      github.event.action == 'closed' &&
+      (
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association) ||
+        contains(fromJSON('["danships", "danshipsbot"]'), github.event.pull_request.user.login)
+      )
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
