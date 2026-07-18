@@ -50,11 +50,17 @@ ENV NODE_ENV=production
 # provisioning, since no TTY is attached in that context.
 ENV CI=true
 
+# `/data` holds the default SQLite database file docker-entrypoint.sh falls
+# back to when the preview deploy tooling doesn't supply a `DB` connection
+# string (preview environments are single, self-contained containers with no
+# external database provisioned for them). It's created and chowned here,
+# at build time, because the `nextjs` user has no permission to create new
+# top-level directories under `/` at container runtime.
 RUN apk add --no-cache wget && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 --home /home/nextjs nextjs && \
-    mkdir -p /home/nextjs && \
-    chown -R nextjs:nodejs /home/nextjs /app
+    mkdir -p /home/nextjs /data && \
+    chown -R nextjs:nodejs /home/nextjs /app /data
 
 # Full node_modules (dev + prod), already fully installed at build time.
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules

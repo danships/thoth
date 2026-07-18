@@ -15,6 +15,17 @@
 # exec` session in this container to load via `dotenv/config`.
 set -e
 
+# Preview environments are single, self-contained containers with no
+# external database provisioned for them by the deploy tooling, so `DB` is
+# not guaranteed to be set. Default it to a local SQLite file under `/data`
+# (created and chowned to the runtime user at build time, see
+# Dockerfile.preview) so both this process and the later `pnpm run db:seed`
+# invocation (which reads `DB` from the `.env` file written below) have a
+# working value. `docker run -e DB=...` still takes precedence if the deploy
+# tooling does supply one.
+: "${DB:=sqlite:///data/thoth.db}"
+export DB
+
 env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' | grep -v -E '^(HOME|PATH|PWD|HOSTNAME|SHLVL|OLDPWD|_)=' > /app/.env
 
 exec "$@"
