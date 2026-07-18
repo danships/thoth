@@ -78,6 +78,21 @@ jobs:
         run: |
           echo "::warning::THOTH_PREVIEW_VM_HOST secret is not configured. Skipping SSH deploy step."
 
+      - name: Wait for preview to become healthy
+        if: steps.check-secrets.outputs.configured == 'true'
+        run: |
+          url="https://thoth-pr-${{ github.event.pull_request.number }}.preview.dbgdan.com/api/health"
+          echo "Polling ${url} ..."
+          for _ in $(seq 1 30); do
+            if curl --silent --fail --max-time 5 "$url" > /dev/null; then
+              echo "Preview is healthy."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Preview at ${url} did not become healthy in time."
+          exit 1
+
       - name: Post or update preview URL comment
         if: steps.check-secrets.outputs.configured == 'true'
         uses: actions/github-script@v7

@@ -45,14 +45,26 @@ if (alreadySeeded) {
   process.exit(0);
 }
 
-database
-  .prepare(
-    `
+// The workspace/container repositories perform their own async writes
+// through SuperSave (not raw, synchronous better-sqlite3 statements), so
+// they can't be wrapped in a single `better-sqlite3` `database.transaction()`
+// callback alongside them (that API only supports synchronous functions).
+// Instead, only the raw INSERT statements below (the preview user and the
+// `_seed_marker` row) are wrapped in a transaction so that pair is atomic;
+// if the preview user insert fails, no marker is written and a subsequent
+// run will retry seeding from scratch.
+const insertPreviewUser = database.prepare(
+  `
   INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
   VALUES (@id, 'Preview User', 'preview@example.com', 1, datetime('now'), datetime('now'))
 `
-  )
-  .run({ id: PREVIEW_USER_ID });
+);
+const insertSeedMarker = database.prepare('INSERT INTO _seed_marker (id) VALUES (1)');
+
+const seedPreviewUser = database.transaction(() => {
+  insertPreviewUser.run({ id: PREVIEW_USER_ID });
+});
+seedPreviewUser();
 
 // Pages are stored by SuperSave behind a generated JSON `contents` column, so
 // they must be created through the repository API (which the rest of the
@@ -94,7 +106,7 @@ for (const page of samplePages) {
   createdPageIdsByName.set(page.name, created.id);
 }
 
-database.prepare('INSERT INTO _seed_marker (id) VALUES (1)').run();
+insertSeedMarker.run();
 
 console.log(`Seeded ${samplePages.length} sample pages.`);
 database.close();
