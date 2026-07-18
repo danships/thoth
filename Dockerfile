@@ -40,6 +40,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # running container, e.g. for preview environment provisioning.
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/src/scripts ./src/scripts
+# Also copy the lockfile and workspace config so a `pnpm install` executed
+# inside the running container (e.g. to add devDependencies like `tsx` before
+# running the seed script) resolves against the same locked versions and
+# respects the `onlyBuiltDependencies` build-script allowlist, instead of
+# failing with ERR_PNPM_IGNORED_BUILDS.
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 USER nextjs
 
