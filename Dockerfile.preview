@@ -56,7 +56,10 @@ ENV CI=true
 # external database provisioned for them). It's created and chowned here,
 # at build time, because the `nextjs` user has no permission to create new
 # top-level directories under `/` at container runtime.
-RUN apk add --no-cache wget && \
+#
+# `su-exec` lets the entrypoint (which must start as root, see below) drop
+# privileges down to the `nextjs` user right before starting the app.
+RUN apk add --no-cache wget su-exec && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 --home /home/nextjs nextjs && \
     mkdir -p /home/nextjs /data && \
@@ -94,7 +97,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-USER nextjs
+# Deliberately stay as root here (no `USER nextjs`): the preview deploy
+# tooling may mount `/data` from a fresh host directory or named volume for
+# persistence across container recreations, which Docker creates as
+# root-owned. docker-entrypoint.sh re-asserts ownership of `/data` on every
+# start (cheap, idempotent) and then drops privileges to `nextjs` via
+# `su-exec` before execing the app, so the SQLite file underneath it is
+# always writable by the user the app actually runs as.
 
 EXPOSE 3000
 ENV PORT=3000

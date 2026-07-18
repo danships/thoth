@@ -28,4 +28,18 @@ export DB
 
 env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' | grep -v -E '^(HOME|PATH|PWD|HOSTNAME|SHLVL|OLDPWD|_)=' > /app/.env
 
+# The container starts as root (no `USER` directive in Dockerfile.preview)
+# specifically so this can run: the preview deploy tooling may mount `/data`
+# from a fresh host directory or named volume for persistence across
+# container recreations, and Docker creates those as root-owned, which would
+# make the built-in chown from the image build (see Dockerfile.preview)
+# ineffective and cause SQLite's `unable to open database file` on first
+# deploy. Re-assert ownership here, on every start, before dropping
+# privileges to the unprivileged `nextjs` user the app actually runs as.
+if [ "$(id -u)" = '0' ]; then
+  chown -R nextjs:nodejs /data
+  chown nextjs:nodejs /app/.env
+  exec su-exec nextjs "$@"
+fi
+
 exec "$@"
