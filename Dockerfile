@@ -36,10 +36,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Overwrite the minimal, traced package.json from the standalone build with the
-# full one (and copy the seed script) so `pnpm run db:seed` is runnable in the
-# running container, e.g. for preview environment provisioning.
+# full one, and copy the full source tree (not just the seed script), so
+# `pnpm run db:seed` is runnable in the running container, e.g. for preview
+# environment provisioning. The seed script imports from `@/lib` and `@/types`
+# via tsx path aliases, so those source directories must also be present, not
+# just src/scripts.
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/src/scripts ./src/scripts
+COPY --from=builder --chown=nextjs:nodejs /app/src ./src
 # Also copy the lockfile and workspace config so a `pnpm install` executed
 # inside the running container (e.g. to add devDependencies like `tsx` before
 # running the seed script) resolves against the same locked versions and
@@ -47,6 +50,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/src/scripts ./src/scripts
 # failing with ERR_PNPM_IGNORED_BUILDS.
 COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+# Copy tsconfig.json so `tsx` can resolve the `@/*` path aliases used by the
+# seed script (and its imports) when it is executed directly in the running
+# container. Without it, tsx has no path-mapping config and fails with
+# ERR_MODULE_NOT_FOUND for aliased imports like `@/lib`.
+COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 
 USER nextjs
 
