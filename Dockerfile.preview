@@ -90,6 +90,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/src ./src
 # script (and its imports) when it is executed directly in the running
 # container.
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
+# `scripts/db-seed.sh` is the wrapper `pnpm run db:seed` now points at (see
+# package.json). It drops privileges to `nextjs` before running the seed
+# script when invoked as root — which `docker exec` does by default against
+# this image, since it has no `USER` directive — so the seed script's SQLite
+# connection never leaves root-owned `-wal`/`-shm` files behind that would
+# make the database unwritable for the app's own `nextjs`-owned connection
+# afterwards.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-seed.sh ./scripts/db-seed.sh
+RUN chmod +x ./scripts/db-seed.sh
 # Persist the container's runtime env vars to /app/.env on startup (see
 # docker-entrypoint.sh) so a later `docker exec ... pnpm run db:seed` can
 # load them via `dotenv/config`, even though that separate exec session
