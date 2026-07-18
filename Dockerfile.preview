@@ -13,7 +13,7 @@
 # any other dependency download) happens when the container starts or when
 # `pnpm run db:seed` is executed later via `docker exec` — the preview
 # environment must not perform network installs at runtime.
-FROM node:22-alpine AS base
+FROM node:24.18.0-alpine AS base
 # Set HOME to the same path the `nextjs` runtime user will use *before*
 # `corepack prepare` runs, so corepack's downloaded pnpm shim is cached
 # under `/home/nextjs/.cache` from the very first stage. If HOME were only

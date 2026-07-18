@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:24.18.0-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@11.13.0 --activate

@@ -1,4 +1,8 @@
 #!/bin/sh
+# This entrypoint is only valid for a preview image build (see
+# Dockerfile.preview) — it seeds data via `pnpm run db:seed` and must never
+# be used for the production image built from the standard `Dockerfile`.
+#
 # Persist the container's runtime environment variables to a `.env` file
 # before starting the app.
 #
