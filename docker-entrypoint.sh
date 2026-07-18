@@ -38,6 +38,16 @@ env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' | grep -v -E '^(HOME|PATH|PWD|HOSTNAME|
 # privileges to the unprivileged `nextjs` user the app actually runs as.
 if [ "$(id -u)" = '0' ]; then
   chown -R nextjs:nodejs /data
+  # The host-side deploy tooling (running as a separate, unprivileged host
+  # user outside this container) also writes a `.seeded` marker file
+  # directly into this same bind-mounted `/data` directory once `pnpm run
+  # db:seed` has completed, to avoid re-seeding on subsequent deploys.
+  # Since the chown above makes `/data` owned by the containerised
+  # `nextjs` user/group (uid/gid 1001), that host user would otherwise get
+  # a "Permission denied" trying to create a file there. Make the
+  # directory itself (not its contents) world-writable so any host user
+  # can create that marker file alongside the app's own data.
+  chmod 777 /data
   chown nextjs:nodejs /app/.env
   exec su-exec nextjs "$@"
 fi
