@@ -14,6 +14,15 @@
 # `pnpm run db:seed` is executed later via `docker exec` — the preview
 # environment must not perform network installs at runtime.
 FROM node:22-alpine AS base
+# Set HOME to the same path the `nextjs` runtime user will use *before*
+# `corepack prepare` runs, so corepack's downloaded pnpm shim is cached
+# under `/home/nextjs/.cache` from the very first stage. If HOME were only
+# set later (in the `runner` stage), corepack would look for its cache in a
+# different, empty HOME when running as the `nextjs` user and would
+# re-download pnpm over the network — and re-run a full `pnpm install` —
+# when `pnpm run db:seed` is executed at runtime, which this image must
+# never do (see comment above).
+ENV HOME=/home/nextjs
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
@@ -46,8 +55,6 @@ RUN apk add --no-cache wget && \
     adduser --system --uid 1001 --home /home/nextjs nextjs && \
     mkdir -p /home/nextjs && \
     chown -R nextjs:nodejs /home/nextjs /app
-
-ENV HOME=/home/nextjs
 
 # Full node_modules (dev + prod), already fully installed at build time.
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
