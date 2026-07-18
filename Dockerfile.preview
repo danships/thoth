@@ -1,0 +1,116 @@
+# Preview-environment image.
+#
+# Unlike the standard `Dockerfile` (which produces a lean, production-only
+# image built from the Next.js standalone output), preview environments also
+# need to run `pnpm run db:seed` after the app starts, so this image must
+# include:
+#   - the full `node_modules` (including devDependencies such as `tsx`,
+#     which the seed script is executed with)
+#   - the full source tree (`src/`, `tsconfig.json`, `package.json`) so the
+#     seed script's `@/*` path aliases resolve
+#
+# Crucially, everything is installed at *build* time. No `pnpm install` (or
+# any other dependency download) happens when the container starts or when
+# `pnpm run db:seed` is executed later via `docker exec` — the preview
+# environment must not perform network installs at runtime.
+FROM node:24.18.0-alpine AS base
+# Set HOME to the same path the `nextjs` runtime user will use *before*
+# `corepack prepare` runs, so corepack's downloaded pnpm shim is cached
+# under `/home/nextjs/.cache` from the very first stage. If HOME were only
+# set later (in the `runner` stage), corepack would look for its cache in a
+# different, empty HOME when running as the `nextjs` user and would
+# re-download pnpm over the network — and re-run a full `pnpm install` —
+# when `pnpm run db:seed` is executed at runtime, which this image must
+# never do (see comment above).
+ENV HOME=/home/nextjs
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
+
+FROM base AS deps
+RUN apk add --no-cache python3 make g++
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Full install (no `--prod`): devDependencies like `tsx` and `typescript`
+# must be present in the final image so the seed script can run without any
+# further installation at runtime.
+RUN pnpm install --frozen-lockfile
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+# Ensure pnpm never prompts interactively when `pnpm run db:seed` is executed
+# non-interactively via `docker exec` during preview environment
+# provisioning, since no TTY is attached in that context.
+ENV CI=true
+
+# `/data` holds the default SQLite database file docker-entrypoint.sh falls
+# back to when the preview deploy tooling doesn't supply a `DB` connection
+# string (preview environments are single, self-contained containers with no
+# external database provisioned for them). It's created and chowned here,
+# at build time, because the `nextjs` user has no permission to create new
+# top-level directories under `/` at container runtime.
+#
+# `su-exec` lets the entrypoint (which must start as root, see below) drop
+# privileges down to the `nextjs` user right before starting the app.
+RUN apk add --no-cache wget su-exec && \
+    addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 --home /home/nextjs nextjs && \
+    mkdir -p /home/nextjs /data && \
+    chown -R nextjs:nodejs /home/nextjs /app /data
+
+# Full node_modules (dev + prod), already fully installed at build time.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Overwrite the minimal, traced package.json from the standalone build with
+# the full one, and copy the full source tree (not just the seed script), so
+# `pnpm run db:seed` is runnable in the running container. The seed script
+# imports from `@/lib` and `@/types` via tsx path aliases, so those source
+# directories must also be present, not just src/scripts.
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+# pnpm-workspace.yaml carries the `onlyBuiltDependencies`/`allowBuilds`
+# allowlist (see pnpm-workspace.yaml). Without it present in /app, any
+# `pnpm install` run against this image (e.g. during preview provisioning)
+# falls back to pnpm's default of ignoring build scripts for dependencies
+# like `better-sqlite3`, `esbuild`, `sharp` and `unrs-resolver`, which pnpm
+# treats as a hard error (`ERR_PNPM_IGNORED_BUILDS`) unless explicitly
+# approved or allowlisted.
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder --chown=nextjs:nodejs /app/src ./src
+# tsconfig.json so `tsx` can resolve the `@/*` path aliases used by the seed
+# script (and its imports) when it is executed directly in the running
+# container.
+COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
+# Persist the container's runtime env vars to /app/.env on startup (see
+# docker-entrypoint.sh) so a later `docker exec ... pnpm run db:seed` can
+# load them via `dotenv/config`, even though that separate exec session
+# does not reliably inherit the runtime environment on its own.
+COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Deliberately stay as root here (no `USER nextjs`): the preview deploy
+# tooling may mount `/data` from a fresh host directory or named volume for
+# persistence across container recreations, which Docker creates as
+# root-owned. docker-entrypoint.sh re-asserts ownership of `/data` on every
+# start (cheap, idempotent) and then drops privileges to `nextjs` via
+# `su-exec` before execing the app, so the SQLite file underneath it is
+# always writable by the user the app actually runs as.
+
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["node", "server.js"]
