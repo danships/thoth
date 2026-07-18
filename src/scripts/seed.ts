@@ -4,7 +4,21 @@
 // during preview environment provisioning), which does not load `.env` files
 // on its own, so `DB` and other required variables would otherwise be
 // undefined even though they are configured for the running container.
-import 'dotenv/config';
+//
+// `dotenv/config`'s default behaviour resolves `.env` relative to
+// `process.cwd()`. During preview provisioning this script may be invoked
+// with a different working directory than `/app` (e.g. via `docker exec`
+// after a fresh `pnpm install`), which would silently skip loading the
+// `.env` file docker-entrypoint.sh wrote at container start, leaving `DB`
+// and other required variables undefined. Resolve the path explicitly
+// relative to this script's own location instead, so it works regardless of
+// the invoking process's working directory.
+import { config as loadDotenv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+loadDotenv({ path: path.resolve(scriptDirectory, '../../.env') });
 
 import type BetterSqlite3 from 'better-sqlite3';
 import type { PageContainerCreate, WorkspaceCreate } from '@/types/database';
