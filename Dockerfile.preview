@@ -67,6 +67,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # imports from `@/lib` and `@/types` via tsx path aliases, so those source
 # directories must also be present, not just src/scripts.
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+# pnpm-workspace.yaml carries the `onlyBuiltDependencies`/`allowBuilds`
+# allowlist (see pnpm-workspace.yaml). Without it present in /app, any
+# `pnpm install` run against this image (e.g. during preview provisioning)
+# falls back to pnpm's default of ignoring build scripts for dependencies
+# like `better-sqlite3`, `esbuild`, `sharp` and `unrs-resolver`, which pnpm
+# treats as a hard error (`ERR_PNPM_IGNORED_BUILDS`) unless explicitly
+# approved or allowlisted.
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder --chown=nextjs:nodejs /app/src ./src
 # tsconfig.json so `tsx` can resolve the `@/*` path aliases used by the seed
 # script (and its imports) when it is executed directly in the running
