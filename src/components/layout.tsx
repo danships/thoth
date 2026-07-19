@@ -47,7 +47,7 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
 
   return (
     <AppShell
-      padding="md"
+      padding={{ base: 0, sm: 'md' }}
       header={{ height: 30 }}
       navbar={{
         width: 300,

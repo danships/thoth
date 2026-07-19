@@ -121,7 +121,7 @@ export default function PageDetailsPage() {
 
   if (isLoading) {
     return (
-      <Container size="md" py="xl">
+      <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
         <Loader />
       </Container>
     );
@@ -129,7 +129,7 @@ export default function PageDetailsPage() {
 
   if (error) {
     return (
-      <Container size="md" py="xl">
+      <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
         <Alert color="red" title="Error">
           {error instanceof Error ? error.message : String(error)}
         </Alert>
@@ -139,7 +139,7 @@ export default function PageDetailsPage() {
 
   if (!pageDetails) {
     return (
-      <Container size="md" py="xl">
+      <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
         <Text>Page not found.</Text>
       </Container>
     );
@@ -147,7 +147,7 @@ export default function PageDetailsPage() {
 
   return (
     <>
-      <Container size="md" py="xl">
+      <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
         <Box className="is-pulled-right">
           <Button size="xs" variant="default" onClick={() => setShowCreateViewForm(true)} leftSection={<IconPlus />}>
             Add View
@@ -178,25 +178,31 @@ export default function PageDetailsPage() {
               mutatePageDetails={mutate}
             />
           )}
-          <Tabs value={selectedView} onChange={(value) => router.replace(`?v=${value}`)}>
-            <Tabs.List>
-              {pageDetails.views?.map((view) => (
-                <Tabs.Tab key={view.id} value={view.id}>
-                  {view.name}
-                </Tabs.Tab>
-              ))}
-              <Tabs.Tab value="contents">Contents</Tabs.Tab>
-            </Tabs.List>
-            <Tabs.Panel value="contents">
-              <PageDetailEditor initialContent={pageDetails.blocks ?? []} onUpdate={updateBlocks} />
-            </Tabs.Panel>
-
-            {pageDetails.views?.map((view) => (
-              <Tabs.Panel key={view.id} value={view.id}>
-                <DataViewRender view={view} />
+          <Box className={styles['tabsWrapper'] ?? ''}>
+            <Tabs
+              value={selectedView}
+              onChange={(value) => router.replace(`?v=${value}`)}
+              className={styles['tabs'] ?? ''}
+            >
+              <Tabs.List>
+                {pageDetails.views?.map((view) => (
+                  <Tabs.Tab key={view.id} value={view.id}>
+                    {view.name}
+                  </Tabs.Tab>
+                ))}
+                <Tabs.Tab value="contents">Contents</Tabs.Tab>
+              </Tabs.List>
+              <Tabs.Panel value="contents" className={styles['tabsPanel'] ?? ''}>
+                <PageDetailEditor initialContent={pageDetails.blocks ?? []} onUpdate={updateBlocks} />
               </Tabs.Panel>
-            ))}
-          </Tabs>
+
+              {pageDetails.views?.map((view) => (
+                <Tabs.Panel key={view.id} value={view.id} className={styles['tabsPanel'] ?? ''}>
+                  <DataViewRender view={view} />
+                </Tabs.Panel>
+              ))}
+            </Tabs>
+          </Box>
         </Stack>
       </Container>
       {showCreateViewForm && (
