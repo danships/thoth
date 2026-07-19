@@ -4,17 +4,13 @@ import { getEnvironment } from '../environment';
 import * as entities from './entities';
 import { migrations } from './migrations';
 
-let database: SuperSave;
+let databasePromise: Promise<SuperSave> | undefined;
 
-export async function getDatabase() {
-  if (database) {
-    return database;
-  }
-
+async function initializeDatabase() {
   const environment = await getEnvironment();
   const skipSync = environment.SUPERSAVE_SKIP_SYNC;
 
-  database = await SuperSave.create(environment.DB, {
+  const database = await SuperSave.create(environment.DB, {
     migrations,
     skipSync,
   });
@@ -28,6 +24,22 @@ export async function getDatabase() {
   }
 
   return database;
+}
+
+export async function getDatabase() {
+  // Cache the in-flight initialization promise (not just the resolved value) so
+  // concurrent callers await the same initialization instead of each racing to
+  // create the database and register entities, which caused duplicate entity
+  // registration (UNIQUE constraint failures) and partially-initialized instances.
+  if (!databasePromise) {
+    databasePromise = initializeDatabase().catch((error: unknown) => {
+      // Allow a subsequent call to retry initialization if it failed.
+      databasePromise = undefined;
+      throw error;
+    });
+  }
+
+  return databasePromise;
 }
 
 export async function getContainerRepository() {
