@@ -12,8 +12,8 @@ import { useNotification } from '@/lib/hooks/use-notification';
 import { useDataViewColumns } from '@/lib/hooks/api/use-data-view-columns';
 import { usePageValueUpdate } from '@/lib/hooks/api/use-page-value-update';
 import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
-import type { Column } from '@/types/schemas/entities/container';
-import type { GetPagesResponse } from '@/types/api';
+import type { Column, DateMode } from '@/types/schemas/entities/container';
+import type { CreateDataSourceColumnBody, GetPagesResponse, UpdateDataSourceColumnBody } from '@/types/api';
 
 type DataViewTableProperties = {
   dataSourceId: string;
@@ -62,31 +62,31 @@ export function DataViewTable({
 
   const handleColumnSubmit = async (values: {
     name: string;
-    type: 'string' | 'number' | 'boolean' | 'date';
-    mode?: 'date' | 'time' | 'datetime';
+    type: Column['type'];
+    mode?: DateMode;
     displayFormat?: string;
   }) => {
     if (editingColumn) {
-      const updateBody =
+      const updateBody: UpdateDataSourceColumnBody =
         values.type === 'date'
           ? {
               name: values.name.trim(),
-              type: 'date' as const,
+              type: 'date',
               mode: values.mode,
               displayFormat: values.displayFormat,
             }
-          : { name: values.name.trim(), type: values.type as 'string' | 'number' | 'boolean' };
+          : { name: values.name.trim(), type: values.type };
       await updateColumn(editingColumn.id, updateBody);
     } else {
-      const createBody =
+      const createBody: CreateDataSourceColumnBody =
         values.type === 'date'
           ? {
               name: values.name.trim(),
-              type: 'date' as const,
+              type: 'date',
               mode: values.mode ?? 'date',
               displayFormat: values.displayFormat ?? '',
             }
-          : { name: values.name.trim(), type: values.type as 'string' | 'number' | 'boolean' };
+          : { name: values.name.trim(), type: values.type };
       await createColumn(createBody);
     }
     mutateDataSource();

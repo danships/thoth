@@ -12,7 +12,7 @@ export const stringValueSchema = z.object({ type: z.literal('string'), value: z.
 export const numberValueSchema = z.object({ type: z.literal('number'), value: z.number() });
 export const booleanValueSchema = z.object({ type: z.literal('boolean'), value: z.boolean() });
 // ISO 8601 string; always stored in full ISO format (with time+timezone)
-export const dateValueSchema = z.object({ type: z.literal('date'), value: z.string().min(1) });
+export const dateValueSchema = z.object({ type: z.literal('date'), value: z.iso.datetime({ offset: true }) });
 
 // Value union used for page values
 export const pageValueSchema = z.discriminatedUnion('type', [
