@@ -24,3 +24,17 @@ test('shows link to login page', async ({ page }) => {
   await page.goto('/signup');
   await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
 });
+
+test('redirects to /pages then to the new user default Welcome page after successful signup', async ({ page }) => {
+  const uniqueEmail = `e2e-signup-${Date.now()}@test.local`;
+
+  await page.goto('/signup');
+  await page.getByLabel('Name').fill('New E2E User');
+  await page.getByLabel('Email').fill(uniqueEmail);
+  await page.getByLabel('Password', { exact: true }).fill('Password123!');
+  await page.getByLabel('Confirm Password').fill('Password123!');
+  await page.getByRole('button', { name: 'Sign Up' }).click();
+
+  await expect(page).toHaveURL(/\/pages\/(?!create)[^/]+$/, { timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
+});

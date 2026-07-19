@@ -18,6 +18,8 @@ export const api = {
     getDetails: (id: string) => apiClient.get(`/pages/${id}`),
 
     create: (data: { name: string; emoji?: string | null; parentId?: string | null }) => apiClient.post('/pages', data),
+
+    createWelcome: () => apiClient.post('/pages/welcome'),
   },
 };
 

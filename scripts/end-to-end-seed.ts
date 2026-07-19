@@ -103,7 +103,11 @@ async function seedAppData() {
     workspaceId: wsId,
     parentId: null,
     createdAt: now,
-    lastUpdated: now,
+    // `/pages` redirects to the most-recently-updated root page. This must stay strictly
+    // later than `pages.dataSourceHost.lastUpdated` (both are root pages, `parentId: null`)
+    // so the redirect target is deterministic across test runs/DB engines instead of relying
+    // on a tie-break that could vary.
+    lastUpdated: new Date(Date.parse(now) + 1000).toISOString(),
   });
 
   await upsertPage({

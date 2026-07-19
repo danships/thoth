@@ -1,13 +1,16 @@
-'use client';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { getAuth } from '@/lib/auth/config';
 
-import { Container, Stack, Title } from '@mantine/core';
+export default async function Home() {
+  const auth = await getAuth();
+  const session = await auth!.api.getSession({
+    headers: await headers(),
+  });
 
-export default function Home() {
-  return (
-    <Container size="md" py="xl">
-      <Stack>
-        <Title order={1}>Welcome to Thoth</Title>
-      </Stack>
-    </Container>
-  );
+  if (!session?.user) {
+    redirect('/login');
+  }
+
+  redirect('/pages');
 }

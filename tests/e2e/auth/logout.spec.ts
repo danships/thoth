@@ -7,13 +7,17 @@ import { SEED } from '../constants';
 // in with its own dedicated session before exercising the logout flow.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('navigating to /logout redirects away from the logout page', async ({ page }) => {
+test('clicking Logout signs out immediately and lands on /login', async ({ page }) => {
   await page.goto('/login');
   await page.getByLabel('Email').fill(SEED.user.email);
   await page.locator('input[type="password"]').fill(SEED.user.password);
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page).toHaveURL('/', { timeout: 10_000 });
+  await expect(page).toHaveURL(`/pages/${SEED.pages.root.id}`, { timeout: 10_000 });
 
-  await page.goto('/logout');
-  await expect(page).not.toHaveURL('/logout', { timeout: 5000 });
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await expect(page).toHaveURL('/login', { timeout: 10_000 });
+
+  // Session should really be gone: revisiting a protected route redirects back to /login.
+  await page.goto('/pages');
+  await expect(page).toHaveURL('/login', { timeout: 10_000 });
 });

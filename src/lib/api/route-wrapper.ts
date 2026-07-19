@@ -42,7 +42,8 @@ export function apiRoute<
       let body: ExpectedBody | undefined;
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         try {
-          body = await request.json();
+          const rawBody = await request.text();
+          body = rawBody ? JSON.parse(rawBody) : undefined;
         } catch {
           return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
