@@ -32,6 +32,13 @@ export const SEED = {
     columns: [
       { id: 'e2e-col-text-0000-0000-0000-000000000001', name: 'Notes', type: 'string' as const },
       { id: 'e2e-col-bool-0000-0000-0000-000000000001', name: 'Done', type: 'boolean' as const },
+      {
+        id: 'e2e-col-date-0000-0000-0000-000000000001',
+        name: 'Due Date',
+        type: 'date' as const,
+        mode: 'date' as const,
+        displayFormat: 'YYYY-MM-DD',
+      },
     ],
   },
   dataView: {

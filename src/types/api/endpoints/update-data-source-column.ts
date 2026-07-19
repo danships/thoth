@@ -1,14 +1,22 @@
 import { z } from 'zod';
 import type { DataWrapper } from '../utilities';
-import { columnSchema } from '@/types/schemas/entities';
+import { columnSchema, dateModeSchema } from '@/types/schemas/entities';
 
 export const UPDATE_DATA_SOURCE_COLUMN_ENDPOINT = '/data-sources/:id/columns/:columnId';
 
 export const updateDataSourceColumnBodySchema = z
-  .object({
-    name: z.string().min(1).optional(),
-    type: z.union([z.literal('string'), z.literal('number'), z.literal('boolean')]).optional(),
-  })
+  .discriminatedUnion('type', [
+    z.object({ name: z.string().min(1).optional(), type: z.literal('string') }),
+    z.object({ name: z.string().min(1).optional(), type: z.literal('number') }),
+    z.object({ name: z.string().min(1).optional(), type: z.literal('boolean') }),
+    z.object({
+      name: z.string().min(1).optional(),
+      type: z.literal('date'),
+      mode: dateModeSchema.optional(),
+      displayFormat: z.string().min(1).optional(),
+    }),
+  ])
+  .or(z.object({ name: z.string().min(1) }))
   .refine((object) => Object.keys(object).length > 0, { message: 'No updates provided' });
 
 export type UpdateDataSourceColumnBody = z.infer<typeof updateDataSourceColumnBodySchema>;

@@ -11,9 +11,16 @@ import { blockSchema } from '../blocks';
 export const stringValueSchema = z.object({ type: z.literal('string'), value: z.string() });
 export const numberValueSchema = z.object({ type: z.literal('number'), value: z.number() });
 export const booleanValueSchema = z.object({ type: z.literal('boolean'), value: z.boolean() });
+// ISO 8601 string; always stored in full ISO format (with time+timezone)
+export const dateValueSchema = z.object({ type: z.literal('date'), value: z.string().min(1) });
 
 // Value union used for page values
-export const pageValueSchema = z.discriminatedUnion('type', [stringValueSchema, numberValueSchema, booleanValueSchema]);
+export const pageValueSchema = z.discriminatedUnion('type', [
+  stringValueSchema,
+  numberValueSchema,
+  booleanValueSchema,
+  dateValueSchema,
+]);
 export type PageValue = z.infer<typeof pageValueSchema>;
 
 const baseColumnSchema = z.object({
@@ -25,8 +32,21 @@ export const stringColumnSchema = baseColumnSchema.extend({ type: z.literal('str
 export const numberColumnSchema = baseColumnSchema.extend({ type: z.literal('number') });
 export const booleanColumnSchema = baseColumnSchema.extend({ type: z.literal('boolean') });
 
+export const dateModeSchema = z.enum(['date', 'time', 'datetime']);
+export type DateMode = z.infer<typeof dateModeSchema>;
+export const dateColumnSchema = baseColumnSchema.extend({
+  type: z.literal('date'),
+  mode: dateModeSchema,
+  displayFormat: z.string().min(1),
+});
+
 // Column union used for data source columns
-export const columnSchema = z.discriminatedUnion('type', [stringColumnSchema, numberColumnSchema, booleanColumnSchema]);
+export const columnSchema = z.discriminatedUnion('type', [
+  stringColumnSchema,
+  numberColumnSchema,
+  booleanColumnSchema,
+  dateColumnSchema,
+]);
 export type Column = z.infer<typeof columnSchema>;
 
 export const containerSchema = z

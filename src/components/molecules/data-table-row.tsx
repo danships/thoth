@@ -3,6 +3,7 @@ import { Table } from '@mantine/core';
 import { EditablePageNameCell } from '@/components/atoms/editable-page-name-cell';
 import { EditableTextCell } from '@/components/atoms/editable-text-cell';
 import { EditableBooleanCell } from '@/components/atoms/editable-boolean-cell';
+import { EditableDateCell } from '@/components/atoms/editable-date-cell';
 import type { Column } from '@/types/schemas/entities/container';
 import type { Page } from '@/types/api';
 import type { PageValue } from '@/types/schemas/entities/container';
@@ -37,6 +38,20 @@ export function DataTableRow({
       </Table.Td>
       {columns.map((col) => {
         const current = values?.[col.id];
+        if (col.type === 'date') {
+          return (
+            <Table.Td key={col.id}>
+              <EditableDateCell
+                value={current?.type === 'date' ? current.value : undefined}
+                mode={col.mode}
+                displayFormat={col.displayFormat}
+                onChange={(iso) => onCellUpdate(col.id, { type: 'date', value: iso })}
+                disabled={disabled}
+              />
+            </Table.Td>
+          );
+        }
+
         if (col.type === 'boolean') {
           return (
             <Table.Td key={col.id}>
