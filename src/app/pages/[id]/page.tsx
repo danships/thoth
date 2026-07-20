@@ -169,6 +169,15 @@ export default function PageDetailsPage() {
               {pageDetails?.page.name ?? <Loader />}
             </Title>
           </Group>
+          {pageDetails.columns && pageDetails.columns.length > 0 && (
+            <PageFieldsEditor
+              pageId={pageId}
+              dataSourceId={pageDetails.page.parentId}
+              columns={pageDetails.columns}
+              values={pageDetails.values}
+              mutatePageDetails={mutate}
+            />
+          )}
           <Tabs value={selectedView} onChange={(value) => router.replace(`?v=${value}`)}>
             <Tabs.List>
               {pageDetails.views?.map((view) => (
@@ -177,23 +186,10 @@ export default function PageDetailsPage() {
                 </Tabs.Tab>
               ))}
               <Tabs.Tab value="contents">Contents</Tabs.Tab>
-              {pageDetails.columns && pageDetails.columns.length > 0 && <Tabs.Tab value="fields">Fields</Tabs.Tab>}
             </Tabs.List>
             <Tabs.Panel value="contents">
               <PageDetailEditor initialContent={pageDetails.blocks ?? []} onUpdate={updateBlocks} />
             </Tabs.Panel>
-
-            {pageDetails.columns && pageDetails.columns.length > 0 && (
-              <Tabs.Panel value="fields">
-                <PageFieldsEditor
-                  pageId={pageId}
-                  dataSourceId={pageDetails.page.parentId}
-                  columns={pageDetails.columns}
-                  values={pageDetails.values}
-                  mutatePageDetails={mutate}
-                />
-              </Tabs.Panel>
-            )}
 
             {pageDetails.views?.map((view) => (
               <Tabs.Panel key={view.id} value={view.id}>
