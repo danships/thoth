@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
 import { PageDetailEditor } from '@/components/organisms/page-detail-editor';
+import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
 import { Block } from '@blocknote/core';
 import { IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
@@ -176,10 +177,23 @@ export default function PageDetailsPage() {
                 </Tabs.Tab>
               ))}
               <Tabs.Tab value="contents">Contents</Tabs.Tab>
+              {pageDetails.columns && pageDetails.columns.length > 0 && <Tabs.Tab value="fields">Fields</Tabs.Tab>}
             </Tabs.List>
             <Tabs.Panel value="contents">
               <PageDetailEditor initialContent={pageDetails.blocks ?? []} onUpdate={updateBlocks} />
             </Tabs.Panel>
+
+            {pageDetails.columns && pageDetails.columns.length > 0 && (
+              <Tabs.Panel value="fields">
+                <PageFieldsEditor
+                  pageId={pageId}
+                  dataSourceId={pageDetails.page.parentId}
+                  columns={pageDetails.columns}
+                  values={pageDetails.values}
+                  mutatePageDetails={mutate}
+                />
+              </Tabs.Panel>
+            )}
 
             {pageDetails.views?.map((view) => (
               <Tabs.Panel key={view.id} value={view.id}>

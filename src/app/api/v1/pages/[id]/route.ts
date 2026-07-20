@@ -2,6 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
+import { pageColumnRetriever } from '@/lib/database/retrievers/page-column-retriever';
 import type {
   GetPageDetailsParameters,
   GetPageDetailsQuery,
@@ -56,6 +57,13 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
     }
     if (query.includeValues) {
       returnValue.values = page.values ?? {};
+    }
+
+    if (query.includeColumns) {
+      const columns = await pageColumnRetriever.retrieveEditableColumns(page, session.user.id);
+      if (columns.length > 0) {
+        returnValue.columns = columns;
+      }
     }
 
     return returnValue;
