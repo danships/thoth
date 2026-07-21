@@ -148,12 +148,17 @@ export default function PageDetailsPage() {
   return (
     <>
       <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
-        <Box className="is-pulled-right">
-          <Button size="xs" variant="default" onClick={() => setShowCreateViewForm(true)} leftSection={<IconPlus />}>
-            Add View
-          </Button>
-        </Box>
         <Stack gap="lg">
+          {/* Uses a flex Group instead of the `is-pulled-right` float utility: a floated
+              element causes any following block-level box that establishes its own formatting
+              context (like this flex Stack) to shrink-to-fit the space beside the float instead
+              of filling the container, which visibly shrank the whole page on narrow/mobile
+              viewports where little space remained beside the float. */}
+          <Group justify="flex-end">
+            <Button size="xs" variant="default" onClick={() => setShowCreateViewForm(true)} leftSection={<IconPlus />}>
+              Add View
+            </Button>
+          </Group>
           {!isLoadingBreadcrumbs && breadcrumbs && breadcrumbs.length > 1 && <PageBreadcrumb pages={breadcrumbs} />}
           <Group gap="sm">
             <Text size="xl">{pageDetails?.page.emoji}</Text>

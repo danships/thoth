@@ -191,7 +191,7 @@ export function DataViewTable({
         </Button>
       </Group>
       <Table.ScrollContainer minWidth={520} mt="lg" type="native" data-testid="data-table-scroll-container">
-        <Table striped highlightOnHover>
+        <Table striped highlightOnHover w="100%">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Name</Table.Th>
