@@ -1,4 +1,5 @@
 export * from './create-page';
+export * from './create-welcome-page';
 export * from './create-data-source';
 export * from './create-data-view';
 export * from './get-auth-config';

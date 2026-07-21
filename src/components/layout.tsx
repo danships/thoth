@@ -1,12 +1,11 @@
 'use client';
 
-import { AppShell, Burger, Group, Loader, Title } from '@mantine/core';
+import { Anchor, AppShell, Burger, Group, Loader, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useRouter } from 'next/navigation';
 import { type PropsWithChildren, type ReactNode, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/provider';
 import Image from 'next/image';
-import Link from 'next/link';
 
 type LayoutProperties = PropsWithChildren & {
   sidebar: ReactNode;
@@ -14,7 +13,7 @@ type LayoutProperties = PropsWithChildren & {
 
 export default function Layout({ children, sidebar }: LayoutProperties) {
   const [opened, { toggle }] = useDisclosure();
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -22,6 +21,21 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
       router.push('/login');
     }
   }, [loading, user, router]);
+
+  const handleLogout = async () => {
+    // Await signOut before navigating so the homepage's server-side session check doesn't
+    // read a stale authenticated cookie. A full navigation (rather than `router.push`) is used
+    // because Next.js can reuse the client Router Cache's already-rendered (authenticated)
+    // layout instance across a soft navigation, leaving stale chrome on screen; see the matching
+    // comment in login-client.tsx for the same issue on the sign-in path.
+    // Only navigate on success; on failure the error notification (shown by signOut) stays
+    // visible and the user remains on the current page instead of landing on /login with a
+    // stale, still-authenticated session.
+    const success = await signOut();
+    if (success) {
+      globalThis.location.assign('/login');
+    }
+  };
 
   if (loading) {
     return <Loader />;
@@ -48,8 +62,10 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
             <Image src="/icons/favicon-32x32.png" width={21} height={21} alt="Thoth Logo" loading="eager" />
             <Title order={5}>Thoth</Title>
           </Group>
-          <Link
-            href="/logout"
+          <Anchor
+            component="button"
+            type="button"
+            onClick={handleLogout}
             style={{
               textDecoration: 'none',
               color: 'inherit',
@@ -58,7 +74,7 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
             }}
           >
             Logout
-          </Link>
+          </Anchor>
         </Group>
       </AppShell.Header>
 
