@@ -3,6 +3,7 @@ import { pageSchema, dataViewSchema } from '../entities';
 import type { DataWrapper } from '../utilities';
 import { getPageBlocksResponseSchema } from './get-page-blocks';
 import { pageContainerSchema } from '@/types/database';
+import { columnSchema } from '@/types/schemas/entities/container';
 
 export const GET_PAGE_DETAILS_ENDPOINT = '/pages/:id';
 
@@ -11,6 +12,7 @@ export const getPageDetailsResponseSchema = z.object({
   blocks: getPageBlocksResponseSchema.shape.blocks.optional(),
   values: pageContainerSchema.shape.values.optional(),
   views: z.array(dataViewSchema).optional(),
+  columns: z.array(columnSchema).optional(),
 });
 
 export type GetPageDetailsResponse = z.infer<typeof getPageDetailsResponseSchema>;
@@ -24,5 +26,6 @@ export type GetPageDetailsParameters = z.infer<typeof getPageDetailsParametersSc
 export const getPageDetailsQuerySchema = z.object({
   includeBlocks: z.coerce.boolean().default(false),
   includeValues: z.coerce.boolean().default(false),
+  includeColumns: z.coerce.boolean().default(false),
 });
 export type GetPageDetailsQuery = z.infer<typeof getPageDetailsQuerySchema>;

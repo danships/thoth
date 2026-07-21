@@ -49,4 +49,24 @@ export const SEED = {
     id: 'e2e-page-dsrow-000-0000-0000-000000000001',
     name: 'E2E Data Row',
   },
+  fieldsTab: {
+    dataSource: {
+      id: 'e2e-datasource-fields-0-0000-000000000001',
+      name: 'E2E Fields Data Source',
+      columns: [
+        { id: 'e2e-col-fields-a-0000-0000-000000000001', name: 'Alpha', type: 'string' as const },
+        { id: 'e2e-col-fields-b-0000-0000-000000000001', name: 'Beta', type: 'boolean' as const },
+      ],
+    },
+    // The DataView deliberately lists the columns in the reverse order of the data source's
+    // own stored column order, so the Fields tab can be asserted to follow the view's order.
+    dataView: {
+      id: 'e2e-dataview-fields-0-0000-000000000001',
+      name: 'E2E Fields View',
+    },
+    page: {
+      id: 'e2e-page-fields-row-0-0000-000000000001',
+      name: 'E2E Fields Row',
+    },
+  },
 } as const;

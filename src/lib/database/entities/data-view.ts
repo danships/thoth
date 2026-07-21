@@ -17,5 +17,6 @@ export const DataView: EntityDefinition = {
     dataSourceId: 'string',
     workspaceId: 'string',
     userId: 'string',
+    createdAt: 'string',
   },
 };

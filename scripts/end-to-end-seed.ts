@@ -190,6 +190,74 @@ async function seedAppData() {
         createdAt: now,
         lastUpdated: now,
       } as unknown as DataViewCreate));
+
+  // ── Fields tab test fixtures ─────────────────────────────────────────────────
+  // A dedicated data source/view/page combo, kept separate from the fixtures above so
+  // reordering its columns can't affect other specs that assert on cell positions.
+  const fieldsSeed = SEED.fieldsTab;
+
+  const existingFieldsDs = await containerRepository.getOneByQuery(
+    containerRepository.createQuery().eq('id', fieldsSeed.dataSource.id)
+  );
+  await (existingFieldsDs
+    ? containerRepository.update({
+        ...(existingFieldsDs as DataSourceContainer),
+        name: fieldsSeed.dataSource.name,
+        columns: [...fieldsSeed.dataSource.columns],
+        lastUpdated: now,
+      })
+    : containerRepository.create({
+        id: fieldsSeed.dataSource.id,
+        name: fieldsSeed.dataSource.name,
+        type: 'data-source',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: null,
+        columns: [...fieldsSeed.dataSource.columns],
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as DataSourceContainerCreate));
+
+  // Reversed relative to fieldsSeed.dataSource.columns' own stored order, so the Fields tab
+  // rendering can be asserted to follow the DataView's order rather than the raw column list.
+  const reorderedColumnIds = [...fieldsSeed.dataSource.columns].toReversed().map((c) => c.id);
+
+  const existingFieldsView = await dataViewRepository.getOneByQuery(
+    dataViewRepository.createQuery().eq('id', fieldsSeed.dataView.id)
+  );
+  await (existingFieldsView
+    ? dataViewRepository.update({
+        ...existingFieldsView,
+        name: fieldsSeed.dataView.name,
+        columns: reorderedColumnIds,
+        lastUpdated: now,
+      })
+    : dataViewRepository.create({
+        id: fieldsSeed.dataView.id,
+        name: fieldsSeed.dataView.name,
+        dataSourceId: fieldsSeed.dataSource.id,
+        userId: uid,
+        workspaceId: wsId,
+        columns: reorderedColumnIds,
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as DataViewCreate));
+
+  await upsertPage({
+    id: fieldsSeed.page.id,
+    name: fieldsSeed.page.name,
+    emoji: null,
+    type: 'page',
+    userId: uid,
+    workspaceId: wsId,
+    parentId: fieldsSeed.dataSource.id,
+    createdAt: now,
+    lastUpdated: now,
+    values: {
+      [fieldsSeed.dataSource.columns[0].id]: { type: 'string', value: 'Initial alpha' },
+      [fieldsSeed.dataSource.columns[1].id]: { type: 'boolean', value: false },
+    },
+  });
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────
