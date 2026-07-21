@@ -28,8 +28,13 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
     // because Next.js can reuse the client Router Cache's already-rendered (authenticated)
     // layout instance across a soft navigation, leaving stale chrome on screen; see the matching
     // comment in login-client.tsx for the same issue on the sign-in path.
-    await signOut();
-    globalThis.location.assign('/login');
+    // Only navigate on success; on failure the error notification (shown by signOut) stays
+    // visible and the user remains on the current page instead of landing on /login with a
+    // stale, still-authenticated session.
+    const success = await signOut();
+    if (success) {
+      globalThis.location.assign('/login');
+    }
   };
 
   if (loading) {

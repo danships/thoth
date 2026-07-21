@@ -8,7 +8,7 @@ import { useNotification } from '@/lib/hooks/use-notification';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signOut: () => Promise<void>;
+  signOut: () => Promise<boolean>;
   refreshSession: () => Promise<void>;
 }
 
@@ -48,9 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await authClient.signOut();
       setUser(null);
+      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign out';
       showError(errorMessage);
+      return false;
     }
   };
 
