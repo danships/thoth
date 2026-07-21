@@ -135,6 +135,23 @@ async function seedAppData() {
     views: [SEED.dataView.id],
   });
 
+  // Deeply nested chain (each page is the child of the previous one, rooted under
+  // `pages.root`), used to exercise the breadcrumb collapse-into-dropdown behavior.
+  for (const [index, deepPage] of SEED.pages.deepChain.entries()) {
+    const parentId = index === 0 ? SEED.pages.root.id : SEED.pages.deepChain[index - 1]!.id;
+    await upsertPage({
+      id: deepPage.id,
+      name: deepPage.name,
+      emoji: '📁',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId,
+      createdAt: now,
+      lastUpdated: now,
+    });
+  }
+
   const existingDs = await containerRepository.getOneByQuery(
     containerRepository.createQuery().eq('id', SEED.dataSource.id)
   );

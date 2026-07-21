@@ -1,42 +1,90 @@
 'use client';
 
-import { Breadcrumbs, Anchor, Text, Group } from '@mantine/core';
+import { Breadcrumbs, Anchor, Text, Group, Menu, ActionIcon } from '@mantine/core';
+import { useResizeObserver } from '@mantine/hooks';
 import Link from 'next/link';
 import type { Page } from '@/types/api';
+import styles from './page-breadcrumb.module.css';
 
 type PageBreadcrumbProperties = {
   pages: Page[];
 };
 
+function renderPageLabel(page: Page) {
+  return (
+    <Group gap="xs" wrap="nowrap" component="span">
+      {page.emoji && <span>{page.emoji}</span>}
+      <span className={styles['truncatedLabel']}>{page.name}</span>
+    </Group>
+  );
+}
+
+function renderCrumb(page: Page, isLast: boolean) {
+  if (isLast) {
+    return (
+      <Text key={page.id} size="xs" fw={500} component="span">
+        {renderPageLabel(page)}
+      </Text>
+    );
+  }
+
+  return (
+    <Anchor key={page.id} component={Link} href={`/pages/${page.id}`} size="xs">
+      {renderPageLabel(page)}
+    </Anchor>
+  );
+}
+
 export function PageBreadcrumb({ pages }: PageBreadcrumbProperties) {
-  if (pages.length === 0) {
+  // Hooks must run unconditionally on every render, so the "single-entry trail" bail-out
+  // (see below) happens after they're declared, not before.
+  const [containerReference, containerRect] = useResizeObserver<HTMLDivElement>();
+  const [measureReference, measureRect] = useResizeObserver<HTMLDivElement>();
+
+  // A single-entry trail means we're on the root page — nothing to navigate up to.
+  if (pages.length <= 1) {
     return null;
   }
+
+  const firstPage = pages[0]!;
+  const lastPage = pages.at(-1)!;
+  const middlePages = pages.slice(1, -1);
+
+  // Collapse only once there's at least one middle page to hide, and the full (unconstrained)
+  // trail measured via the hidden clone no longer fits within the available container width.
+  const isCollapsed = middlePages.length > 0 && containerRect.width > 0 && measureRect.width > containerRect.width;
+
   return (
-    <Breadcrumbs separator=">">
-      {pages.map((page, index) => {
-        const isLast = index === pages.length - 1;
-        const content = (
-          <Group gap="xs" wrap="nowrap" component="span">
-            {page.emoji && <span>{page.emoji}</span>}
-            <span>{page.name}</span>
-          </Group>
-        );
+    <div ref={containerReference} className={styles['breadcrumbContainer']}>
+      {/* Hidden clone used purely to measure the natural (unconstrained) width of the full trail. */}
+      <div ref={measureReference} className={styles['measure']} aria-hidden="true">
+        <Breadcrumbs separator=">">
+          {pages.map((page, index) => renderCrumb(page, index === pages.length - 1))}
+        </Breadcrumbs>
+      </div>
 
-        if (isLast) {
-          return (
-            <Text key={page.id} size="xs" fw={500} component="span">
-              {content}
-            </Text>
-          );
-        }
-
-        return (
-          <Anchor key={page.id} component={Link} href={`/pages/${page.id}`} size="xs">
-            {content}
-          </Anchor>
-        );
-      })}
-    </Breadcrumbs>
+      <Breadcrumbs separator=">" aria-label="Breadcrumb">
+        {isCollapsed
+          ? [
+              renderCrumb(firstPage, false),
+              <Menu key="ellipsis-menu" shadow="md" position="bottom-start">
+                <Menu.Target>
+                  <ActionIcon variant="subtle" size="sm" aria-label="Show hidden breadcrumb pages">
+                    …
+                  </ActionIcon>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  {middlePages.map((page) => (
+                    <Menu.Item key={page.id} component={Link} href={`/pages/${page.id}`}>
+                      {page.name}
+                    </Menu.Item>
+                  ))}
+                </Menu.Dropdown>
+              </Menu>,
+              renderCrumb(lastPage, true),
+            ]
+          : pages.map((page, index) => renderCrumb(page, index === pages.length - 1))}
+      </Breadcrumbs>
+    </div>
   );
 }

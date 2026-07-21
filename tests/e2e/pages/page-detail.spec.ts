@@ -51,3 +51,34 @@ test('data-source host page shows the seeded view tab', async ({ page }) => {
   await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
   await expect(page.getByRole('tab', { name: SEED.dataView.name })).toBeVisible();
 });
+
+test('root page does not show a breadcrumb', async ({ page }) => {
+  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await expect(page.getByRole('heading', { name: SEED.pages.root.name })).toBeVisible();
+  await expect(page.locator('[aria-label="Breadcrumb"]')).toHaveCount(0);
+});
+
+test('deeply nested page collapses breadcrumb into a dropdown', async ({ page }) => {
+  // Use a narrow viewport so the full breadcrumb trail cannot fit and the ellipsis
+  // dropdown deterministically appears, regardless of the actual page name lengths.
+  await page.setViewportSize({ width: 375, height: 800 });
+
+  const deepChain = SEED.pages.deepChain;
+  const lastPage = deepChain.at(-1)!;
+  await page.goto(`/pages/${lastPage.id}`);
+  await expect(page.getByRole('heading', { name: lastPage.name })).toBeVisible();
+
+  const ellipsisTrigger = page.getByRole('button', { name: 'Show hidden breadcrumb pages' });
+  await expect(ellipsisTrigger).toBeVisible();
+
+  const visibleBreadcrumb = page.getByLabel('Breadcrumb', { exact: true });
+
+  // Root and current page remain visible outside the dropdown.
+  await expect(visibleBreadcrumb.getByText(SEED.pages.root.name)).toBeVisible();
+
+  await ellipsisTrigger.click();
+  const middlePages = deepChain.slice(0, -1);
+  for (const middlePage of middlePages) {
+    await expect(page.getByRole('menuitem', { name: middlePage.name })).toBeVisible();
+  }
+});

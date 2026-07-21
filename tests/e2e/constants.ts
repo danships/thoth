@@ -25,6 +25,13 @@ export const SEED = {
       id: 'e2e-page-dshost-00-0000-0000-000000000001',
       name: 'E2E Data Source Page',
     },
+    deepChain: [
+      { id: 'e2e-page-deep-1-00-0000-0000-000000000001', name: 'E2E Deep Page One' },
+      { id: 'e2e-page-deep-2-00-0000-0000-000000000001', name: 'E2E Deep Page Two' },
+      { id: 'e2e-page-deep-3-00-0000-0000-000000000001', name: 'E2E Deep Page Three' },
+      { id: 'e2e-page-deep-4-00-0000-0000-000000000001', name: 'E2E Deep Page Four' },
+      { id: 'e2e-page-deep-5-00-0000-0000-000000000001', name: 'E2E Deep Page Five' },
+    ],
   },
   dataSource: {
     id: 'e2e-datasource-00-0000-0000-000000000001',
