@@ -10,9 +10,13 @@ export const apiClient = axios.create({
 export const api = {
   // Pages API
   pages: {
-    getTree: (parentId?: string) =>
+    getTree: (options?: { parentId?: string; cursor?: string; limit?: number }) =>
       apiClient.get('/pages/tree', {
-        params: parentId ? { parentId } : {},
+        params: {
+          ...(options?.parentId && { parentId: options.parentId }),
+          ...(options?.cursor && { cursor: options.cursor }),
+          ...(options?.limit && { limit: options.limit }),
+        },
       }),
 
     getDetails: (id: string) => apiClient.get(`/pages/${id}`),
@@ -20,6 +24,8 @@ export const api = {
     create: (data: { name: string; emoji?: string | null; parentId?: string | null }) => apiClient.post('/pages', data),
 
     createWelcome: () => apiClient.post('/pages/welcome'),
+
+    registerAccess: (id: string) => apiClient.post(`/pages/${id}/access`),
   },
 };
 

@@ -1,4 +1,4 @@
-import { ActionIcon, Box } from '@mantine/core';
+import { ActionIcon, Box, Text } from '@mantine/core';
 import { useStore } from '@nanostores/react';
 import { IconPlus } from '@tabler/icons-react';
 import { computed } from 'nanostores';
@@ -20,6 +20,10 @@ type TreeNodeProperties = {
       emoji?: string | null;
     };
   }>;
+  // Set when the page has more children than the small inline preview allows (see
+  // CHILD_PREVIEW_LIMIT). Child-listing pagination is out of scope for this ticket, so this
+  // is a static indicator only — no additional fetching is triggered by scrolling/interacting.
+  hasMoreChildren?: boolean;
   views?: Array<{
     id: string;
     name: string;
@@ -29,7 +33,15 @@ type TreeNodeProperties = {
   isView?: boolean;
 };
 
-export function TreeNode({ page, childPages = [], views = [], level = 0, parentPageId, isView }: TreeNodeProperties) {
+export function TreeNode({
+  page,
+  childPages = [],
+  hasMoreChildren = false,
+  views = [],
+  level = 0,
+  parentPageId,
+  isView,
+}: TreeNodeProperties) {
   const $isExpanded = computed($expandedPages, (expandedPages) => expandedPages.get(page.id) ?? false);
 
   const isExpanded = useStore($isExpanded);
@@ -116,6 +128,19 @@ export function TreeNode({ page, childPages = [], views = [], level = 0, parentP
               parentPageId={page.id}
             />
           ))}
+          {hasMoreChildren && (
+            <Box style={{ paddingLeft: (level + 1) * 20 + 24 }}>
+              <Text
+                component={Link}
+                href={`/pages/${page.id}`}
+                size="xs"
+                c="dimmed"
+                style={{ display: 'block', textDecoration: 'none' }}
+              >
+                More inside — open page
+              </Text>
+            </Box>
+          )}
         </Box>
       )}
     </Box>
