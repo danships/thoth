@@ -152,6 +152,19 @@ async function seedAppData() {
     });
   }
 
+  await upsertPage({
+    id: SEED.pages.breadcrumbDataSourceHost.id,
+    name: SEED.pages.breadcrumbDataSourceHost.name,
+    emoji: '📊',
+    type: 'page',
+    userId: uid,
+    workspaceId: wsId,
+    parentId: SEED.pages.root.id,
+    createdAt: now,
+    lastUpdated: now,
+    views: [SEED.breadcrumbDataView.id],
+  });
+
   const existingDs = await containerRepository.getOneByQuery(
     containerRepository.createQuery().eq('id', SEED.dataSource.id)
   );
@@ -211,6 +224,69 @@ async function seedAppData() {
         createdAt: now,
         lastUpdated: now,
       } as unknown as DataViewCreate));
+
+  // ── Breadcrumb test fixtures ─────────────────────────────────────────────────
+  // Reproduces: root page -> sub-page -> data source (hosted on the sub-page via a view)
+  // -> row page. The row's `parentId` points at the data source container, not the
+  // sub-page, so breadcrumb traversal must bridge through the data source's hosting
+  // page to reach the sub-page and root.
+  const existingBreadcrumbDs = await containerRepository.getOneByQuery(
+    containerRepository.createQuery().eq('id', SEED.breadcrumbDataSource.id)
+  );
+  await (existingBreadcrumbDs
+    ? containerRepository.update({
+        ...(existingBreadcrumbDs as DataSourceContainer),
+        name: SEED.breadcrumbDataSource.name,
+        columns: [...SEED.breadcrumbDataSource.columns],
+        lastUpdated: now,
+      })
+    : containerRepository.create({
+        id: SEED.breadcrumbDataSource.id,
+        name: SEED.breadcrumbDataSource.name,
+        type: 'data-source',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: null,
+        columns: [...SEED.breadcrumbDataSource.columns],
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as DataSourceContainerCreate));
+
+  const existingBreadcrumbView = await dataViewRepository.getOneByQuery(
+    dataViewRepository.createQuery().eq('id', SEED.breadcrumbDataView.id)
+  );
+  await (existingBreadcrumbView
+    ? dataViewRepository.update({
+        ...existingBreadcrumbView,
+        name: SEED.breadcrumbDataView.name,
+        columns: SEED.breadcrumbDataSource.columns.map((c) => c.id),
+        lastUpdated: now,
+      })
+    : dataViewRepository.create({
+        id: SEED.breadcrumbDataView.id,
+        name: SEED.breadcrumbDataView.name,
+        dataSourceId: SEED.breadcrumbDataSource.id,
+        userId: uid,
+        workspaceId: wsId,
+        columns: SEED.breadcrumbDataSource.columns.map((c) => c.id),
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as DataViewCreate));
+
+  await upsertPage({
+    id: SEED.breadcrumbRowPage.id,
+    name: SEED.breadcrumbRowPage.name,
+    emoji: null,
+    type: 'page',
+    userId: uid,
+    workspaceId: wsId,
+    parentId: SEED.breadcrumbDataSource.id,
+    createdAt: now,
+    lastUpdated: now,
+    values: {
+      [SEED.breadcrumbDataSource.columns[0].id]: { type: 'string', value: 'Seeded breadcrumb note' },
+    },
+  });
 
   // ── Fields tab test fixtures ─────────────────────────────────────────────────
   // A dedicated data source/view/page combo, kept separate from the fixtures above so

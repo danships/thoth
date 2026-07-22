@@ -47,6 +47,19 @@ test('child page shows breadcrumb trail back to parent', async ({ page }) => {
   await expect(page.getByText(SEED.pages.root.name)).toBeVisible();
 });
 
+test('page nested under a data source row shows breadcrumb back through the hosting page', async ({ page }) => {
+  // Reproduces: root page -> sub-page -> data source (hosted on the sub-page via a view)
+  // -> row page. The row's parentId points at the data source container rather than the
+  // sub-page, so this asserts the breadcrumb still bridges through to the sub-page and root.
+  await page.goto(`/pages/${SEED.breadcrumbRowPage.id}`);
+  await expect(page.getByRole('heading', { name: SEED.breadcrumbRowPage.name })).toBeVisible();
+
+  const breadcrumb = page.getByLabel('Breadcrumb', { exact: true });
+  await expect(breadcrumb).toBeVisible();
+  await expect(breadcrumb.getByText(SEED.pages.root.name)).toBeVisible();
+  await expect(breadcrumb.getByText(SEED.pages.breadcrumbDataSourceHost.name)).toBeVisible();
+});
+
 test('data-source host page shows the seeded view tab', async ({ page }) => {
   await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
   await expect(page.getByRole('tab', { name: SEED.dataView.name })).toBeVisible();
