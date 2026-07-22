@@ -92,6 +92,7 @@ export function SingleSelectOptionsEditor({ options, onChange }: SingleSelectOpt
               aria-label={`Color for option ${index + 1}`}
             />
             <ActionIcon
+              type="button"
               color="red"
               variant="subtle"
               onClick={() => handleRemove(index)}
@@ -102,7 +103,7 @@ export function SingleSelectOptionsEditor({ options, onChange }: SingleSelectOpt
           </Group>
         );
       })}
-      <Button variant="subtle" size="xs" leftSection={<IconPlus size={14} />} onClick={handleAddOption}>
+      <Button type="button" variant="subtle" size="xs" leftSection={<IconPlus size={14} />} onClick={handleAddOption}>
         Add option
       </Button>
     </Stack>

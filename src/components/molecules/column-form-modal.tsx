@@ -3,7 +3,6 @@ import { useForm } from '@mantine/form';
 import { useEffect } from 'react';
 import type { Column, DateMode } from '@/types/schemas/entities/container';
 import { getPresetsForMode, getDefaultFormatForMode } from '@/lib/data-source/date-format';
-import { SELECT_COLOR_OPTIONS } from '@/lib/data-source/select-colors';
 import {
   SingleSelectOptionsEditor,
   type SingleSelectOptionDraft,
@@ -117,9 +116,9 @@ export function ColumnFormModal({
       const currentMode = form.values.mode ?? 'date';
       form.setFieldValue('displayFormat', getDefaultFormatForMode(currentMode));
     }
-    if (newType === 'single-select' && form.values.options.length === 0) {
-      form.setFieldValue('options', [{ id: crypto.randomUUID(), label: '', color: SELECT_COLOR_OPTIONS[0]!.value }]);
-    }
+    // Single-select columns can be created with zero options — options are typically added
+    // inline from the table cell (via the "+ Create" option in the dropdown) rather than being
+    // required up-front here.
   };
 
   const handleModeChange = (value: string | null) => {

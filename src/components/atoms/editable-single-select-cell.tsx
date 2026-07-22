@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Combobox, Group, Text, useCombobox, CloseButton, Box, Loader } from '@mantine/core';
 import { SelectOptionBadge } from '@/components/atoms/select-option-badge';
+import { useNotification } from '@/lib/hooks/use-notification';
 import type { SingleSelectOption } from '@/types/schemas/entities/container';
 import styles from './editable-single-select-cell.module.css';
 
@@ -29,6 +30,7 @@ export function EditableSingleSelectCell({
 }: EditableSingleSelectCellProperties) {
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
+  const { showError } = useNotification();
   const combobox = useCombobox({
     onDropdownClose: () => {
       combobox.resetSelectedOption();
@@ -55,12 +57,22 @@ export function EditableSingleSelectCell({
       onChange(newOption.id);
       combobox.closeDropdown();
       setSearch('');
+    } catch (error) {
+      // Surface the failure via the shared notification system rather than swallowing it —
+      // otherwise the dropdown stays open with no feedback and looks like nothing happened.
+      showError(error instanceof Error ? error.message : 'Failed to create option');
     } finally {
       setCreating(false);
     }
   };
 
   const handleOptionSubmit = (optionValue: string) => {
+    // Ignore selection/creation while a create request is in flight so a newer selection can't
+    // race with — and be overwritten by — the pending create's `onChange` call.
+    if (creating) {
+      return;
+    }
+
     if (optionValue === '$create') {
       void handleCreate();
       return;

@@ -76,6 +76,12 @@ test('can create a new option from the single-select cell dropdown', async ({ pa
   // Reopening the dropdown should now list the newly created option alongside the seeded ones.
   await selectCell.getByTestId('single-select-cell-target').click();
   await expect(page.getByRole('option', { name: priorityColumn.options[0].label })).toBeVisible();
+
+  // Searching for the label just created should offer the existing option rather than a second
+  // "+ Create" action, verifying the case-insensitive idempotency of the create endpoint.
+  await page.getByPlaceholder('Search or create option').fill('Urgent');
+  await expect(page.getByRole('option', { name: 'Urgent' })).toBeVisible();
+  await expect(page.getByRole('option', { name: '+ Create "Urgent"' })).toHaveCount(0);
 });
 
 test('can create a new single-select column via the Add Column modal', async ({ page }) => {
@@ -89,7 +95,9 @@ test('can create a new single-select column via the Add Column modal', async ({ 
   await page.getByRole('combobox', { name: 'Column Type' }).click();
   await page.getByRole('option', { name: 'Single select' }).click();
 
-  // Selecting "single-select" auto-initializes one empty option row.
+  // Selecting "single-select" no longer forces an initial option row — options are added via
+  // "Add option" here (optional), or later inline from the table cell.
+  await page.getByRole('button', { name: 'Add option' }).click();
   await page.getByPlaceholder('Option label').first().fill('Open');
 
   await page.getByRole('button', { name: 'Add option' }).click();
@@ -99,4 +107,38 @@ test('can create a new single-select column via the Add Column modal', async ({ 
 
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
+});
+
+test('can create a single-select column with zero options and add options inline from the table', async ({
+  page,
+}) => {
+  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.getByRole('tab', { name: SEED.dataView.name }).click();
+
+  await page.getByRole('button', { name: 'Add Column' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  await page.getByLabel('Column Name').fill('Empty Status');
+  await page.getByRole('combobox', { name: 'Column Type' }).click();
+  await page.getByRole('option', { name: 'Single select' }).click();
+
+  // No option label input is required to create the column.
+  await expect(page.getByPlaceholder('Option label')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Create Column' }).click();
+
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Empty Status' })).toBeVisible();
+
+  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
+  const selectCell = row.getByRole('cell').last();
+
+  await selectCell.getByTestId('single-select-cell-target').click();
+  // Multiple single-select cells stay mounted in the DOM even when their dropdown is closed —
+  // scope to the one currently expanded to avoid a strict-mode violation on the shared
+  // "Search or create option" placeholder.
+  const searchInput = page.locator('input[placeholder="Search or create option"][data-expanded="true"]');
+  await searchInput.fill('Backlog');
+  await page.getByRole('option', { name: `+ Create "Backlog"` }).click();
+
+  await expect(selectCell.getByText('Backlog')).toBeVisible();
 });
