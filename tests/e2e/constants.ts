@@ -25,6 +25,21 @@ export const SEED = {
       id: 'e2e-page-dshost-00-0000-0000-000000000001',
       name: 'E2E Data Source Page',
     },
+    // A sub-page (child of `root`) that hosts a data source, used to verify that pages
+    // nested under that data source's rows still show a breadcrumb trail back to the
+    // root and this sub-page, even though rows are stored under the data source
+    // container rather than directly under this page.
+    breadcrumbDataSourceHost: {
+      id: 'e2e-page-bc-dshost-0-0000-0000-000000000001',
+      name: 'E2E Breadcrumb Data Source Sub Page',
+    },
+    deepChain: [
+      { id: 'e2e-page-deep-1-00-0000-0000-000000000001', name: 'E2E Deep Page One' },
+      { id: 'e2e-page-deep-2-00-0000-0000-000000000001', name: 'E2E Deep Page Two' },
+      { id: 'e2e-page-deep-3-00-0000-0000-000000000001', name: 'E2E Deep Page Three' },
+      { id: 'e2e-page-deep-4-00-0000-0000-000000000001', name: 'E2E Deep Page Four' },
+      { id: 'e2e-page-deep-5-00-0000-0000-000000000001', name: 'E2E Deep Page Five' },
+    ],
   },
   dataSource: {
     id: 'e2e-datasource-00-0000-0000-000000000001',
@@ -48,6 +63,19 @@ export const SEED = {
   dataSourcePage: {
     id: 'e2e-page-dsrow-000-0000-0000-000000000001',
     name: 'E2E Data Row',
+  },
+  breadcrumbDataSource: {
+    id: 'e2e-datasource-bc-0-0000-0000-000000000001',
+    name: 'E2E Breadcrumb Data Source',
+    columns: [{ id: 'e2e-col-bc-text-000-0000-0000-000000000001', name: 'Note', type: 'string' as const }],
+  },
+  breadcrumbDataView: {
+    id: 'e2e-dataview-bc-000-0000-0000-000000000001',
+    name: 'E2E Breadcrumb View',
+  },
+  breadcrumbRowPage: {
+    id: 'e2e-page-bc-row-00-0000-0000-000000000001',
+    name: 'E2E Breadcrumb Row',
   },
   fieldsTab: {
     dataSource: {

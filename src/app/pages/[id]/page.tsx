@@ -154,7 +154,7 @@ export default function PageDetailsPage() {
           </Button>
         </Box>
         <Stack gap="lg">
-          {!isLoadingBreadcrumbs && breadcrumbs && breadcrumbs.length > 0 && <PageBreadcrumb pages={breadcrumbs} />}
+          {!isLoadingBreadcrumbs && breadcrumbs && breadcrumbs.length > 1 && <PageBreadcrumb pages={breadcrumbs} />}
           <Group gap="sm">
             <Text size="xl">{pageDetails?.page.emoji}</Text>
             <Title

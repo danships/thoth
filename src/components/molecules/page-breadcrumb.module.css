@@ -1,0 +1,18 @@
+.breadcrumbContainer {
+  overflow: hidden;
+}
+
+.measure {
+  position: absolute;
+  top: -9999px;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.truncatedLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 30ch;
+}
