@@ -4,7 +4,14 @@ import { scrypt, randomBytes } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { getContainerRepository, getDatabase, getDataViewRepository, getWorkspaceRepository } from '../src/lib/database/index.js';
 import { SEED } from '../tests/e2e/constants.js';
-import type { DataSourceContainer, DataSourceContainerCreate, PageContainerCreate, WorkspaceCreate, DataViewCreate } from '../src/types/database/index.js';
+import type {
+  DataSourceContainer,
+  DataSourceContainerCreate,
+  PageContainerCreate,
+  WorkspaceCreate,
+  DataViewCreate,
+} from '../src/types/database/index.js';
+import type { Column } from '../src/types/schemas/entities/container.js';
 
 const DB_PATH = process.env['DB']!.replace('sqlite://', '');
 
@@ -142,7 +149,7 @@ async function seedAppData() {
     ? containerRepository.update({
         ...(existingDs as DataSourceContainer),
         name: SEED.dataSource.name,
-        columns: [...SEED.dataSource.columns],
+        columns: [...SEED.dataSource.columns] as Column[],
         lastUpdated: now,
       })
     : containerRepository.create({
@@ -152,7 +159,7 @@ async function seedAppData() {
         userId: uid,
         workspaceId: wsId,
         parentId: null,
-        columns: [...SEED.dataSource.columns],
+        columns: [...SEED.dataSource.columns] as Column[],
         createdAt: now,
         lastUpdated: now,
       } as unknown as DataSourceContainerCreate));
@@ -171,6 +178,7 @@ async function seedAppData() {
       [SEED.dataSource.columns[0].id]: { type: 'string', value: 'Seeded note' },
       [SEED.dataSource.columns[1].id]: { type: 'boolean', value: false },
       [SEED.dataSource.columns[2].id]: { type: 'date', value: '2026-01-31T00:00:00.000Z' },
+      [SEED.dataSource.columns[3].id]: { type: 'single-select', value: SEED.dataSource.columns[3].options[1].id },
     },
   });
 
@@ -207,7 +215,7 @@ async function seedAppData() {
     ? containerRepository.update({
         ...(existingFieldsDs as DataSourceContainer),
         name: fieldsSeed.dataSource.name,
-        columns: [...fieldsSeed.dataSource.columns],
+        columns: [...fieldsSeed.dataSource.columns] as Column[],
         lastUpdated: now,
       })
     : containerRepository.create({
@@ -217,7 +225,7 @@ async function seedAppData() {
         userId: uid,
         workspaceId: wsId,
         parentId: null,
-        columns: [...fieldsSeed.dataSource.columns],
+        columns: [...fieldsSeed.dataSource.columns] as Column[],
         createdAt: now,
         lastUpdated: now,
       } as unknown as DataSourceContainerCreate));

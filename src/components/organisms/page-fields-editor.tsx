@@ -4,6 +4,8 @@ import { Group, Stack, Text } from '@mantine/core';
 import { EditableColumnValue } from '@/components/molecules/editable-column-value';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { usePageDetailValueUpdate } from '@/lib/hooks/api/use-page-detail-value-update';
+import { useCreateSingleSelectOption } from '@/lib/hooks/api/use-create-single-select-option';
+import { getRandomSelectColor } from '@/lib/data-source/select-colors';
 import type { Column, PageValue } from '@/types/schemas/entities/container';
 import type { GetPageDetailsResponse } from '@/types/api';
 
@@ -26,6 +28,7 @@ export function PageFieldsEditor({
   mutatePageDetails,
 }: PageFieldsEditorProperties) {
   const { updateValue, inProgress } = usePageDetailValueUpdate({ mutatePageDetails });
+  const { createOption } = useCreateSingleSelectOption(dataSourceId ?? '');
   const { showError } = useNotification();
 
   const handleChange = async (columnId: string, value: PageValue) => {
@@ -34,6 +37,15 @@ export function PageFieldsEditor({
     } catch (error) {
       showError(error instanceof Error ? error.message : 'Failed to save field');
     }
+  };
+
+  const handleCreateOption = async (columnId: string, label: string) => {
+    const option = await createOption(columnId, { label, color: getRandomSelectColor() });
+    if (!option) {
+      throw new Error('Failed to create option');
+    }
+    mutatePageDetails();
+    return option;
   };
 
   if (columns.length === 0) {
@@ -50,6 +62,7 @@ export function PageFieldsEditor({
             value={values?.[column.id]}
             onChange={(value) => handleChange(column.id, value)}
             disabled={inProgress}
+            onCreateOption={handleCreateOption}
           />
         </Group>
       ))}

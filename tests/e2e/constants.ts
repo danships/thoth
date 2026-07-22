@@ -39,6 +39,16 @@ export const SEED = {
         mode: 'date' as const,
         displayFormat: 'YYYY-MM-DD',
       },
+      {
+        id: 'e2e-col-select-000-0000-0000-000000000001',
+        name: 'Priority',
+        type: 'single-select' as const,
+        options: [
+          { id: 'e2e-opt-low-00000-0000-0000-000000000001', label: 'Low', color: 'gray' as const },
+          { id: 'e2e-opt-medium-000-0000-0000-000000000001', label: 'Medium', color: 'yellow' as const },
+          { id: 'e2e-opt-high-0000-0000-0000-000000000001', label: 'High', color: 'red' as const },
+        ],
+      },
     ],
   },
   dataView: {

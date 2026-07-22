@@ -16,6 +16,11 @@ export const dateValueSchema = z.object({
   type: z.literal('date'),
   value: z.iso.datetime({ offset: true }),
 });
+// References a SingleSelectOption.id on the column, or null = unselected
+export const singleSelectValueSchema = z.object({
+  type: z.literal('single-select'),
+  value: z.string().nullable(),
+});
 
 // Value union used for page values
 export const pageValueSchema = z.discriminatedUnion('type', [
@@ -23,6 +28,7 @@ export const pageValueSchema = z.discriminatedUnion('type', [
   numberValueSchema,
   booleanValueSchema,
   dateValueSchema,
+  singleSelectValueSchema,
 ]);
 export type PageValue = z.infer<typeof pageValueSchema>;
 
@@ -43,12 +49,42 @@ export const dateColumnSchema = baseColumnSchema.extend({
   displayFormat: z.string().min(1),
 });
 
+// Fixed palette of Mantine named theme colors, used so text/background contrast can be
+// computed consistently via Mantine's `Badge`/`Pill` `color` prop. No freeform hex support.
+export const selectColorSchema = z.enum([
+  'blue',
+  'cyan',
+  'teal',
+  'green',
+  'lime',
+  'yellow',
+  'orange',
+  'red',
+  'pink',
+  'grape',
+  'gray',
+]);
+export type SelectColor = z.infer<typeof selectColorSchema>;
+
+export const singleSelectOptionSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  color: selectColorSchema,
+});
+export type SingleSelectOption = z.infer<typeof singleSelectOptionSchema>;
+
+export const singleSelectColumnSchema = baseColumnSchema.extend({
+  type: z.literal('single-select'),
+  options: z.array(singleSelectOptionSchema),
+});
+
 // Column union used for data source columns
 export const columnSchema = z.discriminatedUnion('type', [
   stringColumnSchema,
   numberColumnSchema,
   booleanColumnSchema,
   dateColumnSchema,
+  singleSelectColumnSchema,
 ]);
 export type Column = z.infer<typeof columnSchema>;
 
