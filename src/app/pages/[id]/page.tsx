@@ -149,16 +149,6 @@ export default function PageDetailsPage() {
     <>
       <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
         <Stack gap="lg">
-          {/* Uses a flex Group instead of the `is-pulled-right` float utility: a floated
-              element causes any following block-level box that establishes its own formatting
-              context (like this flex Stack) to shrink-to-fit the space beside the float instead
-              of filling the container, which visibly shrank the whole page on narrow/mobile
-              viewports where little space remained beside the float. */}
-          <Group justify="flex-end">
-            <Button size="xs" variant="default" onClick={() => setShowCreateViewForm(true)} leftSection={<IconPlus />}>
-              Add View
-            </Button>
-          </Group>
           {!isLoadingBreadcrumbs && breadcrumbs && breadcrumbs.length > 1 && <PageBreadcrumb pages={breadcrumbs} />}
           <Group gap="sm">
             <Text size="xl">{pageDetails?.page.emoji}</Text>
@@ -189,14 +179,29 @@ export default function PageDetailsPage() {
               onChange={(value) => router.replace(`?v=${value}`)}
               className={styles['tabs'] ?? ''}
             >
-              <Tabs.List>
-                {pageDetails.views?.map((view) => (
-                  <Tabs.Tab key={view.id} value={view.id}>
-                    {view.name}
-                  </Tabs.Tab>
-                ))}
-                <Tabs.Tab value="contents">Contents</Tabs.Tab>
-              </Tabs.List>
+              {/* The "Add View" button lives alongside the Tabs.List (rather than in its own
+                  row at the top of the page, next to the title/breadcrumb) so it's visually
+                  and contextually tied to the views it manages. `wrap="wrap"` lets the button
+                  drop to its own line below the tab list on narrow viewports instead of
+                  squeezing/overlapping the tabs or shrinking them to fit beside it. */}
+              <Group justify="space-between" align="center" wrap="wrap" gap="xs" className={styles['tabsHeader'] ?? ''}>
+                <Tabs.List className={styles['tabsList'] ?? ''}>
+                  {pageDetails.views?.map((view) => (
+                    <Tabs.Tab key={view.id} value={view.id}>
+                      {view.name}
+                    </Tabs.Tab>
+                  ))}
+                  <Tabs.Tab value="contents">Contents</Tabs.Tab>
+                </Tabs.List>
+                <Button
+                  size="xs"
+                  variant="default"
+                  onClick={() => setShowCreateViewForm(true)}
+                  leftSection={<IconPlus />}
+                >
+                  Add View
+                </Button>
+              </Group>
               <Tabs.Panel value="contents" className={styles['tabsPanel'] ?? ''}>
                 <PageDetailEditor initialContent={pageDetails.blocks ?? []} onUpdate={updateBlocks} />
               </Tabs.Panel>

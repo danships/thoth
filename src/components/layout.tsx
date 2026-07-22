@@ -47,15 +47,15 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
 
   return (
     <AppShell
-      // Mantine's AppShell only writes the `--app-shell-padding` CSS variable when a responsive
-      // size's `base` value is truthy (see assignPaddingVariables upstream) - a numeric `0`
-      // is skipped entirely, leaving `--app-shell-padding` undefined. AppShell.Main's
-      // `padding-top: calc(var(--app-shell-header-offset) + var(--app-shell-padding))` then
-      // becomes an invalid calc() (referencing an undefined variable with no fallback) and the
-      // browser drops the whole declaration, collapsing padding-top to 0 - which lets Main's
-      // content render underneath the fixed header instead of below it. Using the string '0'
-      // is truthy, so the variable is still written (as "0px"), keeping the calc valid.
-      padding={{ base: '0', sm: 'md' }}
+      // Use a small non-zero base padding instead of collapsing it to 0. Mantine's AppShell
+      // only writes the `--app-shell-padding` CSS variable when a responsive size's `base`
+      // value is truthy (see assignPaddingVariables upstream); AppShell.Main's
+      // `padding-top: calc(var(--app-shell-header-offset) + var(--app-shell-padding))` becomes
+      // an invalid calc() if that variable is ever missing/falsy, and the browser drops the
+      // whole declaration - collapsing padding-top to 0 and letting Main's content (e.g. the
+      // page detail header and its "Add View" button) render underneath the fixed header. A
+      // small always-truthy value avoids relying on any particular falsy/truthy edge case.
+      padding={{ base: 'xs', sm: 'md' }}
       header={{ height: 30 }}
       navbar={{
         width: 300,
