@@ -191,12 +191,7 @@ export function DataViewTable({
         </Button>
       </Group>
       <Table.ScrollContainer minWidth={520} mt="lg" type="native" data-testid="data-table-scroll-container">
-        <Table
-          striped
-          highlightOnHover
-          w="100%"
-          style={columns.length > 0 ? { tableLayout: 'fixed' } : undefined}
-        >
+        <Table striped highlightOnHover w="100%" style={columns.length > 0 ? { tableLayout: 'fixed' } : undefined}>
           <Table.Thead>
             <Table.Tr>
               <Table.Th style={columns.length > 0 ? { width: '30%', maxWidth: 260 } : undefined}>Name</Table.Th>
