@@ -33,6 +33,12 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
       if (column.type !== value.type) {
         throw new BadRequestError(`Type mismatch for column: ${columnId}`);
       }
+      if (column.type === 'single-select' && value.type === 'single-select' && value.value !== null) {
+        const validOptionIds = new Set(column.options.map((option) => option.id));
+        if (!validOptionIds.has(value.value)) {
+          throw new BadRequestError(`Unknown option for column: ${columnId}`);
+        }
+      }
     }
 
     const mergedValues = { ...page.values, ...body };

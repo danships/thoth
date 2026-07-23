@@ -1,6 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
+import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type {
   UpdateDataSourceColumnBody,
@@ -35,7 +36,27 @@ export const PATCH = apiRoute<
       throw new NotFoundError('Column not found', true);
     }
 
-    const updatedColumn: typeof foundColumn = { ...foundColumn, ...body } as typeof foundColumn;
+    if ('type' in body && body.type === 'single-select' && body.options) {
+      const seenLabels = new Set<string>();
+      for (const option of body.options) {
+        const normalizedLabel = option.label.trim().toLowerCase();
+        if (!normalizedLabel) {
+          throw new BadRequestError('Option label is required');
+        }
+        if (seenLabels.has(normalizedLabel)) {
+          throw new BadRequestError(`Duplicate option label: ${option.label}`);
+        }
+        seenLabels.add(normalizedLabel);
+      }
+    }
+
+    // Trim option labels before persisting so whitespace-padded input doesn't get stored verbatim.
+    const normalizedBody =
+      'type' in body && body.type === 'single-select' && body.options
+        ? { ...body, options: body.options.map((option) => ({ ...option, label: option.label.trim() })) }
+        : body;
+
+    const updatedColumn: typeof foundColumn = { ...foundColumn, ...normalizedBody } as typeof foundColumn;
     const updatedColumns = columns.map((column) => (column.id === params.columnId ? updatedColumn : column));
 
     await containerRepository.update({

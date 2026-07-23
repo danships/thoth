@@ -3,12 +3,17 @@ import { useForm } from '@mantine/form';
 import { useEffect } from 'react';
 import type { Column, DateMode } from '@/types/schemas/entities/container';
 import { getPresetsForMode, getDefaultFormatForMode } from '@/lib/data-source/date-format';
+import {
+  SingleSelectOptionsEditor,
+  type SingleSelectOptionDraft,
+} from '@/components/molecules/single-select-options-editor';
 
 type ColumnFormValues = {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'date';
+  type: 'string' | 'number' | 'boolean' | 'date' | 'single-select';
   mode: DateMode;
   displayFormat: string;
+  options: SingleSelectOptionDraft[];
 };
 
 type ColumnFormModalProperties = {
@@ -20,6 +25,22 @@ type ColumnFormModalProperties = {
   inProgress?: boolean;
   onError?: (error: unknown) => void;
 };
+
+function getInitialOptions(initialValues: Column | undefined): SingleSelectOptionDraft[] {
+  return initialValues?.type === 'single-select' ? initialValues.options.map((option) => ({ ...option })) : [];
+}
+
+function hasDuplicateOptionLabels(options: SingleSelectOptionDraft[]): boolean {
+  const seen = new Set<string>();
+  for (const option of options) {
+    const normalized = option.label.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) {
+      return true;
+    }
+    seen.add(normalized);
+  }
+  return false;
+}
 
 export function ColumnFormModal({
   opened,
@@ -36,6 +57,7 @@ export function ColumnFormModal({
       type: initialValues?.type ?? 'string',
       mode: initialValues?.type === 'date' ? initialValues.mode : 'date',
       displayFormat: initialValues?.type === 'date' ? initialValues.displayFormat : getDefaultFormatForMode('date'),
+      options: getInitialOptions(initialValues),
     },
     validate: {
       name: (value) => (value.trim() ? null : 'Column name is required'),
@@ -43,6 +65,18 @@ export function ColumnFormModal({
       mode: (value, values) => (values.type === 'date' && !value ? 'Mode is required for date columns' : null),
       displayFormat: (value, values) =>
         values.type === 'date' && !value ? 'Display format is required for date columns' : null,
+      options: (value, values) => {
+        if (values.type !== 'single-select') {
+          return null;
+        }
+        if (value.some((option) => !option.label.trim())) {
+          return 'All options must have a label';
+        }
+        if (hasDuplicateOptionLabels(value)) {
+          return 'Option labels must be unique';
+        }
+        return null;
+      },
     },
   });
 
@@ -53,6 +87,7 @@ export function ColumnFormModal({
         type: initialValues?.type ?? 'string',
         mode: initialValues?.type === 'date' ? initialValues.mode : 'date',
         displayFormat: initialValues?.type === 'date' ? initialValues.displayFormat : getDefaultFormatForMode('date'),
+        options: getInitialOptions(initialValues),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,6 +116,9 @@ export function ColumnFormModal({
       const currentMode = form.values.mode ?? 'date';
       form.setFieldValue('displayFormat', getDefaultFormatForMode(currentMode));
     }
+    // Single-select columns can be created with zero options — options are typically added
+    // inline from the table cell (via the "+ Create" option in the dropdown) rather than being
+    // required up-front here.
   };
 
   const handleModeChange = (value: string | null) => {
@@ -106,6 +144,7 @@ export function ColumnFormModal({
               { value: 'number', label: 'Number' },
               { value: 'boolean', label: 'Checkbox' },
               { value: 'date', label: 'Date' },
+              { value: 'single-select', label: 'Single select' },
             ]}
             {...form.getInputProps('type')}
             onChange={handleTypeChange}
@@ -126,6 +165,12 @@ export function ColumnFormModal({
               />
               <Select label="Display Format" data={formatPresets} {...form.getInputProps('displayFormat')} required />
             </>
+          )}
+          {form.values.type === 'single-select' && (
+            <SingleSelectOptionsEditor
+              options={form.values.options}
+              onChange={(options) => form.setFieldValue('options', options)}
+            />
           )}
           <Group justify="flex-end" mt="md">
             <Button variant="subtle" onClick={handleClose}>

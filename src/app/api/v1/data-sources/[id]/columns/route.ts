@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-nested-ternary */
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
@@ -16,7 +17,14 @@ export const POST = apiRoute<z.infer<typeof columnSchema>, undefined, { id: stri
     const newColumn: Column =
       body.type === 'date'
         ? { id: randomUUID(), name: body.name, type: body.type, mode: body.mode, displayFormat: body.displayFormat }
-        : { id: randomUUID(), name: body.name, type: body.type };
+        : body.type === 'single-select'
+          ? {
+              id: randomUUID(),
+              name: body.name,
+              type: body.type,
+              options: body.options.map((o) => ({ id: randomUUID(), label: o.label, color: o.color })),
+            }
+          : { id: randomUUID(), name: body.name, type: body.type };
     await containerRepository.update({
       ...dataSource,
       columns: [...(dataSource.columns ?? []), newColumn],

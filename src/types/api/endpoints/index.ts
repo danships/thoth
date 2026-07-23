@@ -16,6 +16,7 @@ export * from './update-data-source';
 export * from './update-data-view';
 export * from './create-data-source-column';
 export * from './update-data-source-column';
+export * from './create-single-select-option';
 export * from './delete-data-source-column';
 export * from './update-page-values';
 export * from './update-page';

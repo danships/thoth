@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { DataWrapper } from '../utilities';
-import { columnSchema, dateModeSchema } from '@/types/schemas/entities';
+import { columnSchema, dateModeSchema, singleSelectOptionSchema } from '@/types/schemas/entities';
 
 export const UPDATE_DATA_SOURCE_COLUMN_ENDPOINT = '/data-sources/:id/columns/:columnId';
 
@@ -14,6 +14,13 @@ export const updateDataSourceColumnBodySchema = z
       type: z.literal('date'),
       mode: dateModeSchema.optional(),
       displayFormat: z.string().min(1).optional(),
+    }),
+    z.object({
+      name: z.string().min(1).optional(),
+      type: z.literal('single-select'),
+      // Full replace of the options array (ids included) — the client always sends the
+      // complete, current options array so renames/recolors/deletes are one PATCH.
+      options: z.array(singleSelectOptionSchema).optional(),
     }),
   ])
   .or(z.object({ name: z.string().min(1) }))

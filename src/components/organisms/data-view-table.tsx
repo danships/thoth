@@ -1,5 +1,6 @@
 'use client';
 
+/* eslint-disable unicorn/no-nested-ternary */
 import { Alert, Button, Group, Loader, Stack, Table } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { IconPlus } from '@tabler/icons-react';
@@ -12,7 +13,10 @@ import { useNotification } from '@/lib/hooks/use-notification';
 import { useDataViewColumns } from '@/lib/hooks/api/use-data-view-columns';
 import { usePageValueUpdate } from '@/lib/hooks/api/use-page-value-update';
 import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
+import { useCreateSingleSelectOption } from '@/lib/hooks/api/use-create-single-select-option';
+import { getRandomSelectColor } from '@/lib/data-source/select-colors';
 import type { Column } from '@/types/schemas/entities/container';
+import type { SelectColor } from '@/types/schemas/entities/container';
 import type { CreateDataSourceColumnBody, GetPagesResponse, UpdateDataSourceColumnBody } from '@/types/api';
 
 type DataViewTableProperties = {
@@ -58,13 +62,15 @@ export function DataViewTable({
 
   const { updateValue, inProgress: valueUpdateInProgress } = usePageValueUpdate({ mutatePages });
   const { updatePage, inProgress: pageUpdateInProgress } = useUpdatePage({ mutatePages });
+  const { createOption } = useCreateSingleSelectOption(dataSourceId);
   const { showError } = useNotification();
 
   const handleColumnSubmit = async (values: {
     name: string;
-    type: 'string' | 'number' | 'boolean' | 'date';
+    type: 'string' | 'number' | 'boolean' | 'date' | 'single-select';
     mode?: 'date' | 'time' | 'datetime';
     displayFormat?: string;
+    options?: { id: string; label: string; color: SelectColor }[];
   }) => {
     if (editingColumn) {
       const updateBody: UpdateDataSourceColumnBody =
@@ -75,7 +81,13 @@ export function DataViewTable({
               mode: values.mode,
               displayFormat: values.displayFormat,
             }
-          : { name: values.name.trim(), type: values.type };
+          : values.type === 'single-select'
+            ? {
+                name: values.name.trim(),
+                type: 'single-select',
+                options: (values.options ?? []).map((option) => ({ ...option, label: option.label.trim() })),
+              }
+            : { name: values.name.trim(), type: values.type };
       await updateColumn(editingColumn.id, updateBody);
     } else {
       const createBody: CreateDataSourceColumnBody =
@@ -86,7 +98,16 @@ export function DataViewTable({
               mode: values.mode ?? 'date',
               displayFormat: values.displayFormat ?? '',
             }
-          : { name: values.name.trim(), type: values.type };
+          : values.type === 'single-select'
+            ? {
+                name: values.name.trim(),
+                type: 'single-select',
+                options: (values.options ?? []).map((option) => ({
+                  label: option.label.trim(),
+                  color: option.color,
+                })),
+              }
+            : { name: values.name.trim(), type: values.type };
       await createColumn(createBody);
     }
     mutateDataSource();
@@ -95,6 +116,17 @@ export function DataViewTable({
   const handleColumnError = (error: unknown) => {
     const errorMessage = error instanceof Error ? error.message : 'Failed to save column';
     showError(errorMessage);
+  };
+
+  const handleCreateOption = async (columnId: string, label: string) => {
+    const option = await createOption(columnId, { label, color: getRandomSelectColor() });
+    if (!option) {
+      throw new Error('Failed to create option');
+    }
+    // Refresh the data source so `columns` (and therefore every cell referencing this column)
+    // picks up the newly-created option.
+    mutateDataSource();
+    return option;
   };
 
   const handleEditColumn = (column: Column) => {
@@ -182,6 +214,7 @@ export function DataViewTable({
               onCellUpdate={(columnId, value) => updateValue(page.id, columnId, value)}
               onPageNameUpdate={(pageId, name) => updatePage(pageId, { name })}
               disabled={inProgress}
+              onCreateOption={handleCreateOption}
             />
           ))}
           <NewPageRow
