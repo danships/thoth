@@ -11,10 +11,6 @@
   position: relative;
 }
 
-.repositioning {
-  cursor: move;
-}
-
 .hiddenProbe {
   position: absolute;
   width: 1px;
@@ -23,13 +19,44 @@
   pointer-events: none;
 }
 
-.controls {
+/* Only reveal the edit icon on hover/focus so it never blocks the image itself. Touch devices
+   don't support hover, so it's always shown there as the mobile-friendly alternative. */
+.editButton {
   position: absolute;
   top: var(--mantine-spacing-xs);
   right: var(--mantine-spacing-xs);
-  background: var(--mantine-color-body);
-  border-radius: var(--mantine-radius-sm);
-  padding: 4px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.banner:hover .editButton,
+.banner:focus-within .editButton {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .editButton {
+    opacity: 1;
+  }
+}
+
+.previewBanner {
+  width: 100%;
+  aspect-ratio: 16 / 5;
+  border-radius: var(--mantine-radius-md);
+  background-image: var(--cover-image);
+  background-repeat: no-repeat;
+  background-position: var(--cover-position-x) var(--cover-position-y);
+  background-size: var(--cover-zoom);
+  background-color: var(--mantine-color-gray-1);
+  overflow: hidden;
+  cursor: move;
+  touch-action: none;
+}
+
+.previewBanner:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 2px;
 }
 
 .zoomSlider {

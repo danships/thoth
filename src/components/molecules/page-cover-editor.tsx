@@ -1,7 +1,7 @@
 'use client';
 
 import { ActionIcon, Box, Button, Group, Modal, Slider, Stack, Text, TextInput, Tooltip } from '@mantine/core';
-import { IconArrowsMove, IconPhotoPlus, IconTrash, IconX } from '@tabler/icons-react';
+import { IconEdit, IconPhotoPlus, IconTrash, IconX } from '@tabler/icons-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNotification } from '@/lib/hooks/use-notification';
 import type { PageCover, UpdatePageBody } from '@/types/api';
@@ -15,6 +15,8 @@ type PageCoverEditorProperties = {
 
 const DEFAULT_POSITION = 0.5;
 const DEFAULT_ZOOM = 1;
+const KEYBOARD_STEP = 0.02;
+const KEYBOARD_STEP_LARGE = 0.1;
 
 function isValidImageUrl(value: string): boolean {
   try {
@@ -25,18 +27,26 @@ function isValidImageUrl(value: string): boolean {
   }
 }
 
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
 /**
  * In-place editor for a page's cover image: lets the author set/replace/remove the image,
  * and drag-to-reposition + zoom-to-scale it within a fixed 16/5 banner. Position/zoom are
  * normalized to [0,1] (position) / [1,3] (zoom) and persisted via the existing `PATCH
  * /api/v1/pages/:id` endpoint (through the `updatePage` function passed down from the page).
+ *
+ * The reposition/zoom controls live in a dedicated modal (opened via a small edit icon that
+ * only appears on hover, or is always shown on touch devices) so they never obscure the banner
+ * image itself, especially on small/mobile viewports.
  */
 export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorProperties) {
   const { showError } = useNotification();
 
   const [modalOpened, setModalOpened] = useState(false);
+  const [manageModalOpened, setManageModalOpened] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [isRepositioning, setIsRepositioning] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
 
   // Local, live-updating copy of the position/zoom while dragging/sliding, so the API isn't
@@ -44,7 +54,7 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
   const [livePosition, setLivePosition] = useState<{ x: number; y: number } | null>(null);
   const [liveZoom, setLiveZoom] = useState<number | null>(null);
 
-  const bannerReference = useRef<HTMLDivElement>(null);
+  const previewReference = useRef<HTMLDivElement>(null);
   const dragStateReference = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
   const positionX = livePosition?.x ?? cover?.positionX ?? DEFAULT_POSITION;
@@ -55,10 +65,14 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
 
   const openAddModal = useCallback(() => {
     setImageUrlInput(cover?.imageUrl ?? '');
+    setManageModalOpened(false);
     setModalOpened(true);
   }, [cover]);
 
   const closeModal = useCallback(() => setModalOpened(false), []);
+
+  const openManageModal = useCallback(() => setManageModalOpened(true), []);
+  const closeManageModal = useCallback(() => setManageModalOpened(false), []);
 
   const persistCover = useCallback(
     async (next: PageCover | null) => {
@@ -79,6 +93,8 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
 
     setImageFailed(false);
     setModalOpened(false);
+    setLivePosition(null);
+    setLiveZoom(null);
     await persistCover({
       imageUrl: trimmed,
       positionX: DEFAULT_POSITION,
@@ -88,7 +104,7 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
   }, [imageUrlInput, persistCover]);
 
   const handleRemove = useCallback(async () => {
-    setIsRepositioning(false);
+    setManageModalOpened(false);
     setLivePosition(null);
     setLiveZoom(null);
     await persistCover(null);
@@ -96,7 +112,7 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!isRepositioning || !cover) {
+      if (!cover) {
         return;
       }
 
@@ -108,24 +124,24 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
         originY: positionY,
       };
     },
-    [isRepositioning, cover, positionX, positionY]
+    [cover, positionX, positionY]
   );
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const dragState = dragStateReference.current;
-    const banner = bannerReference.current;
-    if (!dragState || !banner) {
+    const preview = previewReference.current;
+    if (!dragState || !preview) {
       return;
     }
 
-    const rect = banner.getBoundingClientRect();
+    const rect = preview.getBoundingClientRect();
     const deltaX = (event.clientX - dragState.startX) / rect.width;
     const deltaY = (event.clientY - dragState.startY) / rect.height;
 
     // Dragging the image right should move the focal point left (and vice versa), matching
     // the visual direction of the drag.
-    const nextX = Math.min(1, Math.max(0, dragState.originX - deltaX));
-    const nextY = Math.min(1, Math.max(0, dragState.originY - deltaY));
+    const nextX = clamp01(dragState.originX - deltaX);
+    const nextY = clamp01(dragState.originY - deltaY);
 
     setLivePosition({ x: nextX, y: nextY });
   }, []);
@@ -149,6 +165,48 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
     });
   }, [cover, livePosition, persistCover]);
 
+  // Keyboard alternative to dragging: arrow keys nudge the focal point (Shift for a bigger
+  // step), so the reposition control is usable without a pointer device.
+  const handleKeyDown = useCallback(
+    async (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (!cover) {
+        return;
+      }
+
+      const step = event.shiftKey ? KEYBOARD_STEP_LARGE : KEYBOARD_STEP;
+      let deltaX = 0;
+      let deltaY = 0;
+      switch (event.key) {
+        case 'ArrowLeft': {
+          deltaX = -step;
+          break;
+        }
+        case 'ArrowRight': {
+          deltaX = step;
+          break;
+        }
+        case 'ArrowUp': {
+          deltaY = -step;
+          break;
+        }
+        case 'ArrowDown': {
+          deltaY = step;
+          break;
+        }
+        default: {
+          return;
+        }
+      }
+
+      event.preventDefault();
+      const nextX = clamp01(positionX + deltaX);
+      const nextY = clamp01(positionY + deltaY);
+      setLivePosition({ x: nextX, y: nextY });
+      await persistCover({ ...cover, positionX: nextX, positionY: nextY });
+    },
+    [cover, positionX, positionY, persistCover]
+  );
+
   const handleZoomChange = useCallback((value: number) => {
     setLiveZoom(value);
   }, []);
@@ -162,6 +220,13 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
     },
     [cover, persistCover]
   );
+
+  const coverStyle = {
+    '--cover-position-x': `${positionX * 100}%`,
+    '--cover-position-y': `${positionY * 100}%`,
+    '--cover-zoom': `${zoom * 100}%`,
+    '--cover-image': cover ? `url(${JSON.stringify(cover.imageUrl)})` : 'none',
+  } as React.CSSProperties;
 
   if (!cover || imageFailed) {
     return (
@@ -185,21 +250,7 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
 
   return (
     <Stack gap="xs">
-      <Box
-        ref={bannerReference}
-        className={`${styles['banner'] ?? ''} ${isRepositioning ? (styles['repositioning'] ?? '') : ''}`}
-        style={
-          {
-            '--cover-position-x': `${positionX * 100}%`,
-            '--cover-position-y': `${positionY * 100}%`,
-            '--cover-zoom': `${zoom * 100}%`,
-            '--cover-image': `url(${JSON.stringify(cover.imageUrl)})`,
-          } as React.CSSProperties
-        }
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-      >
+      <Box className={styles['banner'] ?? ''} style={coverStyle}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={cover.imageUrl}
@@ -208,27 +259,97 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
           className={styles['hiddenProbe'] ?? ''}
           onError={() => setImageFailed(true)}
         />
-        <Group className={styles['controls'] ?? ''} gap="xs">
-          <Tooltip label={isRepositioning ? 'Done repositioning' : 'Reposition'}>
-            <ActionIcon
-              variant={isRepositioning ? 'filled' : 'default'}
-              aria-label={isRepositioning ? 'Done repositioning' : 'Reposition cover'}
-              onClick={() => setIsRepositioning((previous) => !previous)}
-            >
-              <IconArrowsMove size={16} />
-            </ActionIcon>
-          </Tooltip>
-          <Button size="xs" variant="default" onClick={openAddModal}>
-            Change image
-          </Button>
-          <Tooltip label="Remove cover">
-            <ActionIcon variant="default" aria-label="Remove cover" onClick={handleRemove}>
-              <IconTrash size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+        <Tooltip label="Edit cover">
+          <ActionIcon
+            className={styles['editButton'] ?? ''}
+            variant="default"
+            aria-label="Edit cover"
+            onClick={openManageModal}
+          >
+            <IconEdit size={16} />
+          </ActionIcon>
+        </Tooltip>
       </Box>
-      {isRepositioning && (
+      <ManageCoverModal
+        opened={manageModalOpened}
+        onClose={closeManageModal}
+        previewReference={previewReference}
+        coverStyle={coverStyle}
+        zoom={zoom}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onKeyDown={handleKeyDown}
+        onZoomChange={handleZoomChange}
+        onZoomChangeEnd={handleZoomChangeEnd}
+        onChangeImage={openAddModal}
+        onRemove={handleRemove}
+      />
+      <CoverUrlModal
+        opened={modalOpened}
+        value={imageUrlInput}
+        isValid={isUrlValid}
+        onChange={setImageUrlInput}
+        onClose={closeModal}
+        onSubmit={handleSubmitImage}
+      />
+    </Stack>
+  );
+}
+
+type ManageCoverModalProperties = {
+  opened: boolean;
+  onClose: () => void;
+  previewReference: React.RefObject<HTMLDivElement | null>;
+  coverStyle: React.CSSProperties;
+  zoom: number;
+  onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: () => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onZoomChange: (value: number) => void;
+  onZoomChangeEnd: (value: number) => void;
+  onChangeImage: () => void;
+  onRemove: () => void;
+};
+
+function ManageCoverModal({
+  opened,
+  onClose,
+  previewReference,
+  coverStyle,
+  zoom,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onKeyDown,
+  onZoomChange,
+  onZoomChangeEnd,
+  onChangeImage,
+  onRemove,
+}: ManageCoverModalProperties) {
+  return (
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="Edit cover image"
+      centered
+      size="lg"
+      closeButtonProps={{ 'aria-label': 'Close', icon: <IconX size={16} /> }}
+    >
+      <Stack gap="md">
+        <Box
+          ref={previewReference}
+          className={styles['previewBanner'] ?? ''}
+          style={coverStyle}
+          tabIndex={0}
+          role="group"
+          aria-label="Cover position. Drag to reposition, or use the arrow keys (hold Shift for larger steps)."
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onKeyDown={onKeyDown}
+        />
         <Group gap="sm" wrap="nowrap">
           <Text size="sm" c="dimmed">
             Zoom
@@ -239,23 +360,28 @@ export function PageCoverEditor({ pageId, cover, updatePage }: PageCoverEditorPr
               max={3}
               step={0.01}
               value={zoom}
-              onChange={handleZoomChange}
-              onChangeEnd={handleZoomChangeEnd}
+              onChange={onZoomChange}
+              onChangeEnd={onZoomChangeEnd}
               label={(value) => `${value.toFixed(2)}x`}
               thumbLabel="Cover zoom"
             />
           </Box>
         </Group>
-      )}
-      <CoverUrlModal
-        opened={modalOpened}
-        value={imageUrlInput}
-        isValid={isUrlValid}
-        onChange={setImageUrlInput}
-        onClose={closeModal}
-        onSubmit={handleSubmitImage}
-      />
-    </Stack>
+        <Group justify="space-between">
+          <Button size="xs" variant="default" onClick={onChangeImage}>
+            Change image
+          </Button>
+          <Tooltip label="Remove cover">
+            <ActionIcon variant="default" aria-label="Remove cover" onClick={onRemove}>
+              <IconTrash size={16} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+        <Group justify="flex-end">
+          <Button onClick={onClose}>Done</Button>
+        </Group>
+      </Stack>
+    </Modal>
   );
 }
 
