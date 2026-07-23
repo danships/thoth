@@ -17,6 +17,7 @@ import { useSetPageBlocks } from '@/lib/hooks/api/use-set-page-blocks';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { usePageBreadcrumbs } from '@/lib/hooks/api/use-page-breadcrumbs';
 import { PageBreadcrumb } from '@/components/molecules/page-breadcrumb';
+import { PageCoverEditor } from '@/components/molecules/page-cover-editor';
 import styles from './page.module.css';
 
 export default function PageDetailsPage() {
@@ -155,6 +156,7 @@ export default function PageDetailsPage() {
         </Box>
         <Stack gap="lg">
           {!isLoadingBreadcrumbs && breadcrumbs && breadcrumbs.length > 1 && <PageBreadcrumb pages={breadcrumbs} />}
+          <PageCoverEditor pageId={pageId} cover={pageDetails.page.cover} updatePage={updatePage} />
           <Group gap="sm">
             <Text size="xl">{pageDetails?.page.emoji}</Text>
             <Title
