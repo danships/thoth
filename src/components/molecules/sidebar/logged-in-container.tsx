@@ -43,6 +43,16 @@ export function LoggedInContainer() {
         </ActionIcon>
       </Group>
       {isLoading && <Loader size="sm" />}
+      {!isLoading && !rootPagesTree && error && (
+        <Group justify="center" py="sm">
+          <Text size="xs" c="red">
+            Failed to load pages —{' '}
+            <Anchor size="xs" component="button" type="button" onClick={() => mutate()}>
+              retry
+            </Anchor>
+          </Text>
+        </Group>
+      )}
       {!isLoading && rootPagesTree && (
         <Box
           className={styles['scrollPane']}

@@ -35,7 +35,9 @@ export function usePagesTree() {
   const hasMore = lastPage ? lastPage.pagination.hasMore : false;
 
   // isLoadingMore is true while a *subsequent* page is being fetched (not the very first load).
-  const isLoadingMore = size > 0 && !!data && data[size - 1] === undefined;
+  // Excludes the case where the fetch errored out — otherwise a failed load-more request would
+  // leave data[size - 1] undefined indefinitely, keeping the loader stuck and hiding the retry UI.
+  const isLoadingMore = !error && size > 0 && !!data && data[size - 1] === undefined;
 
   const loadMore = () => {
     if (!hasMore || isLoadingMore || isValidating) {

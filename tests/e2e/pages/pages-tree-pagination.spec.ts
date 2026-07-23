@@ -19,6 +19,27 @@ async function scrollPaneToBottom(page: import('@playwright/test').Page) {
   });
 }
 
+// Each scroll-to-bottom only triggers a single "load more" fetch — repeatedly scroll (bounded,
+// so a stuck sentinel fails the test instead of hanging) until pagination is fully exhausted
+// (the load-more sentinel is removed from the DOM).
+async function scrollUntilPaginationExhausted(page: import('@playwright/test').Page) {
+  // Wait for the initial page to finish loading before checking the sentinel — otherwise, while
+  // the tree is still loading (and the scroll pane/sentinel haven't rendered yet), the sentinel's
+  // absence would be mistaken for "pagination already exhausted".
+  await expect(page.getByTestId('pages-tree-scroll-pane')).toBeVisible();
+
+  const sentinel = page.getByTestId('pages-tree-load-more-sentinel');
+  const maxAttempts = 20;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if ((await sentinel.count()) === 0) {
+      return;
+    }
+    await scrollPaneToBottom(page);
+    await page.waitForTimeout(250);
+  }
+  await expect(sentinel).toHaveCount(0);
+}
+
 test('sidebar loads more root pages as the user scrolls to the bottom', async ({ page }) => {
   await page.goto('/pages');
 
@@ -30,7 +51,7 @@ test('sidebar loads more root pages as the user scrolls to the bottom', async ({
   // ...but the least-recently-accessed one is not, until the user scrolls further.
   await expect(page.getByText(lastPaginationPage.name)).not.toBeVisible();
 
-  await scrollPaneToBottom(page);
+  await scrollUntilPaginationExhausted(page);
 
   await expect(page.getByText(lastPaginationPage.name)).toBeVisible({ timeout: 10_000 });
 });
@@ -38,7 +59,7 @@ test('sidebar loads more root pages as the user scrolls to the bottom', async ({
 test('sidebar sentinel disappears once every root page has been loaded', async ({ page }) => {
   await page.goto('/pages');
 
-  await scrollPaneToBottom(page);
+  await scrollUntilPaginationExhausted(page);
   await expect(page.getByText(SEED.pages.paginationSeed.at(-1)!.name)).toBeVisible({ timeout: 10_000 });
 
   // No more pages left to load, so the sentinel used to trigger further loads is gone.
@@ -61,5 +82,11 @@ test('a root page with more than 10 children shows a "more inside" indicator', a
 
   await expect(page.getByText(firstChild.name)).toBeVisible();
   await expect(page.getByText(eleventhChild.name)).not.toBeVisible();
-  await expect(page.getByText('More inside — open page')).toBeVisible();
+
+  const moreInsideLink = page.getByRole('link', { name: 'More inside — open page' });
+  await expect(moreInsideLink).toBeVisible();
+  await expect(moreInsideLink).toHaveAttribute('href', `/pages/${SEED.pages.childOverflowHost.id}`);
+
+  await moreInsideLink.click();
+  await expect(page).toHaveURL(`/pages/${SEED.pages.childOverflowHost.id}`);
 });
