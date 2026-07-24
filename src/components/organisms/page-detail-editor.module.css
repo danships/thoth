@@ -1,0 +1,25 @@
+.editorWrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+/* BlockNote's own bn-container/bn-editor use height: 100%, which only resolves
+   reliably when the immediate ancestor is itself a flex item with flex: 1 (a
+   plain percentage height doesn't reliably propagate through nested flex
+   containers with an indefinite/flex-grow-derived height). Make both explicit
+   flex children so they stretch to fill this wrapper. */
+.editorWrapper :global(.bn-container) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.editorWrapper :global(.bn-editor) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}

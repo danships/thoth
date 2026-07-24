@@ -185,47 +185,49 @@ export function DataViewTable({
 
   return (
     <>
-      <Group justify="flex-end" mb="md">
+      <Group justify="flex-end" mt="md" mb="md">
         <Button size="xs" variant="default" onClick={handleAddColumn} leftSection={<IconPlus />}>
           Add Column
         </Button>
       </Group>
-      <Table striped highlightOnHover w="full" mt="lg">
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Name</Table.Th>
-            {columns.map((col) => (
-              <DataTableColumnHeader
-                key={col.id}
-                column={col}
-                onEdit={() => handleEditColumn(col)}
-                onDelete={() => handleDeleteColumn(col)}
+      <Table.ScrollContainer minWidth={520} mt="lg" type="native" data-testid="data-table-scroll-container">
+        <Table striped highlightOnHover w="100%" style={columns.length > 0 ? { tableLayout: 'fixed' } : undefined}>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th style={columns.length > 0 ? { width: '30%', maxWidth: 260 } : undefined}>Name</Table.Th>
+              {columns.map((col) => (
+                <DataTableColumnHeader
+                  key={col.id}
+                  column={col}
+                  onEdit={() => handleEditColumn(col)}
+                  onDelete={() => handleDeleteColumn(col)}
+                />
+              ))}
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {pages?.map(({ page, values }) => (
+              <DataTableRow
+                key={page.id}
+                page={page}
+                values={values}
+                columns={columns}
+                onCellUpdate={(columnId, value) => updateValue(page.id, columnId, value)}
+                onPageNameUpdate={(pageId, name) => updatePage(pageId, { name })}
+                disabled={inProgress}
+                onCreateOption={handleCreateOption}
               />
             ))}
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {pages?.map(({ page, values }) => (
-            <DataTableRow
-              key={page.id}
-              page={page}
-              values={values}
-              columns={columns}
-              onCellUpdate={(columnId, value) => updateValue(page.id, columnId, value)}
-              onPageNameUpdate={(pageId, name) => updatePage(pageId, { name })}
+            <NewPageRow
+              value={newPageName}
+              onChange={onPageNameChange}
+              onKeyDown={handleNewPageKeyDown}
               disabled={inProgress}
-              onCreateOption={handleCreateOption}
+              columnCount={columns.length}
             />
-          ))}
-          <NewPageRow
-            value={newPageName}
-            onChange={onPageNameChange}
-            onKeyDown={handleNewPageKeyDown}
-            disabled={inProgress}
-            columnCount={columns.length}
-          />
-        </Table.Tbody>
-      </Table>
+          </Table.Tbody>
+        </Table>
+      </Table.ScrollContainer>
       <ColumnFormModal
         opened={showColumnModal}
         onClose={handleCloseModal}

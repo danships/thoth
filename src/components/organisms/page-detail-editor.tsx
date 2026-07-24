@@ -7,6 +7,7 @@ import '@blocknote/mantine/style.css';
 import '@blocknote/core/fonts/inter.css';
 import { useColorScheme, useDebouncedCallback } from '@mantine/hooks';
 import { Block, BlockNoteEditor } from '@blocknote/core';
+import styles from './page-detail-editor.module.css';
 
 type PageDetailEditorProperties = {
   initialContent: Block[];
@@ -37,6 +38,10 @@ export function PageDetailEditor({ initialContent, onUpdate }: PageDetailEditorP
   const colorScheme = useColorScheme();
 
   // Render the editor
-  // @ts-expect-error Is an issue with the editor, the typings are not 100% correct
-  return <BlockNoteView editor={editor} theme={colorScheme === 'dark' ? 'dark' : 'light'} onChange={onChange} />;
+  return (
+    <div className={styles['editorWrapper'] ?? ''}>
+      {/* @ts-expect-error Is an issue with the editor, the typings are not 100% correct */}
+      <BlockNoteView editor={editor} theme={colorScheme === 'dark' ? 'dark' : 'light'} onChange={onChange} />
+    </div>
+  );
 }
