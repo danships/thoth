@@ -47,7 +47,15 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
 
   return (
     <AppShell
-      padding="md"
+      // Use a small non-zero base padding instead of collapsing it to 0. Mantine's AppShell
+      // only writes the `--app-shell-padding` CSS variable when a responsive size's `base`
+      // value is truthy (see assignPaddingVariables upstream); AppShell.Main's
+      // `padding-top: calc(var(--app-shell-header-offset) + var(--app-shell-padding))` becomes
+      // an invalid calc() if that variable is ever missing/falsy, and the browser drops the
+      // whole declaration - collapsing padding-top to 0 and letting Main's content (e.g. the
+      // page detail header and its "Add View" button) render underneath the fixed header. A
+      // small always-truthy value avoids relying on any particular falsy/truthy edge case.
+      padding={{ base: 'xs', sm: 'md' }}
       header={{ height: 30 }}
       navbar={{
         width: 300,

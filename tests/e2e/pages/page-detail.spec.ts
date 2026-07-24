@@ -24,15 +24,26 @@ test('can inline-edit the page title', async ({ page }) => {
   await heading.click();
   await heading.press('Control+A');
   await heading.pressSequentially('Renamed E2E Page');
-  await heading.press('Enter');
+  const [firstUpdateResponse] = await Promise.all([
+    page.waitForResponse((response) => response.url().includes(`/pages/${SEED.pages.root.id}`) && response.ok()),
+    heading.press('Enter'),
+  ]);
+  expect(firstUpdateResponse.ok()).toBe(true);
   await expect(page.getByRole('heading', { name: 'Renamed E2E Page' })).toBeVisible();
 
   // Restore the seeded name afterwards so other specs that rely on SEED.pages.root.name
-  // (a shared, pre-seeded page) keep working regardless of test execution order.
+  // (a shared, pre-seeded page) keep working regardless of test execution order. We
+  // explicitly wait for the PATCH request to resolve before the test ends — otherwise the
+  // next test's page.goto() can abort the still in-flight rename request, permanently
+  // leaving the shared page renamed for the rest of the suite.
   await heading.click();
   await heading.press('Control+A');
   await heading.pressSequentially(SEED.pages.root.name);
-  await heading.press('Enter');
+  const [restoreResponse] = await Promise.all([
+    page.waitForResponse((response) => response.url().includes(`/pages/${SEED.pages.root.id}`) && response.ok()),
+    heading.press('Enter'),
+  ]);
+  expect(restoreResponse.ok()).toBe(true);
   await expect(page.getByRole('heading', { name: SEED.pages.root.name })).toBeVisible();
 });
 
