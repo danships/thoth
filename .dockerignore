@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.github
+docs
+tests/*
+# `scripts/end-to-end-seed.ts` (type-checked as part of `pnpm build`, though
+# only ever executed locally/in CI via Playwright's global setup) imports
+# `tests/e2e/constants.ts`. Keep this single file so the Docker build's
+# TypeScript check can resolve that import.
+!tests/e2e/constants.ts
+playwright-report
+test-results
+.env*
+!.env.test
+*.md
