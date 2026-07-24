@@ -8,35 +8,72 @@ Thoth aims to provide a fast, flexible note‑taking and knowledge management ex
 
 - **Open source**: community‑driven, MIT‑licensed.
 - **Notion‑inspired UX**: pages, hierarchy, and a clean editor experience.
-- **Modern stack**: TypeScript across the stack, React with Mantine UI, Vite dev tooling.
+- **Modern stack**: TypeScript, Next.js 15 (App Router) with Turbopack, React 19, and Mantine UI.
 
-### Monorepo
+### Architecture
 
-This project is a pnpm‑managed monorepo. Notable packages:
+Thoth is a single Next.js application (not a monorepo) with a single `package.json` at the repository root:
 
-- `packages/web`: Vite + React app using Mantine UI 8 and React Router, following Atomic Design for components.
-- `packages/backend`: TypeScript backend modules and API routes.
-- `packages/types`: Shared TypeScript types.
+- `src/app`: Next.js App Router pages and API routes (`src/app/api`).
+- `src/components`: UI components organized using Atomic Design (`atoms`, `molecules`, `organisms`, `templates`).
+- `src/lib`: shared libraries — auth (`better-auth`), database repositories (SuperSave ORM), API client, environment validation, and Nanostores-based state.
+- `src/types`: shared TypeScript types and Zod schemas for API request/response validation.
+- `tests/e2e`: Playwright end-to-end tests.
 
 ### Getting Started
 
-Prerequisites: pnpm 10+
+Prerequisites: Node.js 24.x and pnpm 10+.
 
 ```bash
-pnpm install --frozen-lockfile
+pnpm install
 pnpm dev
 ```
 
-Open the web app package during development:
+The dev server runs Next.js with Turbopack and hot-reload at `http://localhost:3000`.
+
+#### Environment variables
+
+The app validates required environment variables at startup (see `src/lib/environment.ts`). At minimum you need:
+
+- `NODE_ENV`: `development`, `production`, or `test`.
+- `DB`: database connection string (e.g. `sqlite:///path/to/db.sqlite` or a MySQL connection string).
+- `BETTER_AUTH_SECRET`: secret used by `better-auth` for session/auth handling.
+
+Optional:
+
+- `LOG_LEVEL`: logging verbosity (`error`, `warn`, `info`, `http`, `debug`, `trace`; default `info`).
+- `SUPERSAVE_SKIP_SYNC`: set to `true` to skip automatic schema sync and rely on migrations (used in production).
+- `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISCOVERY_URL`, `OIDC_AUTHORIZATION_URL`: configure OIDC login; if omitted, credentials-based auth is used instead.
+
+A local MySQL database can be started with Docker Compose:
 
 ```bash
-cd packages/web
-pnpm dev
+docker compose up -d
 ```
+
+### Available scripts
+
+Run these from the repository root:
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| Dev server | `pnpm dev` | Start Next.js with Turbopack (hot-reload) |
+| Build | `pnpm build` | Production build via `next build --turbopack` |
+| Start | `pnpm start` | Run the production build |
+| Lint (all) | `pnpm lint` | Run ESLint + Prettier + TypeScript checks concurrently |
+| Format | `pnpm format` | Auto-fix Prettier and ESLint issues in `src/` |
+| E2E tests | `pnpm test:e2e` | Run Playwright end-to-end tests |
+| E2E tests (UI) | `pnpm test:e2e:ui` | Run Playwright tests in interactive UI mode |
+| E2E report | `pnpm test:e2e:report` | Show the last Playwright HTML report |
+| Seed database | `pnpm db:seed` | Seed the database with sample data |
+
+### Testing
+
+Every new or modified feature should ship with Playwright end-to-end tests under `tests/e2e/`. See `.agents/commands/e2e-test.md` for conventions on seeding, authentication, and selectors.
 
 ### Contributing
 
-Issues and PRs are welcome. Please follow TypeScript best practices and the existing Atomic Design conventions in `packages/web`.
+Issues and PRs are welcome. Please follow TypeScript best practices (prefer `type` over `interface`) and the existing Atomic Design conventions in `src/components`. See `AGENTS.md` for detailed guidance on the codebase's patterns and conventions.
 
 ### Releasing
 
