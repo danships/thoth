@@ -1,0 +1,20 @@
+.banner {
+  width: 100%;
+  aspect-ratio: 16 / 5;
+  border-radius: var(--mantine-radius-md);
+  background-image: var(--cover-image);
+  background-repeat: no-repeat;
+  background-position: var(--cover-position-x) var(--cover-position-y);
+  background-size: var(--cover-zoom);
+  background-color: var(--mantine-color-gray-1);
+  overflow: hidden;
+  position: relative;
+}
+
+.hiddenProbe {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

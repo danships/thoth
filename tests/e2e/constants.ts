@@ -87,6 +87,12 @@ export const SEED = {
     id: 'e2e-page-bc-row-00-0000-0000-000000000001',
     name: 'E2E Breadcrumb Row',
   },
+  // Deterministic, CI-safe placeholder images (no dependency on real user-content hosts) used
+  // to exercise the page cover editor/banner in the `page-cover.spec.ts` suite.
+  coverImage: {
+    url: 'https://placehold.co/1200x400',
+    urlAlt: 'https://placehold.co/1200x400/png?text=Alt',
+  },
   fieldsTab: {
     dataSource: {
       id: 'e2e-datasource-fields-0-0000-000000000001',

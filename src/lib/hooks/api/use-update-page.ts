@@ -39,6 +39,9 @@ export function useUpdatePage({ mutatePages, mutatePageDetails }: UseUpdatePageO
               if (updates.emoji !== undefined) {
                 updatedPage.emoji = updates.emoji;
               }
+              if (updates.cover !== undefined) {
+                updatedPage.cover = updates.cover;
+              }
               return { ...pageItem, page: updatedPage };
             }),
           { revalidate: false }
@@ -55,6 +58,7 @@ export function useUpdatePage({ mutatePages, mutatePageDetails }: UseUpdatePageO
                 ...previous.page,
                 ...(updates.name !== undefined && { name: updates.name.trim() }),
                 ...(updates.emoji !== undefined && { emoji: updates.emoji }),
+                ...(updates.cover !== undefined && { cover: updates.cover }),
               },
             };
           },

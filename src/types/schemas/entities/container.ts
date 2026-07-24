@@ -97,10 +97,25 @@ export const containerSchema = z
   .extend(withUserIdSchema.shape)
   .extend(withIdSchema.shape);
 
+// Normalized crop/zoom info for a page's cover image, stored as opaque JSON alongside `emoji`.
+export const pageCoverSchema = z.object({
+  imageUrl: z
+    .url()
+    .max(2048)
+    .refine((value) => ['http:', 'https:'].includes(new URL(value).protocol), {
+      message: 'imageUrl must use the http or https protocol',
+    }),
+  positionX: z.number().min(0).max(1).default(0.5),
+  positionY: z.number().min(0).max(1).default(0.5),
+  zoom: z.number().min(1).max(3).default(1),
+});
+export type PageCover = z.infer<typeof pageCoverSchema>;
+
 export const pageContainerSchema = containerSchema
   .extend({
     type: z.literal('page'),
     emoji: z.string().min(1).nullable(),
+    cover: pageCoverSchema.nullable().optional(),
     // TODO generate/get block validation schemas for blocks
     blocks: z.array(blockSchema).optional(),
     views: z.array(z.string()).optional(),

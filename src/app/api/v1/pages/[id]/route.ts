@@ -42,6 +42,7 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
         id: page.id,
         name: page.name,
         emoji: page.emoji || null,
+        cover: page.cover ?? null,
         lastUpdated: page.lastUpdated,
         createdAt: page.createdAt,
         parentId: page.parentId || null,
@@ -88,6 +89,9 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
     if (body.emoji !== undefined) {
       filteredBody.emoji = body.emoji;
     }
+    if (body.cover !== undefined) {
+      filteredBody.cover = body.cover;
+    }
 
     const updatedPage = await containerRepository.update({
       ...existingPage,
@@ -99,6 +103,7 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
       id: updatedPage.id,
       name: updatedPage.name,
       emoji: 'emoji' in updatedPage ? updatedPage.emoji : null,
+      cover: 'cover' in updatedPage ? (updatedPage.cover ?? null) : null,
       lastUpdated: updatedPage.lastUpdated,
       createdAt: updatedPage.createdAt,
       parentId: updatedPage.parentId || null,

@@ -1,6 +1,9 @@
 import { dataViewSchema as dataViewSchemaEntity } from '../schemas/entities/data-view';
-import { pageContainerSchema, dataSourceContainerSchema } from '../schemas/entities/container';
+import { pageContainerSchema, dataSourceContainerSchema, pageCoverSchema } from '../schemas/entities/container';
 import { z } from 'zod';
+
+export { pageCoverSchema } from '../schemas/entities/container';
+export type PageCover = z.infer<typeof pageCoverSchema>;
 
 export const pageSchema = pageContainerSchema.pick({
   id: true,
@@ -8,6 +11,7 @@ export const pageSchema = pageContainerSchema.pick({
   createdAt: true,
   lastUpdated: true,
   emoji: true,
+  cover: true,
   parentId: true,
 });
 export type Page = z.infer<typeof pageSchema>;
