@@ -1,5 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getWorkspaceRepository } from '@/lib/database';
+import { registerContainerAccessForNewPage } from '@/lib/database/container-access-service';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateWelcomePageResponse } from '@/types/api';
@@ -70,6 +71,10 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, {}>({}, async (_
     };
 
     const createdPage = await containerRepository.create(pageData);
+
+    // Ensure the welcome page also appears in the ContainerAccess-driven root list from the
+    // moment it's created (see `registerContainerAccessForNewPage`).
+    await registerContainerAccessForNewPage(createdPage, session.user.id);
 
     return {
       id: createdPage.id,

@@ -1,5 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getWorkspaceRepository } from '@/lib/database';
+import { registerContainerAccessForNewPage } from '@/lib/database/container-access-service';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
@@ -97,6 +98,11 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
     };
 
     const createdPage = await containerRepository.create(pageData);
+
+    // Every root-level (and nested) page gets a `ContainerAccess` row for its owning user at
+    // creation time, so the root-list pagination in `GET /pages/tree` can be driven entirely
+    // off this table.
+    await registerContainerAccessForNewPage(createdPage, session.user.id);
 
     const returnValue: CreatePageResponse = {
       id: createdPage.id,

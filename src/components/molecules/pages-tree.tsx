@@ -21,6 +21,7 @@ export function PagesTree({ branches }: PagesTreeProperties) {
         const treeNodeProperties = {
           page: branch.page,
           childPages: branch.children,
+          ...(branch.hasMoreChildren && { hasMoreChildren: true }),
           ...(branch.views && {
             views: branch.views.map((view) => ({ id: view.id, name: view.name })),
           }),

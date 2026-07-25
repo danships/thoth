@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { pageContainerSchema, dataSourceContainerSchema } from '../schemas/entities/container';
+import { containerAccessSchema } from '../schemas/entities/container-access';
 import { workspaceSchema as workspaceSchemaEntity } from '../schemas/entities/workspace';
 import { dataViewSchema } from '../schemas/entities/data-view';
 
@@ -39,3 +40,12 @@ export const dataViewCreateSchema = dataViewSchema.omit({ id: true });
 export type DataView = z.infer<typeof dataViewSchema>;
 export type DataViewCreate = z.infer<typeof dataViewCreateSchema>;
 /** End DataView Entity Schema */
+
+/** ContainerAccess Entity Schema */
+export { containerAccessSchema } from '../schemas/entities/container-access';
+
+export const containerAccessCreateSchema = containerAccessSchema.omit({ id: true });
+
+export type ContainerAccess = z.infer<typeof containerAccessSchema>;
+export type ContainerAccessCreate = z.infer<typeof containerAccessCreateSchema>;
+/** End ContainerAccess Entity Schema */
