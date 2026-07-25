@@ -1,3 +1,20 @@
+// 30 root-level pages used to exercise cursor-based pagination of the sidebar's root list.
+// `lastAccessedAt` values are assigned (in the seed script) in descending order matching this
+// array's order, so page 0 is expected to be the most-recently-accessed / first to appear.
+const PAGINATION_SEED_COUNT = 30;
+const paginationSeed = Array.from({ length: PAGINATION_SEED_COUNT }, (_, index) => ({
+  id: `e2e-page-pag-${String(index).padStart(2, '0')}-0000-0000-000000000001`,
+  name: `E2E Pagination Page ${String(index).padStart(2, '0')}`,
+}));
+
+// A root page with more children than CHILD_PREVIEW_LIMIT (10), used to verify the sidebar
+// shows a "more inside" indicator instead of listing/paginating all of them inline.
+const CHILD_OVERFLOW_COUNT = 12;
+const childOverflowChildren = Array.from({ length: CHILD_OVERFLOW_COUNT }, (_, index) => ({
+  id: `e2e-page-cof-child-${String(index).padStart(2, '0')}-000000000001`,
+  name: `E2E Overflow Child ${String(index).padStart(2, '0')}`,
+}));
+
 export const SEED = {
   user: {
     id: 'e2e-user-00000000-0000-0000-0000-000000000001',
@@ -40,6 +57,12 @@ export const SEED = {
       { id: 'e2e-page-deep-4-00-0000-0000-000000000001', name: 'E2E Deep Page Four' },
       { id: 'e2e-page-deep-5-00-0000-0000-000000000001', name: 'E2E Deep Page Five' },
     ],
+    paginationSeed,
+    childOverflowHost: {
+      id: 'e2e-page-cof-host-0-0000-0000-000000000001',
+      name: 'E2E Child Overflow Host',
+      children: childOverflowChildren,
+    },
   },
   dataSource: {
     id: 'e2e-datasource-00-0000-0000-000000000001',
@@ -86,6 +109,12 @@ export const SEED = {
   breadcrumbRowPage: {
     id: 'e2e-page-bc-row-00-0000-0000-000000000001',
     name: 'E2E Breadcrumb Row',
+  },
+  // Deterministic, CI-safe placeholder images (no dependency on real user-content hosts) used
+  // to exercise the page cover editor/banner in the `page-cover.spec.ts` suite.
+  coverImage: {
+    url: 'https://placehold.co/1200x400',
+    urlAlt: 'https://placehold.co/1200x400/png?text=Alt',
   },
   fieldsTab: {
     dataSource: {

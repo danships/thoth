@@ -16,7 +16,9 @@ import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
 import { useSetPageBlocks } from '@/lib/hooks/api/use-set-page-blocks';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { usePageBreadcrumbs } from '@/lib/hooks/api/use-page-breadcrumbs';
+import { useRegisterPageAccess } from '@/lib/hooks/api/use-register-page-access';
 import { PageBreadcrumb } from '@/components/molecules/page-breadcrumb';
+import { PageCoverEditor } from '@/components/molecules/page-cover-editor';
 import styles from './page.module.css';
 
 export default function PageDetailsPage() {
@@ -37,6 +39,15 @@ export default function PageDetailsPage() {
   const { showError } = useNotification();
   const { updatePage } = useUpdatePage({ mutatePageDetails: mutate });
   const { setPageBlocks } = useSetPageBlocks({ mutatePageDetails: mutate });
+  const { registerAccess } = useRegisterPageAccess();
+
+  // Explicitly register that this page was opened, once per navigation (guarded on `pageId`
+  // alone so it doesn't re-fire on every re-render). Kept fully separate from `usePageDetails`
+  // and any GET call so background prefetches/hover-preloads never silently reorder the
+  // sidebar's root list.
+  useEffect(() => {
+    void registerAccess(pageId);
+  }, [pageId, registerAccess]);
 
   // Auto-select first view if views exist and no view is selected
   useEffect(() => {
@@ -150,6 +161,7 @@ export default function PageDetailsPage() {
       <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
         <Stack gap="lg">
           {!isLoadingBreadcrumbs && breadcrumbs && breadcrumbs.length > 1 && <PageBreadcrumb pages={breadcrumbs} />}
+          <PageCoverEditor pageId={pageId} cover={pageDetails.page.cover} updatePage={updatePage} />
           <Group gap="sm">
             <Text size="xl">{pageDetails?.page.emoji}</Text>
             <Title

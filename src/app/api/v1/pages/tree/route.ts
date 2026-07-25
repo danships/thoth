@@ -1,8 +1,117 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository, getDataViewRepository } from '@/lib/database';
+import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
-import type { GetPagesTreeQueryVariables, GetPagesTreeResponse, Page, DataView } from '@/types/api';
-import { getPagesTreeQueryVariablesSchema } from '@/types/api';
+import { BadRequestError } from '@/lib/errors/bad-request-error';
+import type { ContainerAccess } from '@/types/database';
+import type { GetPagesTreeQueryVariables, GetPagesTreeResponse, PagesTreeCursor, Page, DataView } from '@/types/api';
+import {
+  getPagesTreeQueryVariablesSchema,
+  pagesTreeCursorSchema,
+  PAGES_TREE_DEFAULT_LIMIT,
+  CHILD_PREVIEW_LIMIT,
+} from '@/types/api';
+
+// Over-fetch buffer used on top of `limit + 1` when querying `ContainerAccess` rows, to
+// absorb rows that share the exact same `lastAccessedAt` as the cursor position (dropped via
+// the containerId tie-break below) without under-fetching real results.
+const SAFETY_MARGIN = 5;
+
+// Safety valve against runaway loops: `ContainerAccess` rows are per-page (root and nested),
+// so root pages can be interleaved with many nested-page rows in the global lastAccessedAt
+// order. This bounds how many over-fetch batches we're willing to walk through to collect a
+// page of root results.
+const MAX_BATCHES = 50;
+
+function encodeCursor(cursor: PagesTreeCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodeCursor(raw: string): PagesTreeCursor {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+  } catch {
+    throw new BadRequestError('Invalid cursor');
+  }
+
+  const result = pagesTreeCursorSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new BadRequestError('Invalid cursor');
+  }
+
+  return result.data;
+}
+
+/**
+ * Collects the next page of root-level `ContainerAccess` rows, sorted by `lastAccessedAt`
+ * desc (with `containerId` desc as a tie-break for deterministic ordering/pagination).
+ *
+ * SuperSave does not support filtering `parentId` by `null` at the query level (the same
+ * documented limitation `Container` queries work around), and root vs. nested `ContainerAccess`
+ * rows can be arbitrarily interleaved in the global `lastAccessedAt` order. So rather than a
+ * single over-fetch, this walks batches of `limit + 1 + SAFETY_MARGIN` rows (dropping rows at
+ * or before the resuming cursor position in application code) until enough root rows have been
+ * collected or the table is exhausted.
+ */
+async function fetchRootContainerAccessPage(
+  userId: string,
+  limit: number,
+  initialCursor: PagesTreeCursor | undefined
+): Promise<{ rows: ContainerAccess[]; hasMore: boolean }> {
+  const containerAccessRepository = await getContainerAccessRepository();
+
+  const collected: ContainerAccess[] = [];
+  let cursor = initialCursor;
+  let batches = 0;
+
+  while (collected.length < limit + 1 && batches < MAX_BATCHES) {
+    batches += 1;
+
+    const batchQuery = addUserIdToQuery(containerAccessRepository.createQuery(), userId)
+      .sort('lastAccessedAt', 'desc')
+      .sort('containerId', 'desc')
+      .limit(limit + 1 + SAFETY_MARGIN);
+
+    if (cursor) {
+      batchQuery.lte('lastAccessedAt', cursor.lastAccessedAt);
+    }
+
+    const batch = await containerAccessRepository.getByQuery(batchQuery);
+
+    if (batch.length === 0) {
+      break;
+    }
+
+    // Drop rows already returned in a previous batch: any row with a later lastAccessedAt
+    // than the cursor was already excluded by the `lte` filter; rows sharing the exact same
+    // lastAccessedAt as the cursor are disambiguated via the containerId tie-break.
+    const cursorSnapshot = cursor;
+    const freshRows = cursorSnapshot
+      ? batch.filter((row) => {
+          if (row.lastAccessedAt !== cursorSnapshot.lastAccessedAt) {
+            return true;
+          }
+          return row.containerId < cursorSnapshot.containerId;
+        })
+      : batch;
+
+    collected.push(...freshRows.filter((row) => !row.parentId));
+
+    const lastRowInBatch = batch.at(-1);
+    if (!lastRowInBatch) {
+      break;
+    }
+    cursor = { lastAccessedAt: lastRowInBatch.lastAccessedAt, containerId: lastRowInBatch.containerId };
+
+    // Fewer rows than requested means we've reached the end of the table.
+    if (batch.length < limit + 1 + SAFETY_MARGIN) {
+      break;
+    }
+  }
+
+  const hasMore = collected.length > limit;
+  return { rows: collected.slice(0, limit), hasMore };
+}
 
 export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}>(
   {
@@ -10,19 +119,53 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
   },
   async ({ query }, session) => {
     const containerRepository = await getContainerRepository();
-    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id)
-      .eq('type', 'page')
-      .sort('lastUpdated', 'desc');
+    const limit = query?.limit ?? PAGES_TREE_DEFAULT_LIMIT;
+
+    let containers: Awaited<ReturnType<typeof containerRepository.getByQuery>>;
+    let pagination: GetPagesTreeResponse['pagination'];
 
     if (query?.parentId) {
-      databaseQuery.eq('parentId', query.parentId);
-    }
+      // Expanding a specific node: this listing remains fully unpaginated, per the explicit
+      // out-of-scope decision for child listings in this ticket.
+      containers = await containerRepository.getByQuery(
+        addUserIdToQuery(containerRepository.createQuery(), session.user.id)
+          .eq('type', 'page')
+          .eq('parentId', query.parentId)
+          .sort('lastUpdated', 'desc')
+      );
+      pagination = { nextCursor: null, hasMore: false };
+    } else {
+      // Root list: cursor-paginated, driven off `ContainerAccess.lastAccessedAt` rather than
+      // `Container.lastUpdated`.
+      const cursor = query?.cursor ? decodeCursor(query.cursor) : undefined;
+      const { rows, hasMore } = await fetchRootContainerAccessPage(session.user.id, limit, cursor);
 
-    // TODO: SuperSave does not return any result if we set parentId to null
-    // eslint-disable-next-line unicorn/no-await-expression-member
-    const containers = (await containerRepository.getByQuery(databaseQuery)).filter(
-      (container) => query?.parentId || !container.parentId
-    );
+      const containerIds = rows.map((row) => row.containerId);
+      const containersById = new Map<string, Awaited<ReturnType<typeof containerRepository.getByQuery>>[number]>();
+      if (containerIds.length > 0) {
+        const fetchedContainers = await containerRepository.getByQuery(
+          addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('type', 'page').in('id', containerIds)
+        );
+        for (const container of fetchedContainers) {
+          containersById.set(container.id, container);
+        }
+      }
+
+      // Preserve the ContainerAccess-driven (last-accessed) order; a page with no matching
+      // container is skipped (e.g. deleted since the access row was written).
+      containers = rows
+        .map((row) => containersById.get(row.containerId))
+        .filter((container): container is NonNullable<typeof container> => container !== undefined);
+
+      const lastRow = rows.at(-1);
+      pagination = {
+        nextCursor:
+          hasMore && lastRow
+            ? encodeCursor({ lastAccessedAt: lastRow.lastAccessedAt, containerId: lastRow.containerId })
+            : null,
+        hasMore,
+      };
+    }
 
     // Separate containers that have views from those that don't
     const containersWithViews = containers.filter(
@@ -32,13 +175,26 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
 
     const parentIds = containersWithoutViews.map((container) => container.id).filter(Boolean);
 
-    // Query for child pages only for containers without views
+    // Query for child pages only for containers without views. Fetched unbounded (no per-parent
+    // DB limit, since SuperSave's `in` query can't express a per-group limit) and then capped to
+    // CHILD_PREVIEW_LIMIT per parent in application code below, with overflow tracked so the UI
+    // can show a "more inside" indicator instead of paginating child listings.
     const databaseChildren =
       parentIds.length > 0
         ? await containerRepository.getByQuery(
-            addUserIdToQuery(containerRepository.createQuery(), session.user.id).in('parentId', parentIds)
+            addUserIdToQuery(containerRepository.createQuery(), session.user.id)
+              .in('parentId', parentIds)
+              .sort('lastUpdated', 'desc')
           )
         : [];
+
+    const childCountByParent = new Map<string, number>();
+    for (const child of databaseChildren) {
+      if (!child.parentId) {
+        continue;
+      }
+      childCountByParent.set(child.parentId, (childCountByParent.get(child.parentId) ?? 0) + 1);
+    }
 
     // Fetch views for containers that have them
     const dataViewRepository = await getDataViewRepository();
@@ -61,9 +217,10 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
         const hasViews =
           container.type === 'page' && 'views' in container && container.views && container.views.length > 0;
 
-        // Children always contains only pages
+        // Children always contains only pages, capped to CHILD_PREVIEW_LIMIT for preview.
         const children: Array<{ page: Page }> = databaseChildren
           .filter((child) => child.parentId === container.id)
+          .slice(0, CHILD_PREVIEW_LIMIT)
           .map((child): { page: Page } => ({
             page: {
               id: child.id,
@@ -74,6 +231,8 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
               parentId: child.parentId || null,
             },
           }));
+
+        const hasMoreChildren = (childCountByParent.get(container.id) ?? 0) > CHILD_PREVIEW_LIMIT;
 
         // Views are in a separate field
         let views: DataView[] = [];
@@ -101,9 +260,11 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
             parentId: container.parentId || null,
           },
           children,
+          ...(hasMoreChildren && { hasMoreChildren }),
           views,
         };
       }),
+      pagination,
     };
   }
 );

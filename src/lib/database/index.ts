@@ -1,5 +1,5 @@
 import { SuperSave } from 'supersave';
-import type { Container, Workspace, DataView } from '@/types/database';
+import type { Container, ContainerAccess, Workspace, DataView } from '@/types/database';
 import { getEnvironment } from '../environment';
 import * as entities from './entities';
 import { migrations } from './migrations';
@@ -16,6 +16,7 @@ async function initializeDatabase() {
   });
 
   await database.addEntity(entities.Container);
+  await database.addEntity(entities.ContainerAccess);
   await database.addEntity(entities.Workspace);
   await database.addEntity(entities.DataView);
 
@@ -45,6 +46,11 @@ export async function getDatabase() {
 export async function getContainerRepository() {
   const database = await getDatabase();
   return database.getRepository<Container>(entities.CONTAINER_NAME);
+}
+
+export async function getContainerAccessRepository() {
+  const database = await getDatabase();
+  return database.getRepository<ContainerAccess>(entities.CONTAINER_ACCESS_NAME);
 }
 
 export async function getWorkspaceRepository() {

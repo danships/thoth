@@ -1,6 +1,10 @@
 import { dataViewSchema as dataViewSchemaEntity } from '../schemas/entities/data-view';
-import { pageContainerSchema, dataSourceContainerSchema } from '../schemas/entities/container';
+import { pageContainerSchema, dataSourceContainerSchema, pageCoverSchema } from '../schemas/entities/container';
+import { containerAccessSchema as containerAccessSchemaEntity } from '../schemas/entities/container-access';
 import { z } from 'zod';
+
+export { pageCoverSchema } from '../schemas/entities/container';
+export type PageCover = z.infer<typeof pageCoverSchema>;
 
 export const pageSchema = pageContainerSchema.pick({
   id: true,
@@ -8,6 +12,7 @@ export const pageSchema = pageContainerSchema.pick({
   createdAt: true,
   lastUpdated: true,
   emoji: true,
+  cover: true,
   parentId: true,
 });
 export type Page = z.infer<typeof pageSchema>;
@@ -31,3 +36,11 @@ export const dataSourceSchema = dataSourceContainerSchema.pick({
   columns: true,
 });
 export type DataSource = z.infer<typeof dataSourceSchema>;
+
+export const containerAccessSchema = containerAccessSchemaEntity.pick({
+  id: true,
+  containerId: true,
+  parentId: true,
+  lastAccessedAt: true,
+});
+export type ContainerAccessApi = z.infer<typeof containerAccessSchema>;

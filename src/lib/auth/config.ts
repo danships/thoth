@@ -7,6 +7,7 @@ import { createPool } from 'mysql2/promise';
 import { connection } from 'next/server';
 import type { PageContainerCreate, WorkspaceCreate } from '@/types/database';
 import { getContainerRepository, getDatabase, getWorkspaceRepository } from '../database';
+import { registerContainerAccessForNewPage } from '../database/container-access-service';
 import { getEnvironment } from '../environment';
 
 let authInstance: Auth<BetterAuthOptions> | null = null;
@@ -68,7 +69,12 @@ async function initializeAuth() {
               parentId: null,
             };
 
-            await containerRepository.create(pageData);
+            const createdPage = await containerRepository.create(pageData);
+
+            // Ensure the welcome page has a ContainerAccess row from the moment it's created so
+            // it immediately shows up in the ContainerAccess-driven root list (`GET /pages/tree`),
+            // without requiring the client to first POST /pages/[id]/access (e.g. on page open).
+            await registerContainerAccessForNewPage(createdPage, user.id);
           },
         },
       },

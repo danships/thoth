@@ -11,6 +11,7 @@ export const updatePageBodySchema = pageContainerSchema
   .pick({
     name: true,
     emoji: true,
+    cover: true,
   })
   .partial();
 

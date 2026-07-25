@@ -1,0 +1,23 @@
+.previewBanner {
+  width: 100%;
+  aspect-ratio: 16 / 5;
+  border-radius: var(--mantine-radius-md);
+  background-image: var(--cover-image);
+  background-repeat: no-repeat;
+  background-position: var(--cover-position-x) var(--cover-position-y);
+  background-size: var(--cover-zoom);
+  background-color: var(--mantine-color-gray-1);
+  overflow: hidden;
+  cursor: move;
+  touch-action: none;
+}
+
+.previewBanner:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 2px;
+}
+
+.zoomSlider {
+  flex: 1;
+  max-width: 240px;
+}

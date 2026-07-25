@@ -21,3 +21,4 @@ export * from './delete-data-source-column';
 export * from './update-page-values';
 export * from './update-page';
 export * from './set-page-blocks';
+export * from './register-page-access';

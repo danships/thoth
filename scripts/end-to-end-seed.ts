@@ -2,9 +2,16 @@
 import 'dotenv/config';
 import { scrypt, randomBytes } from 'node:crypto';
 import Database from 'better-sqlite3';
-import { getContainerRepository, getDatabase, getDataViewRepository, getWorkspaceRepository } from '../src/lib/database/index.js';
+import {
+  getContainerAccessRepository,
+  getContainerRepository,
+  getDatabase,
+  getDataViewRepository,
+  getWorkspaceRepository,
+} from '../src/lib/database/index.js';
 import { SEED } from '../tests/e2e/constants.js';
 import type {
+  ContainerAccessCreate,
   DataSourceContainer,
   DataSourceContainerCreate,
   PageContainerCreate,
@@ -43,20 +50,26 @@ async function seedAuthTables() {
   const now = new Date().toISOString();
   const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
-  database.prepare(
-    `INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
      VALUES (?, ?, ?, 1, ?, ?)`
-  ).run(SEED.user.id, SEED.user.name, SEED.user.email, now, now);
+    )
+    .run(SEED.user.id, SEED.user.name, SEED.user.email, now, now);
 
-  database.prepare(
-    `INSERT OR REPLACE INTO account (id, accountId, providerId, userId, createdAt, updatedAt, password)
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO account (id, accountId, providerId, userId, createdAt, updatedAt, password)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run('e2e-account-00000000', SEED.user.id, 'credential', SEED.user.id, now, now, passwordHash);
+    )
+    .run('e2e-account-00000000', SEED.user.id, 'credential', SEED.user.id, now, now, passwordHash);
 
-  database.prepare(
-    `INSERT OR REPLACE INTO session (id, expiresAt, token, createdAt, updatedAt, userId)
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO session (id, expiresAt, token, createdAt, updatedAt, userId)
      VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(SEED.session.id, farFuture, SEED.session.token, now, now, SEED.user.id);
+    )
+    .run(SEED.session.id, farFuture, SEED.session.token, now, now, SEED.user.id);
 
   database.close();
 }
@@ -92,30 +105,61 @@ async function seedAppData() {
 
   const wsId = SEED.workspace.id;
 
-  async function upsertPage(data: PageContainerCreate & { id: string }) {
-    const existing = await containerRepository.getOneByQuery(
-      containerRepository.createQuery().eq('id', data.id)
+  const containerAccessRepository = await getContainerAccessRepository();
+
+  async function upsertContainerAccess(
+    page: { id: string; parentId: string | null; workspaceId: string },
+    lastAccessedAt: string
+  ) {
+    const existingAccess = await containerAccessRepository.getOneByQuery(
+      containerAccessRepository.createQuery().eq('containerId', page.id).eq('userId', uid)
     );
+    await (existingAccess
+      ? containerAccessRepository.update({ ...existingAccess, parentId: page.parentId, lastAccessedAt })
+      : containerAccessRepository.create({
+          userId: uid,
+          containerId: page.id,
+          parentId: page.parentId,
+          workspaceId: page.workspaceId,
+          lastAccessedAt,
+          createdAt: lastAccessedAt,
+        } as unknown as ContainerAccessCreate));
+  }
+
+  async function upsertPage(data: PageContainerCreate & { id: string }, options?: { lastAccessedAt?: string }) {
+    const existing = await containerRepository.getOneByQuery(containerRepository.createQuery().eq('id', data.id));
     await (existing
       ? containerRepository.update({ ...existing, ...data, lastUpdated: now })
       : containerRepository.create(data as unknown as PageContainerCreate));
+
+    // Mirrors the app's own page-creation flow: every page gets a `ContainerAccess` row for
+    // its owning user, `parentId` denormalized from the container's own `parentId`.
+    await upsertContainerAccess(
+      { id: data.id, parentId: data.parentId ?? null, workspaceId: data.workspaceId },
+      options?.lastAccessedAt ?? data.createdAt
+    );
   }
 
-  await upsertPage({
-    id: SEED.pages.root.id,
-    name: SEED.pages.root.name,
-    emoji: '📄',
-    type: 'page',
-    userId: uid,
-    workspaceId: wsId,
-    parentId: null,
-    createdAt: now,
-    // `/pages` redirects to the most-recently-updated root page. This must stay strictly
-    // later than `pages.dataSourceHost.lastUpdated` (both are root pages, `parentId: null`)
-    // so the redirect target is deterministic across test runs/DB engines instead of relying
-    // on a tie-break that could vary.
-    lastUpdated: new Date(Date.parse(now) + 1000).toISOString(),
-  });
+  await upsertPage(
+    {
+      id: SEED.pages.root.id,
+      name: SEED.pages.root.name,
+      emoji: '📄',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: null,
+      createdAt: now,
+      // `/pages` redirects to the most-recently-updated root page. This must stay strictly
+      // later than `pages.dataSourceHost.lastUpdated` (both are root pages, `parentId: null`)
+      // so the redirect target is deterministic across test runs/DB engines instead of relying
+      // on a tie-break that could vary.
+      lastUpdated: new Date(Date.parse(now) + 1000).toISOString(),
+    },
+    // Keep this comfortably more recent than any `paginationSeed`/`childOverflowHost` entry so
+    // it deterministically lands on the first page of the cursor-paginated root list.
+    { lastAccessedAt: new Date(Date.parse(now) + 5000).toISOString() }
+  );
 
   await upsertPage({
     id: SEED.pages.child.id,
@@ -129,18 +173,21 @@ async function seedAppData() {
     lastUpdated: now,
   });
 
-  await upsertPage({
-    id: SEED.pages.dataSourceHost.id,
-    name: SEED.pages.dataSourceHost.name,
-    emoji: '📊',
-    type: 'page',
-    userId: uid,
-    workspaceId: wsId,
-    parentId: null,
-    createdAt: now,
-    lastUpdated: now,
-    views: [SEED.dataView.id],
-  });
+  await upsertPage(
+    {
+      id: SEED.pages.dataSourceHost.id,
+      name: SEED.pages.dataSourceHost.name,
+      emoji: '📊',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: null,
+      createdAt: now,
+      lastUpdated: now,
+      views: [SEED.dataView.id],
+    },
+    { lastAccessedAt: new Date(Date.parse(now) + 4000).toISOString() }
+  );
 
   // Deeply nested chain (each page is the child of the previous one, rooted under
   // `pages.root`), used to exercise the breadcrumb collapse-into-dropdown behavior.
@@ -363,6 +410,59 @@ async function seedAppData() {
       [fieldsSeed.dataSource.columns[1].id]: { type: 'boolean', value: false },
     },
   });
+
+  // ── Child-overflow test fixture ──────────────────────────────────────────────
+  // A root page with more children (12) than CHILD_PREVIEW_LIMIT (10), used to verify the
+  // sidebar shows a "more inside" indicator instead of listing/paginating all of them inline.
+  await upsertPage(
+    {
+      id: SEED.pages.childOverflowHost.id,
+      name: SEED.pages.childOverflowHost.name,
+      emoji: '📚',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: null,
+      createdAt: now,
+      lastUpdated: now,
+    },
+    { lastAccessedAt: new Date(Date.parse(now) + 3000).toISOString() }
+  );
+
+  for (const child of SEED.pages.childOverflowHost.children) {
+    await upsertPage({
+      id: child.id,
+      name: child.name,
+      emoji: null,
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: SEED.pages.childOverflowHost.id,
+      createdAt: now,
+      lastUpdated: now,
+    });
+  }
+
+  // ── Root-list pagination test fixtures ───────────────────────────────────────
+  // 30 root-level pages with staggered, strictly descending `lastAccessedAt` values (each one
+  // second earlier than the previous), giving a deterministic cursor-pagination sort order:
+  // pagination page 0 is the most-recently-accessed of the batch, page 29 the least.
+  for (const [index, page] of SEED.pages.paginationSeed.entries()) {
+    await upsertPage(
+      {
+        id: page.id,
+        name: page.name,
+        emoji: null,
+        type: 'page',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: null,
+        createdAt: now,
+        lastUpdated: now,
+      },
+      { lastAccessedAt: new Date(Date.parse(now) - index * 1000).toISOString() }
+    );
+  }
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────
