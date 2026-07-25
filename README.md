@@ -8,7 +8,7 @@ Thoth aims to provide a fast, flexible note‑taking and knowledge management ex
 
 - **Open source**: community‑driven, MIT‑licensed.
 - **Notion‑inspired UX**: pages, hierarchy, and a clean editor experience.
-- **Modern stack**: TypeScript, Next.js 15 (App Router) with Turbopack, React 19, and Mantine UI.
+- **Modern stack**: TypeScript, Next.js 16 (App Router) with Turbopack, React 19, and Mantine UI.
 
 ### Architecture
 
@@ -77,7 +77,13 @@ Issues and PRs are welcome. Please follow TypeScript best practices (prefer `typ
 
 ### Releasing
 
-Releases and production Docker images are published automatically when a `vX.Y.Z` (or `vX.Y.Z-betaN` pre-release) tag is pushed. See [`docs/RELEASING.md`](docs/RELEASING.md) for the full process.
+Releases and production Docker images are published automatically via the [`Release`](.github/workflows/release.yml) GitHub Actions workflow whenever a `vX.Y.Z` (stable) or `vX.Y.Z-betaN` (pre-release) tag is pushed, from `main` or any other branch (e.g. a `hotfix/*` branch):
+
+1. **`validate-tag`** checks the tag matches the expected format and fails fast otherwise.
+2. **`build-and-push-image`** builds the production image from the root `Dockerfile` and pushes it to GitHub Container Registry (`ghcr.io/<owner>/<repo>:<tag>`), additionally tagging `:latest` for stable (non-beta) releases.
+3. **`create-release`** creates a GitHub Release with auto-generated, label-categorized release notes; this only runs once the image has built and pushed successfully.
+
+To cut a release, tag the commit you want to ship and push the tag, e.g. `git tag v1.4.0 && git push origin v1.4.0` (use `-betaN` suffix for pre-releases). See [`docs/RELEASING.md`](docs/RELEASING.md) for the full process, including redoing a release.
 
 ### License
 
