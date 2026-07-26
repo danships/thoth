@@ -49,8 +49,10 @@ export function apiRoute<
         }
       }
 
-      // Validate body schema if provided
-      if (options.expectedBodySchema && body !== undefined) {
+      // Validate body schema if provided. Runs even when the body is undefined (e.g. an empty
+      // request) so a missing body is rejected as a 400 by Zod instead of reaching the handler
+      // as `undefined` and causing a 500 when the handler accesses its fields.
+      if (options.expectedBodySchema) {
         const validationResult = options.expectedBodySchema.safeParse(body);
         if (!validationResult.success) {
           return NextResponse.json(
@@ -66,9 +68,12 @@ export function apiRoute<
 
       // Parse query parameters
       const url = new URL(request.url);
-      const query = Object.fromEntries(url.searchParams.entries()) as ExpectedQuery;
+      let query = Object.fromEntries(url.searchParams.entries()) as ExpectedQuery;
 
-      // Validate query schema if provided
+      // Validate query schema if provided. Reassign `query` to the schema's parsed/coerced
+      // output (mirroring the body validation above) so handlers receive real booleans/numbers
+      // instead of the raw strings every query param arrives as (e.g. `z.coerce.boolean()`
+      // would otherwise still hand back the string `"false"`, which is truthy).
       if (options.expectedQuerySchema) {
         const validationResult = options.expectedQuerySchema.safeParse(query);
         if (!validationResult.success) {
@@ -80,6 +85,7 @@ export function apiRoute<
             { status: 400 }
           );
         }
+        query = validationResult.data as ExpectedQuery;
       }
 
       // Validate params schema if provided

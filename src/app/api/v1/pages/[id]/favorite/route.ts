@@ -27,8 +27,10 @@ export const PUT = apiRoute<PutPageFavoriteResponse, {}, PutPageFavoriteParamete
     const starredAt = starred ? now : null;
 
     // Starring a page also counts as an implicit "open" for root-list ordering purposes, so
-    // `lastAccessedAt` is bumped alongside `starred`/`starredAt`. Unstarring leaves it untouched.
-    const lastAccessedAt = starred ? now : (existing?.lastAccessedAt ?? now);
+    // `lastAccessedAt` is bumped alongside `starred`/`starredAt`. Unstarring leaves it untouched;
+    // a page with no existing access row that's being unstarred falls back to its creation time
+    // rather than `now`, so a no-op unstar never bumps it in root-list ordering.
+    const lastAccessedAt = starred ? now : (existing?.lastAccessedAt ?? page.createdAt);
 
     const upserted = existing
       ? await containerAccessRepository.update({

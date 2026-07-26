@@ -1,5 +1,5 @@
 'use client';
-import { ActionIcon, Group, Title } from '@mantine/core';
+import { ActionIcon, Box, Group, Title } from '@mantine/core';
 import { useStore } from '@nanostores/react';
 import { IconChevronDown, IconChevronRight, IconStarFilled } from '@tabler/icons-react';
 import { FavoritesTree } from '../favorites-tree';
@@ -8,11 +8,12 @@ import { $favoritesSectionExpanded, toggleFavoritesSection } from '@/lib/store/f
 
 export function FavoritesSection() {
   const isExpanded = useStore($favoritesSectionExpanded);
-  const { data: favorites, isLoading } = usePagesByFavorited();
+  const { data: favorites, isLoading, error } = usePagesByFavorited();
 
-  // Hide the whole section once the favorites list has loaded and is empty, so users who've
-  // never starred anything don't see a permanently-empty collapsible shell.
-  if (!isLoading && (!favorites || favorites.length === 0)) {
+  // Hide the whole section once the favorites list has loaded successfully and is empty, so
+  // users who've never starred anything don't see a permanently-empty collapsible shell. On
+  // error, keep the section (and `FavoritesTree`'s retry UI) mounted instead of hiding it.
+  if (!isLoading && !error && (!favorites || favorites.length === 0)) {
     return null;
   }
 
@@ -34,7 +35,11 @@ export function FavoritesSection() {
           {hasFavorite && <IconStarFilled size={14} color="var(--mantine-color-yellow-6)" />}
         </Group>
       </Group>
-      {isExpanded && <FavoritesTree />}
+      {isExpanded && (
+        <Box data-testid="favorites-tree">
+          <FavoritesTree />
+        </Box>
+      )}
     </Group>
   );
 }

@@ -178,7 +178,13 @@ async function seedAppData() {
       containerAccessRepository.createQuery().eq('containerId', page.id).eq('userId', uid)
     );
     await (existingAccess
-      ? containerAccessRepository.update({ ...existingAccess, parentId: page.parentId, lastAccessedAt })
+      ? containerAccessRepository.update({
+          ...existingAccess,
+          parentId: page.parentId,
+          lastAccessedAt,
+          starred: false,
+          starredAt: null,
+        })
       : containerAccessRepository.create({
           userId: uid,
           containerId: page.id,

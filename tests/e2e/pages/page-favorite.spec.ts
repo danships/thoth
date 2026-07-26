@@ -72,7 +72,9 @@ test.describe('page favorite toggle', () => {
     ]);
 
     await expect(page.getByRole('heading', { name: 'Favorites' })).toBeVisible();
-    await expect(page.getByText(SEED.pages.favoriteToggle.name).first()).toBeVisible();
+    await expect(
+      page.getByTestId('favorites-tree').getByRole('link', { name: new RegExp(SEED.pages.favoriteToggle.name) })
+    ).toBeVisible();
 
     const unstarButton = page.getByRole('button', { name: 'Unstar page' });
     await Promise.all([
@@ -96,16 +98,21 @@ test.describe('page favorite toggle', () => {
       starButton.click(),
     ]);
 
-    await expect(page.getByText(SEED.pages.favoriteToggle.name).first()).toBeVisible();
+    const favoriteLink = page.getByTestId('favorites-tree').getByRole('link', {
+      name: new RegExp(SEED.pages.favoriteToggle.name),
+    });
+    await expect(favoriteLink).toBeVisible();
 
     const collapseButton = page.getByRole('button', { name: 'Collapse favorites' });
     await expect(collapseButton).toBeVisible();
     await collapseButton.click();
 
     await expect(page.getByRole('button', { name: 'Expand favorites' })).toBeVisible();
+    await expect(favoriteLink).toBeHidden();
 
     await page.getByRole('button', { name: 'Expand favorites' }).click();
     await expect(page.getByRole('button', { name: 'Collapse favorites' })).toBeVisible();
+    await expect(favoriteLink).toBeVisible();
   });
 
   test('starring a page bumps it to the top of the root pages tree', async ({ page }) => {

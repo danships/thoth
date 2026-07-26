@@ -1,16 +1,17 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
-
-const FAVORITES_MAX_LIMIT = 50;
+import { FAVORITES_MAX_LIMIT } from '@/types/api';
 
 // Bulk-toggles `starred` directly at the database level (bypassing `PUT /pages/:id/favorite`,
 // which intentionally also bumps `lastAccessedAt`) so exercising 50+ favorites here doesn't
 // permanently disturb the `lastAccessedAt` ordering the root-list pagination specs depend on.
 function setFavoritesDirectly(starred: boolean, pageIds: string[]) {
-  execSync(`pnpm tsx --env-file=.env.test scripts/set-page-favorites-for-tests.ts ${starred} ${pageIds.join(' ')}`, {
-    stdio: 'inherit',
-  });
+  execFileSync(
+    'pnpm',
+    ['tsx', '--env-file=.env.test', 'scripts/set-page-favorites-for-tests.ts', String(starred), ...pageIds],
+    { stdio: 'inherit' }
+  );
 }
 
 test.describe.configure({ mode: 'serial' });
