@@ -2,6 +2,7 @@ import type { Migration, SuperSave } from 'supersave';
 import type { Database } from 'better-sqlite3';
 import type { Pool } from 'mysql2/promise';
 import { BETTER_AUTH_SQLITE_SQL, BETTER_AUTH_MYSQL_SQL } from './better-auth';
+import { backfillWorkspaces } from './workspace-backfill';
 
 export const migrations: Migration[] = [
   {
@@ -25,6 +26,15 @@ export const migrations: Migration[] = [
       for (const statement of statements) {
         await pool.query(statement);
       }
+    },
+  },
+  {
+    // Engine-agnostic (uses repository APIs, not raw SQL), so a single entry covers both
+    // engines — SuperSave's migration runner tracks it by name and skips re-running it once
+    // applied, exactly like the `better-auth-tables` migrations above.
+    name: 'workspace-multi-tenancy-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillWorkspaces(superSave);
     },
   },
 ];

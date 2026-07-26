@@ -1,8 +1,10 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository, getWorkspaceRepository } from '@/lib/database';
+import { getContainerRepository, getWorkspaceMemberRepository, getWorkspaceRepository } from '@/lib/database';
 import { registerContainerAccessForNewPage } from '@/lib/database/container-access-service';
 import { addUserIdToQuery } from '@/lib/database/helpers';
+import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
+import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
 import { createPageBodySchema, getPagesQuerySchema } from '@/types/api';
 
@@ -46,6 +48,25 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
   }
 );
 
+/**
+ * Resolves the caller's default workspace when no `workspaceId` was supplied and there's no
+ * `parentId` to derive one from. Kept for backwards compatibility with clients that predate
+ * multi-workspace support; new callers should always pass a `workspaceId` explicitly (see
+ * `useCurrentWorkspace()` on the client).
+ */
+async function resolveDefaultWorkspace(userId: string) {
+  const workspaceMemberRepository = await getWorkspaceMemberRepository();
+  const membership = await workspaceMemberRepository.getOneByQuery(
+    workspaceMemberRepository.createQuery().eq('userId', userId)
+  );
+
+  if (!membership) {
+    throw new NotFoundError('Workspace not found');
+  }
+
+  return membership.workspaceId;
+}
+
 export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
   {
     expectedBodySchema: createPageBodySchema,
@@ -55,34 +76,37 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       throw new Error('Body is required');
     }
 
-    const workspaceRepository = await getWorkspaceRepository();
-    const workspace = await workspaceRepository.getOneByQuery(
-      addUserIdToQuery(workspaceRepository.createQuery(), session.user.id)
-    );
-
-    if (!workspace) {
-      throw new Error('Workspace not found');
-    }
-
     const containerRepository = await getContainerRepository();
 
-    // Validate parent page access if parentId is provided
-    let parentId = null;
+    let workspaceId: string;
+    let parentId: string | null = null;
+
     if (body.parentId) {
+      // Derive the workspace from the parent entity rather than trusting a client-supplied
+      // `workspaceId` — fetch the parent by id, authorize against its own `workspaceId`, and
+      // stamp the new child with the same one.
       const parentPage = await containerRepository.getOneByQuery(
-        addUserIdToQuery(containerRepository.createQuery().eq('id', body.parentId), session.user.id)
+        containerRepository.createQuery().eq('id', body.parentId)
       );
 
       if (!parentPage) {
-        throw new Error('Parent page not found or access denied');
+        throw new NotFoundError('Parent page not found or access denied');
       }
 
-      // Ensure the parent page belongs to the same workspace
-      if (parentPage.workspaceId !== workspace.id) {
-        throw new Error('Parent page does not belong to the same workspace');
-      }
+      await assertWorkspaceAccess(session.user.id, parentPage.workspaceId);
 
+      workspaceId = parentPage.workspaceId;
       parentId = body.parentId;
+    } else {
+      // Root-level page: no existing entity to derive the workspace from.
+      workspaceId = body.workspaceId ?? (await resolveDefaultWorkspace(session.user.id));
+      await assertWorkspaceAccess(session.user.id, workspaceId);
+    }
+
+    const workspaceRepository = await getWorkspaceRepository();
+    const workspace = await workspaceRepository.getOneByQuery(workspaceRepository.createQuery().eq('id', workspaceId));
+    if (!workspace) {
+      throw new NotFoundError('Workspace not found');
     }
 
     // Create the page container with the provided data
@@ -90,7 +114,7 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       name: body.name,
       emoji: body.emoji || null,
       type: 'page' as const,
-      parentId: parentId || null,
+      parentId,
       workspaceId: workspace.id,
       userId: session.user.id,
       lastUpdated: new Date().toISOString(),

@@ -5,10 +5,11 @@ import { genericOAuth } from 'better-auth/plugins';
 import Database from 'better-sqlite3';
 import { createPool } from 'mysql2/promise';
 import { connection } from 'next/server';
-import type { PageContainerCreate, WorkspaceCreate } from '@/types/database';
-import { getContainerRepository, getDatabase, getWorkspaceRepository } from '../database';
-import { registerContainerAccessForNewPage } from '../database/container-access-service';
+import { getDatabase } from '../database';
+import { createWorkspaceForUser } from '../database/seed-workspace';
 import { getEnvironment } from '../environment';
+import { slugify } from '../utils/slug';
+import { pickRandomNerdySuffix } from '../utils/nerdy-slug';
 
 let authInstance: Auth<BetterAuthOptions> | null = null;
 
@@ -48,33 +49,12 @@ async function initializeAuth() {
     const databaseHooks = {
       user: {
         create: {
-          after: async (user: { id: string }) => {
-            const workspaceRepository = await getWorkspaceRepository();
-            const workspace = await workspaceRepository.create({
-              name: 'Default Workspace',
-              userId: user.id,
-              createdAt: new Date().toISOString(),
-              lastUpdated: new Date().toISOString(),
-            } satisfies WorkspaceCreate);
-
-            const containerRepository = await getContainerRepository();
-            const pageData: PageContainerCreate = {
-              name: 'Welcome',
-              type: 'page',
-              userId: user.id,
-              createdAt: new Date().toISOString(),
-              lastUpdated: new Date().toISOString(),
-              workspaceId: workspace.id,
-              emoji: '👋',
-              parentId: null,
-            };
-
-            const createdPage = await containerRepository.create(pageData);
-
-            // Ensure the welcome page has a ContainerAccess row from the moment it's created so
-            // it immediately shows up in the ContainerAccess-driven root list (`GET /pages/tree`),
-            // without requiring the client to first POST /pages/[id]/access (e.g. on page open).
-            await registerContainerAccessForNewPage(createdPage, user.id);
+          after: async (user: { id: string; name?: string; email?: string }) => {
+            const displayName = user.name || user.email?.split('@', 1)[0] || 'my-workspace';
+            // e.g. "Ada Lovelace" -> slug base "ada-lovelace-segfault", de-duplicated on the
+            // rare collision (see `createWorkspaceForUser`'s `strict: false`).
+            const nerdySlug = `${slugify(displayName)}-${pickRandomNerdySuffix()}`;
+            await createWorkspaceForUser(user.id, displayName, { slug: nerdySlug, strict: false });
           },
         },
       },

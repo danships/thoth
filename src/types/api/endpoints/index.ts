@@ -22,3 +22,7 @@ export * from './update-page-values';
 export * from './update-page';
 export * from './set-page-blocks';
 export * from './register-page-access';
+export * from './get-workspaces';
+export * from './create-workspace';
+export * from './update-workspace';
+export * from './get-workspace-slug-availability';

@@ -15,6 +15,9 @@ const environmentSchema = {
   OIDC_CLIENT_SECRET: str({ default: undefined }),
   OIDC_DISCOVERY_URL: url({ default: undefined }),
   OIDC_AUTHORIZATION_URL: url({ default: undefined }),
+  // Number of days a soft-deleted workspace is retained before the external purge job
+  // (`pnpm workspaces:purge`) permanently removes it.
+  WORKSPACE_DELETE_GRACE_PERIOD_DAYS: str({ default: '30' }),
 } as const;
 
 type Environment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;

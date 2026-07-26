@@ -28,6 +28,7 @@ export const SEED = {
   },
   workspace: {
     id: 'e2e-workspace-000-0000-0000-000000000001',
+    slug: 'e2e-workspace',
   },
   pages: {
     root: {

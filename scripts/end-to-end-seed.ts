@@ -7,6 +7,7 @@ import {
   getContainerRepository,
   getDatabase,
   getDataViewRepository,
+  getWorkspaceMemberRepository,
   getWorkspaceRepository,
 } from '../src/lib/database/index.js';
 import { SEED } from '../tests/e2e/constants.js';
@@ -16,6 +17,7 @@ import type {
   DataSourceContainerCreate,
   PageContainerCreate,
   WorkspaceCreate,
+  WorkspaceMemberCreate,
   DataViewCreate,
 } from '../src/types/database/index.js';
 import type { Column } from '../src/types/schemas/entities/container.js';
@@ -93,17 +95,36 @@ async function seedAppData() {
     ? workspaceRepository.update({
         ...existingWorkspace,
         name: 'E2E Workspace',
+        slug: SEED.workspace.slug,
+        deletedAt: null,
         lastUpdated: now,
       })
     : workspaceRepository.create({
         id: SEED.workspace.id,
         name: 'E2E Workspace',
+        slug: SEED.workspace.slug,
         userId: uid,
+        deletedAt: null,
         createdAt: now,
         lastUpdated: now,
       } as unknown as WorkspaceCreate));
 
   const wsId = SEED.workspace.id;
+
+  // WorkspaceMember — authorization now derives from this table (not `Workspace.userId`), so
+  // every e2e workspace lookup/authorization check depends on this row existing.
+  const workspaceMemberRepository = await getWorkspaceMemberRepository();
+  const existingMembership = await workspaceMemberRepository.getOneByQuery(
+    workspaceMemberRepository.createQuery().eq('workspaceId', wsId).eq('userId', uid)
+  );
+  if (!existingMembership) {
+    await workspaceMemberRepository.create({
+      workspaceId: wsId,
+      userId: uid,
+      role: 'owner',
+      createdAt: now,
+    } as unknown as WorkspaceMemberCreate);
+  }
 
   const containerAccessRepository = await getContainerAccessRepository();
 

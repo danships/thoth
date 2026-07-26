@@ -1,8 +1,9 @@
 import { randomBytes, randomUUID, scrypt } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { test, expect } from '../fixtures/test';
-import { getDatabase, getWorkspaceRepository } from '../../../src/lib/database/index.js';
-import type { WorkspaceCreate } from '../../../src/types/database/index.js';
+import { getDatabase, getWorkspaceMemberRepository, getWorkspaceRepository } from '../../../src/lib/database/index.js';
+import { slugify } from '../../../src/lib/utils/slug.js';
+import type { WorkspaceCreate, WorkspaceMemberCreate } from '../../../src/types/database/index.js';
 
 // This spec covers the "recreate Welcome page" empty-state flow, which requires a session for
 // a user whose workspace has zero root pages. The shared seed user/session (used by every other
@@ -49,12 +50,22 @@ async function createIsolatedUserWithoutPages() {
   // (skipping the databaseHooks.user.create.after hook that normally seeds a default "Welcome" page).
   await getDatabase();
   const workspaceRepository = await getWorkspaceRepository();
-  await workspaceRepository.create({
+  const workspace = await workspaceRepository.create({
     name: 'Empty Workspace',
+    slug: `${slugify('Empty Workspace')}-${randomUUID().slice(0, 8)}`,
     userId,
+    deletedAt: null,
     createdAt: now,
     lastUpdated: now,
   } satisfies WorkspaceCreate);
+
+  const workspaceMemberRepository = await getWorkspaceMemberRepository();
+  await workspaceMemberRepository.create({
+    workspaceId: workspace.id,
+    userId,
+    role: 'owner',
+    createdAt: now,
+  } satisfies WorkspaceMemberCreate);
 
   return { email, password };
 }

@@ -1,6 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type {
@@ -23,12 +23,13 @@ export const PATCH = apiRoute<
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
     const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
+      containerRepository.createQuery().eq('id', params.id).eq('type', 'data-source')
     );
 
     if (!dataSource || dataSource.type !== 'data-source') {
       throw new NotFoundError('Data source not found', true);
     }
+    await assertWorkspaceAccess(session.user.id, dataSource.workspaceId);
 
     const columns = [...(dataSource.columns ?? [])];
     const foundColumn = columns.find((column) => column.id === params.columnId);
@@ -75,12 +76,13 @@ export const DELETE = apiRoute<void, undefined, UpdateDataSourceColumnParameters
   async ({ params }, session) => {
     const containerRepository = await getContainerRepository();
     const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
+      containerRepository.createQuery().eq('id', params.id).eq('type', 'data-source')
     );
 
     if (!dataSource || dataSource.type !== 'data-source') {
       throw new NotFoundError('Data source not found', true);
     }
+    await assertWorkspaceAccess(session.user.id, dataSource.workspaceId);
 
     const nextColumns = (dataSource.columns ?? []).filter((c) => c.id !== params.columnId);
     if (nextColumns.length === (dataSource.columns ?? []).length) {

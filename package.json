@@ -17,6 +17,7 @@
     "lint:tsc": "tsc --noEmit",
     "better-auth:generate": "npx @better-auth/cli generate --config ./src/lib/auth/better-auth.ts --output schema.sql",
     "scripts:clear-auth": "tsx scripts/clear-auth.ts",
+    "workspaces:purge": "tsx scripts/purge-deleted-workspaces.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",

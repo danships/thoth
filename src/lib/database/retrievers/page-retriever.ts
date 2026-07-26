@@ -2,6 +2,7 @@ import { PageContainer } from '@/types/database';
 import { getContainerRepository } from '..';
 import { addUserIdToQuery } from '../helpers';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 
 class PageRetriever {
   public async retrievePage(id: string, userId: string): Promise<PageContainer> {
@@ -14,6 +15,11 @@ class PageRetriever {
     if (!existingPage || existingPage.type !== 'page') {
       throw new NotFoundError('Page not found', true);
     }
+
+    // Anchor authorization to the entity's own `workspaceId`, verified against real
+    // membership — never trusted from the client. See `assertWorkspaceAccess` for why this is
+    // a discrete step rather than inlined into the query above.
+    await assertWorkspaceAccess(userId, existingPage.workspaceId);
 
     return existingPage;
   }

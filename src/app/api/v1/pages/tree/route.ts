@@ -1,7 +1,14 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import {
+  getContainerAccessRepository,
+  getContainerRepository,
+  getDataViewRepository,
+  getWorkspaceMemberRepository,
+} from '@/lib/database';
+import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
+import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
+import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { ContainerAccess } from '@/types/database';
 import type { GetPagesTreeQueryVariables, GetPagesTreeResponse, PagesTreeCursor, Page, DataView } from '@/types/api';
 import {
@@ -55,6 +62,7 @@ function decodeCursor(raw: string): PagesTreeCursor {
  */
 async function fetchRootContainerAccessPage(
   userId: string,
+  workspaceId: string,
   limit: number,
   initialCursor: PagesTreeCursor | undefined
 ): Promise<{ rows: ContainerAccess[]; hasMore: boolean }> {
@@ -68,6 +76,7 @@ async function fetchRootContainerAccessPage(
     batches += 1;
 
     const batchQuery = addUserIdToQuery(containerAccessRepository.createQuery(), userId)
+      .eq('workspaceId', workspaceId)
       .sort('lastAccessedAt', 'desc')
       .sort('containerId', 'desc')
       .limit(limit + 1 + SAFETY_MARGIN);
@@ -125,8 +134,18 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
     let pagination: GetPagesTreeResponse['pagination'];
 
     if (query?.parentId) {
-      // Expanding a specific node: this listing remains fully unpaginated, per the explicit
-      // out-of-scope decision for child listings in this ticket.
+      // Expanding a specific node: derive the workspace from the parent entity (rather than
+      // trusting a client-supplied `workspaceId`) and authorize against it.
+      const parent = await containerRepository.getOneByQuery(
+        containerRepository.createQuery().eq('id', query.parentId)
+      );
+      if (!parent) {
+        throw new NotFoundError('Parent page not found');
+      }
+      await assertWorkspaceAccess(session.user.id, parent.workspaceId);
+
+      // this listing remains fully unpaginated, per the explicit out-of-scope decision for
+      // child listings in this ticket.
       containers = await containerRepository.getByQuery(
         addUserIdToQuery(containerRepository.createQuery(), session.user.id)
           .eq('type', 'page')
@@ -135,16 +154,34 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       );
       pagination = { nextCursor: null, hasMore: false };
     } else {
+      // Root list: no existing entity to derive the workspace from, so `workspaceId` is
+      // required here (falling back to the caller's default workspace for backwards
+      // compatibility with pre-multi-workspace clients).
+      let workspaceId = query?.workspaceId;
+      if (!workspaceId) {
+        const workspaceMemberRepository = await getWorkspaceMemberRepository();
+        const membership = await workspaceMemberRepository.getOneByQuery(
+          workspaceMemberRepository.createQuery().eq('userId', session.user.id)
+        );
+        if (!membership) {
+          throw new NotFoundError('Workspace not found');
+        }
+        workspaceId = membership.workspaceId;
+      }
+      await assertWorkspaceAccess(session.user.id, workspaceId);
+
       // Root list: cursor-paginated, driven off `ContainerAccess.lastAccessedAt` rather than
       // `Container.lastUpdated`.
       const cursor = query?.cursor ? decodeCursor(query.cursor) : undefined;
-      const { rows, hasMore } = await fetchRootContainerAccessPage(session.user.id, limit, cursor);
+      const { rows, hasMore } = await fetchRootContainerAccessPage(session.user.id, workspaceId, limit, cursor);
 
       const containerIds = rows.map((row) => row.containerId);
       const containersById = new Map<string, Awaited<ReturnType<typeof containerRepository.getByQuery>>[number]>();
       if (containerIds.length > 0) {
         const fetchedContainers = await containerRepository.getByQuery(
-          addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('type', 'page').in('id', containerIds)
+          addWorkspaceIdToQuery(addUserIdToQuery(containerRepository.createQuery(), session.user.id), workspaceId)
+            .eq('type', 'page')
+            .in('id', containerIds)
         );
         for (const container of fetchedContainers) {
           containersById.set(container.id, container);
