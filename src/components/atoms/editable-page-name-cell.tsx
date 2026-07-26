@@ -1,6 +1,7 @@
 import { Box, Button } from '@mantine/core';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import styles from './editable-page-name-cell.module.css';
 
 type EditablePageNameCellProperties = {
@@ -19,6 +20,7 @@ export function EditablePageNameCell({
   disabled = false,
 }: EditablePageNameCellProperties) {
   const router = useRouter();
+  const { slug: workspaceSlug } = useCurrentWorkspace();
 
   const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
     const text = event.currentTarget.textContent ?? '';
@@ -56,7 +58,7 @@ export function EditablePageNameCell({
 
   const handleLinkClick = (event: React.MouseEvent) => {
     event.stopPropagation();
-    router.push(`/pages/${pageId}`);
+    router.push(`/${workspaceSlug}/pages/${pageId}`);
   };
 
   return (
@@ -76,7 +78,7 @@ export function EditablePageNameCell({
         variant="outline"
         size="sm"
         component={Link}
-        href={`/pages/${pageId}`}
+        href={`/${workspaceSlug}/pages/${pageId}`}
         onClick={handleLinkClick}
       >
         OPEN

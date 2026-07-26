@@ -1,18 +1,19 @@
 import useSWRInfinite from 'swr/infinite';
 import { GET_PAGES_TREE_ENDPOINT, PAGES_TREE_DEFAULT_LIMIT, type GetPagesTreeResponse } from '@/types/api';
 import { swrFetcher } from '@/lib/swr/fetcher';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 
 // Cursor-based key derivation: each page's key is derived from the *previous* page's response
 // (its `pagination.nextCursor`), not from a numeric offset/page-index — required since the
 // root list is ordered by `ContainerAccess.lastAccessedAt`, which can shift between requests.
-function getKey(pageIndex: number, previousPageData: GetPagesTreeResponse | null) {
+function getKey(workspaceId: string, pageIndex: number, previousPageData: GetPagesTreeResponse | null) {
   // Reached the end.
   if (previousPageData && !previousPageData.pagination.hasMore) {
     return null;
   }
 
   if (pageIndex === 0 || !previousPageData) {
-    return `${GET_PAGES_TREE_ENDPOINT}?limit=${PAGES_TREE_DEFAULT_LIMIT}`;
+    return `${GET_PAGES_TREE_ENDPOINT}?limit=${PAGES_TREE_DEFAULT_LIMIT}&workspaceId=${workspaceId}`;
   }
 
   const cursor = previousPageData.pagination.nextCursor;
@@ -20,12 +21,17 @@ function getKey(pageIndex: number, previousPageData: GetPagesTreeResponse | null
     return null;
   }
 
-  return `${GET_PAGES_TREE_ENDPOINT}?limit=${PAGES_TREE_DEFAULT_LIMIT}&cursor=${encodeURIComponent(cursor)}`;
+  return `${GET_PAGES_TREE_ENDPOINT}?limit=${PAGES_TREE_DEFAULT_LIMIT}&workspaceId=${workspaceId}&cursor=${encodeURIComponent(cursor)}`;
 }
 
 export function usePagesTree() {
+  // Scoping the root list to the current workspace (rather than relying on the server's
+  // "caller's first workspace" fallback) is what makes switching workspaces via the sidebar
+  // actually show a different page list — the SWR key changing on workspace switch also
+  // ensures the tree refetches instead of showing stale, cached data from the previous one.
+  const { id: workspaceId } = useCurrentWorkspace();
   const { data, error, isLoading, isValidating, size, setSize, mutate } = useSWRInfinite<GetPagesTreeResponse>(
-    getKey,
+    (pageIndex, previousPageData) => getKey(workspaceId, pageIndex, previousPageData),
     swrFetcher
   );
 

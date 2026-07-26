@@ -4,7 +4,7 @@ import { SEED } from '../constants';
 test.use({ viewport: { width: 390, height: 844 } });
 
 test('block editor fills the available viewport height on mobile', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.child.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.child.id}`);
   await expect(page.getByRole('heading', { name: SEED.pages.child.name })).toBeVisible();
 
   const contentsTab = page.getByRole('tab', { name: 'Contents' });

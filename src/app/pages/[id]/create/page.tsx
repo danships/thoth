@@ -1,11 +1,24 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { withAuthPage } from '@/lib/auth/with-auth-page';
+import { getWorkspaceSlugForContainer } from '@/lib/database/resolve-workspace';
 
-import { useParams } from 'next/navigation';
-import { CreatePageForm } from '@/components/molecules/create-page-form';
+type LegacyCreateSubpageProperties = {
+  params: Promise<{ id: string }>;
+};
 
-export default function CreateSubpagePage() {
-  const parameters = useParams();
-  const parentId = `${parameters['id']}`;
+// Legacy bare `/pages/[id]/create` URL from before multi-workspace support.
+async function LegacyCreateSubpagePage({
+  params,
+  session,
+}: LegacyCreateSubpageProperties & { session: { user: { id: string } } }) {
+  const { id } = await params;
 
-  return <CreatePageForm parentId={parentId} />;
+  const slug = await getWorkspaceSlugForContainer(id, session.user.id);
+  if (!slug) {
+    return redirect('/');
+  }
+
+  return redirect(`/${slug}/pages/${id}/create`);
 }
+
+export default withAuthPage<LegacyCreateSubpageProperties>(LegacyCreateSubpagePage);

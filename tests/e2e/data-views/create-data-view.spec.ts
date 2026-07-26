@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
 test('ViewCreator dialog is visible with expected form elements', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await page.getByRole('button', { name: 'Add View' }).click();
   const dialog = page.getByRole('dialog', { name: 'Create View' });
   await expect(dialog).toBeVisible();
@@ -10,7 +10,7 @@ test('ViewCreator dialog is visible with expected form elements', async ({ page 
 });
 
 test('can create a data view through the UI and the new tab appears', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await page.getByRole('button', { name: 'Add View' }).click();
   const dialog = page.getByRole('dialog', { name: 'Create View' });
 

@@ -1,6 +1,7 @@
 'use client';
 import { PagesTree } from '../pages-tree';
 import { usePagesTree } from '@/lib/hooks/api/use-pages-tree';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { ActionIcon, Anchor, Box, Group, Loader, Text, Title } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import Link from 'next/link';
@@ -14,6 +15,7 @@ const LOAD_MORE_THRESHOLD_PX = 48;
 export function LoggedInContainer() {
   const { isLoading, data: rootPagesTree, isLoadingMore, hasMore, loadMore, error, mutate } = usePagesTree();
   const scrollPaneReference = useRef<HTMLDivElement>(null);
+  const { slug: workspaceSlug } = useCurrentWorkspace();
 
   // Lazily fetch additional root pages as the user actually scrolls to the bottom of the pane,
   // rather than eagerly loading whenever a "load more" marker happens to be within the pane's
@@ -38,7 +40,13 @@ export function LoggedInContainer() {
     <Box>
       <Group justify="space-between" mb="sm">
         <Title order={3}>Pages</Title>
-        <ActionIcon variant="subtle" size="sm" component={Link} href="/pages/create" aria-label="Add page">
+        <ActionIcon
+          variant="subtle"
+          size="sm"
+          component={Link}
+          href={`/${workspaceSlug}/pages/create`}
+          aria-label="Add page"
+        >
           <IconPlus size={16} />
         </ActionIcon>
       </Group>

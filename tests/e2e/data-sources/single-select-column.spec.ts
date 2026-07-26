@@ -8,13 +8,13 @@ const priorityColumn = SEED.dataSource.columns[3];
 // "Medium" option must run before tests that change the row's selected option away from it.
 
 test('seeded single-select column header appears in the data view table', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
   await expect(page.getByRole('columnheader', { name: priorityColumn.name })).toBeVisible();
 });
 
 test('seeded single-select cell value renders as a colored badge', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
@@ -26,7 +26,7 @@ test('seeded single-select cell value renders as a colored badge', async ({ page
 test('renaming an option via Edit Column updates previously-set cells without changing the underlying value', async ({
   page,
 }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const columnHeader = page.getByRole('columnheader', { name: priorityColumn.name });
@@ -48,7 +48,7 @@ test('renaming an option via Edit Column updates previously-set cells without ch
 });
 
 test('can pick a different existing option for a single-select cell', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
@@ -61,7 +61,7 @@ test('can pick a different existing option for a single-select cell', async ({ p
 });
 
 test('can create a new option from the single-select cell dropdown', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
@@ -85,7 +85,7 @@ test('can create a new option from the single-select cell dropdown', async ({ pa
 });
 
 test('can create a new single-select column via the Add Column modal', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   await page.getByRole('button', { name: 'Add Column' }).click();
@@ -109,10 +109,8 @@ test('can create a new single-select column via the Add Column modal', async ({ 
   await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
 });
 
-test('can create a single-select column with zero options and add options inline from the table', async ({
-  page,
-}) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+test('can create a single-select column with zero options and add options inline from the table', async ({ page }) => {
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   await page.getByRole('button', { name: 'Add Column' }).click();

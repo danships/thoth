@@ -25,7 +25,7 @@ test.describe('page cover', () => {
     // deciding whether a cover is present, and wait for the removal to actually complete before
     // the page/context closes — otherwise the in-flight PATCH request gets aborted and the cover
     // lingers for later tests.
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
     const editButton = page.getByRole('button', { name: 'Edit cover' });
     const addButton = page.getByRole('button', { name: 'Add cover' });
     await Promise.race([
@@ -40,12 +40,12 @@ test.describe('page cover', () => {
   });
 
   test('shows an "Add cover" button when the page has no cover', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
     await expect(page.getByRole('button', { name: 'Add cover' })).toBeVisible();
   });
 
   test('can add a cover image via URL', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
 
     await page.getByRole('button', { name: 'Add cover' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -58,7 +58,7 @@ test.describe('page cover', () => {
   });
 
   test('disables Save for an invalid image URL', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
 
     await page.getByRole('button', { name: 'Add cover' }).click();
     await page.getByLabel('Image URL').fill('not-a-valid-url');
@@ -67,7 +67,7 @@ test.describe('page cover', () => {
   });
 
   test('can change the cover image after one is set', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
 
     await page.getByRole('button', { name: 'Add cover' }).click();
     await page.getByLabel('Image URL').fill(SEED.coverImage.url);
@@ -84,7 +84,7 @@ test.describe('page cover', () => {
   });
 
   test('can remove an existing cover', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
 
     await page.getByRole('button', { name: 'Add cover' }).click();
     await page.getByLabel('Image URL').fill(SEED.coverImage.url);
@@ -97,7 +97,7 @@ test.describe('page cover', () => {
   });
 
   test('editing the cover reveals a zoom slider and a repositionable preview', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
 
     await page.getByRole('button', { name: 'Add cover' }).click();
     await page.getByLabel('Image URL').fill(SEED.coverImage.url);
@@ -114,7 +114,7 @@ test.describe('page cover', () => {
   });
 
   test('can reposition the cover with the keyboard', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
 
     await page.getByRole('button', { name: 'Add cover' }).click();
     await page.getByLabel('Image URL').fill(SEED.coverImage.url);
@@ -131,7 +131,7 @@ test.describe('page cover', () => {
   });
 
   test('cover persists across reloads', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
 
     await page.getByRole('button', { name: 'Add cover' }).click();
     await page.getByLabel('Image URL').fill(SEED.coverImage.url);

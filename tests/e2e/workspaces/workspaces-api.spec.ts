@@ -11,9 +11,10 @@ async function getData<T = unknown>(response: APIResponse): Promise<T> {
 // workspaces, listing them, renaming/changing slugs, deleting (with the "last active
 // workspace" guard) and restoring, plus data isolation between workspaces. This spec uses the
 // API directly (via the `request` fixture, authenticated as the shared seed user through the
-// default storage state) rather than the UI, since the workspace switcher/creation UI is
-// tracked as a documented follow-up (see PR description) — the URL stays bare `/pages/...` for
-// now and workspace selection is not yet exposed in the UI.
+// default storage state) rather than the UI. The workspace switcher/creation menu and the
+// per-workspace settings page (rename/slug/delete) are covered by the UI-driven specs in
+// `tests/e2e/workspaces/workspace-menu.spec.ts` and `tests/e2e/workspaces/workspace-settings.spec.ts`;
+// all workspace-scoped URLs are now prefixed with `/[workspace-slug]/...`.
 test.describe('workspaces API', () => {
   test('can create a workspace, see it in the list, and it starts with a Welcome page', async ({ request }) => {
     const createResponse = await request.post('/api/v1/workspaces', {

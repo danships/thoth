@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
 test('Page fields section renders columns in the DataView order and edits persist', async ({ page }) => {
-  await page.goto(`/pages/${SEED.fieldsTab.page.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.fieldsTab.page.id}`);
 
   // The seeded DataView lists the columns in reverse order relative to the data source's own
   // stored column order (Beta, then Alpha) — assert the Fields tab follows the view's order.
@@ -31,6 +31,9 @@ test('Page fields section renders columns in the DataView order and edits persis
 
   // Reload and confirm the change was persisted server-side, not just optimistically applied.
   await page.reload();
-  const alphaValueAfterReload = page.getByText('Alpha', { exact: true }).locator('..').locator('[contenteditable="true"]');
+  const alphaValueAfterReload = page
+    .getByText('Alpha', { exact: true })
+    .locator('..')
+    .locator('[contenteditable="true"]');
   await expect(alphaValueAfterReload).toHaveText('Updated alpha');
 });
