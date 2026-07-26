@@ -8,6 +8,8 @@ export const containerAccessSchema = z
   .object({
     containerId: z.string().min(1),
     lastAccessedAt: z.iso.datetime({ offset: true }),
+    starred: z.boolean().default(false),
+    starredAt: z.iso.datetime({ offset: true }).nullable().default(null),
     createdAt: z.string(),
   })
   .extend(withParentIdSchema.shape)

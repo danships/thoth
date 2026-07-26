@@ -64,6 +64,8 @@ export const api = {
       apiClient.post('/pages/welcome', workspaceId ? { workspaceId } : undefined),
 
     registerAccess: (id: string) => apiClient.post(`/pages/${id}/access`),
+
+    setFavorite: (id: string, starred: boolean) => apiClient.put(`/pages/${id}/favorite`, { starred }),
   },
 
   // Workspaces API

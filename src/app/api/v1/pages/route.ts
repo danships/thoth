@@ -1,5 +1,5 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository, getWorkspaceRepository } from '@/lib/database';
+import { getContainerAccessRepository, getContainerRepository, getWorkspaceRepository } from '@/lib/database';
 import { registerContainerAccessForNewPage } from '@/lib/database/container-access-service';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
@@ -7,7 +7,7 @@ import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
-import { createPageBodySchema, getPagesQuerySchema } from '@/types/api';
+import { createPageBodySchema, getPagesQuerySchema, FAVORITES_MAX_LIMIT } from '@/types/api';
 
 export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
   {
@@ -15,6 +15,55 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
   },
   async ({ query }, session) => {
     const containerRepository = await getContainerRepository();
+
+    if (query.favorited) {
+      // Bounded sidebar list, no cursor pagination — capped at the smaller of the caller's
+      // `limit` and FAVORITES_MAX_LIMIT.
+      const limit = query.limit ? Math.min(query.limit, FAVORITES_MAX_LIMIT) : FAVORITES_MAX_LIMIT;
+
+      const containerAccessRepository = await getContainerAccessRepository();
+      const starredAccessRows = await containerAccessRepository.getByQuery(
+        addUserIdToQuery(containerAccessRepository.createQuery().eq('starred', true), session.user.id)
+          .sort('starredAt', 'desc')
+          .limit(limit)
+      );
+
+      const containerIds = starredAccessRows.map((row) => row.containerId);
+      const containersById = new Map<string, Awaited<ReturnType<typeof containerRepository.getByQuery>>[number]>();
+      if (containerIds.length > 0) {
+        const fetchedContainers = await containerRepository.getByQuery(
+          addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('type', 'page').in('id', containerIds)
+        );
+        for (const container of fetchedContainers) {
+          containersById.set(container.id, container);
+        }
+      }
+
+      return starredAccessRows
+        .map((row) => {
+          const container = containersById.get(row.containerId);
+          // Skip rows whose container no longer exists (e.g. deleted since being starred).
+          if (!container || container.type !== 'page') {
+            return undefined;
+          }
+          const returnValue: GetPagesResponse[number] = {
+            page: {
+              id: container.id,
+              name: container.name,
+              emoji: container.emoji || null,
+              parentId: container.parentId || null,
+              createdAt: container.createdAt,
+              lastUpdated: container.lastUpdated,
+            },
+            ...(row.starredAt && { starredAt: row.starredAt }),
+          };
+          if (query.includeValues) {
+            returnValue.values = container.values;
+          }
+          return returnValue;
+        })
+        .filter((entry): entry is GetPagesResponse[number] => entry !== undefined);
+    }
 
     // Use either parentId or dataSourceId as the parentId in the query
     const parentId = query.parentId || query.dataSourceId;

@@ -27,3 +27,4 @@ export * from './get-deleted-workspaces';
 export * from './create-workspace';
 export * from './update-workspace';
 export * from './get-workspace-slug-availability';
+export * from './put-page-favorite';

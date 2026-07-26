@@ -7,7 +7,7 @@ export const useCudApi = () => {
   const [error, setError] = useState<string | null>(null);
 
   async function request<T = unknown, D = unknown>(
-    method: 'post' | 'patch' | 'delete',
+    method: 'post' | 'patch' | 'put' | 'delete',
     path: string,
     data?: D
   ): Promise<T> {
@@ -38,6 +38,7 @@ export const useCudApi = () => {
     inProgress,
     post: <T, D = unknown>(path: string, data?: D) => request<T, D>('post', path, data),
     patch: <T, D = unknown>(path: string, data?: D) => request<T, D>('patch', path, data),
+    put: <T, D = unknown>(path: string, data?: D) => request<T, D>('put', path, data),
     delete: <T, D = unknown>(path: string, data?: D) => request<T, D>('delete', path, data),
     error,
   };

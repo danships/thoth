@@ -26,6 +26,8 @@ export async function registerContainerAccessForNewPage(page: NewPageForAccess, 
     parentId: page.parentId || null,
     workspaceId: page.workspaceId,
     lastAccessedAt: page.createdAt,
+    starred: false,
+    starredAt: null,
     createdAt: page.createdAt,
   });
 }
