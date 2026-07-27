@@ -2,3 +2,5 @@ export { Container, NAME as CONTAINER_NAME } from './container';
 export { ContainerAccess, NAME as CONTAINER_ACCESS_NAME } from './container-access';
 export { DataView, NAME as DATA_VIEW_NAME } from './data-view';
 export { Workspace, NAME as WORKSPACE_NAME } from './workspace';
+export { WorkspaceMember, NAME as WORKSPACE_MEMBER_NAME } from './workspace-member';
+export { WorkspaceSlugRedirect, NAME as WORKSPACE_SLUG_REDIRECT_NAME } from './workspace-slug-redirect';

@@ -1,6 +1,7 @@
 import { dataViewSchema as dataViewSchemaEntity } from '../schemas/entities/data-view';
 import { pageContainerSchema, dataSourceContainerSchema, pageCoverSchema } from '../schemas/entities/container';
 import { containerAccessSchema as containerAccessSchemaEntity } from '../schemas/entities/container-access';
+import { workspaceSchema as workspaceSchemaEntity } from '../schemas/entities/workspace';
 import { z } from 'zod';
 
 export { pageCoverSchema } from '../schemas/entities/container';
@@ -44,3 +45,12 @@ export const containerAccessSchema = containerAccessSchemaEntity.pick({
   lastAccessedAt: true,
 });
 export type ContainerAccessApi = z.infer<typeof containerAccessSchema>;
+
+export const workspaceSchema = workspaceSchemaEntity.pick({
+  id: true,
+  name: true,
+  slug: true,
+  createdAt: true,
+  lastUpdated: true,
+});
+export type WorkspaceApi = z.infer<typeof workspaceSchema>;

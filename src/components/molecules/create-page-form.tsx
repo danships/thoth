@@ -4,6 +4,7 @@ import { Alert, Button, Container, Group, Stack, TextInput, Title } from '@manti
 import { useForm } from '@mantine/form';
 import { useRouter } from 'next/navigation';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { CreatePageBody, CreatePageResponse } from '@/types/api';
 
 type CreatePageFormProperties = {
@@ -14,6 +15,7 @@ type CreatePageFormProperties = {
 export function CreatePageForm({ parentId = null, title = 'Create New Page' }: CreatePageFormProperties) {
   const router = useRouter();
   const { post, inProgress, error } = useCudApi();
+  const { id: workspaceId, slug: workspaceSlug } = useCurrentWorkspace();
 
   const form = useForm({
     initialValues: {
@@ -29,9 +31,14 @@ export function CreatePageForm({ parentId = null, title = 'Create New Page' }: C
       name: values.name,
       emoji: null,
       parentId: parentId,
+      // Only meaningful for root-level pages (the API derives the workspace from the parent
+      // when `parentId` is set) — but always passing the *current* workspace here (rather than
+      // relying on the server's "caller's first workspace" fallback) is what makes creating a
+      // root page from within a non-default workspace actually create it there.
+      workspaceId,
     });
 
-    router.push(`/pages/${page.id}`);
+    router.push(`/${workspaceSlug}/pages/${page.id}`);
   };
 
   return (

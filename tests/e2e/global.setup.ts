@@ -87,4 +87,3 @@ setup('seed database and write auth storage state', async () => {
     )
   );
 });
-

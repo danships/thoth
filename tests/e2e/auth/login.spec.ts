@@ -28,5 +28,5 @@ test('redirects to /pages then to the most recently updated page after successfu
   await page.getByLabel('Email').fill(SEED.user.email);
   await page.locator('input[type="password"]').fill(SEED.user.password);
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page).toHaveURL(`/pages/${SEED.pages.root.id}`, { timeout: 10_000 });
+  await expect(page).toHaveURL(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`, { timeout: 10_000 });
 });

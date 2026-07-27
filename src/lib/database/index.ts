@@ -1,5 +1,12 @@
 import { SuperSave } from 'supersave';
-import type { Container, ContainerAccess, Workspace, DataView } from '@/types/database';
+import type {
+  Container,
+  ContainerAccess,
+  Workspace,
+  DataView,
+  WorkspaceMember,
+  WorkspaceSlugRedirect,
+} from '@/types/database';
 import { getEnvironment } from '../environment';
 import * as entities from './entities';
 import { migrations } from './migrations';
@@ -19,6 +26,8 @@ async function initializeDatabase() {
   await database.addEntity(entities.ContainerAccess);
   await database.addEntity(entities.Workspace);
   await database.addEntity(entities.DataView);
+  await database.addEntity(entities.WorkspaceMember);
+  await database.addEntity(entities.WorkspaceSlugRedirect);
 
   if (!skipSync) {
     await database.runMigrations();
@@ -61,4 +70,14 @@ export async function getWorkspaceRepository() {
 export async function getDataViewRepository() {
   const database = await getDatabase();
   return database.getRepository<DataView>(entities.DATA_VIEW_NAME);
+}
+
+export async function getWorkspaceMemberRepository() {
+  const database = await getDatabase();
+  return database.getRepository<WorkspaceMember>(entities.WORKSPACE_MEMBER_NAME);
+}
+
+export async function getWorkspaceSlugRedirectRepository() {
+  const database = await getDatabase();
+  return database.getRepository<WorkspaceSlugRedirect>(entities.WORKSPACE_SLUG_REDIRECT_NAME);
 }

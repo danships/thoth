@@ -4,6 +4,7 @@ import { IconPlus } from '@tabler/icons-react';
 import { computed } from 'nanostores';
 import Link from 'next/link';
 import { $expandedPages, togglePageExpanded } from '@/lib/store/tree-expanded-state';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { TreeItem } from '../atoms/tree-item';
 import { TreeToggle } from '../atoms/tree-toggle';
 
@@ -45,6 +46,7 @@ export function TreeNode({
   const $isExpanded = computed($expandedPages, (expandedPages) => expandedPages.get(page.id) ?? false);
 
   const isExpanded = useStore($isExpanded);
+  const { slug: workspaceSlug } = useCurrentWorkspace();
 
   const hasChildren = childPages.length > 0 || views.length > 0;
 
@@ -55,9 +57,9 @@ export function TreeNode({
   // Determine the link URL - if this is a view, link to parent page with view query param
   const getPageUrl = () => {
     if (isView && parentPageId) {
-      return `/pages/${parentPageId}?v=${page.id}`;
+      return `/${workspaceSlug}/pages/${parentPageId}?v=${page.id}`;
     }
-    return `/pages/${page.id}`;
+    return `/${workspaceSlug}/pages/${page.id}`;
   };
 
   return (
@@ -78,7 +80,7 @@ export function TreeNode({
             variant="subtle"
             size="xs"
             component={Link}
-            href={`/pages/${page.id}/create`}
+            href={`/${workspaceSlug}/pages/${page.id}/create`}
             aria-label="Add child page"
             style={{ marginLeft: 'auto' }}
             onClick={(event) => {
@@ -132,7 +134,7 @@ export function TreeNode({
             <Box style={{ paddingLeft: (level + 1) * 20 + 24 }}>
               <Text
                 component={Link}
-                href={`/pages/${page.id}`}
+                href={`/${workspaceSlug}/pages/${page.id}`}
                 size="xs"
                 c="dimmed"
                 style={{ display: 'block', textDecoration: 'none' }}

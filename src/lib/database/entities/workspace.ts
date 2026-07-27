@@ -11,5 +11,7 @@ export const Workspace: EntityDefinition = {
     lastUpdated: 'string',
     createdAt: 'string',
     userId: 'string',
+    slug: 'string',
+    deletedAt: 'string',
   },
 };

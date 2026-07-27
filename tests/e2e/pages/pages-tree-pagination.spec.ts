@@ -41,7 +41,7 @@ async function scrollUntilPaginationExhausted(page: import('@playwright/test').P
 }
 
 test('sidebar loads more root pages as the user scrolls to the bottom', async ({ page }) => {
-  await page.goto('/pages');
+  await page.goto(`/${SEED.workspace.slug}/pages`);
 
   const firstPaginationPage = SEED.pages.paginationSeed[0]!;
   const lastPaginationPage = SEED.pages.paginationSeed.at(-1)!;
@@ -57,7 +57,7 @@ test('sidebar loads more root pages as the user scrolls to the bottom', async ({
 });
 
 test('sidebar sentinel disappears once every root page has been loaded', async ({ page }) => {
-  await page.goto('/pages');
+  await page.goto(`/${SEED.workspace.slug}/pages`);
 
   await scrollUntilPaginationExhausted(page);
   await expect(page.getByText(SEED.pages.paginationSeed.at(-1)!.name)).toBeVisible({ timeout: 10_000 });
@@ -69,7 +69,7 @@ test('sidebar sentinel disappears once every root page has been loaded', async (
 // A root page seeded with more children than CHILD_PREVIEW_LIMIT (10) should show a static
 // "more inside" indicator rather than listing/paginating all of them inline (out of scope).
 test('a root page with more than 10 children shows a "more inside" indicator', async ({ page }) => {
-  await page.goto('/pages');
+  await page.goto(`/${SEED.workspace.slug}/pages`);
 
   const hostLink = page.getByRole('link', { name: new RegExp(SEED.pages.childOverflowHost.name) });
   await expect(hostLink).toBeVisible();
@@ -85,8 +85,11 @@ test('a root page with more than 10 children shows a "more inside" indicator', a
 
   const moreInsideLink = page.getByRole('link', { name: 'More inside — open page' });
   await expect(moreInsideLink).toBeVisible();
-  await expect(moreInsideLink).toHaveAttribute('href', `/pages/${SEED.pages.childOverflowHost.id}`);
+  await expect(moreInsideLink).toHaveAttribute(
+    'href',
+    `/${SEED.workspace.slug}/pages/${SEED.pages.childOverflowHost.id}`
+  );
 
   await moreInsideLink.click();
-  await expect(page).toHaveURL(`/pages/${SEED.pages.childOverflowHost.id}`);
+  await expect(page).toHaveURL(`/${SEED.workspace.slug}/pages/${SEED.pages.childOverflowHost.id}`);
 });

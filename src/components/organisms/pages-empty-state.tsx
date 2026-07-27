@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import type { CreateWelcomePageResponse } from '@/types/api';
 
 export function PagesEmptyState() {
@@ -12,12 +13,13 @@ export function PagesEmptyState() {
   const { post, inProgress, error } = useCudApi();
   const { showError } = useNotification();
   const [isNavigating, setIsNavigating] = useState(false);
+  const workspace = useCurrentWorkspace();
 
   const handleRecreateWelcomePage = async () => {
     try {
-      const page = await post<CreateWelcomePageResponse>('/pages/welcome');
+      const page = await post<CreateWelcomePageResponse>('/pages/welcome', { workspaceId: workspace.id });
       setIsNavigating(true);
-      router.push(`/pages/${page.id}`);
+      router.push(`/${workspace.slug}/pages/${page.id}`);
     } catch {
       showError('Failed to recreate the Welcome page');
     }

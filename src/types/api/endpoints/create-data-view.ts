@@ -14,6 +14,8 @@ export const createDataViewBodySchema = dataViewSchema
   })
   .extend({
     pageId: z.string().min(1).optional(),
+    // No existing entity to derive the workspace from for a root-level data view.
+    workspaceId: z.string().min(1).optional(),
   });
 
 export const createDataViewResponseSchema = getDataViewsResponseSchema.element;

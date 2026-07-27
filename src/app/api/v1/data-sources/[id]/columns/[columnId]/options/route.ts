@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
+import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { ConflictError } from '@/lib/errors/conflict-error';
@@ -55,6 +56,11 @@ export const POST = apiRoute<
     if (!normalizedLabel) {
       throw new BadRequestError('Option label is required');
     }
+
+    // Authorize once up front — the data source's `workspaceId` never changes across the
+    // retry loop below, so there's no need to re-check it on every attempt.
+    const initialDataSource = await fetchDataSource(containerRepository, params.id, session.user.id);
+    await assertWorkspaceAccess(session.user.id, initialDataSource.workspaceId);
 
     for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt++) {
       const dataSource = await fetchDataSource(containerRepository, params.id, session.user.id);

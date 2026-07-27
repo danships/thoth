@@ -2,13 +2,13 @@ import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
 test('seeded date column header appears in the data view table', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
   await expect(page.getByRole('columnheader', { name: SEED.dataSource.columns[2].name })).toBeVisible();
 });
 
 test('seeded date cell value is visible in the data view table', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
@@ -18,7 +18,7 @@ test('seeded date cell value is visible in the data view table', async ({ page }
 });
 
 test('can edit a date cell value inline', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
@@ -32,7 +32,7 @@ test('can edit a date cell value inline', async ({ page }) => {
 });
 
 test('can create a new date column via the Add Column modal', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   await page.getByRole('button', { name: 'Add Column' }).click();

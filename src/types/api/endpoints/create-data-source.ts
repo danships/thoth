@@ -26,6 +26,8 @@ export const createDataSourceBodySchema = dataSourceContainerSchema
         ])
       )
       .optional(),
+    // No existing entity to derive the workspace from for a root-level data source.
+    workspaceId: z.string().min(1).optional(),
   });
 
 export const createDataSourceResponseSchema = getDataSourcesResponseSchema.element;

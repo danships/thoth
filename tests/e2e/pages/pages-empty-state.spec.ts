@@ -1,8 +1,9 @@
 import { randomBytes, randomUUID, scrypt } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { test, expect } from '../fixtures/test';
-import { getDatabase, getWorkspaceRepository } from '../../../src/lib/database/index.js';
-import type { WorkspaceCreate } from '../../../src/types/database/index.js';
+import { getDatabase, getWorkspaceMemberRepository, getWorkspaceRepository } from '../../../src/lib/database/index.js';
+import { slugify } from '../../../src/lib/utils/slug.js';
+import type { WorkspaceCreate, WorkspaceMemberCreate } from '../../../src/types/database/index.js';
 
 // This spec covers the "recreate Welcome page" empty-state flow, which requires a session for
 // a user whose workspace has zero root pages. The shared seed user/session (used by every other
@@ -14,10 +15,16 @@ test.use({ storageState: { cookies: [], origins: [] } });
 function hashPassword(password: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const salt = randomBytes(16).toString('hex');
-    scrypt(password.normalize('NFKC'), salt, 64, { N: 16_384, r: 16, p: 1, maxmem: 128 * 16_384 * 16 * 2 }, (error, key) => {
-      if (error) reject(error);
-      else resolve(`${salt}:${(key as Buffer).toString('hex')}`);
-    });
+    scrypt(
+      password.normalize('NFKC'),
+      salt,
+      64,
+      { N: 16_384, r: 16, p: 1, maxmem: 128 * 16_384 * 16 * 2 },
+      (error, key) => {
+        if (error) reject(error);
+        else resolve(`${salt}:${(key as Buffer).toString('hex')}`);
+      }
+    );
   });
 }
 
@@ -33,7 +40,9 @@ async function createIsolatedUserWithoutPages() {
   const now = new Date().toISOString();
 
   database
-    .prepare(`INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)`)
+    .prepare(
+      `INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)`
+    )
     .run(userId, 'E2E Empty State User', email, now, now);
 
   database
@@ -49,27 +58,37 @@ async function createIsolatedUserWithoutPages() {
   // (skipping the databaseHooks.user.create.after hook that normally seeds a default "Welcome" page).
   await getDatabase();
   const workspaceRepository = await getWorkspaceRepository();
-  await workspaceRepository.create({
+  const workspace = await workspaceRepository.create({
     name: 'Empty Workspace',
+    slug: `${slugify('Empty Workspace')}-${randomUUID().slice(0, 8)}`,
     userId,
+    deletedAt: null,
     createdAt: now,
     lastUpdated: now,
   } satisfies WorkspaceCreate);
 
-  return { email, password };
+  const workspaceMemberRepository = await getWorkspaceMemberRepository();
+  await workspaceMemberRepository.create({
+    workspaceId: workspace.id,
+    userId,
+    role: 'owner',
+    createdAt: now,
+  } satisfies WorkspaceMemberCreate);
+
+  return { email, password, slug: workspace.slug };
 }
 
 test('shows empty-state CTA for a workspace with zero pages, and recreating the Welcome page is idempotent', async ({
   page,
   request,
 }) => {
-  const { email, password } = await createIsolatedUserWithoutPages();
+  const { email, password, slug } = await createIsolatedUserWithoutPages();
 
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page).toHaveURL('/pages', { timeout: 10_000 });
+  await expect(page).toHaveURL(`/${slug}/pages`, { timeout: 10_000 });
 
   await expect(page.getByText('No pages yet')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Recreate Welcome page' })).toBeVisible();
@@ -90,6 +109,6 @@ test('shows empty-state CTA for a workspace with zero pages, and recreating the 
   expect(secondBody.data.id).toBe(firstBody.data.id);
 
   await page.getByRole('button', { name: 'Recreate Welcome page' }).click();
-  await expect(page).toHaveURL(`/pages/${firstBody.data.id}`, { timeout: 10_000 });
+  await expect(page).toHaveURL(`/${slug}/pages/${firstBody.data.id}`, { timeout: 10_000 });
   await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
 });

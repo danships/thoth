@@ -2,27 +2,27 @@ import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
 test('displays seeded page title', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await expect(page.getByRole('heading', { name: SEED.pages.root.name })).toBeVisible();
 });
 
 test('displays Contents tab', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await expect(page.getByRole('tab', { name: 'Contents' })).toBeVisible();
 });
 
 test('shows Add View button', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await expect(page.getByRole('button', { name: 'Add View' })).toBeVisible();
 });
 
 test('can inline-edit the page title', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   // Use a name-agnostic locator: the title's accessible name changes as soon as we start
   // typing, so a locator filtered by the original name would stop matching mid-interaction.
   const heading = page.getByRole('heading', { level: 1 });
   await heading.click();
-  await heading.press('Control+A');
+  await heading.press('ControlOrMeta+A');
   await heading.pressSequentially('Renamed E2E Page');
   const [firstUpdateResponse] = await Promise.all([
     page.waitForResponse((response) => response.url().includes(`/pages/${SEED.pages.root.id}`) && response.ok()),
@@ -37,7 +37,7 @@ test('can inline-edit the page title', async ({ page }) => {
   // next test's page.goto() can abort the still in-flight rename request, permanently
   // leaving the shared page renamed for the rest of the suite.
   await heading.click();
-  await heading.press('Control+A');
+  await heading.press('ControlOrMeta+A');
   await heading.pressSequentially(SEED.pages.root.name);
   const [restoreResponse] = await Promise.all([
     page.waitForResponse((response) => response.url().includes(`/pages/${SEED.pages.root.id}`) && response.ok()),
@@ -48,13 +48,13 @@ test('can inline-edit the page title', async ({ page }) => {
 });
 
 test('block editor is visible on the Contents tab', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await page.getByRole('tab', { name: 'Contents' }).click();
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible({ timeout: 10_000 });
 });
 
 test('child page shows breadcrumb trail back to parent', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.child.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.child.id}`);
   await expect(page.getByText(SEED.pages.root.name)).toBeVisible();
 });
 
@@ -62,7 +62,7 @@ test('page nested under a data source row shows breadcrumb back through the host
   // Reproduces: root page -> sub-page -> data source (hosted on the sub-page via a view)
   // -> row page. The row's parentId points at the data source container rather than the
   // sub-page, so this asserts the breadcrumb still bridges through to the sub-page and root.
-  await page.goto(`/pages/${SEED.breadcrumbRowPage.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.breadcrumbRowPage.id}`);
   await expect(page.getByRole('heading', { name: SEED.breadcrumbRowPage.name })).toBeVisible();
 
   const breadcrumb = page.getByLabel('Breadcrumb', { exact: true });
@@ -72,12 +72,12 @@ test('page nested under a data source row shows breadcrumb back through the host
 });
 
 test('data-source host page shows the seeded view tab', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await expect(page.getByRole('tab', { name: SEED.dataView.name })).toBeVisible();
 });
 
 test('root page does not show a breadcrumb', async ({ page }) => {
-  await page.goto(`/pages/${SEED.pages.root.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await expect(page.getByRole('heading', { name: SEED.pages.root.name })).toBeVisible();
   await expect(page.locator('[aria-label="Breadcrumb"]')).toHaveCount(0);
 });
@@ -89,7 +89,7 @@ test('deeply nested page collapses breadcrumb into a dropdown', async ({ page })
 
   const deepChain = SEED.pages.deepChain;
   const lastPage = deepChain.at(-1)!;
-  await page.goto(`/pages/${lastPage.id}`);
+  await page.goto(`/${SEED.workspace.slug}/pages/${lastPage.id}`);
   await expect(page.getByRole('heading', { name: lastPage.name })).toBeVisible();
 
   const ellipsisTrigger = page.getByRole('button', { name: 'Show hidden breadcrumb pages' });

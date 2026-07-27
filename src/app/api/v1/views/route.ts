@@ -1,6 +1,8 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository, getWorkspaceRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
+import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
+import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateDataViewBody, CreateDataViewResponse, GetDataViewsResponse, GetDataViewsQuery } from '@/types/api';
 import { createDataViewBodySchema, getDataViewsQuerySchema } from '@/types/api';
@@ -36,10 +38,16 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
     expectedBodySchema: createDataViewBodySchema,
   },
   async ({ body }, session) => {
+    // No existing entity to derive the workspace from — `workspaceId` (falling back to the
+    // caller's default workspace for backwards compatibility) is required and validated here.
+    let workspaceId = body.workspaceId;
+    if (!workspaceId) {
+      workspaceId = await resolveDefaultWorkspaceId(session.user.id);
+    }
+    await assertWorkspaceAccess(session.user.id, workspaceId);
+
     const workspaceRepository = await getWorkspaceRepository();
-    const workspace = await workspaceRepository.getOneByQuery(
-      addUserIdToQuery(workspaceRepository.createQuery(), session.user.id)
-    );
+    const workspace = await workspaceRepository.getOneByQuery(workspaceRepository.createQuery().eq('id', workspaceId));
 
     if (!workspace) {
       throw new NotFoundError('Workspace not found');

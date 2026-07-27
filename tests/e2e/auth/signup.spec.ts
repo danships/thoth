@@ -35,6 +35,6 @@ test('redirects to /pages then to the new user default Welcome page after succes
   await page.getByLabel('Confirm Password').fill('Password123!');
   await page.getByRole('button', { name: 'Sign Up' }).click();
 
-  await expect(page).toHaveURL(/\/pages\/(?!create)[^/]+$/, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/[^/]+\/pages\/(?!create)[^/]+$/, { timeout: 10_000 });
   await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
 });

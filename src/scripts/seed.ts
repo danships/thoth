@@ -21,8 +21,14 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 loadDotenv({ path: path.resolve(scriptDirectory, '../../.env') });
 
 import type BetterSqlite3 from 'better-sqlite3';
-import type { PageContainerCreate, WorkspaceCreate } from '@/types/database';
-import { getContainerRepository, getDatabase, getWorkspaceRepository } from '@/lib/database';
+import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from '@/types/database';
+import {
+  getContainerRepository,
+  getDatabase,
+  getWorkspaceMemberRepository,
+  getWorkspaceRepository,
+} from '@/lib/database';
+import { slugify } from '@/lib/utils/slug';
 
 const PREVIEW_USER_ID = 'preview-user-1';
 
@@ -61,10 +67,20 @@ const workspaceRepository = await getWorkspaceRepository();
 const now = new Date().toISOString();
 const workspace = await workspaceRepository.create({
   name: 'Preview Workspace',
+  slug: slugify('Preview Workspace'),
   userId: PREVIEW_USER_ID,
+  deletedAt: null,
   createdAt: now,
   lastUpdated: now,
 } satisfies WorkspaceCreate);
+
+const workspaceMemberRepository = await getWorkspaceMemberRepository();
+await workspaceMemberRepository.create({
+  workspaceId: workspace.id,
+  userId: PREVIEW_USER_ID,
+  role: 'owner',
+  createdAt: now,
+} satisfies WorkspaceMemberCreate);
 
 const containerRepository = await getContainerRepository();
 

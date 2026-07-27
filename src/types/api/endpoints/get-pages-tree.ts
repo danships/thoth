@@ -42,6 +42,9 @@ export const getPagesTreeQueryVariablesSchema = z.object({
   parentId: z.string().min(1).optional(),
   cursor: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
+  // Required for the root listing (no `parentId`) — there's no existing entity to derive the
+  // workspace from in that case.
+  workspaceId: z.string().min(1).optional(),
 });
 export type GetPagesTreeQueryVariables = z.infer<typeof getPagesTreeQueryVariablesSchema>;
 
