@@ -1,5 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getWorkspaceMemberRepository, getWorkspaceRepository } from '@/lib/database';
+import { addUserIdToQuery } from '@/lib/database/helpers';
 import { generateUniqueWorkspaceSlug } from '@/lib/database/workspace-slug';
 import { getWorkspaceDeleteGracePeriodDays } from '@/lib/database/workspace-grace-period';
 import { getLogger } from '@/lib/logger';
@@ -22,7 +23,7 @@ export const POST = apiRoute<RestoreWorkspaceResponse, undefined, RestoreWorkspa
 
     const workspaceMemberRepository = await getWorkspaceMemberRepository();
     const membership = await workspaceMemberRepository.getOneByQuery(
-      workspaceMemberRepository.createQuery().eq('workspaceId', params.id).eq('userId', session.user.id)
+      addUserIdToQuery(workspaceMemberRepository.createQuery().eq('workspaceId', params.id), session.user.id)
     );
 
     if (!membership || membership.role !== 'owner') {
@@ -42,14 +43,15 @@ export const POST = apiRoute<RestoreWorkspaceResponse, undefined, RestoreWorkspa
       throw new HttpError('Grace period has expired for this workspace', 410, true);
     }
 
-    // If the slug has since been claimed by another workspace, auto-assign a temporary,
-    // de-duplicated one so the workspace is immediately reachable — the owner can rename it
-    // later from Settings.
+    // If the slug has since been claimed by another *active* workspace, auto-assign a
+    // temporary, de-duplicated one so the workspace is immediately reachable — the owner can
+    // rename it later from Settings. A slug held by another soft-deleted workspace doesn't
+    // count as taken, matching `reserveWorkspaceSlug`'s collision rules.
     const workspaceRepository2 = workspaceRepository;
     const conflicting = await workspaceRepository2.getByQuery(
       workspaceRepository2.createQuery().eq('slug', workspace.slug)
     );
-    const slugTaken = conflicting.some((candidate) => candidate.id !== workspace.id);
+    const slugTaken = conflicting.some((candidate) => candidate.id !== workspace.id && !candidate.deletedAt);
 
     const slug = slugTaken ? await generateUniqueWorkspaceSlug(`${workspace.name}-restored`) : workspace.slug;
 

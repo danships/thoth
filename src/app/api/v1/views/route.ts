@@ -1,11 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import {
-  getContainerRepository,
-  getDataViewRepository,
-  getWorkspaceMemberRepository,
-  getWorkspaceRepository,
-} from '@/lib/database';
+import { getContainerRepository, getDataViewRepository, getWorkspaceRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
+import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateDataViewBody, CreateDataViewResponse, GetDataViewsResponse, GetDataViewsQuery } from '@/types/api';
@@ -46,14 +42,7 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
     // caller's default workspace for backwards compatibility) is required and validated here.
     let workspaceId = body.workspaceId;
     if (!workspaceId) {
-      const workspaceMemberRepository = await getWorkspaceMemberRepository();
-      const membership = await workspaceMemberRepository.getOneByQuery(
-        workspaceMemberRepository.createQuery().eq('userId', session.user.id)
-      );
-      if (!membership) {
-        throw new NotFoundError('Workspace not found');
-      }
-      workspaceId = membership.workspaceId;
+      workspaceId = await resolveDefaultWorkspaceId(session.user.id);
     }
     await assertWorkspaceAccess(session.user.id, workspaceId);
 

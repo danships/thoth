@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
+import { addUserIdToQuery } from '@/lib/database/helpers';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -24,10 +25,11 @@ const MAX_CREATE_ATTEMPTS = 5;
 
 async function fetchDataSource(
   containerRepository: Awaited<ReturnType<typeof getContainerRepository>>,
-  id: string
+  id: string,
+  userId: string
 ): Promise<DataSourceContainer> {
   const dataSource = await containerRepository.getOneByQuery(
-    containerRepository.createQuery().eq('id', id).eq('type', 'data-source')
+    addUserIdToQuery(containerRepository.createQuery().eq('id', id), userId).eq('type', 'data-source')
   );
 
   if (!dataSource || dataSource.type !== 'data-source') {
@@ -57,11 +59,11 @@ export const POST = apiRoute<
 
     // Authorize once up front — the data source's `workspaceId` never changes across the
     // retry loop below, so there's no need to re-check it on every attempt.
-    const initialDataSource = await fetchDataSource(containerRepository, params.id);
+    const initialDataSource = await fetchDataSource(containerRepository, params.id, session.user.id);
     await assertWorkspaceAccess(session.user.id, initialDataSource.workspaceId);
 
     for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt++) {
-      const dataSource = await fetchDataSource(containerRepository, params.id);
+      const dataSource = await fetchDataSource(containerRepository, params.id, session.user.id);
       const columns = [...(dataSource.columns ?? [])];
       const foundColumn = columns.find((column) => column.id === params.columnId);
       if (!foundColumn) {
@@ -93,7 +95,7 @@ export const POST = apiRoute<
 
       // Verify the write actually stuck — a concurrent creator could have read the same stale
       // snapshot and overwritten this append with its own full-array replace.
-      const persisted = await fetchDataSource(containerRepository, params.id);
+      const persisted = await fetchDataSource(containerRepository, params.id, session.user.id);
       const persistedColumn = (persisted.columns ?? []).find((column) => column.id === params.columnId);
       const persistedOption =
         persistedColumn?.type === 'single-select'

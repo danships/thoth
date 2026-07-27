@@ -41,7 +41,11 @@ export async function reserveWorkspaceSlug<T>(
     const workspaceRepository = await getWorkspaceRepository();
     const existing = await workspaceRepository.getByQuery(workspaceRepository.createQuery().eq('slug', slug));
 
-    const collides = existing.some((workspace) => workspace.id !== excludeWorkspaceId);
+    // Soft-deleted workspaces don't hold their slug hostage for the full grace period — a new
+    // workspace (or a restore, which handles its own conflict-renaming) may reuse it
+    // immediately. SuperSave can't reliably filter `.eq('deletedAt', null)` at the query level
+    // (same documented limitation as `parentId`), so the check is done in application code.
+    const collides = existing.some((workspace) => workspace.id !== excludeWorkspaceId && !workspace.deletedAt);
     if (collides) {
       throw new ConflictError(`Slug "${slug}" is already taken`);
     }
@@ -62,12 +66,15 @@ export async function isWorkspaceSlugAvailable(slug: string, excludeWorkspaceId?
   const workspaceRepository = await getWorkspaceRepository();
   const existing = await workspaceRepository.getByQuery(workspaceRepository.createQuery().eq('slug', slug));
 
-  return !existing.some((workspace) => workspace.id !== excludeWorkspaceId);
+  return !existing.some((workspace) => workspace.id !== excludeWorkspaceId && !workspace.deletedAt);
 }
 
 /**
  * Generates a globally-unique slug from a base string, appending `-2`, `-3`, ... on collision.
  * Unlike `reserveWorkspaceSlug`, this does not throw — it always returns an available slug.
+ * Candidate selection runs inside the same per-slug lock as `reserveWorkspaceSlug` so two
+ * concurrent generation calls can never both settle on (and separately believe they "won") the
+ * same candidate.
  */
 export async function generateUniqueWorkspaceSlug(base: string, excludeWorkspaceId?: string): Promise<string> {
   const workspaceRepository = await getWorkspaceRepository();
@@ -78,12 +85,22 @@ export async function generateUniqueWorkspaceSlug(base: string, excludeWorkspace
   // Loop is bounded by workspace count in practice; reserved words and collisions are the only
   // reasons to retry.
   while (true) {
-    if (!isReservedWorkspaceSlug(candidate)) {
-      const existing = await workspaceRepository.getByQuery(workspaceRepository.createQuery().eq('slug', candidate));
-      if (!existing.some((workspace) => workspace.id !== excludeWorkspaceId)) {
-        return candidate;
+    const nextCandidate: string = candidate;
+    const isAvailable = await withSlugLock(nextCandidate, async () => {
+      if (isReservedWorkspaceSlug(nextCandidate)) {
+        return false;
       }
+      const existing = await workspaceRepository.getByQuery(
+        workspaceRepository.createQuery().eq('slug', nextCandidate)
+      );
+      // As in reserveWorkspaceSlug, soft-deleted workspaces never block slug reuse.
+      return !existing.some((workspace) => workspace.id !== excludeWorkspaceId && !workspace.deletedAt);
+    });
+
+    if (isAvailable) {
+      return nextCandidate;
     }
+
     candidate = `${baseSlug}-${suffix}`;
     suffix += 1;
   }

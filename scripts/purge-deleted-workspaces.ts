@@ -1,11 +1,12 @@
 // scripts/purge-deleted-workspaces.ts
 //
-// Hard-deletes workspaces (and all their Container/DataView/WorkspaceMember/
+// Hard-deletes workspaces (and all their ContainerAccess/Container/DataView/WorkspaceMember/
 // WorkspaceSlugRedirect rows) whose soft-delete grace period has expired. Intended to be
 // invoked by an external daily cron / scheduled task outside the app process — no in-app job
 // scheduler is introduced for this ticket. Run via `pnpm workspaces:purge`.
 import 'dotenv/config';
 import {
+  getContainerAccessRepository,
   getContainerRepository,
   getDataViewRepository,
   getDatabase,
@@ -31,6 +32,7 @@ async function purgeDeletedWorkspaces() {
 
   const workspaceRepository = await getWorkspaceRepository();
   const containerRepository = await getContainerRepository();
+  const containerAccessRepository = await getContainerAccessRepository();
   const dataViewRepository = await getDataViewRepository();
   const workspaceMemberRepository = await getWorkspaceMemberRepository();
   const workspaceSlugRedirectRepository = await getWorkspaceSlugRedirectRepository();
@@ -54,6 +56,32 @@ async function purgeDeletedWorkspaces() {
     const lastUpdatedMs = Date.parse(workspace.lastUpdated);
     if (!Number.isNaN(lastUpdatedMs) && lastUpdatedMs > Date.now() - RACE_SAFETY_MARGIN_MS) {
       continue;
+    }
+
+    // SuperSave has no transaction/conditional-update support (see workspace-slug.ts), so this
+    // cannot be made fully atomic. As a best-effort guard against a concurrent restore landing
+    // between the initial scan above and the deletion below, re-fetch the workspace by id
+    // immediately before destroying anything and re-verify it is still (a) soft-deleted and
+    // (b) still past the grace threshold. A restore that completes after this final check but
+    // before the deletes below finish is not protected against — that residual window is
+    // accepted as the practical limit of what's achievable without database-level transactions.
+    const revalidated = await workspaceRepository.getOneByQuery(
+      workspaceRepository.createQuery().eq('id', workspace.id)
+    );
+    if (!revalidated || !revalidated.deletedAt) {
+      // Restored (or deleted from under us) since the scan — skip it.
+      continue;
+    }
+    const revalidatedDeletedAtMs = Date.parse(revalidated.deletedAt);
+    if (Number.isNaN(revalidatedDeletedAtMs) || revalidatedDeletedAtMs > graceThreshold) {
+      continue;
+    }
+
+    const accessRows = await containerAccessRepository.getByQuery(
+      containerAccessRepository.createQuery().eq('workspaceId', workspace.id)
+    );
+    for (const accessRow of accessRows) {
+      await containerAccessRepository.deleteUsingId(accessRow.id);
     }
 
     const containers = await containerRepository.getByQuery(

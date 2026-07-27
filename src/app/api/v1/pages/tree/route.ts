@@ -1,11 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import {
-  getContainerAccessRepository,
-  getContainerRepository,
-  getDataViewRepository,
-  getWorkspaceMemberRepository,
-} from '@/lib/database';
+import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
+import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -137,9 +133,9 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       // Expanding a specific node: derive the workspace from the parent entity (rather than
       // trusting a client-supplied `workspaceId`) and authorize against it.
       const parent = await containerRepository.getOneByQuery(
-        containerRepository.createQuery().eq('id', query.parentId)
+        containerRepository.createQuery().eq('id', query.parentId).eq('type', 'page')
       );
-      if (!parent) {
+      if (!parent || parent.type !== 'page') {
         throw new NotFoundError('Parent page not found');
       }
       await assertWorkspaceAccess(session.user.id, parent.workspaceId);
@@ -159,14 +155,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       // compatibility with pre-multi-workspace clients).
       let workspaceId = query?.workspaceId;
       if (!workspaceId) {
-        const workspaceMemberRepository = await getWorkspaceMemberRepository();
-        const membership = await workspaceMemberRepository.getOneByQuery(
-          workspaceMemberRepository.createQuery().eq('userId', session.user.id)
-        );
-        if (!membership) {
-          throw new NotFoundError('Workspace not found');
-        }
-        workspaceId = membership.workspaceId;
+        workspaceId = await resolveDefaultWorkspaceId(session.user.id);
       }
       await assertWorkspaceAccess(session.user.id, workspaceId);
 

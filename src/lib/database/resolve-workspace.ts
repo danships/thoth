@@ -7,6 +7,7 @@ import {
   getWorkspaceSlugRedirectRepository,
 } from './index';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { NotFoundError } from '@/lib/errors/not-found-error';
 import { LAST_WORKSPACE_COOKIE } from '@/lib/workspace/last-workspace-cookie';
 import type { Workspace } from '@/types/database';
 
@@ -89,6 +90,25 @@ export async function getDefaultWorkspaceForUser(userId: string): Promise<Worksp
     .toSorted((a, b) => (a.lastUpdated < b.lastUpdated ? 1 : -1));
 
   return activeWorkspaces[0];
+}
+
+/**
+ * API-route variant of `getDefaultWorkspaceForUser`: resolves the id of the caller's default
+ * workspace (deterministically the most-recently-updated, non-deleted workspace they belong
+ * to — same ordering/filtering, so different routes never disagree on which workspace is
+ * "default" for the same user), throwing `NotFoundError` instead of returning `undefined` when
+ * there isn't one. Shared by every endpoint that falls back to a default workspace when no
+ * explicit `workspaceId`/`parentId` was supplied (`pages`, `pages/tree`, `pages/welcome`,
+ * `data-sources`, `views`).
+ */
+export async function resolveDefaultWorkspaceId(userId: string): Promise<string> {
+  const workspace = await getDefaultWorkspaceForUser(userId);
+
+  if (!workspace) {
+    throw new NotFoundError('Workspace not found');
+  }
+
+  return workspace.id;
 }
 
 /**

@@ -1,7 +1,8 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository, getWorkspaceMemberRepository, getWorkspaceRepository } from '@/lib/database';
+import { getContainerRepository, getWorkspaceRepository } from '@/lib/database';
 import { registerContainerAccessForNewPage } from '@/lib/database/container-access-service';
 import { addUserIdToQuery } from '@/lib/database/helpers';
+import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -48,25 +49,6 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
   }
 );
 
-/**
- * Resolves the caller's default workspace when no `workspaceId` was supplied and there's no
- * `parentId` to derive one from. Kept for backwards compatibility with clients that predate
- * multi-workspace support; new callers should always pass a `workspaceId` explicitly (see
- * `useCurrentWorkspace()` on the client).
- */
-async function resolveDefaultWorkspace(userId: string) {
-  const workspaceMemberRepository = await getWorkspaceMemberRepository();
-  const membership = await workspaceMemberRepository.getOneByQuery(
-    workspaceMemberRepository.createQuery().eq('userId', userId)
-  );
-
-  if (!membership) {
-    throw new NotFoundError('Workspace not found');
-  }
-
-  return membership.workspaceId;
-}
-
 export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
   {
     expectedBodySchema: createPageBodySchema,
@@ -86,10 +68,10 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       // `workspaceId` — fetch the parent by id, authorize against its own `workspaceId`, and
       // stamp the new child with the same one.
       const parentPage = await containerRepository.getOneByQuery(
-        containerRepository.createQuery().eq('id', body.parentId)
+        containerRepository.createQuery().eq('id', body.parentId).eq('type', 'page')
       );
 
-      if (!parentPage) {
+      if (!parentPage || parentPage.type !== 'page') {
         throw new NotFoundError('Parent page not found or access denied');
       }
 
@@ -99,7 +81,7 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       parentId = body.parentId;
     } else {
       // Root-level page: no existing entity to derive the workspace from.
-      workspaceId = body.workspaceId ?? (await resolveDefaultWorkspace(session.user.id));
+      workspaceId = body.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
       await assertWorkspaceAccess(session.user.id, workspaceId);
     }
 

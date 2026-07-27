@@ -1,5 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
+import { addUserIdToQuery } from '@/lib/database/helpers';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -23,7 +24,7 @@ export const PATCH = apiRoute<
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
     const dataSource = await containerRepository.getOneByQuery(
-      containerRepository.createQuery().eq('id', params.id).eq('type', 'data-source')
+      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
     );
 
     if (!dataSource || dataSource.type !== 'data-source') {
@@ -76,7 +77,7 @@ export const DELETE = apiRoute<void, undefined, UpdateDataSourceColumnParameters
   async ({ params }, session) => {
     const containerRepository = await getContainerRepository();
     const dataSource = await containerRepository.getOneByQuery(
-      containerRepository.createQuery().eq('id', params.id).eq('type', 'data-source')
+      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
     );
 
     if (!dataSource || dataSource.type !== 'data-source') {

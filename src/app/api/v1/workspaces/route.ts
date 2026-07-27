@@ -1,5 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getWorkspaceMemberRepository, getWorkspaceRepository } from '@/lib/database';
+import { addUserIdToQuery } from '@/lib/database/helpers';
 import { createWorkspaceForUser } from '@/lib/database/seed-workspace';
 import type { CreateWorkspaceBody, CreateWorkspaceResponse, GetWorkspacesResponse } from '@/types/api';
 import { createWorkspaceBodySchema } from '@/types/api';
@@ -7,7 +8,7 @@ import { createWorkspaceBodySchema } from '@/types/api';
 export const GET = apiRoute<GetWorkspacesResponse, {}, {}, {}>({}, async (_request, session) => {
   const workspaceMemberRepository = await getWorkspaceMemberRepository();
   const memberships = await workspaceMemberRepository.getByQuery(
-    workspaceMemberRepository.createQuery().eq('userId', session.user.id)
+    addUserIdToQuery(workspaceMemberRepository.createQuery(), session.user.id)
   );
 
   if (memberships.length === 0) {
