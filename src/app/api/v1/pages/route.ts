@@ -50,7 +50,6 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
         }
       }
 
-
       return starredAccessRows
         .map((row) => {
           const container = containersById.get(row.containerId);

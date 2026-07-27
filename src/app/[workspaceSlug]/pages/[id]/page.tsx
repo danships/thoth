@@ -1,6 +1,19 @@
 'use client';
 
-import { Alert, ActionIcon, Box, Button, Container, Group, Loader, Modal, Stack, Tabs, Text, Title } from '@mantine/core';
+import {
+  Alert,
+  ActionIcon,
+  Box,
+  Button,
+  Container,
+  Group,
+  Loader,
+  Modal,
+  Stack,
+  Tabs,
+  Text,
+  Title,
+} from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
