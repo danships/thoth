@@ -97,14 +97,17 @@ test.describe('workspaces API', () => {
     });
     const workspace = await getData<{ id: string }>(createResponse);
 
+    // Use a per-run-unique slug: the e2e SQLite DB persists across local runs and the seed only
+    // upserts (never purges), so a fixed slug would collide (409) on the second run.
+    const newSlug = `renamed-workspace-e2e-${Date.now()}`;
     const patchResponse = await request.patch(`/api/v1/workspaces/${workspace.id}`, {
-      data: { name: 'Renamed Workspace', slug: 'renamed-workspace-e2e' },
+      data: { name: 'Renamed Workspace', slug: newSlug },
     });
     expect(patchResponse.ok()).toBeTruthy();
     const updated = await getData<{ name: string; slug: string }>(patchResponse);
 
     expect(updated.name).toBe('Renamed Workspace');
-    expect(updated.slug).toBe('renamed-workspace-e2e');
+    expect(updated.slug).toBe(newSlug);
   });
 
   test('slug-availability reflects reserved words and existing slugs as unavailable', async ({ request }) => {
@@ -128,6 +131,27 @@ test.describe('workspaces API', () => {
     expect(freeResponse.ok()).toBeTruthy();
     const freeData = await getData<{ available: boolean }>(freeResponse);
     expect(freeData.available).toBe(true);
+  });
+
+  test('the seeded second workspace is listed and its pages stay isolated from the first', async ({ request }) => {
+    const listResponse = await request.get('/api/v1/workspaces');
+    const workspaces = await getData<{ id: string }[]>(listResponse);
+    expect(workspaces.some((workspace) => workspace.id === SEED.workspace.id)).toBeTruthy();
+    expect(workspaces.some((workspace) => workspace.id === SEED.secondWorkspace.id)).toBeTruthy();
+
+    // The second workspace's own seeded root page shows up in its tree...
+    const treeTwoResponse = await request.get('/api/v1/pages/tree', {
+      params: { workspaceId: SEED.secondWorkspace.id },
+    });
+    const treeTwo = await getData<{ branches: { page: { id: string } }[] }>(treeTwoResponse);
+    expect(treeTwo.branches.some((branch) => branch.page.id === SEED.secondWorkspace.rootPage.id)).toBeTruthy();
+
+    // ...but it must never leak into the first workspace's tree.
+    const treeOneResponse = await request.get('/api/v1/pages/tree', {
+      params: { workspaceId: SEED.workspace.id },
+    });
+    const treeOne = await getData<{ branches: { page: { id: string } }[] }>(treeOneResponse);
+    expect(treeOne.branches.some((branch) => branch.page.id === SEED.secondWorkspace.rootPage.id)).toBeFalsy();
   });
 
   test('cannot delete the only active workspace, but can delete and restore an extra one', async ({ request }) => {
@@ -175,5 +199,10 @@ test.describe('workspaces API', () => {
     // The last remaining active workspace (the seed workspace) cannot be deleted.
     const lastDeleteResponse = await request.delete(`/api/v1/workspaces/${SEED.workspace.id}`);
     expect(lastDeleteResponse.status()).toBe(400);
+
+    // Restore the seeded second workspace we soft-deleted in the loop above, so the database
+    // returns to its seeded shape for any later specs / re-runs that rely on it being active.
+    const restoreSecondResponse = await request.post(`/api/v1/workspaces/${SEED.secondWorkspace.id}/restore`);
+    expect(restoreSecondResponse.ok()).toBeTruthy();
   });
 });

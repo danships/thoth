@@ -1,64 +1,18 @@
 'use client';
 
-import { Alert, Badge, Button, Divider, Group, Loader, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Alert, Button, Divider, Group, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useDebouncedValue } from '@mantine/hooks';
 import { modals } from '@mantine/modals';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api/client';
+import { useState } from 'react';
+import { SlugAvailabilityIndicator } from '@/components/atoms/slug-availability-indicator';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
+import { useSlugAvailability } from '@/lib/hooks/api/use-slug-availability';
 import { useWorkspaces } from '@/lib/hooks/api/use-workspaces';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { workspaceSlugSchema } from '@/types/schemas/entities/workspace';
 import type { UpdateWorkspaceBody, WorkspaceApi } from '@/types/api';
-
-type SlugAvailability = 'checking' | 'available' | 'taken' | 'unchanged' | 'invalid' | null;
-
-function resolveSlugAvailability({
-  slugChanged,
-  slugFormatValid,
-  isChecking,
-  available,
-}: {
-  slugChanged: boolean;
-  slugFormatValid: boolean;
-  isChecking: boolean;
-  available: boolean | undefined;
-}): SlugAvailability {
-  if (!slugChanged) {
-    return 'unchanged';
-  }
-  if (!slugFormatValid) {
-    return 'invalid';
-  }
-  if (isChecking || available === undefined) {
-    return 'checking';
-  }
-  return available ? 'available' : 'taken';
-}
-
-function SlugAvailabilityIndicator({ availability }: { availability: SlugAvailability }) {
-  if (availability === 'checking') {
-    return <Loader size="xs" />;
-  }
-  if (availability === 'available') {
-    return (
-      <Badge color="teal" size="xs">
-        Available
-      </Badge>
-    );
-  }
-  if (availability === 'taken') {
-    return (
-      <Badge color="red" size="xs">
-        Taken
-      </Badge>
-    );
-  }
-  return null;
-}
 
 export default function WorkspaceSettingsPage() {
   const workspace = useCurrentWorkspace();
@@ -78,51 +32,15 @@ export default function WorkspaceSettingsPage() {
     },
   });
 
-  const [debouncedSlug] = useDebouncedValue(form.values.slug, 400);
-  // Keyed by the slug it was resolved for, so a stale in-flight result never gets shown for a
-  // slug the user has since changed. `null` result means "not yet resolved for this slug".
-  const [availabilityResult, setAvailabilityResult] = useState<{ slug: string; available: boolean } | null>(null);
-
-  const slugChanged = debouncedSlug !== workspace.slug;
-  const slugFormatValid = workspaceSlugSchema.safeParse(debouncedSlug).success;
-  const isCheckingAvailability = slugChanged && slugFormatValid && availabilityResult?.slug !== debouncedSlug;
-
-  useEffect(() => {
-    if (!slugChanged || !slugFormatValid) {
-      return;
-    }
-
-    let cancelled = false;
-
-    api.workspaces
-      .checkSlugAvailability(debouncedSlug, workspace.id)
-      .then((response) => {
-        if (!cancelled) {
-          setAvailabilityResult({ slug: debouncedSlug, available: response.data.data.available });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAvailabilityResult(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedSlug, slugChanged, slugFormatValid, workspace.id]);
-
-  const effectiveSlugAvailability = resolveSlugAvailability({
-    slugChanged,
-    slugFormatValid,
-    isChecking: isCheckingAvailability,
-    available: availabilityResult?.slug === debouncedSlug ? availabilityResult.available : undefined,
+  const { availability, isBlocking } = useSlugAvailability(form.values.slug, {
+    currentSlug: workspace.slug,
+    excludeWorkspaceId: workspace.id,
   });
 
   const canDelete = (workspaces?.length ?? 0) > 1;
 
   const handleSubmit = async (values: typeof form.values) => {
-    if (effectiveSlugAvailability === 'taken' || effectiveSlugAvailability === 'invalid') {
+    if (isBlocking) {
       return;
     }
 
@@ -154,27 +72,25 @@ export default function WorkspaceSettingsPage() {
   };
 
   const handleDelete = () => {
-    modals.openConfirmModal({
+    // Require the user to type the workspace name to confirm — a soft-delete is reversible for
+    // 30 days, but this still hides the whole workspace, so it shouldn't be a single misclick.
+    modals.open({
+      modalId: 'delete-workspace',
       title: 'Delete workspace',
-      children: (
-        <Text size="sm">
-          Are you sure you want to delete <strong>{workspace.name}</strong>? It will be kept for 30 days before being
-          permanently removed, so you can restore it if this was a mistake.
-        </Text>
-      ),
-      labels: { confirm: 'Delete workspace', cancel: 'Cancel' },
-      confirmProps: { color: 'red' },
-      onConfirm: async () => {
-        try {
-          await remove(`/workspaces/${workspace.id}`);
-          showSuccess('Workspace deleted');
-          const nextWorkspace = workspaces?.find((candidate) => candidate.id !== workspace.id);
-          globalThis.location.assign(nextWorkspace ? `/${nextWorkspace.slug}/pages` : '/');
-        } catch {
-          showError('Failed to delete workspace');
-        }
-      },
+      children: <DeleteWorkspaceConfirm workspace={workspace} onConfirm={confirmDelete} />,
     });
+  };
+
+  const confirmDelete = async () => {
+    modals.close('delete-workspace');
+    try {
+      await remove(`/workspaces/${workspace.id}`);
+      showSuccess('Workspace deleted');
+      const nextWorkspace = workspaces?.find((candidate) => candidate.id !== workspace.id);
+      globalThis.location.assign(nextWorkspace ? `/${nextWorkspace.slug}/pages` : '/');
+    } catch {
+      showError('Failed to delete workspace');
+    }
   };
 
   return (
@@ -197,16 +113,12 @@ export default function WorkspaceSettingsPage() {
               description={`Your workspace lives at /${form.values.slug || workspace.slug}`}
               required
               {...form.getInputProps('slug')}
-              rightSection={<SlugAvailabilityIndicator availability={effectiveSlugAvailability} />}
+              rightSection={<SlugAvailabilityIndicator availability={availability} />}
               rightSectionWidth={80}
             />
 
             <Group justify="flex-end">
-              <Button
-                type="submit"
-                loading={inProgress}
-                disabled={effectiveSlugAvailability === 'taken' || effectiveSlugAvailability === 'invalid'}
-              >
+              <Button type="submit" loading={inProgress} disabled={isBlocking}>
                 Save changes
               </Button>
             </Group>
@@ -235,6 +147,43 @@ export default function WorkspaceSettingsPage() {
           </Group>
         </Stack>
       </Paper>
+    </Stack>
+  );
+}
+
+// Confirmation body requiring the user to type the workspace name exactly before the delete
+// button enables — a deliberate friction step for a workspace-wide (if reversible) action.
+function DeleteWorkspaceConfirm({
+  workspace,
+  onConfirm,
+}: {
+  workspace: { name: string };
+  onConfirm: () => void | Promise<void>;
+}) {
+  const [typed, setTyped] = useState('');
+  const matches = typed.trim() === workspace.name;
+
+  return (
+    <Stack gap="md">
+      <Text size="sm">
+        This workspace will be permanently deleted in 30 days. You can restore it from here until then. Type{' '}
+        <strong>{workspace.name}</strong> to confirm.
+      </Text>
+      <TextInput
+        aria-label="Confirm workspace name"
+        placeholder={workspace.name}
+        value={typed}
+        onChange={(event) => setTyped(event.currentTarget.value)}
+        data-autofocus
+      />
+      <Group justify="flex-end">
+        <Button variant="default" onClick={() => modals.close('delete-workspace')}>
+          Cancel
+        </Button>
+        <Button color="red" disabled={!matches} onClick={onConfirm}>
+          Delete workspace
+        </Button>
+      </Group>
     </Stack>
   );
 }

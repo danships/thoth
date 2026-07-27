@@ -1,6 +1,9 @@
 'use client';
 
-import { createContext, useContext, type PropsWithChildren } from 'react';
+import { createContext, useContext, useEffect, useRef, type PropsWithChildren } from 'react';
+import { $currentWorkspaceId } from './current-workspace-id';
+import { clearExpandedPages } from './tree-expanded-state';
+import { writeLastWorkspaceSlugCookie } from '@/lib/workspace/last-workspace-cookie';
 
 export type CurrentWorkspace = {
   id: string;
@@ -20,6 +23,21 @@ type WorkspaceProviderProperties = PropsWithChildren & {
 // beneath it (sidebar, page creation forms, the workspace switcher, etc.) without prop-drilling
 // or a redundant client-side fetch.
 export function WorkspaceProvider({ workspace, children }: WorkspaceProviderProperties) {
+  const previousWorkspaceId = useRef<string | undefined>(undefined);
+
+  // Keep the non-React nanostore mirror in sync, remember the active workspace for the root
+  // redirect (via cookie), and clear stale expanded-tree state whenever the workspace actually
+  // changes (i.e. the user switched workspaces, not just navigated within one).
+  useEffect(() => {
+    $currentWorkspaceId.set(workspace.id);
+    writeLastWorkspaceSlugCookie(workspace.slug);
+
+    if (previousWorkspaceId.current !== undefined && previousWorkspaceId.current !== workspace.id) {
+      clearExpandedPages();
+    }
+    previousWorkspaceId.current = workspace.id;
+  }, [workspace.id, workspace.slug]);
+
   return <WorkspaceContext.Provider value={workspace}>{children}</WorkspaceContext.Provider>;
 }
 

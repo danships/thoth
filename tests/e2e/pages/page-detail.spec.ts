@@ -22,7 +22,7 @@ test('can inline-edit the page title', async ({ page }) => {
   // typing, so a locator filtered by the original name would stop matching mid-interaction.
   const heading = page.getByRole('heading', { level: 1 });
   await heading.click();
-  await heading.press('Control+A');
+  await heading.press('ControlOrMeta+A');
   await heading.pressSequentially('Renamed E2E Page');
   const [firstUpdateResponse] = await Promise.all([
     page.waitForResponse((response) => response.url().includes(`/pages/${SEED.pages.root.id}`) && response.ok()),
@@ -37,7 +37,7 @@ test('can inline-edit the page title', async ({ page }) => {
   // next test's page.goto() can abort the still in-flight rename request, permanently
   // leaving the shared page renamed for the rest of the suite.
   await heading.click();
-  await heading.press('Control+A');
+  await heading.press('ControlOrMeta+A');
   await heading.pressSequentially(SEED.pages.root.name);
   const [restoreResponse] = await Promise.all([
     page.waitForResponse((response) => response.url().includes(`/pages/${SEED.pages.root.id}`) && response.ok()),

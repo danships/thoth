@@ -30,6 +30,17 @@ export const SEED = {
     id: 'e2e-workspace-000-0000-0000-000000000001',
     slug: 'e2e-workspace',
   },
+  // A second, independent workspace owned by the same seed user, used to exercise
+  // multi-workspace switching, data isolation, and slug/redirect behaviour (THOTH-027). It is
+  // seeded with its own root Welcome page so isolation assertions have something to look at.
+  secondWorkspace: {
+    id: 'e2e-workspace-002-0000-0000-000000000001',
+    slug: 'e2e-workspace-two',
+    rootPage: {
+      id: 'e2e-page-ws2-root-0-0000-0000-000000000001',
+      name: 'E2E Second Workspace Home',
+    },
+  },
   pages: {
     root: {
       id: 'e2e-page-root-0000-0000-0000-000000000001',

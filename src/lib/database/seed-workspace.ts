@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getContainerRepository, getWorkspaceMemberRepository, getWorkspaceRepository } from './index';
 import { registerContainerAccessForNewPage } from './container-access-service';
 import { generateUniqueWorkspaceSlug, reserveWorkspaceSlug } from './workspace-slug';
+import { ConflictError } from '../errors/conflict-error';
 import { slugify } from '../utils/slug';
 import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from '@/types/database';
 
@@ -81,47 +82,70 @@ export async function createWorkspaceForUser(
   const workspaceMemberRepository = await getWorkspaceMemberRepository();
   const containerRepository = await getContainerRepository();
 
-  // If the caller supplied an explicit slug (e.g. from POST /workspaces), reserve exactly that
-  // one and surface a 409 on collision by default. When `strict: false` (signup's generated
-  // nerdy slug), fall back to de-duplication instead — no user-facing form to reject there.
-  const slug =
-    options.slug && options.strict !== false
-      ? await reserveWorkspaceSlug(baseSlugSource, async () => baseSlugSource)
-      : await generateUniqueWorkspaceSlug(baseSlugSource);
+  // Creates the Workspace row, its owning membership, and the seeded Welcome page for a slug
+  // that has already been reserved. Kept as a closure so it can run *inside* the slug
+  // reservation lock, making the check-then-write atomic per slug.
+  const createWithSlug = async (slug: string) => {
+    const workspace = await workspaceRepository.create({
+      name,
+      slug,
+      userId,
+      deletedAt: null,
+      createdAt: now,
+      lastUpdated: now,
+    } satisfies WorkspaceCreate);
 
-  const workspace = await workspaceRepository.create({
-    name,
-    slug,
-    userId,
-    deletedAt: null,
-    createdAt: now,
-    lastUpdated: now,
-  } satisfies WorkspaceCreate);
+    await workspaceMemberRepository.create({
+      workspaceId: workspace.id,
+      userId,
+      role: 'owner',
+      createdAt: now,
+    } satisfies WorkspaceMemberCreate);
 
-  await workspaceMemberRepository.create({
-    workspaceId: workspace.id,
-    userId,
-    role: 'owner',
-    createdAt: now,
-  } satisfies WorkspaceMemberCreate);
+    const pageData: PageContainerCreate = {
+      name: 'Welcome',
+      type: 'page',
+      userId,
+      createdAt: now,
+      lastUpdated: now,
+      workspaceId: workspace.id,
+      emoji: '👋',
+      parentId: null,
+      blocks: buildWelcomeBlocks(workspace.name, workspace.slug),
+    };
+    // BlockNote block ids are generated client-side normally; stamp a stable id server-side too
+    // so the seeded content round-trips through the editor without complaint.
+    pageData.blocks = pageData.blocks?.map((block: Record<string, unknown>) => ({ id: randomUUID(), ...block }));
 
-  const pageData: PageContainerCreate = {
-    name: 'Welcome',
-    type: 'page',
-    userId,
-    createdAt: now,
-    lastUpdated: now,
-    workspaceId: workspace.id,
-    emoji: '👋',
-    parentId: null,
-    blocks: buildWelcomeBlocks(workspace.name, workspace.slug),
+    const createdPage = await containerRepository.create(pageData);
+    await registerContainerAccessForNewPage(createdPage, userId);
+
+    return workspace;
   };
-  // BlockNote block ids are generated client-side normally; stamp a stable id server-side too
-  // so the seeded content round-trips through the editor without complaint.
-  pageData.blocks = pageData.blocks?.map((block: Record<string, unknown>) => ({ id: randomUUID(), ...block }));
 
-  const createdPage = await containerRepository.create(pageData);
-  await registerContainerAccessForNewPage(createdPage, userId);
+  // If the caller supplied an explicit slug (e.g. from POST /workspaces), reserve exactly that
+  // one and surface a 409 on collision by default — creating the workspace *inside* the lock so
+  // the check-then-write can't race another creation of the same slug. When `strict: false`
+  // (signup's generated nerdy slug), fall back to de-duplication instead, retrying on the rare
+  // lost race — no user-facing form to reject there.
+  if (options.slug && options.strict !== false) {
+    return reserveWorkspaceSlug(baseSlugSource, () => createWithSlug(baseSlugSource));
+  }
 
-  return workspace;
+  // Non-strict path: generate a unique slug and create atomically under the lock, retrying with
+  // a freshly-generated slug if a concurrent creation claimed it in between.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = await generateUniqueWorkspaceSlug(baseSlugSource);
+    try {
+      return await reserveWorkspaceSlug(candidate, () => createWithSlug(candidate));
+    } catch (error) {
+      if (error instanceof ConflictError && attempt < 4) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  // Unreachable in practice (the loop either returns or throws), but satisfies the type checker.
+  throw new ConflictError('Unable to reserve a unique workspace slug');
 }

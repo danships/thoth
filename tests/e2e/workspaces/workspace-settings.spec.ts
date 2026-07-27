@@ -72,8 +72,45 @@ test.describe('workspace settings', () => {
 
     await page.goto(`/${created.slug}/settings`);
     await page.getByRole('button', { name: 'Delete workspace' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete workspace' }).click();
+    // The confirmation now requires typing the workspace name before the delete button enables.
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Confirm workspace name').fill(created.name);
+    await dialog.getByRole('button', { name: 'Delete workspace' }).click();
 
     await expect(page).toHaveURL(/\/[^/]+\/pages$/, { timeout: 10_000 });
+  });
+
+  test('a freed slug can be reclaimed by another workspace, which then supersedes the old redirect', async ({
+    page,
+    request,
+  }) => {
+    const oldSlug = `super-old-${Date.now()}`;
+    const newSlug = `super-new-${Date.now()}`;
+
+    // Workspace A takes `oldSlug`, then renames away from it — freeing `oldSlug`, which now only
+    // survives as a redirect pointing at A's new slug.
+    const aResponse = await request.post('/api/v1/workspaces', { data: { name: `Supersession A ${Date.now()}` } });
+    const aBody = await aResponse.json();
+    const workspaceA = aBody.data as { id: string };
+    const aToOld = await request.patch(`/api/v1/workspaces/${workspaceA.id}`, { data: { slug: oldSlug } });
+    expect(aToOld.ok()).toBeTruthy();
+    const aToNew = await request.patch(`/api/v1/workspaces/${workspaceA.id}`, { data: { slug: newSlug } });
+    expect(aToNew.ok()).toBeTruthy();
+
+    // Right now the freed slug redirects to A's new slug.
+    await page.goto(`/${oldSlug}/pages`);
+    await expect(page).toHaveURL(`/${newSlug}/pages`, { timeout: 15_000 });
+
+    // Workspace B reclaims the freed `oldSlug`.
+    const bResponse = await request.post('/api/v1/workspaces', { data: { name: `Supersession B ${Date.now()}` } });
+    const bBody = await bResponse.json();
+    const workspaceB = bBody.data as { id: string };
+    const bToOld = await request.patch(`/api/v1/workspaces/${workspaceB.id}`, { data: { slug: oldSlug } });
+    expect(bToOld.ok()).toBeTruthy();
+
+    // An active workspace matching the slug wins over the stale redirect, so the old slug now
+    // resolves directly to B and no longer bounces to A's new slug.
+    await page.goto(`/${oldSlug}/pages`);
+    await expect(page).toHaveURL(`/${oldSlug}/pages`, { timeout: 15_000 });
   });
 });

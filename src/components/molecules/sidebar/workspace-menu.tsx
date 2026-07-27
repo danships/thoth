@@ -1,7 +1,7 @@
 'use client';
 
 import { ActionIcon, Avatar, Group, Loader, Menu, Text } from '@mantine/core';
-import { IconChevronDown, IconLogout, IconPlus, IconSettings } from '@tabler/icons-react';
+import { IconChevronDown, IconLayoutGrid, IconLogout, IconPlus, IconSettings } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -83,6 +83,9 @@ export function WorkspaceMenu() {
           ))}
           <Menu.Item leftSection={<IconPlus size={16} />} onClick={() => setCreateModalOpened(true)}>
             New workspace
+          </Menu.Item>
+          <Menu.Item component={Link} href="/workspaces" leftSection={<IconLayoutGrid size={16} />}>
+            Manage workspaces
           </Menu.Item>
 
           <Menu.Divider />

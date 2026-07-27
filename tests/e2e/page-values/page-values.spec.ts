@@ -23,7 +23,7 @@ test('can edit a text cell value inline', async ({ page }) => {
   const noteCell = row.getByRole('cell').nth(1);
 
   await noteCell.click();
-  await noteCell.press('Control+A');
+  await noteCell.press('ControlOrMeta+A');
   await noteCell.pressSequentially('Updated note');
   await noteCell.press('Enter');
   await expect(noteCell).toHaveText('Updated note');

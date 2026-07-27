@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAuth } from '@/lib/auth/config';
-import { getDefaultWorkspaceForUser } from '@/lib/database/resolve-workspace';
+import { getLandingWorkspaceForUser } from '@/lib/database/resolve-workspace';
 
 export default async function Home() {
   const auth = await getAuth();
@@ -13,11 +13,11 @@ export default async function Home() {
     redirect('/login');
   }
 
-  const workspace = await getDefaultWorkspaceForUser(session.user.id);
+  const workspace = await getLandingWorkspaceForUser(session.user.id);
   if (!workspace) {
-    // No workspace membership at all (shouldn't happen — every user gets one on signup), so
-    // there's nowhere workspace-scoped to send them.
-    redirect('/login');
+    // No active workspace at all (e.g. the user's only workspace was soft-deleted). Send them
+    // to the dedicated creation flow so they always end up with somewhere to work.
+    redirect('/workspaces/new');
   }
 
   redirect(`/${workspace.slug}/pages`);

@@ -126,6 +126,48 @@ async function seedAppData() {
     } as unknown as WorkspaceMemberCreate);
   }
 
+  // ── Second workspace (multi-workspace fixtures) ──────────────────────────────
+  // An independent, active workspace owned by the same user, with its own membership row and a
+  // single root page, so switching/isolation/legacy-redirect specs have a real target that is
+  // guaranteed not to share any content with the primary workspace above. Its `lastUpdated` is
+  // kept strictly older than the primary workspace's so `getDefaultWorkspaceForUser` (which
+  // sorts by `lastUpdated` desc) deterministically lands users in the primary workspace — many
+  // existing specs assert on that default-landing behaviour.
+  const secondWorkspaceId = SEED.secondWorkspace.id;
+  const secondWorkspaceTimestamp = new Date(Date.parse(now) - 60_000).toISOString();
+  const existingSecondWorkspace = await workspaceRepository.getOneByQuery(
+    workspaceRepository.createQuery().eq('id', secondWorkspaceId)
+  );
+  await (existingSecondWorkspace
+    ? workspaceRepository.update({
+        ...existingSecondWorkspace,
+        name: 'E2E Second Workspace',
+        slug: SEED.secondWorkspace.slug,
+        deletedAt: null,
+        lastUpdated: secondWorkspaceTimestamp,
+      })
+    : workspaceRepository.create({
+        id: secondWorkspaceId,
+        name: 'E2E Second Workspace',
+        slug: SEED.secondWorkspace.slug,
+        userId: uid,
+        deletedAt: null,
+        createdAt: secondWorkspaceTimestamp,
+        lastUpdated: secondWorkspaceTimestamp,
+      } as unknown as WorkspaceCreate));
+
+  const existingSecondMembership = await workspaceMemberRepository.getOneByQuery(
+    workspaceMemberRepository.createQuery().eq('workspaceId', secondWorkspaceId).eq('userId', uid)
+  );
+  if (!existingSecondMembership) {
+    await workspaceMemberRepository.create({
+      workspaceId: secondWorkspaceId,
+      userId: uid,
+      role: 'owner',
+      createdAt: now,
+    } as unknown as WorkspaceMemberCreate);
+  }
+
   const containerAccessRepository = await getContainerAccessRepository();
 
   async function upsertContainerAccess(
@@ -484,6 +526,21 @@ async function seedAppData() {
       { lastAccessedAt: new Date(Date.parse(now) - index * 1000).toISOString() }
     );
   }
+
+  // ── Second workspace's own root page ─────────────────────────────────────────
+  // Belongs to `secondWorkspace` (not `wsId`), so it must never appear in the primary
+  // workspace's tree — this is exactly what the isolation specs assert.
+  await upsertPage({
+    id: SEED.secondWorkspace.rootPage.id,
+    name: SEED.secondWorkspace.rootPage.name,
+    emoji: '🗂️',
+    type: 'page',
+    userId: uid,
+    workspaceId: SEED.secondWorkspace.id,
+    parentId: null,
+    createdAt: now,
+    lastUpdated: now,
+  });
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────

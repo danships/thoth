@@ -1,4 +1,4 @@
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
   getContainerRepository,
@@ -7,6 +7,7 @@ import {
   getWorkspaceSlugRedirectRepository,
 } from './index';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { LAST_WORKSPACE_COOKIE } from '@/lib/workspace/last-workspace-cookie';
 import type { Workspace } from '@/types/database';
 
 /**
@@ -15,7 +16,7 @@ import type { Workspace } from '@/types/database';
  * workspace the user is a member of, falls back to the `WorkspaceSlugRedirect` table (a
  * previous slug of one of the user's own workspaces, e.g. after a rename) and issues a
  * permanent redirect to the canonical slug, preserving the rest of the requested path/query
- * (read from the `x-pathname` header set by `src/middleware.ts`, since Server Components below
+ * (read from the `x-pathname` header set by `src/proxy.ts`, since Server Components below
  * a layout don't otherwise have access to the full current request pathname).
  *
  * Redirects (via `next/navigation`'s `redirect()`, which throws) rather than returning
@@ -88,6 +89,34 @@ export async function getDefaultWorkspaceForUser(userId: string): Promise<Worksp
     .toSorted((a, b) => (a.lastUpdated < b.lastUpdated ? 1 : -1));
 
   return activeWorkspaces[0];
+}
+
+/**
+ * Picks the workspace to land a user in when there's no workspace slug in the URL yet (root `/`
+ * or a legacy bare `/pages` link): prefers the workspace named by the non-authoritative
+ * `thoth_last_workspace` cookie (so the user resumes where they left off), re-validating live
+ * membership, and falls back to the most-recently-updated workspace otherwise. Returns
+ * `undefined` only when the user has no active workspace at all.
+ */
+export async function getLandingWorkspaceForUser(userId: string): Promise<Workspace | undefined> {
+  const cookieStore = await cookies();
+  const lastSlug = cookieStore.get(LAST_WORKSPACE_COOKIE)?.value;
+
+  if (lastSlug) {
+    const workspaceRepository = await getWorkspaceRepository();
+    const candidate = await workspaceRepository.getOneByQuery(workspaceRepository.createQuery().eq('slug', lastSlug));
+    if (candidate && !candidate.deletedAt) {
+      try {
+        await assertWorkspaceAccess(userId, candidate.id);
+        return candidate;
+      } catch {
+        // Cookie is stale (workspace deleted, renamed, or membership lost) — fall through to
+        // the default resolution below.
+      }
+    }
+  }
+
+  return getDefaultWorkspaceForUser(userId);
 }
 
 /**

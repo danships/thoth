@@ -30,3 +30,9 @@ export const collapsePage = (pageId: string) => {
   newMap.set(pageId, false);
   $expandedPages.set(newMap);
 };
+
+// Clears all expanded state. Called on workspace switch so a page id expanded in one workspace
+// doesn't leave stale entries that could apply to another workspace's tree.
+export const clearExpandedPages = () => {
+  $expandedPages.set(new Map());
+};

@@ -1,13 +1,12 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getWorkspaceMemberRepository, getWorkspaceRepository } from '@/lib/database';
 import { generateUniqueWorkspaceSlug } from '@/lib/database/workspace-slug';
+import { getWorkspaceDeleteGracePeriodDays } from '@/lib/database/workspace-grace-period';
 import { getLogger } from '@/lib/logger';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { HttpError } from '@/lib/errors/http-error';
 import type { RestoreWorkspaceParameters, RestoreWorkspaceResponse } from '@/types/api';
 import { restoreWorkspaceParametersSchema } from '@/types/api';
-
-const GRACE_PERIOD_DAYS = 30;
 
 export const POST = apiRoute<RestoreWorkspaceResponse, undefined, RestoreWorkspaceParameters, {}>(
   {
@@ -37,7 +36,8 @@ export const POST = apiRoute<RestoreWorkspaceResponse, undefined, RestoreWorkspa
     }
 
     const deletedAtMs = Date.parse(workspace.deletedAt);
-    const graceThresholdMs = Date.now() - GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+    const gracePeriodDays = await getWorkspaceDeleteGracePeriodDays();
+    const graceThresholdMs = Date.now() - gracePeriodDays * 24 * 60 * 60 * 1000;
     if (Number.isNaN(deletedAtMs) || deletedAtMs <= graceThresholdMs) {
       throw new HttpError('Grace period has expired for this workspace', 410, true);
     }

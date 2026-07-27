@@ -13,6 +13,12 @@ test.describe('workspace menu', () => {
   test('shows the current workspace name and links to its settings page', async ({ page }) => {
     await page.goto(`/${SEED.workspace.slug}/pages`);
 
+    // `/[slug]/pages` redirects on to the landing page, which may then append a `?v=` view param
+    // via a client-side replace. Let that settle before interacting with the menu, otherwise the
+    // late replace can race with (and clobber) the settings navigation triggered below.
+    await page.waitForURL(/\/pages\/(?!create)[^/]+/);
+    await page.waitForLoadState('networkidle');
+
     const menuTrigger = page.getByRole('button', { name: 'Workspace menu' });
     await expect(menuTrigger).toBeVisible();
     await menuTrigger.click();
@@ -35,8 +41,9 @@ test.describe('workspace menu', () => {
     await page.getByLabel('Workspace name').fill(workspaceName);
     await page.getByRole('button', { name: 'Create workspace' }).click();
 
-    // Creating navigates straight into the new workspace's Pages view.
-    await expect(page).toHaveURL(/\/[^/]+\/pages$/, { timeout: 10_000 });
+    // Creating navigates into the new workspace's Pages view, which forwards on to its seeded
+    // Welcome page (`/[slug]/pages/[welcomeId]`), so tolerate the trailing page id.
+    await expect(page).toHaveURL(/\/[^/]+\/pages(\/|$)/, { timeout: 10_000 });
     await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible({ timeout: 10_000 });
 
     // The new workspace is now current, and the original seeded one is listed as switchable.
@@ -56,7 +63,9 @@ test.describe('workspace menu', () => {
     await page.getByRole('button', { name: 'Workspace menu' }).click();
     await page.getByRole('menuitem', { name: created.name }).click();
 
-    await expect(page).toHaveURL(`/${created.slug}/pages`, { timeout: 10_000 });
+    // Switching lands on the target workspace's Pages view, which forwards on to its landing
+    // page, so match the slug prefix rather than an exact `/pages` URL.
+    await expect(page).toHaveURL(new RegExp(`/${created.slug}/pages(/|$)`), { timeout: 10_000 });
   });
 
   test('can log out from the workspace menu', async ({ page }) => {

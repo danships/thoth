@@ -24,7 +24,7 @@ test('Page fields section renders columns in the DataView order and edits persis
   const alphaRow = page.getByText('Alpha', { exact: true }).locator('..');
   const alphaValue = alphaRow.locator('[contenteditable="true"]');
   await alphaValue.click();
-  await alphaValue.press('Control+A');
+  await alphaValue.press('ControlOrMeta+A');
   await alphaValue.pressSequentially('Updated alpha');
   await alphaValue.press('Enter');
   await expect(alphaValue).toHaveText('Updated alpha');
