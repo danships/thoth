@@ -18,7 +18,7 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('favorites sidebar section and GET /pages?favorited filter', () => {
   test('sidebar Favorites section is absent when no pages are starred', async ({ page }) => {
-    await page.goto('/pages');
+    await page.goto(`/${SEED.workspace.slug}/pages`);
     await expect(page.getByRole('heading', { name: 'Pages' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Favorites' })).toHaveCount(0);
   });
@@ -30,7 +30,7 @@ test.describe('favorites sidebar section and GET /pages?favorited filter', () =>
     expect(response.ok()).toBe(true);
 
     try {
-      await page.goto('/pages');
+      await page.goto(`/${SEED.workspace.slug}/pages`);
       await expect(page.getByRole('heading', { name: 'Favorites' })).toBeVisible();
       await expect(page.getByText(SEED.pages.favoritesOverflowSeed[0]!.name).first()).toBeVisible();
     } finally {
@@ -72,7 +72,7 @@ test.describe('favorites sidebar section and GET /pages?favorited filter', () =>
     try {
       setFavoritesDirectly(true, overflowPageIds);
 
-      await page.goto('/pages');
+      await page.goto(`/${SEED.workspace.slug}/pages`);
       await expect(page.getByRole('heading', { name: 'Favorites' })).toBeVisible();
       await expect(page.getByText(/there may be more/i)).toBeVisible();
 

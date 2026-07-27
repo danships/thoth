@@ -32,8 +32,11 @@ export function useToggleFavorite({ mutatePageDetails }: UseToggleFavoriteOption
       }
 
       // Revalidate the independent `usePagesByFavorited()` cache so the sidebar's Favorites
-      // section updates immediately.
-      void globalMutate(`${GET_PAGES_ENDPOINT}?favorited=true`);
+      // section updates immediately. Matched by key prefix since the cache key is now
+      // workspace-scoped (`?favorited=true&workspaceId=...`).
+      void globalMutate(
+        (key) => typeof key === 'string' && key.startsWith(`${GET_PAGES_ENDPOINT}?favorited=true`)
+      );
 
       // Starring also bumps `lastAccessedAt`, so the root pages-tree cache (keyed per-page by
       // `useSWRInfinite`) needs to be told to refresh too — matched by key prefix since it's

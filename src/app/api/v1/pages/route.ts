@@ -1,7 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerAccessRepository, getContainerRepository, getWorkspaceRepository } from '@/lib/database';
 import { registerContainerAccessForNewPage } from '@/lib/database/container-access-service';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
@@ -17,13 +17,22 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
     const containerRepository = await getContainerRepository();
 
     if (query.favorited) {
+      // Root-list parity: scope favorites to a single workspace (defaulting to the caller's
+      // default workspace for backwards compatibility), rather than mixing starred pages
+      // across every workspace the user belongs to.
+      const workspaceId = query.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
+      await assertWorkspaceAccess(session.user.id, workspaceId);
+
       // Bounded sidebar list, no cursor pagination — capped at the smaller of the caller's
       // `limit` and FAVORITES_MAX_LIMIT.
       const limit = query.limit ? Math.min(query.limit, FAVORITES_MAX_LIMIT) : FAVORITES_MAX_LIMIT;
 
       const containerAccessRepository = await getContainerAccessRepository();
       const starredAccessRows = await containerAccessRepository.getByQuery(
-        addUserIdToQuery(containerAccessRepository.createQuery().eq('starred', true), session.user.id)
+        addWorkspaceIdToQuery(
+          addUserIdToQuery(containerAccessRepository.createQuery().eq('starred', true), session.user.id),
+          workspaceId
+        )
           .sort('starredAt', 'desc')
           .limit(limit)
       );
@@ -32,12 +41,15 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       const containersById = new Map<string, Awaited<ReturnType<typeof containerRepository.getByQuery>>[number]>();
       if (containerIds.length > 0) {
         const fetchedContainers = await containerRepository.getByQuery(
-          addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('type', 'page').in('id', containerIds)
+          addWorkspaceIdToQuery(addUserIdToQuery(containerRepository.createQuery(), session.user.id), workspaceId)
+            .eq('type', 'page')
+            .in('id', containerIds)
         );
         for (const container of fetchedContainers) {
           containersById.set(container.id, container);
         }
       }
+
 
       return starredAccessRows
         .map((row) => {

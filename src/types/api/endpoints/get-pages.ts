@@ -14,6 +14,7 @@ export const getPagesQuerySchema = z
     parentId: z.string().min(1).optional(),
     dataSourceId: z.string().min(1).optional(),
     favorited: z.coerce.boolean().optional(),
+    workspaceId: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(FAVORITES_MAX_LIMIT).optional(),
     includeValues: z.coerce.boolean().optional().default(false),
   })

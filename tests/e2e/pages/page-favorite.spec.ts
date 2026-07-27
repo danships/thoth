@@ -14,7 +14,7 @@ test.describe('page favorite toggle', () => {
   test('starring a page from the detail header flips the icon to filled and persists across reload', async ({
     page,
   }) => {
-    await page.goto(`/pages/${SEED.pages.favoriteToggle.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.favoriteToggle.id}`);
 
     const starButton = page.getByRole('button', { name: 'Star page' });
     await expect(starButton).toBeVisible();
@@ -34,7 +34,7 @@ test.describe('page favorite toggle', () => {
   });
 
   test('unstarring a page reverts the icon back to the outline state', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.favoriteToggle.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.favoriteToggle.id}`);
 
     const starButton = page.getByRole('button', { name: 'Star page' });
     await Promise.all([
@@ -58,7 +58,7 @@ test.describe('page favorite toggle', () => {
   });
 
   test('the sidebar Favorites section shows and hides the page as it is starred/unstarred', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.favoriteToggle.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.favoriteToggle.id}`);
 
     // No Favorites section yet — nothing starred.
     await expect(page.getByRole('heading', { name: 'Favorites' })).toHaveCount(0);
@@ -88,7 +88,7 @@ test.describe('page favorite toggle', () => {
   });
 
   test('the Favorites section collapses and expands via its chevron toggle', async ({ page }) => {
-    await page.goto(`/pages/${SEED.pages.favoriteToggle.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.favoriteToggle.id}`);
 
     const starButton = page.getByRole('button', { name: 'Star page' });
     await Promise.all([
@@ -124,7 +124,7 @@ test.describe('page favorite toggle', () => {
     });
     expect(response.ok()).toBe(true);
 
-    await page.goto('/pages');
+    await page.goto(`/${SEED.workspace.slug}/pages`);
 
     // The root tree is ordered by lastAccessedAt desc, and starring bumps it to "now" (well
     // after any of the seeded fixture timestamps), so it should render above the seeded root
