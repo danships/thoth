@@ -178,13 +178,21 @@ async function seedAppData() {
       containerAccessRepository.createQuery().eq('containerId', page.id).eq('userId', uid)
     );
     await (existingAccess
-      ? containerAccessRepository.update({ ...existingAccess, parentId: page.parentId, lastAccessedAt })
+      ? containerAccessRepository.update({
+          ...existingAccess,
+          parentId: page.parentId,
+          lastAccessedAt,
+          starred: false,
+          starredAt: null,
+        })
       : containerAccessRepository.create({
           userId: uid,
           containerId: page.id,
           parentId: page.parentId,
           workspaceId: page.workspaceId,
           lastAccessedAt,
+          starred: false,
+          starredAt: null,
           createdAt: lastAccessedAt,
         } as unknown as ContainerAccessCreate));
   }
@@ -541,6 +549,48 @@ async function seedAppData() {
     createdAt: now,
     lastUpdated: now,
   });
+
+  // ── Favorites test fixtures ───────────────────────────────────────────────────
+  // A dedicated root page, seeded unstarred, used to exercise starring/unstarring from the
+  // page detail header and the resulting Favorites sidebar section. Seeded with a
+  // deliberately old `lastAccessedAt` (well before the pagination fixtures below) so it
+  // doesn't shift the root-list pagination tests' expected first-page ordering.
+  await upsertPage(
+    {
+      id: SEED.pages.favoriteToggle.id,
+      name: SEED.pages.favoriteToggle.name,
+      emoji: '⭐',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: null,
+      createdAt: now,
+      lastUpdated: now,
+    },
+    { lastAccessedAt: new Date(Date.parse(now) - 1_000_000).toISOString() }
+  );
+
+  // A pool of unstarred root pages the favorites-overflow e2e spec stars/unstars on demand
+  // (via the API) to exceed FAVORITES_MAX_LIMIT and verify the "may be more" indicator,
+  // without permanently seeding starred state that would break the "no favorites" test.
+  // Seeded with deliberately old, strictly descending `lastAccessedAt` values (same rationale
+  // as `favoriteToggle` above) so this pool never shifts the root-list pagination ordering.
+  for (const [index, page] of SEED.pages.favoritesOverflowSeed.entries()) {
+    await upsertPage(
+      {
+        id: page.id,
+        name: page.name,
+        emoji: null,
+        type: 'page',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: null,
+        createdAt: now,
+        lastUpdated: now,
+      },
+      { lastAccessedAt: new Date(Date.parse(now) - 1_000_000 - index * 1000).toISOString() }
+    );
+  }
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository, getDataViewRepository } from '@/lib/database';
+import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { pageColumnRetriever } from '@/lib/database/retrievers/page-column-retriever';
@@ -37,6 +37,13 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
       );
     }
 
+    // Look up the per-user starred status for this page, same lookup pattern as
+    // `POST /pages/:id/access`. `false` if no ContainerAccess row exists yet.
+    const containerAccessRepository = await getContainerAccessRepository();
+    const containerAccess = await containerAccessRepository.getOneByQuery(
+      addUserIdToQuery(containerAccessRepository.createQuery().eq('containerId', page.id), session.user.id)
+    );
+
     const returnValue: GetPageDetailsResponse = {
       page: {
         id: page.id,
@@ -47,6 +54,7 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
         createdAt: page.createdAt,
         parentId: page.parentId || null,
       },
+      starred: containerAccess?.starred ?? false,
     };
 
     if (linkedViews.length > 0) {

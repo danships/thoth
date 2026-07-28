@@ -37,6 +37,8 @@ export const POST = apiRoute<RegisterPageAccessResponse, {}, RegisterPageAccessP
           parentId: page.parentId || null,
           workspaceId: page.workspaceId,
           lastAccessedAt,
+          starred: false,
+          starredAt: null,
           createdAt: lastAccessedAt,
         });
 

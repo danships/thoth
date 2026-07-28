@@ -12,5 +12,7 @@ export const ContainerAccess: EntityDefinition = {
     workspaceId: 'string',
     userId: 'string',
     lastAccessedAt: 'string',
+    starred: 'boolean',
+    starredAt: 'string',
   },
 };

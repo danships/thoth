@@ -1,6 +1,7 @@
 import useSWR from 'swr';
 import { GET_PAGES_ENDPOINT, type GetPagesResponse } from '@/types/api';
 import { swrFetcher } from '@/lib/swr/fetcher';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 
 export function usePagesByParent(parentId: string | null) {
   const { data, error, isLoading, mutate } = useSWR<GetPagesResponse>(
@@ -16,6 +17,20 @@ export function usePagesByParent(parentId: string | null) {
   };
 }
 
+export function usePagesByFavorited() {
+  const { id: workspaceId } = useCurrentWorkspace();
+  const { data, error, isLoading, mutate } = useSWR<GetPagesResponse>(
+    `${GET_PAGES_ENDPOINT}?favorited=true&workspaceId=${workspaceId}`,
+    swrFetcher
+  );
+
+  return {
+    data,
+    error,
+    isLoading,
+    mutate,
+  };
+}
 type UsePagesByDataSourceOptions = { includeValues?: boolean };
 const defaultOptions: UsePagesByDataSourceOptions = { includeValues: false };
 export function usePagesByDataSource(dataSourceId: string | null, options?: UsePagesByDataSourceOptions) {

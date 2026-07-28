@@ -15,6 +15,16 @@ const childOverflowChildren = Array.from({ length: CHILD_OVERFLOW_COUNT }, (_, i
   name: `E2E Overflow Child ${String(index).padStart(2, '0')}`,
 }));
 
+// A pool of root-level pages seeded unstarred, starred on-demand by the favorites-overflow
+// spec (via `PUT /pages/:id/favorite`) to exceed `FAVORITES_MAX_LIMIT` (50) and verify the
+// "may be more" indicator, then unstarred again at the end of that test so other specs (e.g.
+// the "no favorites" empty-state assertion) aren't affected by leftover starred state.
+const FAVORITES_OVERFLOW_COUNT = 55;
+const favoritesOverflowSeed = Array.from({ length: FAVORITES_OVERFLOW_COUNT }, (_, index) => ({
+  id: `e2e-page-fav-of-${String(index).padStart(2, '0')}-000-0000-000000000001`,
+  name: `E2E Favorites Overflow Page ${String(index).padStart(2, '0')}`,
+}));
+
 export const SEED = {
   user: {
     id: 'e2e-user-00000000-0000-0000-0000-000000000001',
@@ -75,6 +85,14 @@ export const SEED = {
       name: 'E2E Child Overflow Host',
       children: childOverflowChildren,
     },
+    // A dedicated, always-unstarred-by-default root page used by the star/unstar toggle spec,
+    // kept separate from `root` so toggling favorite state here never affects other specs that
+    // rely on `SEED.pages.root`'s access/ordering fixtures.
+    favoriteToggle: {
+      id: 'e2e-page-fav-tog-0-0000-0000-000000000001',
+      name: 'E2E Favorite Toggle Page',
+    },
+    favoritesOverflowSeed,
   },
   dataSource: {
     id: 'e2e-datasource-00-0000-0000-000000000001',

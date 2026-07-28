@@ -12,9 +12,13 @@ export const createWelcomePageResponseSchema = pageSchema;
 export type CreateWelcomePageResponse = z.infer<typeof createWelcomePageResponseSchema>;
 export type CreateWelcomePageResponseData = DataWrapper<CreateWelcomePageResponse>;
 
-// There's no existing entity to derive the workspace from, so `workspaceId` is a required,
-// explicit parameter here.
-export const createWelcomePageBodySchema = z.object({
-  workspaceId: z.string().min(1),
-});
+// `workspaceId` is optional: when omitted, the handler falls back to the caller's default
+// workspace (see `resolveDefaultWorkspaceId`) for backwards compatibility. The body itself may
+// also be entirely absent (no request body sent), which is why the schema must accept an
+// `undefined` object too.
+export const createWelcomePageBodySchema = z
+  .object({
+    workspaceId: z.string().min(1).optional(),
+  })
+  .optional();
 export type CreateWelcomePageBody = z.infer<typeof createWelcomePageBodySchema>;

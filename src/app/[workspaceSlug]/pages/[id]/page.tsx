@@ -1,6 +1,19 @@
 'use client';
 
-import { Alert, Box, Button, Container, Group, Loader, Modal, Stack, Tabs, Text, Title } from '@mantine/core';
+import {
+  Alert,
+  ActionIcon,
+  Box,
+  Button,
+  Container,
+  Group,
+  Loader,
+  Modal,
+  Stack,
+  Tabs,
+  Text,
+  Title,
+} from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
@@ -17,8 +30,10 @@ import { useSetPageBlocks } from '@/lib/hooks/api/use-set-page-blocks';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { usePageBreadcrumbs } from '@/lib/hooks/api/use-page-breadcrumbs';
 import { useRegisterPageAccess } from '@/lib/hooks/api/use-register-page-access';
+import { useToggleFavorite } from '@/lib/hooks/api/use-toggle-page-favorite';
 import { PageBreadcrumb } from '@/components/molecules/page-breadcrumb';
 import { PageCoverEditor } from '@/components/molecules/page-cover-editor';
+import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import styles from './page.module.css';
 
 export default function PageDetailsPage() {
@@ -40,6 +55,7 @@ export default function PageDetailsPage() {
   const { updatePage } = useUpdatePage({ mutatePageDetails: mutate });
   const { setPageBlocks } = useSetPageBlocks({ mutatePageDetails: mutate });
   const { registerAccess } = useRegisterPageAccess();
+  const { toggleFavorite, inProgress: isTogglingFavorite } = useToggleFavorite({ mutatePageDetails: mutate });
 
   // Explicitly register that this page was opened, once per navigation (guarded on `pageId`
   // alone so it doesn't re-fire on every re-render). Kept fully separate from `usePageDetails`
@@ -130,6 +146,18 @@ export default function PageDetailsPage() {
     }
   }, []);
 
+  const handleToggleFavorite = useCallback(async () => {
+    if (!pageDetails || !pageId) {
+      return;
+    }
+
+    try {
+      await toggleFavorite(pageId, !pageDetails.starred);
+    } catch {
+      showError('Failed to update favorite status');
+    }
+  }, [pageDetails, pageId, toggleFavorite, showError]);
+
   if (isLoading) {
     return (
       <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
@@ -175,6 +203,19 @@ export default function PageDetailsPage() {
             >
               {pageDetails?.page.name ?? <Loader />}
             </Title>
+            <ActionIcon
+              variant="subtle"
+              size="lg"
+              disabled={isTogglingFavorite}
+              onClick={handleToggleFavorite}
+              aria-label={pageDetails.starred ? 'Unstar page' : 'Star page'}
+            >
+              {pageDetails.starred ? (
+                <IconStarFilled size={20} color="var(--mantine-color-yellow-6)" />
+              ) : (
+                <IconStar size={20} />
+              )}
+            </ActionIcon>
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (
             <PageFieldsEditor

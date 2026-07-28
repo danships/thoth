@@ -13,6 +13,7 @@ export const getPageDetailsResponseSchema = z.object({
   values: pageContainerSchema.shape.values.optional(),
   views: z.array(dataViewSchema).optional(),
   columns: z.array(columnSchema).optional(),
+  starred: z.boolean(),
 });
 
 export type GetPageDetailsResponse = z.infer<typeof getPageDetailsResponseSchema>;

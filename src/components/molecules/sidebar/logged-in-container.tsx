@@ -1,5 +1,6 @@
 'use client';
 import { PagesTree } from '../pages-tree';
+import { FavoritesSection } from './favorites-section';
 import { usePagesTree } from '@/lib/hooks/api/use-pages-tree';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { ActionIcon, Anchor, Box, Group, Loader, Text, Title } from '@mantine/core';
@@ -38,6 +39,7 @@ export function LoggedInContainer() {
 
   return (
     <Box>
+      <FavoritesSection />
       <Group justify="space-between" mb="sm">
         <Title order={3}>Pages</Title>
         <ActionIcon
