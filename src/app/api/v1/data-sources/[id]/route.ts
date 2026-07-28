@@ -1,6 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import type {
   GetDataSourceResponse,
   GetDataSourceParameters,
@@ -20,6 +21,7 @@ export const GET = apiRoute<GetDataSourceResponse, undefined, GetDataSourceParam
   },
   async ({ params }, session) => {
     const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, dataSource);
 
     return {
       id: dataSource.id,
@@ -45,6 +47,7 @@ export const PATCH = apiRoute<UpdateDataSourceResponse, undefined, UpdateDataSou
 
     // Verify the data source exists and belongs to the user
     const existingDataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, existingDataSource);
 
     // Update the data source with provided fields
     const filteredBody = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));

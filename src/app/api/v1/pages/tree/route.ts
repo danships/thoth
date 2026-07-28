@@ -3,6 +3,7 @@ import { getContainerAccessRepository, getContainerRepository, getDataViewReposi
 import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { ContainerAccess } from '@/types/database';
@@ -192,6 +193,11 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
         hasMore,
       };
     }
+
+    // Filter out-of-scope containers for bearer-token (App-key) callers — a no-op for
+    // session-cookie callers. Applied after both branches above so a scoped key can never
+    // enumerate out-of-scope page titles via the tree endpoint (root list or child expansion).
+    containers = await filterContainersByGrantForSession(session, containers);
 
     // Separate containers that have views from those that don't
     const containersWithViews = containers.filter(

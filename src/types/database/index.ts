@@ -5,6 +5,9 @@ import { workspaceSchema as workspaceSchemaEntity } from '../schemas/entities/wo
 import { workspaceMemberSchema } from '../schemas/entities/workspace-member';
 import { workspaceSlugRedirectSchema } from '../schemas/entities/workspace-slug-redirect';
 import { dataViewSchema } from '../schemas/entities/data-view';
+import { appSchema } from '../schemas/entities/app';
+import { apiKeySchema, apiKeyPublicSchema } from '../schemas/entities/api-key';
+import { appScopedContainerSchema } from '../schemas/entities/app-scoped-container';
 
 /** Container Entity Schema */
 export { pageContainerSchema, dataSourceContainerSchema } from '../schemas/entities/container';
@@ -69,3 +72,32 @@ export const workspaceSlugRedirectCreateSchema = workspaceSlugRedirectSchema.omi
 export type WorkspaceSlugRedirect = z.infer<typeof workspaceSlugRedirectSchema>;
 export type WorkspaceSlugRedirectCreate = z.infer<typeof workspaceSlugRedirectCreateSchema>;
 /** End WorkspaceSlugRedirect Entity Schema */
+
+/** App Entity Schema */
+export { appSchema, appAttributionModeSchema, appPermissionSchema, appScopeTypeSchema } from '../schemas/entities/app';
+export type { AppAttributionMode, AppPermission, AppScopeType } from '../schemas/entities/app';
+
+export const appCreateSchema = appSchema.omit({ id: true });
+
+export type App = z.infer<typeof appSchema>;
+export type AppCreate = z.infer<typeof appCreateSchema>;
+/** End App Entity Schema */
+
+/** ApiKey Entity Schema */
+export { apiKeySchema, apiKeyPublicSchema } from '../schemas/entities/api-key';
+
+export const apiKeyCreateSchema = apiKeySchema.omit({ id: true });
+
+export type ApiKey = z.infer<typeof apiKeySchema>;
+export type ApiKeyCreate = z.infer<typeof apiKeyCreateSchema>;
+export type ApiKeyPublic = z.infer<typeof apiKeyPublicSchema>;
+/** End ApiKey Entity Schema */
+
+/** AppScopedContainer Entity Schema */
+export { appScopedContainerSchema } from '../schemas/entities/app-scoped-container';
+
+export const appScopedContainerCreateSchema = appScopedContainerSchema.omit({ id: true });
+
+export type AppScopedContainer = z.infer<typeof appScopedContainerSchema>;
+export type AppScopedContainerCreate = z.infer<typeof appScopedContainerCreateSchema>;
+/** End AppScopedContainer Entity Schema */

@@ -2,6 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getDataViewRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { dataViewRetriever } from '@/lib/database/retrievers/data-view-retriever';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import type {
   GetDataViewResponse,
   GetDataViewParameters,
@@ -16,6 +17,7 @@ export const GET = apiRoute<GetDataViewResponse, undefined, GetDataViewParameter
   },
   async ({ params }, session) => {
     const dataView = await dataViewRetriever.retrieveDataView(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, dataView);
 
     return {
       id: dataView.id,
@@ -37,6 +39,7 @@ export const PATCH = apiRoute<UpdateDataViewResponse, undefined, UpdateDataViewP
 
     // Verify the data view exists and belongs to the user
     const existingDataView = await dataViewRetriever.retrieveDataView(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, existingDataView);
 
     // If dataSourceId is being updated, verify the new data source exists and belongs to user
     if (body.dataSourceId && body.dataSourceId !== existingDataView.dataSourceId) {

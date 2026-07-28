@@ -8,6 +8,13 @@ import type {
   GetWorkspaceSlugAvailabilityResponse,
   UpdateWorkspaceBody,
   WorkspaceApi,
+  CreateAppBody,
+  UpdateAppBody,
+  AppResponse,
+  AppDetailResponse,
+  GetAppsResponse,
+  CreateApiKeyBody,
+  CreateApiKeyResponse,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -81,6 +88,18 @@ export const api = {
       apiClient.get<DataWrapper<GetWorkspaceSlugAvailabilityResponse>>('/workspaces/slug-availability', {
         params: { slug, excludeWorkspaceId },
       }),
+  },
+
+  // Apps API
+  apps: {
+    list: (workspaceId: string) => apiClient.get<DataWrapper<GetAppsResponse>>('/apps', { params: { workspaceId } }),
+    getDetails: (id: string) => apiClient.get<DataWrapper<AppDetailResponse>>(`/apps/${id}`),
+    create: (data: CreateAppBody) => apiClient.post<DataWrapper<AppResponse>>('/apps', data),
+    update: (id: string, data: UpdateAppBody) => apiClient.patch<DataWrapper<AppResponse>>(`/apps/${id}`, data),
+    archive: (id: string) => apiClient.delete(`/apps/${id}`),
+    createKey: (appId: string, data: CreateApiKeyBody) =>
+      apiClient.post<DataWrapper<CreateApiKeyResponse>>(`/apps/${appId}/keys`, data),
+    revokeKey: (appId: string, keyId: string) => apiClient.delete(`/apps/${appId}/keys/${keyId}`),
   },
 };
 

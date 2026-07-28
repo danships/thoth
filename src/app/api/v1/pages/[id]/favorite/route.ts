@@ -2,6 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerAccessRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import type { PutPageFavoriteBody, PutPageFavoriteParameters, PutPageFavoriteResponse } from '@/types/api';
 import { putPageFavoriteBodySchema, putPageFavoriteParametersSchema } from '@/types/api';
 
@@ -16,6 +17,7 @@ export const PUT = apiRoute<PutPageFavoriteResponse, {}, PutPageFavoriteParamete
     // Ensures the page exists and is visible to the current user before any ContainerAccess
     // row is written or updated — a user can never star/unstar a page they don't own.
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, page);
 
     const containerAccessRepository = await getContainerAccessRepository();
     const existing = await containerAccessRepository.getOneByQuery(
