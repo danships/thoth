@@ -53,4 +53,42 @@ test.describe('Apps settings UI', () => {
 
     await expect(archivedRow.getByText('Archived')).toBeVisible({ timeout: 10_000 });
   });
+
+  test('can mint a key with an expiration date, shown afterwards in the keys table', async ({ page }) => {
+    await page.goto(`/${SEED.workspace.slug}/settings/apps`);
+    await page.waitForLoadState('networkidle');
+
+    const label = `E2E Expiry UI App ${Date.now()}`;
+
+    await page.getByRole('button', { name: 'New App' }).click();
+    await page.getByLabel('Label').fill(label);
+    await page.getByRole('button', { name: 'Create App' }).click();
+
+    const row = page.getByRole('row', { name: new RegExp(label) });
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await row.getByRole('button', { name: 'Manage keys' }).click();
+    await expect(page.getByRole('heading', { name: label })).toBeVisible();
+
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    const expiresAtValue = nextYear.toISOString().slice(0, 16);
+
+    await page.getByLabel('New key label').fill('e2e-expiring-key');
+    await page.getByLabel('Expires at').fill(expiresAtValue);
+
+    const [createKeyResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/keys') && response.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Create key' }).click(),
+    ]);
+    const createKeyBody = await createKeyResponse.json();
+    expect(createKeyBody.data.expiresAt).not.toBeNull();
+
+    await expect(page.getByText('Copy this key now')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Done' }).click();
+
+    const keyRow = page.getByRole('row', { name: /e2e-expiring-key/ });
+    await expect(keyRow).toBeVisible();
+    const expectedExpiresLabel = nextYear.toLocaleDateString();
+    await expect(keyRow.getByRole('cell', { name: expectedExpiresLabel })).toBeVisible();
+  });
 });

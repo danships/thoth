@@ -3,6 +3,7 @@
 import { ActionIcon, Badge, Button, Group, Table, Text, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { IconArchive, IconEdit, IconKey } from '@tabler/icons-react';
+import { getAppScopeLabel } from '@/lib/format/app-scope-label';
 import type { AppResponse } from '@/types/api';
 
 type AppsTableProperties = {
@@ -56,7 +57,7 @@ export function AppsTable({ apps, onManage, onEdit, onArchive }: AppsTableProper
                 {app.permission}
               </Badge>
             </Table.Td>
-            <Table.Td>{app.scopeType}</Table.Td>
+            <Table.Td>{getAppScopeLabel(app.scopeType)}</Table.Td>
             <Table.Td>{app.keyCount}</Table.Td>
             <Table.Td>
               {app.archivedAt ? (

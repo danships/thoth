@@ -21,6 +21,7 @@ import { useState } from 'react';
 import { useApp } from '@/lib/hooks/api/use-app';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
+import { getAppScopeLabel } from '@/lib/format/app-scope-label';
 import { ApiKeyCreatedModal } from './api-key-created-modal';
 import type { CreateApiKeyBody, CreateApiKeyResponse } from '@/types/api';
 
@@ -40,6 +41,9 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
 
   const form = useForm({
     initialValues: { label: '', expiresAt: '' },
+    validate: {
+      expiresAt: (value) => (value && new Date(value).getTime() <= Date.now() ? 'Must be in the future' : null),
+    },
   });
 
   const handleMintKey = async (values: typeof form.values) => {
@@ -96,7 +100,7 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
           <Stack gap="lg">
             <Group gap="xs">
               <Badge color={app.permission === 'read_write' ? 'blue' : 'gray'}>{app.permission}</Badge>
-              <Badge variant="light">{app.scopeType}</Badge>
+              <Badge variant="light">{getAppScopeLabel(app.scopeType)}</Badge>
               <Badge variant="light">Created by {app.createdByDisplayName}</Badge>
               {app.archivedAt && <Badge color="red">Archived</Badge>}
             </Group>
@@ -169,6 +173,12 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
               <form onSubmit={form.onSubmit(handleMintKey)}>
                 <Group align="flex-end" gap="sm">
                   <TextInput label="New key label" placeholder="prod" {...form.getInputProps('label')} />
+                  <TextInput
+                    label="Expires at"
+                    description="Leave empty for a key that never expires"
+                    type="datetime-local"
+                    {...form.getInputProps('expiresAt')}
+                  />
                   <Button type="submit">Create key</Button>
                 </Group>
               </form>

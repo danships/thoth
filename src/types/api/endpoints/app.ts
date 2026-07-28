@@ -24,19 +24,17 @@ export type AppResponseData = DataWrapper<AppResponse>;
 /** POST /apps */
 export const CREATE_APP_ENDPOINT = '/apps';
 
-export const createAppBodySchema = z
-  .object({
-    workspaceId: z.string().min(1),
-    label: z.string().min(1).max(100),
-    permission: appSchema.shape.permission,
-    scopeType: appSchema.shape.scopeType,
-    containerIds: z.array(z.string().min(1)).optional(),
-    attributionMode: appSchema.shape.attributionMode,
-  })
-  .refine((data) => data.scopeType === 'workspace' || (data.containerIds && data.containerIds.length > 0), {
-    message: 'containerIds is required and must be non-empty when scopeType is not "workspace"',
-    path: ['containerIds'],
-  });
+export const createAppBodySchema = z.object({
+  workspaceId: z.string().min(1),
+  label: z.string().min(1).max(100),
+  permission: appSchema.shape.permission,
+  scopeType: appSchema.shape.scopeType,
+  // No longer required to be non-empty for non-workspace scopes: a page can be granted access
+  // later from its own "Apps" menu (see `POST /pages/:id/apps`), so an App can legitimately be
+  // created with an empty container scope and populated afterwards.
+  containerIds: z.array(z.string().min(1)).optional(),
+  attributionMode: appSchema.shape.attributionMode,
+});
 export type CreateAppBody = z.infer<typeof createAppBodySchema>;
 
 export const createAppResponseSchema = appResponseSchema;

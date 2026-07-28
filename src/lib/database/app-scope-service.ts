@@ -4,11 +4,12 @@ import { BadRequestError } from '@/lib/errors/bad-request-error';
 /**
  * Guards against a `containerId` spanning a different workspace than the App being
  * created/updated, or referencing a container that doesn't exist — every scoped container
- * must belong to the App's own `workspaceId`.
+ * must belong to the App's own `workspaceId`. An empty `containerIds` array is valid: pages
+ * can be granted access later, individually, from the page detail screen's "Apps" menu.
  */
 export async function assertContainerIdsBelongToWorkspace(containerIds: string[], workspaceId: string): Promise<void> {
   if (containerIds.length === 0) {
-    throw new BadRequestError('containerIds must be non-empty when scopeType is not "workspace"');
+    return;
   }
 
   const containerRepository = await getContainerRepository();
@@ -68,5 +69,43 @@ export async function deleteScopedContainerReferences(containerId: string): Prom
   );
   for (const row of existing) {
     await appScopedContainerRepository.deleteUsingId(row.id);
+  }
+}
+
+/**
+ * Adds a single `AppScopedContainer` row connecting `appId` to `containerId`, unless one
+ * already exists — used by `POST /pages/:id/apps` so a page can be individually granted to a
+ * `containers`/`containers_with_children`-scoped App without disturbing any of the App's other
+ * scoped containers (unlike `replaceScopedContainers`, which is a full delete-then-recreate).
+ */
+export async function addScopedContainer(appId: string, containerId: string): Promise<void> {
+  const appScopedContainerRepository = await getAppScopedContainerRepository();
+  const existing = await appScopedContainerRepository.getOneByQuery(
+    appScopedContainerRepository.createQuery().eq('appId', appId).eq('containerId', containerId)
+  );
+
+  if (existing) {
+    return;
+  }
+
+  await appScopedContainerRepository.create({
+    appId,
+    containerId,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Removes the single `AppScopedContainer` row connecting `appId` to `containerId`, if any —
+ * the inverse of `addScopedContainer`, used by `DELETE /pages/:id/apps/:appId`.
+ */
+export async function removeScopedContainer(appId: string, containerId: string): Promise<void> {
+  const appScopedContainerRepository = await getAppScopedContainerRepository();
+  const existing = await appScopedContainerRepository.getOneByQuery(
+    appScopedContainerRepository.createQuery().eq('appId', appId).eq('containerId', containerId)
+  );
+
+  if (existing) {
+    await appScopedContainerRepository.deleteUsingId(existing.id);
   }
 }

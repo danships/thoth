@@ -15,6 +15,8 @@ import type {
   GetAppsResponse,
   CreateApiKeyBody,
   CreateApiKeyResponse,
+  GetPageAppsResponse,
+  ConnectPageAppResponse,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -73,6 +75,11 @@ export const api = {
     registerAccess: (id: string) => apiClient.post(`/pages/${id}/access`),
 
     setFavorite: (id: string, starred: boolean) => apiClient.put(`/pages/${id}/favorite`, { starred }),
+
+    listApps: (id: string) => apiClient.get<DataWrapper<GetPageAppsResponse>>(`/pages/${id}/apps`),
+    connectApp: (id: string, appId: string) =>
+      apiClient.post<DataWrapper<ConnectPageAppResponse>>(`/pages/${id}/apps`, { appId }),
+    disconnectApp: (id: string, appId: string) => apiClient.delete(`/pages/${id}/apps/${appId}`),
   },
 
   // Workspaces API

@@ -72,17 +72,22 @@ test.describe('apps management API', () => {
     expect(detail.archivedAt).not.toBeNull();
   });
 
-  test('requires containerIds when scopeType is not "workspace"', async ({ request }) => {
+  test('allows creating an App scoped to specific containers with an empty scope (pages are attached later, from the page itself)', async ({
+    request,
+  }) => {
     const response = await request.post('/api/v1/apps', {
       data: {
         workspaceId: SEED.workspace.id,
-        label: 'E2E Missing Scope App',
+        label: 'E2E Empty Scope App',
         permission: 'read',
         scopeType: 'containers',
         attributionMode: 'creator',
       },
     });
-    expect(response.status()).toBe(400);
+    expect(response.ok()).toBeTruthy();
+    const created = await getData<AppApi & { containers?: { id: string }[] }>(response);
+    expect(created.scopeType).toBe('containers');
+    expect(created.containers ?? []).toHaveLength(0);
   });
 
   test('can scope an App to specific containers', async ({ request }) => {

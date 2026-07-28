@@ -34,6 +34,7 @@ import { useToggleFavorite } from '@/lib/hooks/api/use-toggle-page-favorite';
 import { PageBreadcrumb } from '@/components/molecules/page-breadcrumb';
 import { PageCoverEditor } from '@/components/molecules/page-cover-editor';
 import { PageEmojiPicker } from '@/components/molecules/page-emoji-picker';
+import { PageAppsMenu } from '@/components/organisms/page-apps-menu';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import styles from './page.module.css';
 
@@ -217,6 +218,9 @@ export default function PageDetailsPage() {
                 <IconStar size={20} />
               )}
             </ActionIcon>
+          </Group>
+          <Group justify="flex-end">
+            <PageAppsMenu pageId={pageId} />
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (
             <PageFieldsEditor
