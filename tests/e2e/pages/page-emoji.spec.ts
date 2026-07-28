@@ -5,13 +5,15 @@ test.describe('page emoji', () => {
   test.beforeEach(async ({ page }) => {
     // The seeded root page ships with a default emoji (📄), so start every test from a known
     // "no emoji" baseline regardless of the seed's default or leftover state from other specs.
-    await page.request.patch(`/api/v1/pages/${SEED.pages.root.id}`, { data: { emoji: null } });
+    const response = await page.request.patch(`/api/v1/pages/${SEED.pages.root.id}`, { data: { emoji: null } });
+    expect(response.ok()).toBe(true);
   });
 
   test.afterEach(async ({ page }) => {
-    // Best-effort cleanup: reset the seeded root page back to "no emoji" so other specs that
-    // load `SEED.pages.root` aren't affected by leftover state from this suite.
-    await page.request.patch(`/api/v1/pages/${SEED.pages.root.id}`, { data: { emoji: null } }).catch(() => {});
+    // Restore the seeded root page emoji (📄) so other specs that load `SEED.pages.root`
+    // aren't affected by leftover state from this suite.
+    const response = await page.request.patch(`/api/v1/pages/${SEED.pages.root.id}`, { data: { emoji: '📄' } });
+    expect(response.ok()).toBe(true);
   });
 
   test('shows an "add emoji" affordance when none set', async ({ page }) => {
