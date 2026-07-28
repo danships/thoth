@@ -2,7 +2,7 @@
 
 import { Alert, Button, Group, Modal, Select, Stack, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { DataSourceScopePicker } from './data-source-scope-picker';
 import type { AppResponse, CreateAppBody, UpdateAppBody } from '@/types/api';
@@ -19,12 +19,15 @@ type AppFormModalProperties = {
 // Key minting/rotation is handled separately in the App detail view — this modal only ever
 // touches `App` fields, never a key's secret. Page scoping is handled separately, from the
 // page detail screen's "Apps" menu, so `containerIds` here only ever carries data-source ids.
+function getInitialDataSourceIds(app: AppResponse | undefined): string[] {
+  return (
+    app?.containers?.filter((container) => container.type === 'data-source').map((container) => container.id) ?? []
+  );
+}
+
 export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: AppFormModalProperties) {
   const { post, patch, inProgress, error } = useCudApi();
   const isEditing = Boolean(app);
-  const [dataSourceIds, setDataSourceIds] = useState<string[]>(
-    app?.containers?.filter((container) => container.type === 'data-source').map((container) => container.id) ?? []
-  );
 
   const form = useForm({
     initialValues: {
@@ -32,11 +35,28 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
       permission: app?.permission ?? 'read',
       scopeType: app?.scopeType ?? 'workspace',
       attributionMode: app?.attributionMode ?? 'creator',
+      dataSourceIds: getInitialDataSourceIds(app),
     },
     validate: {
       label: (value) => (value.trim().length === 0 ? 'Label is required' : null),
     },
   });
+
+  // `useForm`'s `initialValues` are only applied on mount, so when this modal is reused to edit
+  // different Apps (or switch between "new" and an existing App) we need to explicitly
+  // re-populate the form whenever it's opened, mirroring the pattern in `ColumnFormModal`.
+  useEffect(() => {
+    if (opened) {
+      form.setValues({
+        label: app?.label ?? '',
+        permission: app?.permission ?? 'read',
+        scopeType: app?.scopeType ?? 'workspace',
+        attributionMode: app?.attributionMode ?? 'creator',
+        dataSourceIds: getInitialDataSourceIds(app),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, app]);
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
@@ -46,7 +66,7 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
           permission: values.permission,
           scopeType: values.scopeType,
           attributionMode: values.attributionMode,
-          ...(values.scopeType !== 'workspace' && { containerIds: dataSourceIds }),
+          ...(values.scopeType !== 'workspace' && { containerIds: values.dataSourceIds }),
         };
         const updated = await patch<AppResponse, UpdateAppBody>(`/apps/${app.id}`, body);
         onSaved(updated);
@@ -57,7 +77,7 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
           permission: values.permission,
           scopeType: values.scopeType,
           attributionMode: values.attributionMode,
-          ...(values.scopeType !== 'workspace' && { containerIds: dataSourceIds }),
+          ...(values.scopeType !== 'workspace' && { containerIds: values.dataSourceIds }),
         };
         const created = await post<AppResponse, CreateAppBody>('/apps', body);
         onSaved(created);
@@ -108,7 +128,10 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
           />
 
           {form.values.scopeType !== 'workspace' && (
-            <DataSourceScopePicker value={dataSourceIds} onChange={setDataSourceIds} />
+            <DataSourceScopePicker
+              value={form.values.dataSourceIds}
+              onChange={(ids) => form.setFieldValue('dataSourceIds', ids)}
+            />
           )}
 
           <Select

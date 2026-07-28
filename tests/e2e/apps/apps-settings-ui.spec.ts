@@ -91,4 +91,32 @@ test.describe('Apps settings UI', () => {
     const expectedExpiresLabel = nextYear.toLocaleDateString();
     await expect(keyRow.getByRole('cell', { name: expectedExpiresLabel })).toBeVisible();
   });
+
+  test('editing an App pre-fills the form with its existing details', async ({ page }) => {
+    await page.goto(`/${SEED.workspace.slug}/settings/apps`);
+    await page.waitForLoadState('networkidle');
+
+    const label = `E2E Edit UI App ${Date.now()}`;
+
+    await page.getByRole('button', { name: 'New App' }).click();
+    await page.getByLabel('Label').fill(label);
+    await page.getByRole('combobox', { name: 'Permission' }).click();
+    await page.getByRole('option', { name: 'Read & write' }).click();
+    await page.getByRole('button', { name: 'Create App' }).click();
+
+    const row = page.getByRole('row', { name: new RegExp(label) });
+    await expect(row).toBeVisible({ timeout: 10_000 });
+
+    await row.getByRole('button', { name: 'Edit App' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Edit App' })).toBeVisible();
+    await expect(page.getByLabel('Label')).toHaveValue(label);
+    await expect(page.getByRole('combobox', { name: 'Permission' })).toHaveValue('Read & write');
+
+    const updatedLabel = `${label} - updated`;
+    await page.getByLabel('Label').fill(updatedLabel);
+    await page.getByRole('button', { name: 'Save changes' }).click();
+
+    await expect(page.getByRole('row', { name: new RegExp(updatedLabel) })).toBeVisible({ timeout: 10_000 });
+  });
 });

@@ -132,18 +132,20 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
     if (body.parentId) {
       // Derive the workspace from the parent entity rather than trusting a client-supplied
       // `workspaceId` — fetch the parent by id, authorize against its own `workspaceId`, and
-      // stamp the new child with the same one.
-      const parentPage = await containerRepository.getOneByQuery(
-        containerRepository.createQuery().eq('id', body.parentId).eq('type', 'page')
+      // stamp the new child with the same one. The parent can be either another page (nested
+      // pages) or a data source (rows added inline from a data view's table), so we can't
+      // filter the lookup down to `type: 'page'` alone.
+      const parentContainer = await containerRepository.getOneByQuery(
+        containerRepository.createQuery().eq('id', body.parentId)
       );
 
-      if (!parentPage || parentPage.type !== 'page') {
+      if (!parentContainer || (parentContainer.type !== 'page' && parentContainer.type !== 'data-source')) {
         throw new NotFoundError('Parent page not found or access denied');
       }
 
-      await assertWorkspaceAccess(session.user.id, parentPage.workspaceId);
+      await assertWorkspaceAccess(session.user.id, parentContainer.workspaceId);
 
-      workspaceId = parentPage.workspaceId;
+      workspaceId = parentContainer.workspaceId;
       parentId = body.parentId;
     } else {
       // Root-level page: no existing entity to derive the workspace from.
