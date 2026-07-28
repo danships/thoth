@@ -22,3 +22,17 @@ test('can create a child page via /pages/[parentId]/create', async ({ page }) =>
   await page.waitForURL(/\/pages\/(?!create)/);
   await expect(page.getByRole('heading', { name: 'My New Child Page' })).toBeVisible();
 });
+
+test('can create a page with an emoji set', async ({ page }) => {
+  await page.goto(`/${SEED.workspace.slug}/pages/create`);
+  await page.getByRole('button', { name: /set page emoji/i }).click();
+  await page.getByLabel('Search emojis').fill('rocket');
+  await page.getByRole('button', { name: 'rocket' }).click();
+
+  await page.getByLabel('Page Name').fill('My Page With Emoji');
+  await page.getByRole('button', { name: 'Create Page' }).click();
+  await page.waitForURL(/\/pages\/(?!create)/);
+
+  await expect(page.getByRole('heading', { name: 'My Page With Emoji' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /change page emoji/i })).toContainText('🚀');
+});
