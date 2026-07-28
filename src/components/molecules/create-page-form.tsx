@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { CreatePageBody, CreatePageResponse } from '@/types/api';
+import { PageEmojiPicker } from '@/components/molecules/page-emoji-picker';
 
 type CreatePageFormProperties = {
   parentId?: string | null;
@@ -20,6 +21,7 @@ export function CreatePageForm({ parentId = null, title = 'Create New Page' }: C
   const form = useForm({
     initialValues: {
       name: '',
+      emoji: null as string | null,
     },
     validate: {
       name: (value) => (value.length === 0 ? 'Page name is required' : null),
@@ -29,7 +31,7 @@ export function CreatePageForm({ parentId = null, title = 'Create New Page' }: C
   const handleSubmit = async (values: typeof form.values) => {
     const page = await post<CreatePageResponse, CreatePageBody>('/pages', {
       name: values.name,
-      emoji: null,
+      emoji: values.emoji,
       parentId: parentId,
       // Only meaningful for root-level pages (the API derives the workspace from the parent
       // when `parentId` is set) — but always passing the *current* workspace here (rather than
@@ -54,7 +56,20 @@ export function CreatePageForm({ parentId = null, title = 'Create New Page' }: C
 
         <form noValidate onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
-            <TextInput label="Page Name" placeholder="Enter page name" {...form.getInputProps('name')} required />
+            <Group align="flex-end" gap="xs">
+              <PageEmojiPicker
+                emoji={form.values.emoji}
+                value={form.values.emoji}
+                onSelect={(next) => form.setFieldValue('emoji', next)}
+              />
+              <TextInput
+                label="Page Name"
+                placeholder="Enter page name"
+                {...form.getInputProps('name')}
+                required
+                style={{ flex: 1 }}
+              />
+            </Group>
 
             <Group>
               <Button type="submit" loading={inProgress}>

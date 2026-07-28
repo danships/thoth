@@ -33,6 +33,7 @@ import { useRegisterPageAccess } from '@/lib/hooks/api/use-register-page-access'
 import { useToggleFavorite } from '@/lib/hooks/api/use-toggle-page-favorite';
 import { PageBreadcrumb } from '@/components/molecules/page-breadcrumb';
 import { PageCoverEditor } from '@/components/molecules/page-cover-editor';
+import { PageEmojiPicker } from '@/components/molecules/page-emoji-picker';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import styles from './page.module.css';
 
@@ -191,7 +192,7 @@ export default function PageDetailsPage() {
           {!isLoadingBreadcrumbs && breadcrumbs && breadcrumbs.length > 1 && <PageBreadcrumb pages={breadcrumbs} />}
           <PageCoverEditor pageId={pageId} cover={pageDetails.page.cover} updatePage={updatePage} />
           <Group gap="sm">
-            <Text size="xl">{pageDetails?.page.emoji}</Text>
+            <PageEmojiPicker pageId={pageId} emoji={pageDetails.page.emoji} updatePage={updatePage} />
             <Title
               ref={titleReference}
               order={1}

@@ -1,0 +1,31 @@
+.trigger {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.emoji {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+  width: 260px;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 1.1rem;
+  border-radius: var(--mantine-radius-sm);
+}
+
+.cell:hover,
+.cell:focus-visible {
+  background-color: var(--mantine-color-gray-1);
+}
