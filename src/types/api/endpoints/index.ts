@@ -21,6 +21,7 @@ export * from './delete-data-source-column';
 export * from './update-page-values';
 export * from './update-page';
 export * from './set-page-content';
+export * from './mutate-page-content';
 export * from './register-page-access';
 export * from './get-workspaces';
 export * from './get-deleted-workspaces';

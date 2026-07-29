@@ -17,6 +17,7 @@ import type {
   CreateApiKeyResponse,
   GetPageAppsResponse,
   ConnectPageAppResponse,
+  MutatePageContentResponse,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -80,6 +81,11 @@ export const api = {
     connectApp: (id: string, appId: string) =>
       apiClient.post<DataWrapper<ConnectPageAppResponse>>(`/pages/${id}/apps`, { appId }),
     disconnectApp: (id: string, appId: string) => apiClient.delete(`/pages/${id}/apps/${appId}`),
+
+    appendContent: (id: string, content: string) =>
+      apiClient.post<DataWrapper<MutatePageContentResponse>>(`/pages/${id}/append`, { content }),
+    prependContent: (id: string, content: string) =>
+      apiClient.post<DataWrapper<MutatePageContentResponse>>(`/pages/${id}/prepend`, { content }),
   },
 
   // Workspaces API
