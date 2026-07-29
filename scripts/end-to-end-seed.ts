@@ -221,6 +221,9 @@ async function seedAppData() {
       workspaceId: wsId,
       parentId: null,
       createdAt: now,
+      // Seeded markdown body: verifies markdown -> BlockNote hydration renders a heading on
+      // the Contents tab (see `tests/e2e/pages/page-detail.spec.ts`).
+      content: `# ${SEED.pages.root.contentHeading}`,
       // `/pages` redirects to the most-recently-updated root page. This must stay strictly
       // later than `pages.dataSourceHost.lastUpdated` (both are root pages, `parentId: null`)
       // so the redirect target is deterministic across test runs/DB engines instead of relying

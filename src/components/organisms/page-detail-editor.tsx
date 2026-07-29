@@ -1,39 +1,75 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
 import '@blocknote/core/fonts/inter.css';
 import { useColorScheme, useDebouncedCallback } from '@mantine/hooks';
-import { Block, BlockNoteEditor } from '@blocknote/core';
+import { BlockNoteEditor } from '@blocknote/core';
 import styles from './page-detail-editor.module.css';
 
 type PageDetailEditorProperties = {
-  initialContent: Block[];
-  onUpdate?: (blocks: Block[]) => void;
+  initialContent: string;
+  onUpdate?: (markdown: string) => void;
 };
 
 export function PageDetailEditor({ initialContent, onUpdate }: PageDetailEditorProperties) {
-  const onChange = useDebouncedCallback(
+  // Guards against the programmatic hydration below (replaceBlocks) being mistaken for a user
+  // edit: BlockNote's onChange fires synchronously for that mutation too, and without this we'd
+  // debounce-persist the seeded content right back to the server with no user input involved.
+  const isSeedingReference = useRef(false);
+
+  const debouncedUpdate = useDebouncedCallback(
     useCallback(
       (editor: BlockNoteEditor) => {
         if (!onUpdate) {
           return;
         }
-        onUpdate(editor.document);
+        onUpdate(editor.blocksToMarkdownLossy());
       },
       [onUpdate]
     ),
     { delay: 1500, flushOnUnmount: true }
   );
 
-  // @ts-expect-error We except the issue, BlockNote editor gives an error if we provide it with an empty array
+  const onChange = useCallback(
+    (editor: BlockNoteEditor) => {
+      if (isSeedingReference.current) {
+        return;
+      }
+      debouncedUpdate(editor);
+    },
+    [debouncedUpdate]
+  );
+
   const editor = useCreateBlockNote({
     domAttributes: { editor: { class: 'thothBlockNoteEditor' } }, // the class sets the background color
-    // It doesn't accept an empty array, so set to undefined.
-    initialContent: initialContent.length === 0 ? undefined : initialContent,
   });
+
+  // Seed the editor from the persisted markdown once on mount. Guarded so it doesn't clobber
+  // user edits on subsequent re-renders (e.g. after the SWR cache updates post-save). Callers
+  // should key the component by page id so a new editor instance is created per page.
+  useEffect(() => {
+    if (!initialContent) {
+      return;
+    }
+
+    isSeedingReference.current = true;
+    try {
+      const blocks = editor.tryParseMarkdownToBlocks(initialContent);
+      if (blocks.length === 0) {
+        return;
+      }
+      editor.replaceBlocks(editor.document, blocks);
+    } catch (error) {
+      console.error('Failed to parse page content markdown', error);
+    } finally {
+      isSeedingReference.current = false;
+    }
+    // Seed only on mount / when the source page's markdown identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
   const colorScheme = useColorScheme();
 

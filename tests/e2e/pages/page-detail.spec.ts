@@ -18,9 +18,10 @@ test('shows Add View button', async ({ page }) => {
 
 test('can inline-edit the page title', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
-  // Use a name-agnostic locator: the title's accessible name changes as soon as we start
-  // typing, so a locator filtered by the original name would stop matching mid-interaction.
-  const heading = page.getByRole('heading', { level: 1 });
+  // Use a name-agnostic, role-agnostic locator scoped to the editable title element itself:
+  // the page body (BlockNote) can also render `h1`s from markdown content, so a plain
+  // `getByRole('heading', { level: 1 })` is no longer guaranteed to be unique.
+  const heading = page.locator('h1[contenteditable="true"]');
   await heading.click();
   await heading.press('ControlOrMeta+A');
   await heading.pressSequentially('Renamed E2E Page');
@@ -51,6 +52,65 @@ test('block editor is visible on the Contents tab', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await page.getByRole('tab', { name: 'Contents' }).click();
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible({ timeout: 10_000 });
+});
+
+test('seeded markdown renders as rich content', async ({ page }) => {
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
+  await page.getByRole('tab', { name: 'Contents' }).click();
+  await expect(page.locator('.bn-editor h1', { hasText: SEED.pages.root.contentHeading })).toBeVisible({
+    timeout: 10_000,
+  });
+});
+
+test('opening seeded content does not trigger a content save', async ({ page }) => {
+  let contentPostSeen = false;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes(`/pages/${SEED.pages.root.id}/content`)) {
+      contentPostSeen = true;
+    }
+  });
+
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
+  await page.getByRole('tab', { name: 'Contents' }).click();
+  await expect(page.locator('.bn-editor h1', { hasText: SEED.pages.root.contentHeading })).toBeVisible({
+    timeout: 10_000,
+  });
+
+  // Give the debounced save (1500ms) a chance to fire if the seeding hydration were
+  // (incorrectly) treated as a user edit.
+  await page.waitForTimeout(2000);
+  expect(contentPostSeen).toBe(false);
+});
+
+test('edit round-trips after reload', async ({ page }) => {
+  const uniqueText = `E2E Round Trip ${Date.now()}`;
+
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.child.id}`);
+  await page.getByRole('tab', { name: 'Contents' }).click();
+
+  const editable = page.locator('.bn-editor[contenteditable="true"]');
+  await expect(editable).toBeVisible({ timeout: 10_000 });
+  await editable.click();
+  await editable.press('ControlOrMeta+End');
+  await page.keyboard.press('Enter');
+
+  // Wait for the debounced (1500ms) content POST to resolve, started concurrently with
+  // typing so the response can't resolve and be missed before we start listening for it.
+  const [contentResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes(`/pages/${SEED.pages.child.id}/content`) &&
+        response.ok(),
+      { timeout: 15_000 }
+    ),
+    page.keyboard.type(uniqueText),
+  ]);
+  expect(contentResponse.ok()).toBe(true);
+
+  await page.reload();
+  await page.getByRole('tab', { name: 'Contents' }).click();
+  await expect(page.getByText(uniqueText)).toBeVisible({ timeout: 10_000 });
 });
 
 test('child page shows breadcrumb trail back to parent', async ({ page }) => {

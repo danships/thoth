@@ -55,6 +55,9 @@ export const SEED = {
     root: {
       id: 'e2e-page-root-0000-0000-0000-000000000001',
       name: 'E2E Root Page',
+      // Known markdown seeded onto this page's body, used to verify markdown -> BlockNote
+      // block hydration renders a heading element on the Contents tab.
+      contentHeading: 'E2E Content Heading',
     },
     child: {
       id: 'e2e-page-child-000-0000-0000-000000000001',
