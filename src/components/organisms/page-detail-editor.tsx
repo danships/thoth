@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/mantine/style.css';
@@ -15,7 +15,12 @@ type PageDetailEditorProperties = {
 };
 
 export function PageDetailEditor({ initialContent, onUpdate }: PageDetailEditorProperties) {
-  const onChange = useDebouncedCallback(
+  // Guards against the programmatic hydration below (replaceBlocks) being mistaken for a user
+  // edit: BlockNote's onChange fires synchronously for that mutation too, and without this we'd
+  // debounce-persist the seeded content right back to the server with no user input involved.
+  const isSeedingReference = useRef(false);
+
+  const debouncedUpdate = useDebouncedCallback(
     useCallback(
       (editor: BlockNoteEditor) => {
         if (!onUpdate) {
@@ -26,6 +31,16 @@ export function PageDetailEditor({ initialContent, onUpdate }: PageDetailEditorP
       [onUpdate]
     ),
     { delay: 1500, flushOnUnmount: true }
+  );
+
+  const onChange = useCallback(
+    (editor: BlockNoteEditor) => {
+      if (isSeedingReference.current) {
+        return;
+      }
+      debouncedUpdate(editor);
+    },
+    [debouncedUpdate]
   );
 
   const editor = useCreateBlockNote({
@@ -40,6 +55,7 @@ export function PageDetailEditor({ initialContent, onUpdate }: PageDetailEditorP
       return;
     }
 
+    isSeedingReference.current = true;
     try {
       const blocks = editor.tryParseMarkdownToBlocks(initialContent);
       if (blocks.length === 0) {
@@ -48,6 +64,8 @@ export function PageDetailEditor({ initialContent, onUpdate }: PageDetailEditorP
       editor.replaceBlocks(editor.document, blocks);
     } catch (error) {
       console.error('Failed to parse page content markdown', error);
+    } finally {
+      isSeedingReference.current = false;
     }
     // Seed only on mount / when the source page's markdown identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps

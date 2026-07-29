@@ -62,6 +62,26 @@ test('seeded markdown renders as rich content', async ({ page }) => {
   });
 });
 
+test('opening seeded content does not trigger a content save', async ({ page }) => {
+  let contentPostSeen = false;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes(`/pages/${SEED.pages.root.id}/content`)) {
+      contentPostSeen = true;
+    }
+  });
+
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
+  await page.getByRole('tab', { name: 'Contents' }).click();
+  await expect(page.locator('.bn-editor h1', { hasText: SEED.pages.root.contentHeading })).toBeVisible({
+    timeout: 10_000,
+  });
+
+  // Give the debounced save (1500ms) a chance to fire if the seeding hydration were
+  // (incorrectly) treated as a user edit.
+  await page.waitForTimeout(2000);
+  expect(contentPostSeen).toBe(false);
+});
+
 test('edit round-trips after reload', async ({ page }) => {
   const uniqueText = `E2E Round Trip ${Date.now()}`;
 
@@ -78,7 +98,10 @@ test('edit round-trips after reload', async ({ page }) => {
   // typing so the response can't resolve and be missed before we start listening for it.
   const [contentResponse] = await Promise.all([
     page.waitForResponse(
-      (response) => response.url().includes(`/pages/${SEED.pages.child.id}/content`) && response.ok(),
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes(`/pages/${SEED.pages.child.id}/content`) &&
+        response.ok(),
       { timeout: 15_000 }
     ),
     page.keyboard.type(uniqueText),
