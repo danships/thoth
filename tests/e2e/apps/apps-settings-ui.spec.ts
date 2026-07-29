@@ -34,7 +34,8 @@ test.describe('Apps settings UI', () => {
     const row = page.getByRole('row', { name: new RegExp(label) });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    await row.getByRole('button', { name: 'Manage keys' }).click();
+    await row.click();
+    await expect(page).toHaveURL(/\/settings\/apps\/[^/]+$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: label })).toBeVisible();
 
     await page.getByLabel('New key label').fill('e2e-key');
@@ -45,7 +46,8 @@ test.describe('Apps settings UI', () => {
     await expect(secretInput).toHaveValue(/^thk_/);
 
     await page.getByRole('button', { name: 'Done' }).click();
-    await page.getByRole('button', { name: 'Close' }).last().click();
+    await page.getByRole('link', { name: /Back to Apps/ }).click();
+    await expect(page).toHaveURL(`/${SEED.workspace.slug}/settings/apps`, { timeout: 15_000 });
 
     const archivedRow = page.getByRole('row', { name: new RegExp(label) });
     await archivedRow.getByRole('button', { name: 'Archive App' }).click();
@@ -66,7 +68,8 @@ test.describe('Apps settings UI', () => {
 
     const row = page.getByRole('row', { name: new RegExp(label) });
     await expect(row).toBeVisible({ timeout: 10_000 });
-    await row.getByRole('button', { name: 'Manage keys' }).click();
+    await row.click();
+    await expect(page).toHaveURL(/\/settings\/apps\/[^/]+$/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: label })).toBeVisible();
 
     const nextYear = new Date();

@@ -2,11 +2,12 @@
 
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Button,
+  Container,
   Group,
   Loader,
-  Modal,
   Stack,
   Switch,
   Table,
@@ -17,17 +18,20 @@ import {
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { IconArrowLeft, IconEdit, IconTrash } from '@tabler/icons-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { useApp } from '@/lib/hooks/api/use-app';
 import { useAppWebhooks, useWebhookDeliveries } from '@/lib/hooks/api/use-app-webhooks';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { getAppScopeLabel } from '@/lib/format/app-scope-label';
-import { ApiKeyCreatedModal } from './api-key-created-modal';
-import { WebhookSecretModal } from './webhook-secret-modal';
-import { WebhookDeliveriesTable } from './webhook-deliveries-table';
-import { WebhookPayloadDocumentation } from './webhook-payload-documentation';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { ApiKeyCreatedModal } from '@/components/organisms/api-key-created-modal';
+import { WebhookSecretModal } from '@/components/organisms/webhook-secret-modal';
+import { WebhookDeliveriesTable } from '@/components/organisms/webhook-deliveries-table';
+import { WebhookPayloadDocumentation } from '@/components/organisms/webhook-payload-documentation';
 import type {
   CreateApiKeyBody,
   CreateApiKeyResponse,
@@ -38,15 +42,15 @@ import type {
   WebhookResponse,
 } from '@/types/api';
 
-type AppDetailModalProperties = {
-  appId: string | undefined;
-  onClose: () => void;
-};
-
 // The "manage keys" surface for a single App — shows its resolved scope, the owner label
-// (`createdByDisplayName`, resolved via `resolveOwnerDisplay` on the server), and a table of
-// keys with mint/revoke actions. Rotation is just "mint a new one, then revoke the old one".
-export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
+// (`createdByDisplayName`, resolved via `resolveOwnerDisplay` on the server), a table of keys
+// with mint/revoke actions, and its webhooks. Rotation is just "mint a new one, then revoke the
+// old one". Reachable by clicking an App's row on the Apps settings list.
+export default function AppDetailPage() {
+  const parameters = useParams();
+  const appId = `${parameters['appId']}`;
+  const { slug: workspaceSlug } = useCurrentWorkspace();
+
   const { data: app, isLoading, mutate } = useApp(appId);
   const { data: webhooksData, isLoading: isLoadingWebhooks, mutate: mutateWebhooks } = useAppWebhooks(appId);
   const { post, patch, delete: remove } = useCudApi();
@@ -206,24 +210,34 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
   };
 
   return (
-    <>
-      <Modal
-        opened={Boolean(appId)}
-        onClose={onClose}
-        title={app ? app.label : 'App'}
-        size="lg"
-        centered
-        closeButtonProps={{ 'aria-label': 'Close' }}
-      >
+    <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
+      <Stack gap="lg">
+        <Anchor component={Link} href={`/${workspaceSlug}/settings/apps`} size="sm">
+          <Group gap={4}>
+            <IconArrowLeft size={14} />
+            Back to Apps
+          </Group>
+        </Anchor>
+
         {isLoading && <Loader />}
+
+        {!isLoading && !app && (
+          <Text c="dimmed" size="sm">
+            App not found.
+          </Text>
+        )}
+
         {app && (
-          <Stack gap="lg">
-            <Group gap="xs">
-              <Badge color={app.permission === 'read_write' ? 'blue' : 'gray'}>{app.permission}</Badge>
-              <Badge variant="light">{getAppScopeLabel(app.scopeType)}</Badge>
-              <Badge variant="light">Created by {app.createdByDisplayName}</Badge>
-              {app.archivedAt && <Badge color="red">Archived</Badge>}
-            </Group>
+          <>
+            <div>
+              <Title order={2}>{app.label}</Title>
+              <Group gap="xs" mt="xs">
+                <Badge color={app.permission === 'read_write' ? 'blue' : 'gray'}>{app.permission}</Badge>
+                <Badge variant="light">{getAppScopeLabel(app.scopeType)}</Badge>
+                <Badge variant="light">Created by {app.createdByDisplayName}</Badge>
+                {app.archivedAt && <Badge color="red">Archived</Badge>}
+              </Group>
+            </div>
 
             <div>
               <Title order={5} mb="xs">
@@ -442,9 +456,9 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
                 />
               </div>
             )}
-          </Stack>
+          </>
         )}
-      </Modal>
+      </Stack>
 
       <ApiKeyCreatedModal
         opened={Boolean(createdSecret)}
@@ -457,6 +471,6 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
         secret={createdWebhookSecret}
         onClose={() => setCreatedWebhookSecret(undefined)}
       />
-    </>
+    </Container>
   );
 }

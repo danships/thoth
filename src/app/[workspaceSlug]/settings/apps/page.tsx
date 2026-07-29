@@ -3,7 +3,6 @@
 import { Button, Group, Stack, Text, Title } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
-import { AppDetailModal } from '@/components/organisms/app-detail-modal';
 import { AppFormModal } from '@/components/organisms/app-form-modal';
 import { AppsTable } from '@/components/organisms/apps-table';
 import { useApps } from '@/lib/hooks/api/use-apps';
@@ -19,7 +18,6 @@ export default function AppsSettingsPage() {
   const { showSuccess, showError } = useNotification();
 
   const [formApp, setFormApp] = useState<AppResponse | 'new' | undefined>(undefined);
-  const [manageAppId, setManageAppId] = useState<string | undefined>(undefined);
 
   const handleSaved = () => {
     setFormApp(undefined);
@@ -50,14 +48,7 @@ export default function AppsSettingsPage() {
         </Button>
       </Group>
 
-      {!isLoading && (
-        <AppsTable
-          apps={data?.apps ?? []}
-          onManage={(app) => setManageAppId(app.id)}
-          onEdit={(app) => setFormApp(app)}
-          onArchive={handleArchive}
-        />
-      )}
+      {!isLoading && <AppsTable apps={data?.apps ?? []} onEdit={(app) => setFormApp(app)} onArchive={handleArchive} />}
 
       <AppFormModal
         opened={Boolean(formApp)}
@@ -66,8 +57,6 @@ export default function AppsSettingsPage() {
         onClose={() => setFormApp(undefined)}
         onSaved={handleSaved}
       />
-
-      <AppDetailModal appId={manageAppId} onClose={() => setManageAppId(undefined)} />
     </Stack>
   );
 }
