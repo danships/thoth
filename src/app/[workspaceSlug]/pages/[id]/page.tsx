@@ -19,14 +19,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
 import { PageDetailEditor } from '@/components/organisms/page-detail-editor';
 import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
-import { Block } from '@blocknote/core';
 import { IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
 import { DataViewRender } from '@/components/organisms/data-view-render';
 import { GetDataViewsResponse } from '@/types/api';
 import { useSearchParams } from 'next/navigation';
 import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
-import { useSetPageBlocks } from '@/lib/hooks/api/use-set-page-blocks';
+import { useSetPageContent } from '@/lib/hooks/api/use-set-page-content';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { usePageBreadcrumbs } from '@/lib/hooks/api/use-page-breadcrumbs';
 import { useRegisterPageAccess } from '@/lib/hooks/api/use-register-page-access';
@@ -55,7 +54,7 @@ export default function PageDetailsPage() {
 
   const { showError } = useNotification();
   const { updatePage } = useUpdatePage({ mutatePageDetails: mutate });
-  const { setPageBlocks } = useSetPageBlocks({ mutatePageDetails: mutate });
+  const { setPageContent } = useSetPageContent({ mutatePageDetails: mutate });
   const { registerAccess } = useRegisterPageAccess();
   const { toggleFavorite, inProgress: isTogglingFavorite } = useToggleFavorite({ mutatePageDetails: mutate });
 
@@ -84,19 +83,19 @@ export default function PageDetailsPage() {
     }
   }, [pageDetails?.page.name]);
 
-  const updateBlocks = useCallback(
-    async (blocks: Block[]) => {
+  const updateContent = useCallback(
+    async (content: string) => {
       if (!pageId) {
         return;
       }
 
       try {
-        await setPageBlocks(pageId, blocks);
+        await setPageContent(pageId, content);
       } catch {
         showError('Failed to update page content');
       }
     },
-    [pageId, setPageBlocks, showError]
+    [pageId, setPageContent, showError]
   );
 
   const doViewCreated = useCallback(
@@ -261,7 +260,7 @@ export default function PageDetailsPage() {
                 </Button>
               </Group>
               <Tabs.Panel value="contents" className={styles['tabsPanel'] ?? ''}>
-                <PageDetailEditor initialContent={pageDetails.blocks ?? []} onUpdate={updateBlocks} />
+                <PageDetailEditor key={pageId} initialContent={pageDetails.content ?? ''} onUpdate={updateContent} />
               </Tabs.Panel>
 
               {pageDetails.views?.map((view) => (

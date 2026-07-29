@@ -5,7 +5,7 @@ import { swrFetcher } from '@/lib/swr/fetcher';
 export const usePageDetails = (pageId: string | null) =>
   useSWR<GetPageDetailsResponse>(
     pageId
-      ? `${GET_PAGE_DETAILS_ENDPOINT.replace(':id', pageId)}?includeBlocks=true&includeValues=true&includeColumns=true`
+      ? `${GET_PAGE_DETAILS_ENDPOINT.replace(':id', pageId)}?includeContent=true&includeValues=true&includeColumns=true`
       : null,
     swrFetcher
   );

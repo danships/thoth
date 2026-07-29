@@ -1,21 +1,20 @@
 import { useCallback } from 'react';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
-import { SET_PAGE_BLOCKS, type GetPageDetailsResponse, type SetPageBlocksBody } from '@/types/api';
-import { Block } from '@blocknote/core';
+import { SET_PAGE_CONTENT, type GetPageDetailsResponse, type SetPageContentBody } from '@/types/api';
 
-type UseSetPageBlocksOptions = {
+type UseSetPageContentOptions = {
   mutatePageDetails: (
     updateFunction?: (previous: GetPageDetailsResponse | undefined) => GetPageDetailsResponse | undefined,
     options?: { revalidate: boolean }
   ) => void;
 };
 
-export function useSetPageBlocks({ mutatePageDetails }: UseSetPageBlocksOptions) {
+export function useSetPageContent({ mutatePageDetails }: UseSetPageContentOptions) {
   const { post, inProgress } = useCudApi();
 
-  const setPageBlocks = useCallback(
-    async (pageId: string, blocks: Block[]) => {
-      await post<unknown, SetPageBlocksBody>(SET_PAGE_BLOCKS.replace(':pageId', pageId), { blocks });
+  const setPageContent = useCallback(
+    async (pageId: string, content: string) => {
+      await post<unknown, SetPageContentBody>(SET_PAGE_CONTENT.replace(':id', pageId), { content });
       mutatePageDetails(
         (previous) => {
           if (!previous) {
@@ -23,7 +22,7 @@ export function useSetPageBlocks({ mutatePageDetails }: UseSetPageBlocksOptions)
           }
           return {
             ...previous,
-            blocks,
+            content,
           };
         },
         { revalidate: false }
@@ -33,7 +32,7 @@ export function useSetPageBlocks({ mutatePageDetails }: UseSetPageBlocksOptions)
   );
 
   return {
-    setPageBlocks,
+    setPageContent,
     inProgress,
   };
 }

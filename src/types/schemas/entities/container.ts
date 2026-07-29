@@ -6,7 +6,6 @@ import {
   withUserIdSchema,
   withWorkspaceIdSchema,
 } from '../utilities';
-import { blockSchema } from '../blocks';
 
 export const stringValueSchema = z.object({ type: z.literal('string'), value: z.string() });
 export const numberValueSchema = z.object({ type: z.literal('number'), value: z.number() });
@@ -116,8 +115,7 @@ export const pageContainerSchema = containerSchema
     type: z.literal('page'),
     emoji: z.string().min(1).nullable(),
     cover: pageCoverSchema.nullable().optional(),
-    // TODO generate/get block validation schemas for blocks
-    blocks: z.array(blockSchema).optional(),
+    content: z.string().max(1_000_000).optional(),
     views: z.array(z.string()).optional(),
     values: z.record(z.string(), pageValueSchema).optional(),
   })

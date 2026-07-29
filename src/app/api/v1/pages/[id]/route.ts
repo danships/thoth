@@ -63,8 +63,8 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
       returnValue.views = linkedViews;
     }
 
-    if (query.includeBlocks) {
-      returnValue.blocks = page.blocks ?? [];
+    if (query.includeContent) {
+      returnValue.content = page.content ?? '';
     }
     if (query.includeValues) {
       returnValue.values = page.values ?? {};

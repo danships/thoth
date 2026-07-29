@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { getContainerRepository, getWorkspaceMemberRepository, getWorkspaceRepository } from './index';
 import { registerContainerAccessForNewPage } from './container-access-service';
 import { generateUniqueWorkspaceSlug, reserveWorkspaceSlug } from './workspace-slug';
@@ -16,51 +15,23 @@ type CreateWorkspaceOptions = {
 };
 
 /**
- * Builds the BlockNote `PartialBlock[]` content for a newly created workspace's Welcome page,
- * explaining the workspace concept and interpolating the actual name/slug.
+ * Builds the markdown content for a newly created workspace's Welcome page, explaining the
+ * workspace concept and interpolating the actual name/slug. Parsed into BlockNote blocks by
+ * the editor on load.
  */
-function buildWelcomeBlocks(name: string, slug: string) {
+function buildWelcomeMarkdown(name: string, slug: string): string {
   return [
-    {
-      type: 'heading',
-      props: { level: 1 },
-      content: '👋 About this workspace',
-    },
-    {
-      type: 'paragraph',
-      content:
-        'Workspaces keep your pages, data sources, and views organized into separate, isolated spaces. ' +
-        'Create as many as you like — for different projects, teams, or parts of your life — and switch ' +
-        'between them anytime using the workspace switcher in the sidebar.',
-    },
-    {
-      type: 'paragraph',
-      content: [
-        { type: 'text', text: 'This workspace is called ', styles: {} },
-        { type: 'text', text: name, styles: { bold: true } },
-        { type: 'text', text: ' and lives at ', styles: {} },
-        { type: 'text', text: `/${slug}`, styles: { bold: true } },
-        {
-          type: 'text',
-          text: '. You can rename it, or change its URL slug, anytime from Workspace Settings — none of your pages or data will be affected.',
-          styles: {},
-        },
-      ],
-    },
-    {
-      type: 'bulletListItem',
-      content: 'Rename this workspace or its URL from Settings',
-    },
-    {
-      type: 'bulletListItem',
-      content: 'Create a new workspace from the switcher at any time',
-    },
-    {
-      type: 'bulletListItem',
-      content:
-        'Deleted workspaces are kept for 30 days before being permanently removed, so you can always restore one you delete by mistake.',
-    },
-  ];
+    '# 👋 About this workspace',
+    'Workspaces keep your pages, data sources, and views organized into separate, isolated spaces. ' +
+      'Create as many as you like — for different projects, teams, or parts of your life — and switch ' +
+      'between them anytime using the workspace switcher in the sidebar.',
+    `This workspace is called **${name}** and lives at **/${slug}**. You can rename it, or change its URL slug, ` +
+      'anytime from Workspace Settings — none of your pages or data will be affected.',
+    '- Rename this workspace or its URL from Settings\n' +
+      '- Create a new workspace from the switcher at any time\n' +
+      '- Deleted workspaces are kept for 30 days before being permanently removed, so you can always restore ' +
+      'one you delete by mistake.',
+  ].join('\n\n');
 }
 
 /**
@@ -111,11 +82,8 @@ export async function createWorkspaceForUser(
       workspaceId: workspace.id,
       emoji: '👋',
       parentId: null,
-      blocks: buildWelcomeBlocks(workspace.name, workspace.slug),
+      content: buildWelcomeMarkdown(workspace.name, workspace.slug),
     };
-    // BlockNote block ids are generated client-side normally; stamp a stable id server-side too
-    // so the seeded content round-trips through the editor without complaint.
-    pageData.blocks = pageData.blocks?.map((block: Record<string, unknown>) => ({ id: randomUUID(), ...block }));
 
     const createdPage = await containerRepository.create(pageData);
     await registerContainerAccessForNewPage(createdPage, userId);
