@@ -4,6 +4,7 @@ import { syncAppWorkspaceMembership } from '@/lib/database/app-service';
 import { resolveOwnerDisplay } from '@/lib/database/owner-display-service';
 import { hydrateAppResponse } from '@/lib/database/app-response';
 import { appRetriever } from '@/lib/database/retrievers/app-retriever';
+import { deleteWebhooksForApp } from '@/lib/database/webhook-service';
 import {
   assertContainerIdsBelongToWorkspace,
   clearScopedContainers,
@@ -107,6 +108,10 @@ export const DELETE = apiRoute<void, undefined, AppParameters, {}>(
     // Archiving always removes the `role: 'app'` workspace-membership row (if any) — an
     // archived App can no longer attribute new content, so it shouldn't retain membership.
     await syncAppWorkspaceMembership(archivedApp);
+
+    // Cascade-delete every webhook (+ delivery history) owned by the App — an archived App can
+    // no longer receive notifications, and its webhooks/secrets shouldn't linger.
+    await deleteWebhooksForApp(existingApp.id);
   }
 );
 

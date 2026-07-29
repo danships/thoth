@@ -1,6 +1,7 @@
 import { getContainerRepository } from '@/lib/database';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import type { ApiKeySession } from '@/lib/auth/session';
 import type { MutatePageContentResponse } from '@/types/api';
 
@@ -49,6 +50,8 @@ export async function mutatePageContent(
     content,
     lastUpdated: new Date().toISOString(),
   });
+
+  scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
 
   return {
     content: 'content' in updatedPage ? (updatedPage.content ?? '') : '',

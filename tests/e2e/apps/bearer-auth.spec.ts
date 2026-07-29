@@ -146,6 +146,41 @@ test.describe('bearer-token API authentication', () => {
     }
   });
 
+  // THOTH-031: `/apps/:id/webhooks*` is `disallowApiKey: true`, matching every other `/apps*`
+  // route -- an App's own key must never be usable to manage its webhooks (closes the same
+  // privilege-escalation loop as `/apps/:id/keys*`).
+  test('a valid App key is rejected (401) on the webhooks management routes', async ({ request }) => {
+    const appResponse = await request.post('/api/v1/apps', {
+      data: {
+        workspaceId: SEED.workspace.id,
+        label: 'E2E Webhook-Auth App',
+        permission: 'read_write',
+        scopeType: 'workspace',
+        attributionMode: 'creator',
+      },
+    });
+    const app = await getData<{ id: string }>(appResponse);
+    const keyResponse = await request.post(`/api/v1/apps/${app.id}/keys`, { data: {} });
+    const key = await getData<{ secret: string }>(keyResponse);
+    const authorizationHeader = ['Bearer', key.secret].join(' ');
+
+    const bearerContext = await playwrightRequest.newContext({ baseURL: BASE_URL, storageState: { cookies: [], origins: [] } });
+    try {
+      const listResponse = await bearerContext.get(`/api/v1/apps/${app.id}/webhooks`, {
+        headers: { Authorization: authorizationHeader },
+      });
+      expect(listResponse.status()).toBe(401);
+
+      const createResponse = await bearerContext.post(`/api/v1/apps/${app.id}/webhooks`, {
+        headers: { Authorization: authorizationHeader },
+        data: { label: 'Should be rejected', url: 'https://192.0.2.1/hook' },
+      });
+      expect(createResponse.status()).toBe(401);
+    } finally {
+      await bearerContext.dispose();
+    }
+  });
+
   test('an App with attributionMode "app" attributes created content to the App, not the creator', async ({
     request,
   }) => {

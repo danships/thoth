@@ -8,6 +8,8 @@ import { dataViewSchema } from '../schemas/entities/data-view';
 import { appSchema } from '../schemas/entities/app';
 import { apiKeySchema, apiKeyPublicSchema } from '../schemas/entities/api-key';
 import { appScopedContainerSchema } from '../schemas/entities/app-scoped-container';
+import { webhookSchema } from '../schemas/entities/webhook';
+import { webhookDeliverySchema } from '../schemas/entities/webhook-delivery';
 
 /** Container Entity Schema */
 export { pageContainerSchema, dataSourceContainerSchema } from '../schemas/entities/container';
@@ -101,3 +103,33 @@ export const appScopedContainerCreateSchema = appScopedContainerSchema.omit({ id
 export type AppScopedContainer = z.infer<typeof appScopedContainerSchema>;
 export type AppScopedContainerCreate = z.infer<typeof appScopedContainerCreateSchema>;
 /** End AppScopedContainer Entity Schema */
+
+/** Webhook Entity Schema */
+export { webhookSchema, webhookPublicSchema, webhookUrlSchema } from '../schemas/entities/webhook';
+
+export const webhookCreateSchema = webhookSchema.omit({ id: true });
+
+export type Webhook = z.infer<typeof webhookSchema>;
+export type WebhookCreate = z.infer<typeof webhookCreateSchema>;
+/** End Webhook Entity Schema */
+
+/** WebhookDelivery Entity Schema */
+export {
+  webhookDeliverySchema,
+  webhookPayloadSchema,
+  webhookDeliveryEventSchema,
+  webhookDeliveryStatusSchema,
+  webhookRawValueSchema,
+} from '../schemas/entities/webhook-delivery';
+export type {
+  WebhookPayload,
+  WebhookDeliveryEvent,
+  WebhookDeliveryStatus,
+  WebhookRawValue,
+} from '../schemas/entities/webhook-delivery';
+
+export const webhookDeliveryCreateSchema = webhookDeliverySchema.omit({ id: true });
+
+export type WebhookDelivery = z.infer<typeof webhookDeliverySchema>;
+export type WebhookDeliveryCreate = z.infer<typeof webhookDeliveryCreateSchema>;
+/** End WebhookDelivery Entity Schema */
