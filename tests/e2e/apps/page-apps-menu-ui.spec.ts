@@ -25,7 +25,8 @@ test.describe('page detail Apps menu', () => {
     await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.child.id}`);
     await page.waitForLoadState('networkidle');
 
-    await page.getByRole('button', { name: 'Apps for this page' }).click();
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    await page.getByRole('menuitem', { name: 'App connections' }).hover();
     await expect(page.getByText('Connect an app')).toBeVisible();
 
     const connectItem = page.getByRole('menuitem', { name: new RegExp(label) });
