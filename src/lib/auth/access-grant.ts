@@ -62,7 +62,7 @@ export async function assertGrantAllowsContainer(
 
 /**
  * Non-throwing predicate version of `assertGrantAllowsContainer` — used by
- * `src/lib/webhooks/notify-service.ts`'s resolver, which needs to test many (grant, container)
+ * `src/lib/webhooks/resolve-webhooks.ts`'s resolver, which needs to test many (grant, container)
  * pairs and simply keep/discard rather than catch an exception per pair. `assertGrantAllowsContainer`
  * throws ⇔ this returns `false`; kept in perfect parity by having the throwing wrapper delegate here.
  */

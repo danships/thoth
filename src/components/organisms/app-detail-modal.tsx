@@ -27,6 +27,7 @@ import { getAppScopeLabel } from '@/lib/format/app-scope-label';
 import { ApiKeyCreatedModal } from './api-key-created-modal';
 import { WebhookSecretModal } from './webhook-secret-modal';
 import { WebhookDeliveriesTable } from './webhook-deliveries-table';
+import { WebhookPayloadDocumentation } from './webhook-payload-documentation';
 import type {
   CreateApiKeyBody,
   CreateApiKeyResponse,
@@ -307,7 +308,8 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
               <Title order={5} mb="xs">
                 Webhooks
               </Title>
-              <Table>
+              <WebhookPayloadDocumentation />
+              <Table mt="sm">
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Label</Table.Th>

@@ -1,6 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { appRetriever } from '@/lib/database/retrievers/app-retriever';
-import { resendDelivery } from '@/lib/webhooks/notify-service';
+import { resendDelivery } from '@/lib/webhooks/resend-delivery';
 import { ConflictError } from '@/lib/errors/conflict-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { ResendWebhookDeliveryParameters, ResendWebhookDeliveryResponse } from '@/types/api';

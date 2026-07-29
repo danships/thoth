@@ -8,7 +8,7 @@ import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
 import type { PageValue } from '@/types/schemas/entities/container';
-import type { ValueChangeInput } from '@/lib/webhooks/notify-service';
+import type { ValueChangeInput } from '@/lib/webhooks/build-payload';
 import { z } from 'zod';
 
 const bodySchema = z.record(z.string(), pageValueSchema);
