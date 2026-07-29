@@ -115,7 +115,11 @@ test('edit round-trips after reload', async ({ page }) => {
 
 test('child page shows breadcrumb trail back to parent', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.child.id}`);
-  await expect(page.getByText(SEED.pages.root.name)).toBeVisible();
+  // Root also appears in the sidebar's Recent/Pages tree sections (per THOTH-035), so scope
+  // this assertion to the breadcrumb to avoid a strict-mode violation.
+  const breadcrumb = page.getByLabel('Breadcrumb', { exact: true });
+  await expect(breadcrumb).toBeVisible();
+  await expect(breadcrumb.getByText(SEED.pages.root.name)).toBeVisible();
 });
 
 test('page nested under a data source row shows breadcrumb back through the hosting page', async ({ page }) => {

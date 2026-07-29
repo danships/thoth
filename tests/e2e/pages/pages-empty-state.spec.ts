@@ -93,6 +93,11 @@ test('shows empty-state CTA for a workspace with zero pages, and recreating the 
   await expect(page.getByText('No pages yet')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Recreate Welcome page' })).toBeVisible();
 
+  // Recent (per THOTH-035) is never hidden, even for an empty workspace with zero access rows —
+  // it renders its heading and a muted placeholder instead of disappearing.
+  await expect(page.getByTestId('recent-tree')).toBeVisible();
+  await expect(page.getByTestId('recent-tree').getByText('No recent pages')).toBeVisible();
+
   const cookies = await page.context().cookies();
   const cookieHeader = cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
 

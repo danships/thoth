@@ -31,6 +31,21 @@ export function usePagesByFavorited() {
     mutate,
   };
 }
+export function usePagesByRecent() {
+  const { id: workspaceId } = useCurrentWorkspace();
+  const { data, error, isLoading, mutate } = useSWR<GetPagesResponse>(
+    `${GET_PAGES_ENDPOINT}?recent=true&workspaceId=${workspaceId}`,
+    swrFetcher
+  );
+
+  return {
+    data,
+    error,
+    isLoading,
+    mutate,
+  };
+}
+
 type UsePagesByDataSourceOptions = { includeValues?: boolean };
 const defaultOptions: UsePagesByDataSourceOptions = { includeValues: false };
 export function usePagesByDataSource(dataSourceId: string | null, options?: UsePagesByDataSourceOptions) {

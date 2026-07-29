@@ -8,7 +8,7 @@ import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
-import { createPageBodySchema, getPagesQuerySchema, FAVORITES_MAX_LIMIT } from '@/types/api';
+import { createPageBodySchema, getPagesQuerySchema, FAVORITES_MAX_LIMIT, RECENT_MAX_LIMIT } from '@/types/api';
 
 export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
   {
@@ -70,6 +70,64 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
               lastUpdated: container.lastUpdated,
             },
             ...(row.starredAt && { starredAt: row.starredAt }),
+          };
+          if (query.includeValues) {
+            returnValue.values = container.values;
+          }
+          return returnValue;
+        })
+        .filter((entry): entry is GetPagesResponse[number] => entry !== undefined);
+    }
+
+    if (query.recent) {
+      // Root-list parity: scope Recent to a single workspace (defaulting to the caller's
+      // default workspace for backwards compatibility), mirroring the `favorited` branch above.
+      const workspaceId = query.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
+      await assertWorkspaceAccess(session.user.id, workspaceId);
+
+      // Bounded sidebar list, always capped at RECENT_MAX_LIMIT regardless of the caller's
+      // `limit` (which may be as high as FAVORITES_MAX_LIMIT for the shared query schema).
+      const limit = Math.min(query.limit ?? RECENT_MAX_LIMIT, RECENT_MAX_LIMIT);
+
+      const containerAccessRepository = await getContainerAccessRepository();
+      const recentAccessRows = await containerAccessRepository.getByQuery(
+        addWorkspaceIdToQuery(addUserIdToQuery(containerAccessRepository.createQuery(), session.user.id), workspaceId)
+          .sort('lastAccessedAt', 'desc')
+          .limit(limit)
+      );
+
+      const containerIds = recentAccessRows.map((row) => row.containerId);
+      const containersById = new Map<string, Awaited<ReturnType<typeof containerRepository.getByQuery>>[number]>();
+      if (containerIds.length > 0) {
+        const fetchedContainers = await containerRepository.getByQuery(
+          addWorkspaceIdToQuery(addUserIdToQuery(containerRepository.createQuery(), session.user.id), workspaceId)
+            .eq('type', 'page')
+            .in('id', containerIds)
+        );
+        const scopedContainers = await filterContainersByGrantForSession(session, fetchedContainers);
+        for (const container of scopedContainers) {
+          containersById.set(container.id, container);
+        }
+      }
+
+      return recentAccessRows
+        .map((row) => {
+          const container = containersById.get(row.containerId);
+          // Skip rows whose container no longer exists (e.g. deleted since being accessed, or
+          // filtered out of an App key's scope above).
+          if (!container || container.type !== 'page') {
+            return undefined;
+          }
+          const returnValue: GetPagesResponse[number] = {
+            page: {
+              id: container.id,
+              name: container.name,
+              emoji: container.emoji || null,
+              parentId: container.parentId || null,
+              createdAt: container.createdAt,
+              lastUpdated: container.lastUpdated,
+            },
+            ...(row.lastAccessedAt && { lastAccessedAt: row.lastAccessedAt }),
           };
           if (query.includeValues) {
             returnValue.values = container.values;
