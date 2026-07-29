@@ -214,12 +214,16 @@ test.describe('page content append/prepend API', () => {
     const pageId = await createPage(request);
 
     const before = await getData<PageDetails>(await request.get(`/api/v1/pages/${pageId}`));
+    const beforeTime = new Date(before.page.lastUpdated).getTime();
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
     await request.post(`/api/v1/pages/${pageId}/append`, { data: { content: 'B' } });
 
-    const after = await getData<PageDetails>(await request.get(`/api/v1/pages/${pageId}`));
-    expect(new Date(after.page.lastUpdated).getTime()).toBeGreaterThan(new Date(before.page.lastUpdated).getTime());
+    await expect
+      .poll(async () => {
+        const after = await getData<PageDetails>(await request.get(`/api/v1/pages/${pageId}`));
+        return new Date(after.page.lastUpdated).getTime();
+      })
+      .toBeGreaterThan(beforeTime);
   });
 
   test('an empty content string is an accepted no-op that still bumps lastUpdated', async ({ request }) => {
@@ -227,14 +231,18 @@ test.describe('page content append/prepend API', () => {
     await request.post(`/api/v1/pages/${pageId}/content`, { data: { content: 'A' } });
 
     const before = await getData<PageDetails>(await request.get(`/api/v1/pages/${pageId}`));
+    const beforeTime = new Date(before.page.lastUpdated).getTime();
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
     const response = await request.post(`/api/v1/pages/${pageId}/append`, { data: { content: '' } });
     expect(response.ok()).toBeTruthy();
     const result = await getData<ContentResponse>(response);
     expect(result.content).toBe('A');
 
-    const after = await getData<PageDetails>(await request.get(`/api/v1/pages/${pageId}`));
-    expect(new Date(after.page.lastUpdated).getTime()).toBeGreaterThan(new Date(before.page.lastUpdated).getTime());
+    await expect
+      .poll(async () => {
+        const after = await getData<PageDetails>(await request.get(`/api/v1/pages/${pageId}`));
+        return new Date(after.page.lastUpdated).getTime();
+      })
+      .toBeGreaterThan(beforeTime);
   });
 });
