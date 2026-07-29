@@ -101,12 +101,12 @@ export default function PageDetailsPage() {
 
   // Imports a Markdown file's contents into the editor (see the "Import from Markdown" menu
   // action) and persists the normalised result through the same content-save flow as regular
-  // edits. No-ops if the editor hasn't mounted yet — defensive only, since the menu is only
-  // rendered once `pageDetails` has loaded.
+  // edits. Throws if the editor hasn't mounted yet so the caller's error handling (and toast)
+  // reflects the failed import instead of a false success.
   const handleImportMarkdown = useCallback(
     async (markdown: string) => {
       if (!editorReference.current || !pageId) {
-        return;
+        throw new Error('Editor is not ready to import markdown');
       }
 
       const normalizedMarkdown = await editorReference.current.replaceWithMarkdown(markdown);
