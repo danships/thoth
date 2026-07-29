@@ -13,7 +13,13 @@ export function TreeToggle({ isExpanded, onToggle, hasChildren }: TreeToggleProp
   }
 
   return (
-    <ActionIcon variant="subtle" size="sm" onClick={onToggle} style={{ flexShrink: 0 }}>
+    <ActionIcon
+      variant="subtle"
+      size="sm"
+      onClick={onToggle}
+      style={{ flexShrink: 0 }}
+      aria-label={isExpanded ? 'Collapse tree item' : 'Expand tree item'}
+    >
       {isExpanded ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
     </ActionIcon>
   );

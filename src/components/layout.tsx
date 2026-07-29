@@ -2,8 +2,8 @@
 
 import { AppShell, Burger, Group, Loader, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useRouter } from 'next/navigation';
-import { type PropsWithChildren, type ReactNode, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { type PropsWithChildren, type ReactNode, Suspense, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/provider';
 import { WorkspaceMenu } from '@/components/molecules/sidebar/workspace-menu';
 import Image from 'next/image';
@@ -12,8 +12,27 @@ type LayoutProperties = PropsWithChildren & {
   sidebar: ReactNode;
 };
 
+// useSearchParams() opts the nearest Suspense boundary into client-side rendering, and Next.js
+// requires it to be wrapped in a Suspense boundary (there is none above `Layout` in the tree).
+// Isolating it in this tiny subcomponent keeps that de-opt scoped to a no-op (it renders
+// nothing) instead of affecting the whole `Layout` tree.
+function CloseNavbarOnNavigate({ close }: { close: () => void }) {
+  const pathname = usePathname();
+  const searchParameters = useSearchParams();
+  const searchParametersKey = searchParameters.toString();
+
+  // Close the mobile navbar overlay whenever the route (pathname or `?v=` query) changes, so
+  // client-side navigation from a sidebar link doesn't leave the overlay covering the newly
+  // routed content. `close()` is idempotent, so this is a no-op on mount and on desktop.
+  useEffect(() => {
+    close();
+  }, [pathname, searchParametersKey, close]);
+
+  return null;
+}
+
 export default function Layout({ children, sidebar }: LayoutProperties) {
-  const [opened, { toggle }] = useDisclosure();
+  const [opened, { toggle, close }] = useDisclosure();
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -49,10 +68,13 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
         collapsed: { mobile: !opened },
       }}
     >
+      <Suspense fallback={null}>
+        <CloseNavbarOnNavigate close={close} />
+      </Suspense>
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between" style={{ width: '100%' }}>
           <Group>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
             <Image src="/icons/favicon-32x32.png" width={21} height={21} alt="Thoth Logo" loading="eager" />
             <Title order={5}>Thoth</Title>
           </Group>
