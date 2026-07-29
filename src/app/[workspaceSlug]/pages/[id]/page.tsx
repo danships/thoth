@@ -16,6 +16,7 @@ import {
 } from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { mutate as mutateGlobal } from 'swr';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
 import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
 import { IconPlus } from '@tabler/icons-react';
@@ -35,6 +36,8 @@ import { PageEmojiPicker } from '@/components/molecules/page-emoji-picker';
 import { PageDetailMenu } from '@/components/organisms/page-detail-menu';
 import { PageDetailEditor, type PageDetailEditorHandle } from '@/components/organisms/page-detail-editor';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
+import { GET_PAGES_ENDPOINT } from '@/types/api';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import styles from './page.module.css';
 
 export default function PageDetailsPage() {
@@ -58,14 +61,20 @@ export default function PageDetailsPage() {
   const { setPageContent } = useSetPageContent({ mutatePageDetails: mutate });
   const { registerAccess } = useRegisterPageAccess();
   const { toggleFavorite, inProgress: isTogglingFavorite } = useToggleFavorite({ mutatePageDetails: mutate });
+  const { id: workspaceId } = useCurrentWorkspace();
 
   // Explicitly register that this page was opened, once per navigation (guarded on `pageId`
   // alone so it doesn't re-fire on every re-render). Kept fully separate from `usePageDetails`
   // and any GET call so background prefetches/hover-preloads never silently reorder the
   // sidebar's root list.
   useEffect(() => {
-    void registerAccess(pageId);
-  }, [pageId, registerAccess]);
+    void (async () => {
+      await registerAccess(pageId);
+      // Best-effort: nudge the sidebar's Recent list to revalidate promptly so it reorders
+      // without waiting for SWR's default focus/mount revalidation. Never blocks navigation.
+      void mutateGlobal(`${GET_PAGES_ENDPOINT}?recent=true&workspaceId=${workspaceId}`);
+    })();
+  }, [pageId, registerAccess, workspaceId]);
 
   // Auto-select first view if views exist and no view is selected
   useEffect(() => {

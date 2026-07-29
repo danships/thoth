@@ -20,7 +20,9 @@ test.describe('sidebar closes on mobile navigation', () => {
       // Sidebar is open: its "Pages" heading and the seeded page link are visible on screen.
       const pagesHeading = page.getByRole('heading', { name: 'Pages' });
       await expect(pagesHeading).toBeInViewport();
-      const pageLink = page.getByRole('link', { name: SEED.pages.root.name });
+      // Scoped to the Pages tree since (per THOTH-035) the page also appears in the sidebar's
+      // Recent section.
+      const pageLink = page.getByTestId('pages-tree-scroll-pane').getByRole('link', { name: SEED.pages.root.name });
       await expect(pageLink).toBeVisible({ timeout: 10_000 });
 
       await pageLink.click();
@@ -44,8 +46,11 @@ test.describe('sidebar closes on mobile navigation', () => {
       const pagesHeading = page.getByRole('heading', { name: 'Pages' });
       await expect(pagesHeading).toBeInViewport();
 
-      // Expand the tree node for the data-source host page to reveal its view link.
+      // Expand the tree node for the data-source host page to reveal its view link. Scoped to
+      // the Pages tree since (per THOTH-035) it also appears (as a leaf, without an expand
+      // toggle) in the sidebar's Recent section.
       const dataSourceRow = page
+        .getByTestId('pages-tree-scroll-pane')
         .getByRole('link', { name: SEED.pages.dataSourceHost.name })
         .locator('xpath=ancestor::div[1]');
       const expandToggle = dataSourceRow.getByRole('button', { name: 'Expand tree item' });
@@ -68,7 +73,7 @@ test.describe('sidebar closes on mobile navigation', () => {
     test('sidebar stays visible after navigation on desktop', async ({ page }) => {
       await page.goto(`/${SEED.workspace.slug}/pages`);
 
-      const pageLink = page.getByRole('link', { name: SEED.pages.root.name });
+      const pageLink = page.getByTestId('pages-tree-scroll-pane').getByRole('link', { name: SEED.pages.root.name });
       await expect(pageLink).toBeVisible({ timeout: 10_000 });
       await pageLink.click();
 

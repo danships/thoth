@@ -1,14 +1,52 @@
+import Database from 'better-sqlite3';
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
+
+// Restores `favoriteToggle`'s `ContainerAccess.lastAccessedAt` directly at the database level
+// (bypassing `PUT /pages/:id/favorite`, which intentionally bumps `lastAccessedAt` on starring
+// and never reverts it on unstarring). Without this, once any test below stars the page, its
+// `lastAccessedAt` permanently becomes "now" for the remainder of the suite run, which would
+// otherwise leak into the sidebar's Recent section (THOTH-035, see `recent-tree.spec.ts`) and
+// the root-list pagination ordering in other specs.
+function restoreLastAccessedAt(pageId: string, lastAccessedAt: string) {
+  const databasePath = process.env['DB']!.replace('sqlite://', '');
+  const database = new Database(databasePath);
+  database
+    .prepare(
+      `UPDATE container_access SET contents = json_set(contents, '$.lastAccessedAt', ?)
+       WHERE containerId = ? AND userId = ?`
+    )
+    .run(lastAccessedAt, pageId, SEED.user.id);
+  database.close();
+}
+
+function readLastAccessedAt(pageId: string): string {
+  const databasePath = process.env['DB']!.replace('sqlite://', '');
+  const database = new Database(databasePath);
+  const row = database
+    .prepare(`SELECT "lastAccessedAt" FROM container_access WHERE containerId = ? AND userId = ?`)
+    .get(pageId, SEED.user.id) as { lastAccessedAt: string };
+  database.close();
+  return row.lastAccessedAt;
+}
 
 // Uses a dedicated, always-unstarred-by-default page (`favoriteToggle`) so toggling its
 // starred state here never interferes with other specs relying on `SEED.pages.root`.
 test.describe('page favorite toggle', () => {
+  let originalLastAccessedAt: string;
+
+  test.beforeAll(() => {
+    // Deferred to `beforeAll` (rather than the describe body) since the seed database doesn't
+    // exist yet at test-collection time — only after the `setup` project has run.
+    originalLastAccessedAt = readLastAccessedAt(SEED.pages.favoriteToggle.id);
+  });
+
   test.afterEach(async ({ page }) => {
     // Best-effort restore to unstarred so test order/re-runs don't leave stale state behind.
     await page.request.put(`/api/v1/pages/${SEED.pages.favoriteToggle.id}/favorite`, {
       data: { starred: false },
     });
+    restoreLastAccessedAt(SEED.pages.favoriteToggle.id, originalLastAccessedAt);
   });
 
   test('starring a page from the detail header flips the icon to filled and persists across reload', async ({

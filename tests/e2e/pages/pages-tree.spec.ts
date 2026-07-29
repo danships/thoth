@@ -13,12 +13,14 @@ test('sidebar shows add-page link', async ({ page }) => {
 
 test('seeded root page appears in sidebar', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages`);
-  await expect(page.getByText(SEED.pages.root.name)).toBeVisible();
+  // Root also appears in the Recent section (per THOTH-035), so scope to the Pages tree.
+  await expect(page.getByTestId('pages-tree-scroll-pane').getByText(SEED.pages.root.name)).toBeVisible();
 });
 
 test('seeded data source host page appears in sidebar', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages`);
-  await expect(page.getByText(SEED.pages.dataSourceHost.name)).toBeVisible();
+  // Also appears in the Recent section (per THOTH-035), so scope to the Pages tree.
+  await expect(page.getByTestId('pages-tree-scroll-pane').getByText(SEED.pages.dataSourceHost.name)).toBeVisible();
 });
 
 test('/ redirects through /pages to the most recently updated root page', async ({ page }) => {

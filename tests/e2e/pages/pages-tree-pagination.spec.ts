@@ -46,8 +46,9 @@ test('sidebar loads more root pages as the user scrolls to the bottom', async ({
   const firstPaginationPage = SEED.pages.paginationSeed[0]!;
   const lastPaginationPage = SEED.pages.paginationSeed.at(-1)!;
 
-  // The most-recently-accessed pagination page is within the first fetch...
-  await expect(page.getByText(firstPaginationPage.name)).toBeVisible();
+  // The most-recently-accessed pagination page is within the first fetch. Scoped to the Pages
+  // tree since (per THOTH-035) it now also appears in the sidebar's Recent section.
+  await expect(page.getByTestId('pages-tree-scroll-pane').getByText(firstPaginationPage.name)).toBeVisible();
   // ...but the least-recently-accessed one is not, until the user scrolls further.
   await expect(page.getByText(lastPaginationPage.name)).not.toBeVisible();
 
@@ -71,7 +72,9 @@ test('sidebar sentinel disappears once every root page has been loaded', async (
 test('a root page with more than 10 children shows a "more inside" indicator', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages`);
 
-  const hostLink = page.getByRole('link', { name: new RegExp(SEED.pages.childOverflowHost.name) });
+  const hostLink = page.getByTestId('pages-tree-scroll-pane').getByRole('link', {
+    name: new RegExp(SEED.pages.childOverflowHost.name),
+  });
   await expect(hostLink).toBeVisible();
 
   const row = hostLink.locator('..');
@@ -80,7 +83,7 @@ test('a root page with more than 10 children shows a "more inside" indicator', a
   const firstChild = SEED.pages.childOverflowHost.children.at(0)!;
   const eleventhChild = SEED.pages.childOverflowHost.children.at(10)!;
 
-  await expect(page.getByText(firstChild.name)).toBeVisible();
+  await expect(page.getByTestId('pages-tree-scroll-pane').getByText(firstChild.name)).toBeVisible();
   await expect(page.getByText(eleventhChild.name)).not.toBeVisible();
 
   const moreInsideLink = page.getByRole('link', { name: 'More inside — open page' });
