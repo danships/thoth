@@ -1,0 +1,56 @@
+import { getContainerRepository } from '@/lib/database';
+import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import type { ApiKeySession } from '@/lib/auth/session';
+import type { MutatePageContentResponse } from '@/types/api';
+
+export type MutatePageContentMode = 'append' | 'prepend';
+
+/**
+ * Shared implementation behind `POST /pages/:id/append` and `POST /pages/:id/prepend`. Retrieves
+ * the page (scoped to the user + the caller's App grant, if any), concatenates `incoming` onto
+ * the existing markdown `content` and persists the result, bumping `lastUpdated` the same way
+ * the `PATCH /pages/:id` handler does (deliberately unlike the plain `POST /pages/:id/content`
+ * setter, which leaves `lastUpdated` untouched since it doesn't necessarily represent a genuine
+ * content change).
+ *
+ * Concatenation is a simple in-memory read-modify-write via `containerRepository.update` — like
+ * the existing `set-page-content` route, there is no optimistic locking, so concurrent
+ * append/prepend calls against the same page could still race at the document level. This is an
+ * accepted limitation (see THOTH-032 spec); it still massively reduces the race window compared
+ * to a client-side GET -> concat -> PUT round trip.
+ */
+export async function mutatePageContent(
+  id: string,
+  session: ApiKeySession,
+  incoming: string,
+  mode: MutatePageContentMode
+): Promise<MutatePageContentResponse> {
+  const containerRepository = await getContainerRepository();
+
+  const page = await pageRetriever.retrievePage(id, session.user.id);
+  await assertGrantAllowsContainerForSession(session, page);
+
+  const existing = 'content' in page ? (page.content ?? '') : '';
+
+  let content: string;
+  if (!existing) {
+    content = incoming;
+  } else if (!incoming) {
+    content = existing;
+  } else if (mode === 'append') {
+    content = `${existing}\n${incoming}`;
+  } else {
+    content = `${incoming}\n${existing}`;
+  }
+
+  const updatedPage = await containerRepository.update({
+    ...page,
+    content,
+    lastUpdated: new Date().toISOString(),
+  });
+
+  return {
+    content: 'content' in updatedPage ? (updatedPage.content ?? '') : '',
+  };
+}
