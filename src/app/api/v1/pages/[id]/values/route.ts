@@ -2,6 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
@@ -14,6 +15,7 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, page);
 
     if (!page.parentId) {
       throw new BadRequestError('Page does not have a data source parent');

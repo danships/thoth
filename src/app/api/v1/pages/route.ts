@@ -4,6 +4,7 @@ import { registerContainerAccessForNewPage } from '@/lib/database/container-acce
 import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
@@ -45,7 +46,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
             .eq('type', 'page')
             .in('id', containerIds)
         );
-        for (const container of fetchedContainers) {
+        const scopedContainers = await filterContainersByGrantForSession(session, fetchedContainers);
+        for (const container of scopedContainers) {
           containersById.set(container.id, container);
         }
       }
@@ -53,7 +55,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       return starredAccessRows
         .map((row) => {
           const container = containersById.get(row.containerId);
-          // Skip rows whose container no longer exists (e.g. deleted since being starred).
+          // Skip rows whose container no longer exists (e.g. deleted since being starred, or
+          // filtered out of an App key's scope above).
           if (!container || container.type !== 'page') {
             return undefined;
           }
@@ -88,24 +91,27 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       addUserIdToQuery(containerRepository.createQuery().eq('parentId', parentId).eq('type', 'page'), session.user.id)
     );
 
-    return pages
-      .filter((page) => page.type === 'page')
-      .map((page) => {
-        const returnValue: GetPagesResponse[number] = {
-          page: {
-            id: page.id,
-            name: page.name,
-            emoji: page.emoji || null,
-            parentId: page.parentId || null,
-            createdAt: page.createdAt,
-            lastUpdated: page.lastUpdated,
-          },
-        };
-        if (query.includeValues) {
-          returnValue.values = page.values;
-        }
-        return returnValue;
-      });
+    const scopedPages = await filterContainersByGrantForSession(
+      session,
+      pages.filter((page) => page.type === 'page')
+    );
+
+    return scopedPages.map((page) => {
+      const returnValue: GetPagesResponse[number] = {
+        page: {
+          id: page.id,
+          name: page.name,
+          emoji: page.emoji || null,
+          parentId: page.parentId || null,
+          createdAt: page.createdAt,
+          lastUpdated: page.lastUpdated,
+        },
+      };
+      if (query.includeValues) {
+        returnValue.values = page.values;
+      }
+      return returnValue;
+    });
   }
 );
 
@@ -126,18 +132,20 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
     if (body.parentId) {
       // Derive the workspace from the parent entity rather than trusting a client-supplied
       // `workspaceId` — fetch the parent by id, authorize against its own `workspaceId`, and
-      // stamp the new child with the same one.
-      const parentPage = await containerRepository.getOneByQuery(
-        containerRepository.createQuery().eq('id', body.parentId).eq('type', 'page')
+      // stamp the new child with the same one. The parent can be either another page (nested
+      // pages) or a data source (rows added inline from a data view's table), so we can't
+      // filter the lookup down to `type: 'page'` alone.
+      const parentContainer = await containerRepository.getOneByQuery(
+        containerRepository.createQuery().eq('id', body.parentId)
       );
 
-      if (!parentPage || parentPage.type !== 'page') {
+      if (!parentContainer || (parentContainer.type !== 'page' && parentContainer.type !== 'data-source')) {
         throw new NotFoundError('Parent page not found or access denied');
       }
 
-      await assertWorkspaceAccess(session.user.id, parentPage.workspaceId);
+      await assertWorkspaceAccess(session.user.id, parentContainer.workspaceId);
 
-      workspaceId = parentPage.workspaceId;
+      workspaceId = parentContainer.workspaceId;
       parentId = body.parentId;
     } else {
       // Root-level page: no existing entity to derive the workspace from.

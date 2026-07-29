@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities';
 
-export const workspaceMemberRoleSchema = z.enum(['owner', 'editor', 'viewer']);
+// 'app' is an additive role (THOTH-026): assigned to the synthetic `app--<id>` owner id so
+// App-attributed content can pass the standard `assertWorkspaceAccess` membership check.
+export const workspaceMemberRoleSchema = z.enum(['owner', 'editor', 'viewer', 'app']);
 
 export const workspaceMemberSchema = z
   .object({

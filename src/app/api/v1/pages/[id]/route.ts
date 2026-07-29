@@ -3,6 +3,7 @@ import { getContainerAccessRepository, getContainerRepository, getDataViewReposi
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { pageColumnRetriever } from '@/lib/database/retrievers/page-column-retriever';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import type {
   GetPageDetailsParameters,
   GetPageDetailsQuery,
@@ -25,6 +26,7 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
   },
   async ({ params, query }, session): Promise<GetPageDetailsResponse> => {
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, page);
 
     // fetch the linked views
     const dataViewRepository = await getDataViewRepository();
@@ -89,6 +91,7 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
 
     // Verify the page exists and belongs to the user
     const existingPage = await pageRetriever.retrievePage(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, existingPage);
 
     const filteredBody: Partial<typeof existingPage> = {};
     if (body.name !== undefined) {

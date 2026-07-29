@@ -8,6 +8,15 @@ import type {
   GetWorkspaceSlugAvailabilityResponse,
   UpdateWorkspaceBody,
   WorkspaceApi,
+  CreateAppBody,
+  UpdateAppBody,
+  AppResponse,
+  AppDetailResponse,
+  GetAppsResponse,
+  CreateApiKeyBody,
+  CreateApiKeyResponse,
+  GetPageAppsResponse,
+  ConnectPageAppResponse,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -66,6 +75,11 @@ export const api = {
     registerAccess: (id: string) => apiClient.post(`/pages/${id}/access`),
 
     setFavorite: (id: string, starred: boolean) => apiClient.put(`/pages/${id}/favorite`, { starred }),
+
+    listApps: (id: string) => apiClient.get<DataWrapper<GetPageAppsResponse>>(`/pages/${id}/apps`),
+    connectApp: (id: string, appId: string) =>
+      apiClient.post<DataWrapper<ConnectPageAppResponse>>(`/pages/${id}/apps`, { appId }),
+    disconnectApp: (id: string, appId: string) => apiClient.delete(`/pages/${id}/apps/${appId}`),
   },
 
   // Workspaces API
@@ -81,6 +95,18 @@ export const api = {
       apiClient.get<DataWrapper<GetWorkspaceSlugAvailabilityResponse>>('/workspaces/slug-availability', {
         params: { slug, excludeWorkspaceId },
       }),
+  },
+
+  // Apps API
+  apps: {
+    list: (workspaceId: string) => apiClient.get<DataWrapper<GetAppsResponse>>('/apps', { params: { workspaceId } }),
+    getDetails: (id: string) => apiClient.get<DataWrapper<AppDetailResponse>>(`/apps/${id}`),
+    create: (data: CreateAppBody) => apiClient.post<DataWrapper<AppResponse>>('/apps', data),
+    update: (id: string, data: UpdateAppBody) => apiClient.patch<DataWrapper<AppResponse>>(`/apps/${id}`, data),
+    archive: (id: string) => apiClient.delete(`/apps/${id}`),
+    createKey: (appId: string, data: CreateApiKeyBody) =>
+      apiClient.post<DataWrapper<CreateApiKeyResponse>>(`/apps/${appId}/keys`, data),
+    revokeKey: (appId: string, keyId: string) => apiClient.delete(`/apps/${appId}/keys/${keyId}`),
   },
 };
 

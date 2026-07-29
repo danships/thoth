@@ -1,7 +1,7 @@
 'use client';
 
 import { ActionIcon, Avatar, Group, Loader, Menu, Text } from '@mantine/core';
-import { IconChevronDown, IconLayoutGrid, IconLogout, IconPlus, IconSettings } from '@tabler/icons-react';
+import { IconChevronDown, IconKey, IconLayoutGrid, IconLogout, IconPlus, IconSettings } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -96,6 +96,13 @@ export function WorkspaceMenu() {
             leftSection={<IconSettings size={16} />}
           >
             Workspace settings
+          </Menu.Item>
+          <Menu.Item
+            component={Link}
+            href={`/${currentWorkspace.slug}/settings/apps`}
+            leftSection={<IconKey size={16} />}
+          >
+            Apps
           </Menu.Item>
           <Menu.Item color="red" leftSection={<IconLogout size={16} />} onClick={handleLogout}>
             Logout

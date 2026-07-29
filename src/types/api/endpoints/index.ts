@@ -28,3 +28,6 @@ export * from './create-workspace';
 export * from './update-workspace';
 export * from './get-workspace-slug-availability';
 export * from './put-page-favorite';
+export * from './app';
+export * from './api-key';
+export * from './page-apps';

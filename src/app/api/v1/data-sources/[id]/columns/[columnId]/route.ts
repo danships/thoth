@@ -2,6 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type {
@@ -31,6 +32,7 @@ export const PATCH = apiRoute<
       throw new NotFoundError('Data source not found', true);
     }
     await assertWorkspaceAccess(session.user.id, dataSource.workspaceId);
+    await assertGrantAllowsContainerForSession(session, dataSource);
 
     const columns = [...(dataSource.columns ?? [])];
     const foundColumn = columns.find((column) => column.id === params.columnId);
@@ -84,6 +86,7 @@ export const DELETE = apiRoute<void, undefined, UpdateDataSourceColumnParameters
       throw new NotFoundError('Data source not found', true);
     }
     await assertWorkspaceAccess(session.user.id, dataSource.workspaceId);
+    await assertGrantAllowsContainerForSession(session, dataSource);
 
     const nextColumns = (dataSource.columns ?? []).filter((c) => c.id !== params.columnId);
     if (nextColumns.length === (dataSource.columns ?? []).length) {

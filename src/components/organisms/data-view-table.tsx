@@ -222,6 +222,7 @@ export function DataViewTable({
               value={newPageName}
               onChange={onPageNameChange}
               onKeyDown={handleNewPageKeyDown}
+              onSubmit={() => void onPageCreate(newPageName)}
               disabled={inProgress}
               columnCount={columns.length}
             />

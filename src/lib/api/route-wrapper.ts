@@ -1,15 +1,22 @@
 import type { NextRequest } from 'next/server';
 import { connection, NextResponse } from 'next/server';
-import type { User } from 'better-auth';
 import type { z } from 'zod';
-import { getSession } from '../auth/session';
+import { getSessionOrApiKey, type ApiKeySession } from '../auth/session';
+import { assertGrantAllowsWrite } from '../auth/access-grant';
 import { getLogger } from '../logger';
 import { HttpError } from '@/lib/errors/http-error';
+import { NotAuthorizedError } from '@/lib/errors/not-authorized-error';
+
+const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
 type ApiRouteOptions<ExpectedQuery = unknown, ExpectedParameters = unknown, ExpectedBody = unknown> = {
   expectedBodySchema?: z.ZodType<ExpectedBody>;
   expectedQuerySchema?: z.ZodType<ExpectedQuery>;
   expectedParamsSchema?: z.ZodType<ExpectedParameters>;
+  // An App's own API key must never be usable to manage Apps/keys themselves (closes a
+  // privilege-escalation loop). Set on every `/apps*` route — bearer-token auth is rejected
+  // (401) there even for an otherwise-valid key.
+  disallowApiKey?: boolean;
 };
 
 export function apiRoute<
@@ -25,15 +32,26 @@ export function apiRoute<
       query: ExpectedQuery;
       params: ExpectedParameters;
     },
-    session: { user: User },
+    session: ApiKeySession,
     request_: NextRequest
   ) => ResponseType | Promise<ResponseType>
 ) {
   return async (request: NextRequest, { params }: { params: Promise<ExpectedParameters> }) => {
     await connection();
     try {
-      // Get session
-      const session = await getSession();
+      // Get session — cookie session if present, otherwise falls back to `Authorization:
+      // Bearer <key>` auth (see `getSessionOrApiKey`).
+      const session = await getSessionOrApiKey(request);
+
+      if (session.appContext && options.disallowApiKey) {
+        throw new NotAuthorizedError('API keys cannot be used to call this endpoint');
+      }
+
+      // A read-only key's App attempting a mutating verb is a permission violation (403), not
+      // an authentication failure — enforced here so it never needs re-implementing per route.
+      if (session.appContext && MUTATING_METHODS.has(request.method)) {
+        assertGrantAllowsWrite(session.appContext.accessGrant);
+      }
 
       // Resolve params
       const resolvedParameters = await params;

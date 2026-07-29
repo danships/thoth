@@ -2,6 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import type { Container, PageContainer } from '@/types/database';
 import type { GetPageBreadcrumbsParameters, GetPageBreadcrumbsResponse, Page } from '@/types/api';
 import { getPageBreadcrumbsParametersSchema } from '@/types/api';
@@ -49,6 +50,7 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
 
     // Start with the current page
     const startingPage = await pageRetriever.retrievePage(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, startingPage);
 
     // Traverse up the ancestor chain. Only `page` containers are added to the visible
     // breadcrumb trail; `data-source` containers are skipped over transparently so

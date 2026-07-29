@@ -2,6 +2,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
+import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { z } from 'zod';
 import { Column, columnSchema } from '@/types/schemas/entities/container';
 import { randomUUID } from 'node:crypto';
@@ -13,6 +14,7 @@ export const POST = apiRoute<z.infer<typeof columnSchema>, undefined, { id: stri
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
     const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, dataSource);
 
     const newColumn: Column =
       body.type === 'date'

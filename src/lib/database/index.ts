@@ -6,6 +6,9 @@ import type {
   DataView,
   WorkspaceMember,
   WorkspaceSlugRedirect,
+  App,
+  ApiKey,
+  AppScopedContainer,
 } from '@/types/database';
 import { getEnvironment } from '../environment';
 import * as entities from './entities';
@@ -28,6 +31,9 @@ async function initializeDatabase() {
   await database.addEntity(entities.DataView);
   await database.addEntity(entities.WorkspaceMember);
   await database.addEntity(entities.WorkspaceSlugRedirect);
+  await database.addEntity(entities.App);
+  await database.addEntity(entities.ApiKey);
+  await database.addEntity(entities.AppScopedContainer);
 
   if (!skipSync) {
     await database.runMigrations();
@@ -80,4 +86,19 @@ export async function getWorkspaceMemberRepository() {
 export async function getWorkspaceSlugRedirectRepository() {
   const database = await getDatabase();
   return database.getRepository<WorkspaceSlugRedirect>(entities.WORKSPACE_SLUG_REDIRECT_NAME);
+}
+
+export async function getAppRepository() {
+  const database = await getDatabase();
+  return database.getRepository<App>(entities.APP_NAME);
+}
+
+export async function getApiKeyRepository() {
+  const database = await getDatabase();
+  return database.getRepository<ApiKey>(entities.API_KEY_NAME);
+}
+
+export async function getAppScopedContainerRepository() {
+  const database = await getDatabase();
+  return database.getRepository<AppScopedContainer>(entities.APP_SCOPED_CONTAINER_NAME);
 }

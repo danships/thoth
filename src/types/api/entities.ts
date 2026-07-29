@@ -2,6 +2,8 @@ import { dataViewSchema as dataViewSchemaEntity } from '../schemas/entities/data
 import { pageContainerSchema, dataSourceContainerSchema, pageCoverSchema } from '../schemas/entities/container';
 import { containerAccessSchema as containerAccessSchemaEntity } from '../schemas/entities/container-access';
 import { workspaceSchema as workspaceSchemaEntity } from '../schemas/entities/workspace';
+import { appSchema as appSchemaEntity } from '../schemas/entities/app';
+import { apiKeyPublicSchema as apiKeyPublicSchemaEntity } from '../schemas/entities/api-key';
 import { z } from 'zod';
 
 export { pageCoverSchema } from '../schemas/entities/container';
@@ -54,3 +56,32 @@ export const workspaceSchema = workspaceSchemaEntity.pick({
   lastUpdated: true,
 });
 export type WorkspaceApi = z.infer<typeof workspaceSchema>;
+
+// API-facing representation of an "App" (see THOTH-026): never includes any key secret — a
+// key is minted separately via `POST /apps/:id/keys` (see `apiKeySchema` below).
+export const appSchema = appSchemaEntity.pick({
+  id: true,
+  workspaceId: true,
+  label: true,
+  permission: true,
+  scopeType: true,
+  attributionMode: true,
+  archivedAt: true,
+  createdAt: true,
+  lastUpdated: true,
+});
+export type AppApi = z.infer<typeof appSchema>;
+
+// API-facing representation of a key: never includes `keyHash` (internal only) or the raw
+// secret (returned exactly once, at mint time, as `secret` on `CreateApiKeyResponse`).
+export const apiKeySchema = apiKeyPublicSchemaEntity.pick({
+  id: true,
+  appId: true,
+  label: true,
+  keyPrefix: true,
+  expiresAt: true,
+  lastUsedAt: true,
+  revokedAt: true,
+  createdAt: true,
+});
+export type ApiKeyApi = z.infer<typeof apiKeySchema>;
