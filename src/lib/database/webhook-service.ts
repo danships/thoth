@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
 import { getWebhookDeliveryRepository, getWebhookRepository } from './index';
 import type { Webhook, WebhookDelivery, WebhookDeliveryStatus, WebhookPayload } from '@/types/database';
+import type { WebhookDeliveryResponse, WebhookResponse } from '@/types/api';
 
-// Cap on how many `webhook-delivery` rows are retained per webhook — see `recordAndPrune`.
-const MAX_DELIVERIES_PER_WEBHOOK = 25;
+// Cap on how many `webhook-delivery` rows are retained per webhook — see `recordAndPrune`. Also
+// reused as the `.limit()` on the deliveries-listing route so the two can never drift apart.
+export const MAX_DELIVERIES_PER_WEBHOOK = 25;
 
 const WEBHOOK_SECRET_PREFIX = 'thwhk_';
 
@@ -102,4 +104,35 @@ export async function deleteWebhooksForApp(appId: string): Promise<void> {
 export async function listWebhooksForApp(appId: string): Promise<Webhook[]> {
   const webhookRepository = await getWebhookRepository();
   return webhookRepository.getByQuery(webhookRepository.createQuery().eq('appId', appId).sort('createdAt', 'desc'));
+}
+
+/** Shared `Webhook` -> `WebhookResponse` mapper — used by every route that returns a webhook. */
+export function toWebhookResponse(webhook: Webhook): WebhookResponse {
+  return {
+    id: webhook.id,
+    appId: webhook.appId,
+    workspaceId: webhook.workspaceId,
+    label: webhook.label,
+    url: webhook.url,
+    enabled: webhook.enabled,
+    suppressOwnChanges: webhook.suppressOwnChanges,
+    secretMasked: maskWebhookSecret(webhook.secret),
+    createdAt: webhook.createdAt,
+    lastUpdated: webhook.lastUpdated,
+  };
+}
+
+/** Shared `WebhookDelivery` -> `WebhookDeliveryResponse` mapper — used by the deliveries-listing and resend routes. */
+export function toDeliveryResponse(delivery: WebhookDelivery): WebhookDeliveryResponse {
+  return {
+    id: delivery.id,
+    event: delivery.event,
+    containerId: delivery.containerId,
+    status: delivery.status,
+    httpStatus: delivery.httpStatus,
+    error: delivery.error,
+    attempts: delivery.attempts,
+    createdAt: delivery.createdAt,
+    lastAttemptAt: delivery.lastAttemptAt,
+  };
 }

@@ -13,11 +13,16 @@ export type WebhookActor = {
  * whose owning App's `AccessGrant` covers it (or, for a data-source page, covers its parent data
  * source — see "Data-source rule" below), excluding archived Apps and honouring per-webhook
  * `suppressOwnChanges`. Dedupes by `webhook.id`.
+ *
+ * `parentDataSource` is the container's already-resolved data-source parent (see
+ * `resolveDataSourceParent`), passed in so callers that also need it (e.g. `notifyPageChange`
+ * for the outbound payload) don't trigger the lookup twice.
  */
 export async function resolveWebhooksToNotify(
   container: Container,
   workspaceId: string,
-  actor: WebhookActor
+  actor: WebhookActor,
+  parentDataSource?: DataSourceContainer
 ): Promise<Webhook[]> {
   const webhookRepository = await getWebhookRepository();
   const candidateWebhooks = await webhookRepository.getByQuery(
@@ -32,20 +37,6 @@ export async function resolveWebhooksToNotify(
   const appIds = [...new Set(candidateWebhooks.map((webhook) => webhook.appId))];
   const apps = await appRepository.getByQuery(appRepository.createQuery().in('id', appIds));
   const appsById = new Map<string, App>(apps.filter((app) => !app.archivedAt).map((app) => [app.id, app]));
-
-  // Data-source rule: a page nested under a data source also matches a grant that covers the
-  // parent data source (so rows of a scoped data source notify even under plain `containers`
-  // scope, mirroring `resolvePageEmbeddedContainerIds`).
-  let parentDataSource: DataSourceContainer | undefined;
-  if (container.type === 'page' && container.parentId) {
-    const containerRepository = await getContainerRepository();
-    const parent = await containerRepository.getOneByQuery(
-      containerRepository.createQuery().eq('id', container.parentId).eq('workspaceId', workspaceId)
-    );
-    if (parent && parent.type === 'data-source') {
-      parentDataSource = parent;
-    }
-  }
 
   const grantCache = new Map<string, ReturnType<typeof appToAccessGrant>>();
   const matched = new Map<string, Webhook>();
@@ -89,7 +80,7 @@ export async function resolveDataSourceParent(container: Container): Promise<Dat
   }
   const containerRepository = await getContainerRepository();
   const parent = await containerRepository.getOneByQuery(
-    containerRepository.createQuery().eq('id', container.parentId)
+    containerRepository.createQuery().eq('id', container.parentId).eq('workspaceId', container.workspaceId)
   );
   return parent && parent.type === 'data-source' ? parent : undefined;
 }

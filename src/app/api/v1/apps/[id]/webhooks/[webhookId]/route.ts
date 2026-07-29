@@ -1,27 +1,12 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getWebhookRepository } from '@/lib/database';
-import { deleteWebhook, generateWebhookSecret, maskWebhookSecret } from '@/lib/database/webhook-service';
+import { deleteWebhook, generateWebhookSecret, toWebhookResponse } from '@/lib/database/webhook-service';
 import { assertPublicHttpsUrl } from '@/lib/webhooks/ssrf';
 import { appRetriever } from '@/lib/database/retrievers/app-retriever';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { UpdateWebhookBody, UpdateWebhookResponse, WebhookDetailParameters, WebhookResponse } from '@/types/api';
 import { updateWebhookBodySchema, webhookDetailParametersSchema } from '@/types/api';
 import type { Webhook } from '@/types/database';
-
-function toResponse(webhook: Webhook): WebhookResponse {
-  return {
-    id: webhook.id,
-    appId: webhook.appId,
-    workspaceId: webhook.workspaceId,
-    label: webhook.label,
-    url: webhook.url,
-    enabled: webhook.enabled,
-    suppressOwnChanges: webhook.suppressOwnChanges,
-    secretMasked: maskWebhookSecret(webhook.secret),
-    createdAt: webhook.createdAt,
-    lastUpdated: webhook.lastUpdated,
-  };
-}
 
 async function retrieveWebhookForApp(appId: string, webhookId: string): Promise<Webhook> {
   const webhookRepository = await getWebhookRepository();
@@ -42,7 +27,7 @@ export const GET = apiRoute<WebhookResponse, {}, WebhookDetailParameters, {}>(
   async ({ params }, session) => {
     const app = await appRetriever.retrieveApp(params.id, session.user.id);
     const webhook = await retrieveWebhookForApp(app.id, params.webhookId);
-    return toResponse(webhook);
+    return toWebhookResponse(webhook);
   }
 );
 
@@ -74,7 +59,7 @@ export const PATCH = apiRoute<UpdateWebhookResponse, undefined, WebhookDetailPar
     });
 
     return {
-      ...toResponse(updated),
+      ...toWebhookResponse(updated),
       ...(rotatedSecret && { secret: rotatedSecret }),
     };
   }

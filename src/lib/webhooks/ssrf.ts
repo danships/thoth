@@ -19,12 +19,17 @@ function isPrivateOrLocalIp(address: string): boolean {
 
   if (version === 4) {
     const octets = address.split('.').map(Number);
-    const [a, b] = octets;
+    const [a, b, c] = octets;
     if (a === 127) return true; // loopback 127.0.0.0/8
     if (a === 10) return true; // private 10/8
     if (a === 172 && b !== undefined && b >= 16 && b <= 31) return true; // private 172.16/12
     if (a === 192 && b === 168) return true; // private 192.168/16
+    if (a === 192 && b === 0 && c === 0) return true; // reserved 192.0.0.0/24 (IETF protocol assignments)
+    if (a === 198 && b !== undefined && (b === 18 || b === 19)) return true; // benchmarking 198.18.0.0/15
     if (a === 169 && b === 254) return true; // link-local 169.254.0.0/16 (incl. 169.254.169.254)
+    if (a === 100 && b !== undefined && b >= 64 && b <= 127) return true; // carrier-grade NAT 100.64.0.0/10
+    if (a !== undefined && a >= 224 && a <= 239) return true; // multicast 224.0.0.0/4
+    if (address === '255.255.255.255') return true; // limited broadcast
     if (a === 0) return true; // unspecified / "this network"
     return false;
   }
@@ -33,12 +38,21 @@ function isPrivateOrLocalIp(address: string): boolean {
   const normalized = address.toLowerCase();
   if (normalized === '::1') return true; // loopback
   if (normalized === '::') return true; // unspecified
-  if (normalized.startsWith('fe80:')) return true; // link-local fe80::/10
+  // link-local fe80::/10 (fe80:: through febf::)
+  if (/^fe[89ab][0-9a-f]:/.test(normalized)) return true;
   if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true; // unique local fc00::/7
-  // IPv4-mapped IPv6 addresses (::ffff:a.b.c.d) — unwrap and re-check as IPv4.
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalized);
-  if (mapped?.[1]) {
-    return isPrivateOrLocalIp(mapped[1]);
+  // IPv4-mapped IPv6 addresses (::ffff:a.b.c.d or the fully-hex ::ffff:7f00:1 form) — unwrap and
+  // re-check as IPv4 so a mapped loopback/private address can't slip past the dotted-quad regex.
+  const dottedMapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalized);
+  if (dottedMapped?.[1]) {
+    return isPrivateOrLocalIp(dottedMapped[1]);
+  }
+  const hexMapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(normalized);
+  if (hexMapped?.[1] && hexMapped?.[2]) {
+    const high = Number.parseInt(hexMapped[1], 16);
+    const low = Number.parseInt(hexMapped[2], 16);
+    const ipv4 = [(high >> 8) & 255, high & 255, (low >> 8) & 255, low & 255].join('.');
+    return isPrivateOrLocalIp(ipv4);
   }
   return false;
 }

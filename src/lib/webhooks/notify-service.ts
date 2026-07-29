@@ -34,10 +34,8 @@ export async function notifyPageChange(
   }
 
   try {
-    const [dataSource, webhooks] = await Promise.all([
-      resolveDataSourceParent(container),
-      resolveWebhooksToNotify(container, container.workspaceId, actor),
-    ]);
+    const dataSource = await resolveDataSourceParent(container);
+    const webhooks = await resolveWebhooksToNotify(container, container.workspaceId, actor, dataSource);
 
     if (webhooks.length === 0) {
       return;

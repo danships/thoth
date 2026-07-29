@@ -1,6 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { appRetriever } from '@/lib/database/retrievers/app-retriever';
 import { resendDelivery } from '@/lib/webhooks/resend-delivery';
+import { toDeliveryResponse } from '@/lib/database/webhook-service';
 import { ConflictError } from '@/lib/errors/conflict-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { ResendWebhookDeliveryParameters, ResendWebhookDeliveryResponse } from '@/types/api';
@@ -24,16 +25,6 @@ export const POST = apiRoute<ResendWebhookDeliveryResponse, undefined, ResendWeb
     }
 
     const { delivery } = result;
-    return {
-      id: delivery.id,
-      event: delivery.event,
-      containerId: delivery.containerId,
-      status: delivery.status,
-      httpStatus: delivery.httpStatus,
-      error: delivery.error,
-      attempts: delivery.attempts,
-      createdAt: delivery.createdAt,
-      lastAttemptAt: delivery.lastAttemptAt,
-    };
+    return toDeliveryResponse(delivery);
   }
 );

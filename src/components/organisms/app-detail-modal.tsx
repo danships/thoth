@@ -48,7 +48,7 @@ type AppDetailModalProperties = {
 // keys with mint/revoke actions. Rotation is just "mint a new one, then revoke the old one".
 export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
   const { data: app, isLoading, mutate } = useApp(appId);
-  const { data: webhooksData, mutate: mutateWebhooks } = useAppWebhooks(appId);
+  const { data: webhooksData, isLoading: isLoadingWebhooks, mutate: mutateWebhooks } = useAppWebhooks(appId);
   const { post, patch, delete: remove } = useCudApi();
   const { showError, showSuccess } = useNotification();
   const [createdSecret, setCreatedSecret] = useState<string | undefined>(undefined);
@@ -321,7 +321,7 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {(webhooksData?.webhooks ?? []).length === 0 && (
+                  {!isLoadingWebhooks && (webhooksData?.webhooks ?? []).length === 0 && (
                     <Table.Tr>
                       <Table.Td colSpan={6}>
                         <Text size="sm" c="dimmed">
@@ -334,6 +334,14 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
                     <Table.Tr
                       key={webhook.id}
                       onClick={() => setSelectedWebhookId(webhook.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedWebhookId(webhook.id);
+                        }
+                      }}
                       style={{ cursor: 'pointer', fontWeight: selectedWebhookId === webhook.id ? 600 : undefined }}
                     >
                       <Table.Td>{webhook.label}</Table.Td>
@@ -427,7 +435,11 @@ export function AppDetailModal({ appId, onClose }: AppDetailModalProperties) {
                 <Title order={5} mb="xs">
                   Deliveries
                 </Title>
-                <WebhookDeliveriesTable deliveries={deliveriesData?.deliveries ?? []} onResend={handleResendDelivery} />
+                <WebhookDeliveriesTable
+                  key={selectedWebhookId}
+                  deliveries={deliveriesData?.deliveries ?? []}
+                  onResend={handleResendDelivery}
+                />
               </div>
             )}
           </Stack>

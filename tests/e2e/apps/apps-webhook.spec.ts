@@ -210,7 +210,9 @@ test.describe('apps webhooks management API', () => {
     }
   });
 
-  test('disabled webhook records no deliveries and resend on it returns 409', async ({ request }) => {
+  test('disabled webhook records no deliveries and resend on a nonexistent delivery returns 404', async ({
+    request,
+  }) => {
     const app = await createApp(request, {
       scopeType: 'containers',
       containerIds: [SEED.pages.child.id],
