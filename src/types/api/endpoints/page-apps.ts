@@ -20,12 +20,21 @@ export const pageAppSummarySchema = z.object({
 });
 export type PageAppSummary = z.infer<typeof pageAppSummarySchema>;
 
+// A connected App entry. `viaWorkspace` marks an implicit workspace-scoped grant; `viaInheritance`
+// marks a `containers_with_children` grant inherited from an ancestor container (a parent page,
+// or a page that embeds this container's data source). Both are shown as connected but are not
+// disconnectable from here — change the App's scope to remove them.
+export const connectedPageAppSchema = pageAppSummarySchema.extend({
+  viaWorkspace: z.boolean(),
+  viaInheritance: z.boolean().optional(),
+});
+export type ConnectedPageApp = z.infer<typeof connectedPageAppSchema>;
+
 export const getPageAppsResponseSchema = z.object({
   // Apps that currently grant access to this page: `scopeType: 'workspace'` Apps (implicitly,
-  // for every page) plus `containers`/`containers_with_children` Apps that directly list this
-  // page in their scope. `viaWorkspace` distinguishes the former (not disconnectable here — see
-  // the App's own settings to change its scope) from the latter (disconnectable).
-  connected: z.array(pageAppSummarySchema.extend({ viaWorkspace: z.boolean() })),
+  // for every page), `containers`/`containers_with_children` Apps that directly list this page,
+  // and `containers_with_children` Apps that reach it via an ancestor (`viaInheritance`).
+  connected: z.array(connectedPageAppSchema),
   // Other non-workspace-scoped, non-archived Apps in the same workspace that this page could
   // be connected to.
   connectable: z.array(pageAppSummarySchema),

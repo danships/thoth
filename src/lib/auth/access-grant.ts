@@ -1,5 +1,5 @@
 import { getAppScopedContainerRepository } from '@/lib/database';
-import { resolveContainerDescendants } from '@/lib/database/app-service';
+import { resolveContainerDescendants, resolvePageEmbeddedContainerIds } from '@/lib/database/app-service';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import type { App, AppPermission, AppScopeType } from '@/types/database';
 
@@ -66,7 +66,13 @@ export async function assertGrantAllowsContainer(
   const scopedContainerIds = grant.scopedContainerIds ?? [];
 
   if (grant.scopeType === 'containers') {
-    if (!scopedContainerIds.includes(container.id)) {
+    if (scopedContainerIds.includes(container.id)) {
+      return;
+    }
+    // Data sources are never granted on their own — access to a page implicitly covers the
+    // data source(s) embedded on it and the rows they display.
+    const embedded = await resolvePageEmbeddedContainerIds(scopedContainerIds, grant.workspaceId);
+    if (!embedded.has(container.id)) {
       throw new ForbiddenError('Container is outside the API key scope');
     }
     return;
@@ -103,7 +109,9 @@ export async function filterContainersByGrant<T extends { id: string; workspaceI
   const scopedContainerIds = new Set(grant.scopedContainerIds);
 
   if (grant.scopeType === 'containers') {
-    return scoped.filter((container) => scopedContainerIds.has(container.id));
+    // See `assertGrantAllowsContainer`: page scope implicitly covers embedded data sources/rows.
+    const embedded = await resolvePageEmbeddedContainerIds([...scopedContainerIds], grant.workspaceId);
+    return scoped.filter((container) => scopedContainerIds.has(container.id) || embedded.has(container.id));
   }
 
   // 'containers_with_children'

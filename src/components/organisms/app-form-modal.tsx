@@ -4,7 +4,6 @@ import { Alert, Button, Group, Modal, Select, Stack, TextInput } from '@mantine/
 import { useForm } from '@mantine/form';
 import { useEffect } from 'react';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
-import { DataSourceScopePicker } from './data-source-scope-picker';
 import type { AppResponse, CreateAppBody, UpdateAppBody } from '@/types/api';
 
 type AppFormModalProperties = {
@@ -17,14 +16,9 @@ type AppFormModalProperties = {
 
 // Shared create/edit form for an App's configuration (label, permission, scope, attribution).
 // Key minting/rotation is handled separately in the App detail view — this modal only ever
-// touches `App` fields, never a key's secret. Page scoping is handled separately, from the
-// page detail screen's "Apps" menu, so `containerIds` here only ever carries data-source ids.
-function getInitialDataSourceIds(app: AppResponse | undefined): string[] {
-  return (
-    app?.containers?.filter((container) => container.type === 'data-source').map((container) => container.id) ?? []
-  );
-}
-
+// touches `App` fields, never a key's secret. Container scoping (pages *and* data sources) is
+// handled entirely from each container's own page detail "Apps" menu, so this form never sends
+// `containerIds` and can't clobber grants made there.
 export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: AppFormModalProperties) {
   const { post, patch, inProgress, error } = useCudApi();
   const isEditing = Boolean(app);
@@ -35,7 +29,6 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
       permission: app?.permission ?? 'read',
       scopeType: app?.scopeType ?? 'workspace',
       attributionMode: app?.attributionMode ?? 'creator',
-      dataSourceIds: getInitialDataSourceIds(app),
     },
     validate: {
       label: (value) => (value.trim().length === 0 ? 'Label is required' : null),
@@ -52,7 +45,6 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
         permission: app?.permission ?? 'read',
         scopeType: app?.scopeType ?? 'workspace',
         attributionMode: app?.attributionMode ?? 'creator',
-        dataSourceIds: getInitialDataSourceIds(app),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,7 +58,6 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
           permission: values.permission,
           scopeType: values.scopeType,
           attributionMode: values.attributionMode,
-          ...(values.scopeType !== 'workspace' && { containerIds: values.dataSourceIds }),
         };
         const updated = await patch<AppResponse, UpdateAppBody>(`/apps/${app.id}`, body);
         onSaved(updated);
@@ -77,7 +68,6 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
           permission: values.permission,
           scopeType: values.scopeType,
           attributionMode: values.attributionMode,
-          ...(values.scopeType !== 'workspace' && { containerIds: values.dataSourceIds }),
         };
         const created = await post<AppResponse, CreateAppBody>('/apps', body);
         onSaved(created);
@@ -117,7 +107,7 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
 
           <Select
             label="Scope"
-            description="Pages are granted separately, from each page's own Apps menu"
+            description="Pages and data sources are granted access individually, from each page's own Apps menu"
             data={[
               { value: 'workspace', label: 'Entire workspace' },
               { value: 'containers', label: 'Specific pages and/or data sources' },
@@ -126,13 +116,6 @@ export function AppFormModal({ opened, workspaceId, app, onClose, onSaved }: App
             allowDeselect={false}
             {...form.getInputProps('scopeType')}
           />
-
-          {form.values.scopeType !== 'workspace' && (
-            <DataSourceScopePicker
-              value={form.values.dataSourceIds}
-              onChange={(ids) => form.setFieldValue('dataSourceIds', ids)}
-            />
-          )}
 
           <Select
             label="Attribution"

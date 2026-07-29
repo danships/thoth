@@ -1,6 +1,12 @@
 import crypto from 'node:crypto';
-import { getApiKeyRepository, getAppRepository, getContainerRepository, getWorkspaceMemberRepository } from './index';
-import type { ApiKey, App } from '@/types/database';
+import {
+  getApiKeyRepository,
+  getAppRepository,
+  getContainerRepository,
+  getDataViewRepository,
+  getWorkspaceMemberRepository,
+} from './index';
+import type { ApiKey, App, Container } from '@/types/database';
 
 // The single place the `"app--"` owner-id prefix convention is constructed/parsed, so it's
 // never hand-typed/duplicated at call sites. See Architecture Decision 1 in the THOTH-026 spec:
@@ -69,31 +75,116 @@ export async function verifyApiKey(rawKey: string): Promise<{ apiKey: ApiKey; ap
 }
 
 /**
- * Iteratively expands `containerIds` to include every descendant (recursively, via
- * `Container.parentId`), scoped to `workspaceId`. Used by `access-grant.ts` for
- * `scopeType === 'containers_with_children'`, resolved dynamically at check time (never
- * denormalized) so reparenting containers is automatically reflected without touching any
- * grant data.
+ * Iteratively expands `containerIds` to include every descendant, scoped to `workspaceId`.
+ * Used by `access-grant.ts` for `scopeType === 'containers_with_children'`, resolved
+ * dynamically at check time (never denormalized) so reparenting containers is automatically
+ * reflected without touching any grant data.
+ *
+ * Descendants are reached two ways: (1) directly, via `Container.parentId` (nested pages, and
+ * rows added under a data source); and (2) through the data sources a page embeds — rows added
+ * from a data view are parented to the *data source* (`parentId = dataSourceId`), and the data
+ * source itself has `parentId = null`, linked to its host page only via
+ * `page.views -> dataView.dataSourceId`. Without bridging that link, pages shown inside a data
+ * view on an in-scope page would be invisible to the grant. This mirrors, in the opposite
+ * direction, the breadcrumb traversal that bridges a data source up to its host page (see
+ * `pages/[id]/breadcrumbs`).
  */
 export async function resolveContainerDescendants(containerIds: string[], workspaceId: string): Promise<Set<string>> {
+  if (containerIds.length === 0) {
+    return new Set<string>();
+  }
+
   const containerRepository = await getContainerRepository();
+  const dataViewRepository = await getDataViewRepository();
   const descendants = new Set<string>();
-  let frontier = [...containerIds];
+
+  // Seed the frontier with the actual container objects (not just ids) so a page's `views` can
+  // be read to bridge into the data sources it embeds.
+  let frontier: Container[] = await containerRepository.getByQuery(
+    containerRepository.createQuery().eq('workspaceId', workspaceId).in('id', containerIds)
+  );
 
   while (frontier.length > 0) {
+    const frontierIds = frontier.map((container) => container.id);
+
+    // 1. Containers nested directly via `parentId` (nested pages, and rows under a data source).
     const children = await containerRepository.getByQuery(
-      containerRepository.createQuery().eq('workspaceId', workspaceId).in('parentId', frontier)
+      containerRepository.createQuery().eq('workspaceId', workspaceId).in('parentId', frontierIds)
     );
 
-    const newIds = children.map((child) => child.id).filter((id) => !descendants.has(id));
-    for (const id of newIds) {
-      descendants.add(id);
+    // 2. Data sources embedded in the frontier's pages via their data views.
+    const viewIds = frontier.flatMap((container) => (container.type === 'page' ? (container.views ?? []) : []));
+    let linkedDataSources: Container[] = [];
+    if (viewIds.length > 0) {
+      const dataViews = await dataViewRepository.getByQuery(
+        dataViewRepository.createQuery().eq('workspaceId', workspaceId).in('id', viewIds)
+      );
+      const dataSourceIds = [...new Set(dataViews.map((dataView) => dataView.dataSourceId))];
+      if (dataSourceIds.length > 0) {
+        linkedDataSources = await containerRepository.getByQuery(
+          containerRepository.createQuery().eq('workspaceId', workspaceId).in('id', dataSourceIds)
+        );
+      }
     }
 
-    frontier = newIds;
+    const nextFrontier: Container[] = [];
+    for (const container of [...children, ...linkedDataSources]) {
+      if (!descendants.has(container.id)) {
+        descendants.add(container.id);
+        nextFrontier.push(container);
+      }
+    }
+
+    frontier = nextFrontier;
   }
 
   return descendants;
+}
+
+/**
+ * Resolves the containers that are *implicitly* accessible through the given pages because they
+ * are embedded on them: the `data-source` containers shown on the pages (via
+ * `page.views -> dataView.dataSourceId`) plus the rows stored under those data sources
+ * (`parentId = dataSourceId`). Used by `access-grant.ts` so that granting an App access to a
+ * page implicitly grants access to the data (data source + its rows) displayed on that page —
+ * regardless of scope type — since data sources are never granted on their own.
+ */
+export async function resolvePageEmbeddedContainerIds(pageIds: string[], workspaceId: string): Promise<Set<string>> {
+  if (pageIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const containerRepository = await getContainerRepository();
+  const scopedContainers = await containerRepository.getByQuery(
+    containerRepository.createQuery().eq('workspaceId', workspaceId).in('id', pageIds)
+  );
+
+  const viewIds = scopedContainers.flatMap((container) => (container.type === 'page' ? (container.views ?? []) : []));
+  if (viewIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const dataViewRepository = await getDataViewRepository();
+  const dataViews = await dataViewRepository.getByQuery(
+    dataViewRepository.createQuery().eq('workspaceId', workspaceId).in('id', viewIds)
+  );
+
+  const dataSourceIds = [...new Set(dataViews.map((dataView) => dataView.dataSourceId))];
+  if (dataSourceIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const embedded = new Set<string>(dataSourceIds);
+
+  // The rows displayed by those data views live under the data source container.
+  const rows = await containerRepository.getByQuery(
+    containerRepository.createQuery().eq('workspaceId', workspaceId).in('parentId', dataSourceIds)
+  );
+  for (const row of rows) {
+    embedded.add(row.id);
+  }
+
+  return embedded;
 }
 
 /**

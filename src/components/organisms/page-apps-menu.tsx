@@ -6,17 +6,29 @@ import { usePageApps } from '@/lib/hooks/api/use-page-apps';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { getAppScopeLabel } from '@/lib/format/app-scope-label';
-import type { ConnectPageAppResponse, PageAppSummary } from '@/types/api';
+import type { ConnectPageAppResponse, ConnectedPageApp, PageAppSummary } from '@/types/api';
 
 type PageAppsMenuProperties = {
   pageId: string;
 };
 
+// The badge shown next to a connected App: where its access comes from. Extracted to a plain
+// function to avoid a nested ternary in the JSX.
+function connectedBadgeLabel(app: ConnectedPageApp): string {
+  if (app.viaWorkspace) {
+    return 'Workspace';
+  }
+  if (app.viaInheritance) {
+    return 'Inherited';
+  }
+  return getAppScopeLabel(app.scopeType);
+}
+
 // A small "three dots" menu, shown below the page header, listing the Apps (see THOTH-026)
 // that currently have access to this page ("Connected") plus any other non-workspace-scoped
-// Apps in the workspace that could be granted access ("Connect an App"). This is deliberately
-// the *only* place a page's App scope is managed — the App settings screen itself no longer
-// lets you pick pages (see `app-form-modal.tsx` / `data-source-scope-picker.tsx`).
+// Apps in the workspace that could be granted access ("Connect an App"). Connecting an App to a
+// page implicitly grants it access to the data sources embedded on the page, so data sources
+// are never managed here — only the page's own connections.
 export function PageAppsMenu({ pageId }: PageAppsMenuProperties) {
   const { data, isLoading, mutate } = usePageApps(pageId);
   const { post, delete: remove, inProgress } = useCudApi();
@@ -25,7 +37,7 @@ export function PageAppsMenu({ pageId }: PageAppsMenuProperties) {
   const handleConnect = async (app: PageAppSummary) => {
     try {
       await post<ConnectPageAppResponse>(`/pages/${pageId}/apps`, { appId: app.id });
-      showSuccess(`Connected "${app.label}" to this page`);
+      showSuccess(`Connected "${app.label}"`);
       await mutate();
     } catch {
       showError(`Failed to connect "${app.label}"`);
@@ -35,7 +47,7 @@ export function PageAppsMenu({ pageId }: PageAppsMenuProperties) {
   const handleDisconnect = async (app: PageAppSummary) => {
     try {
       await remove(`/pages/${pageId}/apps/${app.id}`);
-      showSuccess(`Disconnected "${app.label}" from this page`);
+      showSuccess(`Disconnected "${app.label}"`);
       await mutate();
     } catch {
       showError(`Failed to disconnect "${app.label}"`);
@@ -46,7 +58,7 @@ export function PageAppsMenu({ pageId }: PageAppsMenuProperties) {
   const connectable = data?.connectable ?? [];
 
   return (
-    <Menu shadow="md" width={280} closeOnItemClick={false} position="bottom-end">
+    <Menu shadow="md" width={300} closeOnItemClick={false} position="bottom-end">
       <Menu.Target>
         <Tooltip label="Apps">
           <ActionIcon variant="subtle" color="gray" aria-label="Apps for this page">
@@ -63,38 +75,43 @@ export function PageAppsMenu({ pageId }: PageAppsMenuProperties) {
           </Menu.Item>
         )}
         {!isLoading && connected.length === 0 && <Menu.Item disabled>No apps connected</Menu.Item>}
-        {connected.map((app) => (
-          // A plain row (not `Menu.Item`, which renders a `<button>`) — its only interactive
-          // element is the disconnect `ActionIcon`, and nesting a button inside a button is
-          // invalid HTML (and breaks hydration).
-          <Box key={app.id} px="sm" py={6}>
-            <Group gap={6} wrap="nowrap" justify="space-between">
-              <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
-                <IconPlugConnected size={14} style={{ flexShrink: 0 }} />
-                <Text size="sm" truncate>
-                  {app.label}
-                </Text>
-                <Badge size="xs" variant="light">
-                  {app.viaWorkspace ? 'Workspace' : getAppScopeLabel(app.scopeType)}
-                </Badge>
+        {connected.map((app) => {
+          // Workspace- and inheritance-granted connections can't be removed from here — they come
+          // from the App's scope, not a direct grant on this page.
+          const locked = app.viaWorkspace || app.viaInheritance === true;
+          return (
+            // A plain row (not `Menu.Item`, which renders a `<button>`) — its only interactive
+            // element is the disconnect `ActionIcon`, and nesting a button inside a button is
+            // invalid HTML (and breaks hydration).
+            <Box key={app.id} px="sm" py={6}>
+              <Group gap={6} wrap="nowrap" justify="space-between">
+                <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
+                  <IconPlugConnected size={14} style={{ flexShrink: 0 }} />
+                  <Text size="sm" truncate>
+                    {app.label}
+                  </Text>
+                  <Badge size="xs" variant="light">
+                    {connectedBadgeLabel(app)}
+                  </Badge>
+                </Group>
+                {!locked && (
+                  <Tooltip label="Disconnect">
+                    <ActionIcon
+                      size="xs"
+                      variant="subtle"
+                      color="red"
+                      aria-label={`Disconnect ${app.label}`}
+                      disabled={inProgress}
+                      onClick={() => void handleDisconnect(app)}
+                    >
+                      <IconUnlink size={12} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
               </Group>
-              {!app.viaWorkspace && (
-                <Tooltip label="Disconnect">
-                  <ActionIcon
-                    size="xs"
-                    variant="subtle"
-                    color="red"
-                    aria-label={`Disconnect ${app.label}`}
-                    disabled={inProgress}
-                    onClick={() => void handleDisconnect(app)}
-                  >
-                    <IconUnlink size={12} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-            </Group>
-          </Box>
-        ))}
+            </Box>
+          );
+        })}
 
         <Divider my={4} />
 
