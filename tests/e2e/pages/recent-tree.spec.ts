@@ -135,9 +135,12 @@ test.describe('recent sidebar section and GET /pages?recent filter', () => {
       await expect(page.getByRole('heading', { name: lowerRankedPage.name })).toBeVisible();
       await accessResponsePromise;
 
-      // Full navigation back to the pages list remounts the sidebar, forcing a fresh fetch of
-      // `GET /pages?recent=true` rather than relying on stale SWR cache.
-      await page.goto(`/${SEED.workspace.slug}/pages`);
+      // Reload (rather than navigating to the bare `/pages` landing route) remounts the sidebar,
+      // forcing a fresh fetch of `GET /pages?recent=true` rather than relying on stale SWR cache
+      // — without re-triggering a redirect through `/pages`, which always lands on the most
+      // recently *updated* root page (`SEED.pages.root` here) and would re-fire its own
+      // `POST /pages/:id/access` on mount, overwriting the very ordering this assertion checks.
+      await page.reload();
 
       const recentTree = page.getByTestId('recent-tree');
       await expect(recentTree.getByText(lowerRankedPage.name)).toBeVisible();
