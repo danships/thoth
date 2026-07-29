@@ -87,6 +87,16 @@ async function seedAppData() {
   const now = new Date().toISOString();
   const uid = SEED.user.id;
 
+  // Pages that only exist to support other fixtures (breadcrumbs, data-source rows, the child
+  // overflow preview, etc.) shouldn't compete for a slot in the Recent sidebar section
+  // (THOTH-035), which is scoped across *all* pages (root and nested) sorted by
+  // `lastAccessedAt` desc — not just root-level ones like the paginated root list. Without an
+  // explicit offset these would otherwise tie with `paginationSeed`'s entries (all seeded off
+  // the same `now` timestamp), making Recent's ordering nondeterministic. Kept comfortably
+  // older than every `paginationSeed` entry (oldest offset: -29s) so they never enter its
+  // top-`RECENT_MAX_LIMIT` window.
+  const OLD_ACCESS_TIMESTAMP = new Date(Date.parse(now) - 1_000_000).toISOString();
+
   // Workspace
   const existingWorkspace = await workspaceRepository.getOneByQuery(
     workspaceRepository.createQuery().eq('id', SEED.workspace.id)
@@ -235,17 +245,20 @@ async function seedAppData() {
     { lastAccessedAt: new Date(Date.parse(now) + 5000).toISOString() }
   );
 
-  await upsertPage({
-    id: SEED.pages.child.id,
-    name: SEED.pages.child.name,
-    emoji: '📝',
-    type: 'page',
-    userId: uid,
-    workspaceId: wsId,
-    parentId: SEED.pages.root.id,
-    createdAt: now,
-    lastUpdated: now,
-  });
+  await upsertPage(
+    {
+      id: SEED.pages.child.id,
+      name: SEED.pages.child.name,
+      emoji: '📝',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: SEED.pages.root.id,
+      createdAt: now,
+      lastUpdated: now,
+    },
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
 
   await upsertPage(
     {
@@ -267,31 +280,37 @@ async function seedAppData() {
   // `pages.root`), used to exercise the breadcrumb collapse-into-dropdown behavior.
   for (const [index, deepPage] of SEED.pages.deepChain.entries()) {
     const parentId = index === 0 ? SEED.pages.root.id : SEED.pages.deepChain[index - 1]!.id;
-    await upsertPage({
-      id: deepPage.id,
-      name: deepPage.name,
-      emoji: '📁',
+    await upsertPage(
+      {
+        id: deepPage.id,
+        name: deepPage.name,
+        emoji: '📁',
+        type: 'page',
+        userId: uid,
+        workspaceId: wsId,
+        parentId,
+        createdAt: now,
+        lastUpdated: now,
+      },
+      { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+    );
+  }
+
+  await upsertPage(
+    {
+      id: SEED.pages.breadcrumbDataSourceHost.id,
+      name: SEED.pages.breadcrumbDataSourceHost.name,
+      emoji: '📊',
       type: 'page',
       userId: uid,
       workspaceId: wsId,
-      parentId,
+      parentId: SEED.pages.root.id,
       createdAt: now,
       lastUpdated: now,
-    });
-  }
-
-  await upsertPage({
-    id: SEED.pages.breadcrumbDataSourceHost.id,
-    name: SEED.pages.breadcrumbDataSourceHost.name,
-    emoji: '📊',
-    type: 'page',
-    userId: uid,
-    workspaceId: wsId,
-    parentId: SEED.pages.root.id,
-    createdAt: now,
-    lastUpdated: now,
-    views: [SEED.breadcrumbDataView.id],
-  });
+      views: [SEED.breadcrumbDataView.id],
+    },
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
 
   const existingDs = await containerRepository.getOneByQuery(
     containerRepository.createQuery().eq('id', SEED.dataSource.id)
@@ -315,23 +334,26 @@ async function seedAppData() {
         lastUpdated: now,
       } as unknown as DataSourceContainerCreate));
 
-  await upsertPage({
-    id: SEED.dataSourcePage.id,
-    name: SEED.dataSourcePage.name,
-    emoji: null,
-    type: 'page',
-    userId: uid,
-    workspaceId: wsId,
-    parentId: SEED.dataSource.id,
-    createdAt: now,
-    lastUpdated: now,
-    values: {
-      [SEED.dataSource.columns[0].id]: { type: 'string', value: 'Seeded note' },
-      [SEED.dataSource.columns[1].id]: { type: 'boolean', value: false },
-      [SEED.dataSource.columns[2].id]: { type: 'date', value: '2026-01-31T00:00:00.000Z' },
-      [SEED.dataSource.columns[3].id]: { type: 'single-select', value: SEED.dataSource.columns[3].options[1].id },
+  await upsertPage(
+    {
+      id: SEED.dataSourcePage.id,
+      name: SEED.dataSourcePage.name,
+      emoji: null,
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: SEED.dataSource.id,
+      createdAt: now,
+      lastUpdated: now,
+      values: {
+        [SEED.dataSource.columns[0].id]: { type: 'string', value: 'Seeded note' },
+        [SEED.dataSource.columns[1].id]: { type: 'boolean', value: false },
+        [SEED.dataSource.columns[2].id]: { type: 'date', value: '2026-01-31T00:00:00.000Z' },
+        [SEED.dataSource.columns[3].id]: { type: 'single-select', value: SEED.dataSource.columns[3].options[1].id },
+      },
     },
-  });
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
 
   const existingView = await dataViewRepository.getOneByQuery(
     dataViewRepository.createQuery().eq('id', SEED.dataView.id)
@@ -402,20 +424,23 @@ async function seedAppData() {
         lastUpdated: now,
       } as unknown as DataViewCreate));
 
-  await upsertPage({
-    id: SEED.breadcrumbRowPage.id,
-    name: SEED.breadcrumbRowPage.name,
-    emoji: null,
-    type: 'page',
-    userId: uid,
-    workspaceId: wsId,
-    parentId: SEED.breadcrumbDataSource.id,
-    createdAt: now,
-    lastUpdated: now,
-    values: {
-      [SEED.breadcrumbDataSource.columns[0].id]: { type: 'string', value: 'Seeded breadcrumb note' },
+  await upsertPage(
+    {
+      id: SEED.breadcrumbRowPage.id,
+      name: SEED.breadcrumbRowPage.name,
+      emoji: null,
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: SEED.breadcrumbDataSource.id,
+      createdAt: now,
+      lastUpdated: now,
+      values: {
+        [SEED.breadcrumbDataSource.columns[0].id]: { type: 'string', value: 'Seeded breadcrumb note' },
+      },
     },
-  });
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
 
   // ── Fields tab test fixtures ─────────────────────────────────────────────────
   // A dedicated data source/view/page combo, kept separate from the fixtures above so
@@ -469,21 +494,24 @@ async function seedAppData() {
         lastUpdated: now,
       } as unknown as DataViewCreate));
 
-  await upsertPage({
-    id: fieldsSeed.page.id,
-    name: fieldsSeed.page.name,
-    emoji: null,
-    type: 'page',
-    userId: uid,
-    workspaceId: wsId,
-    parentId: fieldsSeed.dataSource.id,
-    createdAt: now,
-    lastUpdated: now,
-    values: {
-      [fieldsSeed.dataSource.columns[0].id]: { type: 'string', value: 'Initial alpha' },
-      [fieldsSeed.dataSource.columns[1].id]: { type: 'boolean', value: false },
+  await upsertPage(
+    {
+      id: fieldsSeed.page.id,
+      name: fieldsSeed.page.name,
+      emoji: null,
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: fieldsSeed.dataSource.id,
+      createdAt: now,
+      lastUpdated: now,
+      values: {
+        [fieldsSeed.dataSource.columns[0].id]: { type: 'string', value: 'Initial alpha' },
+        [fieldsSeed.dataSource.columns[1].id]: { type: 'boolean', value: false },
+      },
     },
-  });
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
 
   // ── Child-overflow test fixture ──────────────────────────────────────────────
   // A root page with more children (12) than CHILD_PREVIEW_LIMIT (10), used to verify the
@@ -504,17 +532,20 @@ async function seedAppData() {
   );
 
   for (const child of SEED.pages.childOverflowHost.children) {
-    await upsertPage({
-      id: child.id,
-      name: child.name,
-      emoji: null,
-      type: 'page',
-      userId: uid,
-      workspaceId: wsId,
-      parentId: SEED.pages.childOverflowHost.id,
-      createdAt: now,
-      lastUpdated: now,
-    });
+    await upsertPage(
+      {
+        id: child.id,
+        name: child.name,
+        emoji: null,
+        type: 'page',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: SEED.pages.childOverflowHost.id,
+        createdAt: now,
+        lastUpdated: now,
+      },
+      { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+    );
   }
 
   // ── Root-list pagination test fixtures ───────────────────────────────────────

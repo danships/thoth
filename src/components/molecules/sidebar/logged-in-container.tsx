@@ -1,5 +1,6 @@
 'use client';
 import { PagesTree } from '../pages-tree';
+import { RecentSection } from './recent-section';
 import { FavoritesSection } from './favorites-section';
 import { usePagesTree } from '@/lib/hooks/api/use-pages-tree';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
@@ -39,6 +40,7 @@ export function LoggedInContainer() {
 
   return (
     <Box>
+      <RecentSection />
       <FavoritesSection />
       <Group justify="space-between" mb="sm">
         <Title order={3}>Pages</Title>
