@@ -33,6 +33,11 @@ const eslintConfig = [
       'commitlint.config.js',
     ],
   },
+  {
+    // Restrict linting to TypeScript files only, replacing the previous
+    // `eslint --ext .ts,.tsx` CLI flag which is unsupported on flat config.
+    ignores: ['**/*.js', '**/*.jsx', '**/*.mjs', '**/*.cjs'],
+  },
 ];
 
 export default eslintConfig;

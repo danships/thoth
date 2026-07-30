@@ -305,7 +305,12 @@ function inlineAnonymousDefs(node: unknown): void {
     );
     if (anonymousDefs.size > 0) {
       inlineAnonymousDefinitionReferences(record, anonymousDefs);
-      record['$defs'] = Object.fromEntries(Object.entries(defs).filter(([name]) => !isAnonymousSchemaName(name)));
+      const remainingDefs = Object.fromEntries(Object.entries(defs).filter(([name]) => !isAnonymousSchemaName(name)));
+      if (Object.keys(remainingDefs).length > 0) {
+        record['$defs'] = remainingDefs;
+      } else {
+        delete record['$defs'];
+      }
     }
   }
 
@@ -320,8 +325,8 @@ function extractDefs(node: unknown, componentSchemas: Record<string, OpenApiSche
   }
 
   const record = node as Record<string, unknown>;
-  const defs = asRecord(record['$defs']);
-  if (Object.keys(defs).length > 0) {
+  if ('$defs' in record) {
+    const defs = asRecord(record['$defs']);
     for (const [name, definition] of Object.entries(defs)) {
       const component = clone(definition);
       extractDefs(component, componentSchemas);

@@ -33,4 +33,8 @@ assert.ok(
   'GET /pages/tree limit parameter should have a JSON schema'
 );
 
-await validate(document);
+const validationResult = await validate(document);
+assert.ok(
+  validationResult.valid,
+  `OpenAPI document is invalid: ${JSON.stringify(validationResult.valid ? [] : validationResult.errors, null, 2)}`
+);

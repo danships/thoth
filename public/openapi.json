@@ -657,8 +657,7 @@
                         "emoji",
                         "parentId"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -881,8 +880,7 @@
                         "emoji",
                         "parentId"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -1803,8 +1801,7 @@
                         "emoji",
                         "parentId"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -2000,8 +1997,7 @@
                         "parentId",
                         "lastAccessedAt"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -2749,8 +2745,7 @@
                         "connected",
                         "connectable"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -2868,8 +2863,7 @@
                         "scopeType",
                         "viaWorkspace"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -3163,8 +3157,7 @@
                         "createdAt",
                         "dataSourceId"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -3420,8 +3413,7 @@
                         "createdAt",
                         "dataSourceId"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -3713,8 +3705,7 @@
                         "createdAt",
                         "lastUpdated"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -3956,8 +3947,7 @@
                         "createdAt",
                         "lastUpdated"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -4200,8 +4190,7 @@
                         "createdAt",
                         "lastUpdated"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -4566,8 +4555,7 @@
                         "lastUpdated",
                         "columns"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -4701,8 +4689,7 @@
                 },
                 "required": [
                   "name"
-                ],
-                "$defs": {}
+                ]
               }
             }
           }
@@ -4935,8 +4922,7 @@
                         "lastUpdated",
                         "columns"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -5221,8 +5207,7 @@
                         "createdAt",
                         "columns"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -5505,8 +5490,7 @@
                           ],
                           "additionalProperties": false
                         }
-                      ],
-                      "$defs": {}
+                      ]
                     }
                   }
                 }
@@ -5916,8 +5900,7 @@
                           ],
                           "additionalProperties": false
                         }
-                      ],
-                      "$defs": {}
+                      ]
                     }
                   }
                 }
@@ -6146,8 +6129,7 @@
                       "name"
                     ]
                   }
-                ],
-                "$defs": {}
+                ]
               }
             }
           }
@@ -8735,8 +8717,7 @@
                         "createdAt",
                         "lastAttemptAt"
                       ],
-                      "additionalProperties": false,
-                      "$defs": {}
+                      "additionalProperties": false
                     }
                   }
                 }
