@@ -64,6 +64,9 @@ async function initializeAuth() {
       // OIDC authentication mode
       authInstance = betterAuth({
         database: createDatabaseAdapter(environment.DB),
+        advanced: {
+          cookiePrefix: 'thoth-auth',
+        },
         plugins: [
           genericOAuth({
             config: [
@@ -87,6 +90,9 @@ async function initializeAuth() {
       // Credentials (email/password) authentication mode
       authInstance = betterAuth({
         database: createDatabaseAdapter(environment.DB),
+        advanced: {
+          cookiePrefix: 'thoth-auth',
+        },
         emailAndPassword: {
           enabled: true,
         },

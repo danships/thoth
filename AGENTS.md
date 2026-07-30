@@ -108,6 +108,9 @@ src/app/api/
 - Integrate with authentication system (better-auth)
 - Use NextRequest/NextResponse objects
 - Export functions named after HTTP methods (GET, POST, PUT, DELETE, etc.)
+- Whenever a route or its API Zod schemas change, update `src/lib/openapi/registry.ts`, run `pnpm openapi:generate`, and commit the refreshed `public/openapi.json` (served statically at `/openapi.json`).
+- `pnpm lint` includes `lint:openapi`, which fails if `public/openapi.json` drifts from the registry/Zod source of truth.
+- The Docker build already copies `/app/public` into the runtime image (`COPY --from=builder /app/public ./public`), so the committed spec ships automatically.
 
 ## General TypeScript Rules
 
@@ -141,6 +144,9 @@ Before completing tasks, run available lint and typecheck commands:
 - Check package.json for scripts like `npm run lint`, `npm run typecheck`, `npm run test`
 - Fix any issues found
 - Only commit changes when explicitly requested by the user
+- Never add custom patches (e.g. via `pnpm patch`/`patches/*.patch`) to work around a broken
+  ESLint rule or dependency incompatibility. Instead, disable the offending rule (or fix the
+  root cause via config, e.g. explicit `settings`) in `eslint.config.mjs`.
 
 ## E2E Tests (Playwright)
 
@@ -155,11 +161,11 @@ Every feature — new or modified — **must** ship with Playwright E2E tests.
 
 The following agent skills provide targeted guidance for specific tasks:
 
-| Skill | Path | Purpose |
-|-------|------|---------|
-| `react-tsx-components` | `.agents/skills/react-tsx-components/SKILL.md` | Styling and error-handling conventions when editing `*.tsx` component files |
-| `pnpm-workflow` | `.agents/skills/pnpm-workflow/SKILL.md` | pnpm commands, available scripts, quality-gate workflow, and env-var setup |
-| `api-route-definition` | `.agents/skills/api-route-definition/SKILL.md` | Creating API routes with the `apiRoute` wrapper, file placement, HTTP exports, error handling, and the client helper pattern |
-| `zod-types-schemas` | `.agents/skills/zod-types-schemas/SKILL.md` | Defining Zod schemas and TypeScript types for API endpoints, naming conventions, and `DataWrapper` usage |
-| `securing-routes` | `.agents/skills/securing-routes/SKILL.md` | Session enforcement, per-user data scoping with `addUserIdToQuery`, resource ownership checks, and error types |
-| `database-repositories` | `.agents/skills/database-repositories/SKILL.md` | Using SuperSave repositories, query building, entity definitions, retrievers, and migration patterns |
+| Skill                   | Path                                            | Purpose                                                                                                                      |
+| ----------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `react-tsx-components`  | `.agents/skills/react-tsx-components/SKILL.md`  | Styling and error-handling conventions when editing `*.tsx` component files                                                  |
+| `pnpm-workflow`         | `.agents/skills/pnpm-workflow/SKILL.md`         | pnpm commands, available scripts, quality-gate workflow, and env-var setup                                                   |
+| `api-route-definition`  | `.agents/skills/api-route-definition/SKILL.md`  | Creating API routes with the `apiRoute` wrapper, file placement, HTTP exports, error handling, and the client helper pattern |
+| `zod-types-schemas`     | `.agents/skills/zod-types-schemas/SKILL.md`     | Defining Zod schemas and TypeScript types for API endpoints, naming conventions, and `DataWrapper` usage                     |
+| `securing-routes`       | `.agents/skills/securing-routes/SKILL.md`       | Session enforcement, per-user data scoping with `addUserIdToQuery`, resource ownership checks, and error types               |
+| `database-repositories` | `.agents/skills/database-repositories/SKILL.md` | Using SuperSave repositories, query building, entity definitions, retrievers, and migration patterns                         |

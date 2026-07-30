@@ -50,7 +50,12 @@ export const connectPageAppBodySchema = z.object({
 });
 export type ConnectPageAppBody = z.infer<typeof connectPageAppBodySchema>;
 
-export type ConnectPageAppResponse = PageAppSummary & { viaWorkspace: boolean };
+export const connectPageAppResponseSchema = pageAppSummarySchema
+  .extend({
+    viaWorkspace: z.boolean(),
+  })
+  .meta({ id: 'ConnectedPageApp' });
+export type ConnectPageAppResponse = z.infer<typeof connectPageAppResponseSchema>;
 export type ConnectPageAppResponseData = DataWrapper<ConnectPageAppResponse>;
 
 /** DELETE /pages/:id/apps/:appId */

@@ -22,6 +22,17 @@ const eslintConfig = [
     },
   },
   {
+    // Pin the React version instead of using eslint-config-next's default
+    // `settings.react.version: 'detect'`. Auto-detection calls
+    // eslint-plugin-react's context.getFilename(), which was removed in
+    // ESLint 9+, and crashes every rule that needs the React version.
+    settings: {
+      react: {
+        version: '19.2.7',
+      },
+    },
+  },
+  {
     ignores: [
       'node_modules/**',
       '.next/**',
@@ -32,6 +43,11 @@ const eslintConfig = [
       '**/node_modules/**',
       'commitlint.config.js',
     ],
+  },
+  {
+    // Restrict linting to TypeScript files only, replacing the previous
+    // `eslint --ext .ts,.tsx` CLI flag which is unsupported on flat config.
+    ignores: ['**/*.js', '**/*.jsx', '**/*.mjs', '**/*.cjs'],
   },
 ];
 
