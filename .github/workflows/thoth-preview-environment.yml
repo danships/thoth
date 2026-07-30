@@ -48,15 +48,7 @@ jobs:
           fi
 
       - name: Set up Docker Buildx
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 5
-          max_attempts: 3
-          retry_wait_seconds: 15
-          command: |
-            docker buildx create --name preview-builder \
-              --driver docker-container \
-              --bootstrap --use
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push image to ttl.sh
         run: |

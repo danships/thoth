@@ -144,6 +144,9 @@ Before completing tasks, run available lint and typecheck commands:
 - Check package.json for scripts like `npm run lint`, `npm run typecheck`, `npm run test`
 - Fix any issues found
 - Only commit changes when explicitly requested by the user
+- Never add custom patches (e.g. via `pnpm patch`/`patches/*.patch`) to work around a broken
+  ESLint rule or dependency incompatibility. Instead, disable the offending rule (or fix the
+  root cause via config, e.g. explicit `settings`) in `eslint.config.mjs`.
 
 ## E2E Tests (Playwright)
 
