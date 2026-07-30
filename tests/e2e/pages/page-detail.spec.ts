@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test';
+import type { Response } from '@playwright/test';
 import { SEED } from '../constants';
 
 test('displays seeded page title', async ({ page }) => {
@@ -25,8 +26,18 @@ test('can inline-edit the page title', async ({ page }) => {
   await heading.click();
   await heading.press('ControlOrMeta+A');
   await heading.pressSequentially('Renamed E2E Page');
+  // Match only the PATCH that actually renames the page, not any other in-flight request
+  // that happens to share the `/pages/:id` URL substring (e.g. the GET for page details, the
+  // breadcrumbs/apps GETs, or the page-access POST fired on mount) — under load, one of those
+  // can resolve before the real rename request and would otherwise cause this wait to resolve
+  // prematurely, on the wrong response.
+  const isRenamePatchResponse = (response: Response) =>
+    response.request().method() === 'PATCH' &&
+    new URL(response.url()).pathname.endsWith(`/pages/${SEED.pages.root.id}`) &&
+    response.ok();
+
   const [firstUpdateResponse] = await Promise.all([
-    page.waitForResponse((response) => response.url().includes(`/pages/${SEED.pages.root.id}`) && response.ok()),
+    page.waitForResponse(isRenamePatchResponse),
     heading.press('Enter'),
   ]);
   expect(firstUpdateResponse.ok()).toBe(true);
@@ -41,7 +52,7 @@ test('can inline-edit the page title', async ({ page }) => {
   await heading.press('ControlOrMeta+A');
   await heading.pressSequentially(SEED.pages.root.name);
   const [restoreResponse] = await Promise.all([
-    page.waitForResponse((response) => response.url().includes(`/pages/${SEED.pages.root.id}`) && response.ok()),
+    page.waitForResponse(isRenamePatchResponse),
     heading.press('Enter'),
   ]);
   expect(restoreResponse.ok()).toBe(true);
