@@ -2,6 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import {
   GetPageContentParameters,
   getPageContentParametersSchema,
@@ -34,6 +35,12 @@ export const POST = apiRoute(
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
     await assertGrantAllowsContainerForSession(session, page);
 
-    await containerRepository.update({ ...page, content: body.content, lastUpdated: new Date().toISOString() });
+    const updatedPage = await containerRepository.update({
+      ...page,
+      content: body.content,
+      lastUpdated: new Date().toISOString(),
+    });
+
+    scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
   }
 );

@@ -5,6 +5,7 @@ import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers'
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
+import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
@@ -235,6 +236,8 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
     // creation time, so the root-list pagination in `GET /pages/tree` can be driven entirely
     // off this table.
     await registerContainerAccessForNewPage(createdPage, session.user.id);
+
+    scheduleNotifyPageChange('page.created', createdPage, { appId: session.appContext?.appId });
 
     const returnValue: CreatePageResponse = {
       id: createdPage.id,

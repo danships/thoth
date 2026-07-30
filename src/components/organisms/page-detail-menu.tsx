@@ -137,7 +137,12 @@ export function PageDetailMenu({ pageId, hasContent, onImportMarkdown }: PageDet
             Import from Markdown
           </Menu.Item>
 
-          <Menu.Sub position="right-start">
+          {/* `closeDelay` guards against the hover-based submenu closing itself the instant a
+              connect/disconnect click shrinks or grows the dropdown: with no delay, the cursor
+              can end up outside the resized floating panel mid-click, and Mantine's `useHover`
+              would immediately treat that as "mouse left" and close the submenu before the
+              updated (dis)connected row ever renders. */}
+          <Menu.Sub position="right-start" closeDelay={300}>
             <Menu.Sub.Target>
               <Menu.Sub.Item leftSection={<IconPlugConnected size={14} />}>App connections</Menu.Sub.Item>
             </Menu.Sub.Target>

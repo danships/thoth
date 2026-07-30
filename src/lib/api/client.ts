@@ -18,6 +18,14 @@ import type {
   GetPageAppsResponse,
   ConnectPageAppResponse,
   MutatePageContentResponse,
+  GetWebhooksResponse,
+  CreateWebhookBody,
+  CreateWebhookResponse,
+  WebhookResponse,
+  UpdateWebhookBody,
+  UpdateWebhookResponse,
+  GetWebhookDeliveriesResponse,
+  ResendWebhookDeliveryResponse,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -113,6 +121,20 @@ export const api = {
     createKey: (appId: string, data: CreateApiKeyBody) =>
       apiClient.post<DataWrapper<CreateApiKeyResponse>>(`/apps/${appId}/keys`, data),
     revokeKey: (appId: string, keyId: string) => apiClient.delete(`/apps/${appId}/keys/${keyId}`),
+    listWebhooks: (appId: string) => apiClient.get<DataWrapper<GetWebhooksResponse>>(`/apps/${appId}/webhooks`),
+    createWebhook: (appId: string, data: CreateWebhookBody) =>
+      apiClient.post<DataWrapper<CreateWebhookResponse>>(`/apps/${appId}/webhooks`, data),
+    getWebhook: (appId: string, webhookId: string) =>
+      apiClient.get<DataWrapper<WebhookResponse>>(`/apps/${appId}/webhooks/${webhookId}`),
+    updateWebhook: (appId: string, webhookId: string, data: UpdateWebhookBody) =>
+      apiClient.patch<DataWrapper<UpdateWebhookResponse>>(`/apps/${appId}/webhooks/${webhookId}`, data),
+    deleteWebhook: (appId: string, webhookId: string) => apiClient.delete(`/apps/${appId}/webhooks/${webhookId}`),
+    listWebhookDeliveries: (appId: string, webhookId: string) =>
+      apiClient.get<DataWrapper<GetWebhookDeliveriesResponse>>(`/apps/${appId}/webhooks/${webhookId}/deliveries`),
+    resendWebhookDelivery: (appId: string, webhookId: string, deliveryId: string) =>
+      apiClient.post<DataWrapper<ResendWebhookDeliveryResponse>>(
+        `/apps/${appId}/webhooks/${webhookId}/deliveries/${deliveryId}/resend`
+      ),
   },
 };
 

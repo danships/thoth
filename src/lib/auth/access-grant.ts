@@ -55,38 +55,48 @@ export async function assertGrantAllowsContainer(
   grant: AccessGrant,
   container: { id: string; workspaceId: string }
 ): Promise<void> {
-  if (grant.workspaceId !== container.workspaceId) {
+  if (!(await grantAllowsContainer(grant, container))) {
     throw new ForbiddenError('Container is outside the API key scope');
+  }
+}
+
+/**
+ * Non-throwing predicate version of `assertGrantAllowsContainer` — used by
+ * `src/lib/webhooks/resolve-webhooks.ts`'s resolver, which needs to test many (grant, container)
+ * pairs and simply keep/discard rather than catch an exception per pair. `assertGrantAllowsContainer`
+ * throws ⇔ this returns `false`; kept in perfect parity by having the throwing wrapper delegate here.
+ */
+export async function grantAllowsContainer(
+  grant: AccessGrant,
+  container: { id: string; workspaceId: string }
+): Promise<boolean> {
+  if (grant.workspaceId !== container.workspaceId) {
+    return false;
   }
 
   if (grant.scopeType === 'workspace') {
-    return;
+    return true;
   }
 
   const scopedContainerIds = grant.scopedContainerIds ?? [];
 
   if (grant.scopeType === 'containers') {
     if (scopedContainerIds.includes(container.id)) {
-      return;
+      return true;
     }
     // Data sources are never granted on their own — access to a page implicitly covers the
     // data source(s) embedded on it and the rows they display.
     const embedded = await resolvePageEmbeddedContainerIds(scopedContainerIds, grant.workspaceId);
-    if (!embedded.has(container.id)) {
-      throw new ForbiddenError('Container is outside the API key scope');
-    }
-    return;
+    return embedded.has(container.id);
   }
 
   // 'containers_with_children'
   if (scopedContainerIds.includes(container.id)) {
-    return;
+    return true;
   }
 
   const descendants = await resolveContainerDescendants(scopedContainerIds, grant.workspaceId);
-  if (!descendants.has(container.id)) {
-    throw new ForbiddenError('Container is outside the API key scope');
-  }
+  return descendants.has(container.id);
 }
 
 /**

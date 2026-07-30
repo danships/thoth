@@ -3,9 +3,12 @@ import { getContainerRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
+import type { PageValue } from '@/types/schemas/entities/container';
+import type { ValueChangeInput } from '@/lib/webhooks/build-payload';
 import { z } from 'zod';
 
 const bodySchema = z.record(z.string(), pageValueSchema);
@@ -44,10 +47,29 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
     }
 
     const mergedValues = { ...page.values, ...body };
-    await containerRepository.update({
+
+    // Capture the raw before/after `PageValue`s (keyed by column id) for changed columns only —
+    // `notifyPageChange`/`buildPayload` resolves column-id -> name and single-select id -> label
+    // centrally, so this stays a dumb diff.
+    const valueChanges: ValueChangeInput = {};
+    for (const [columnId, newValue] of Object.entries(body)) {
+      const previousValue: PageValue | null = page.values?.[columnId] ?? null;
+      if (JSON.stringify(previousValue) !== JSON.stringify(newValue)) {
+        valueChanges[columnId] = { previous: previousValue, new: newValue };
+      }
+    }
+
+    const updatedPage = await containerRepository.update({
       ...page,
       values: mergedValues,
       lastUpdated: new Date().toISOString(),
     });
+
+    scheduleNotifyPageChange(
+      'page.updated',
+      updatedPage,
+      { appId: session.appContext?.appId },
+      Object.keys(valueChanges).length > 0 ? { valueChanges } : undefined
+    );
   }
 );

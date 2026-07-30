@@ -9,6 +9,8 @@ import type {
   App,
   ApiKey,
   AppScopedContainer,
+  Webhook,
+  WebhookDelivery,
 } from '@/types/database';
 import { getEnvironment } from '../environment';
 import * as entities from './entities';
@@ -34,6 +36,8 @@ async function initializeDatabase() {
   await database.addEntity(entities.App);
   await database.addEntity(entities.ApiKey);
   await database.addEntity(entities.AppScopedContainer);
+  await database.addEntity(entities.Webhook);
+  await database.addEntity(entities.WebhookDelivery);
 
   if (!skipSync) {
     await database.runMigrations();
@@ -101,4 +105,14 @@ export async function getApiKeyRepository() {
 export async function getAppScopedContainerRepository() {
   const database = await getDatabase();
   return database.getRepository<AppScopedContainer>(entities.APP_SCOPED_CONTAINER_NAME);
+}
+
+export async function getWebhookRepository() {
+  const database = await getDatabase();
+  return database.getRepository<Webhook>(entities.WEBHOOK_NAME);
+}
+
+export async function getWebhookDeliveryRepository() {
+  const database = await getDatabase();
+  return database.getRepository<WebhookDelivery>(entities.WEBHOOK_DELIVERY_NAME);
 }

@@ -1,19 +1,27 @@
 'use client';
 
-import { ActionIcon, Badge, Button, Group, Table, Text, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Group, Table, Text, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconArchive, IconEdit, IconKey } from '@tabler/icons-react';
+import { IconArchive, IconEdit } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
 import { getAppScopeLabel } from '@/lib/format/app-scope-label';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import type { AppResponse } from '@/types/api';
 
 type AppsTableProperties = {
   apps: AppResponse[];
-  onManage: (app: AppResponse) => void;
   onEdit: (app: AppResponse) => void;
   onArchive: (app: AppResponse) => void;
 };
 
-export function AppsTable({ apps, onManage, onEdit, onArchive }: AppsTableProperties) {
+export function AppsTable({ apps, onEdit, onArchive }: AppsTableProperties) {
+  const router = useRouter();
+  const { slug: workspaceSlug } = useCurrentWorkspace();
+
+  const goToApp = (app: AppResponse) => {
+    router.push(`/${workspaceSlug}/settings/apps/${app.id}`);
+  };
+
   const confirmArchive = (app: AppResponse) => {
     modals.openConfirmModal({
       title: 'Archive App',
@@ -51,7 +59,18 @@ export function AppsTable({ apps, onManage, onEdit, onArchive }: AppsTableProper
         </Table.Thead>
         <Table.Tbody>
           {apps.map((app) => (
-            <Table.Tr key={app.id}>
+            <Table.Tr
+              key={app.id}
+              onClick={() => goToApp(app)}
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  goToApp(app);
+                }
+              }}
+              style={{ cursor: 'pointer' }}
+            >
               <Table.Td>{app.label}</Table.Td>
               <Table.Td>
                 <Badge color={app.permission === 'read_write' ? 'blue' : 'gray'} variant="light">
@@ -70,30 +89,25 @@ export function AppsTable({ apps, onManage, onEdit, onArchive }: AppsTableProper
                 )}
               </Table.Td>
               <Table.Td>
-                <Group gap="xs">
-                  <Button size="xs" variant="light" leftSection={<IconKey size={14} />} onClick={() => onManage(app)}>
-                    Manage keys
-                  </Button>
-                  {!app.archivedAt && (
-                    <>
-                      <Tooltip label="Edit App">
-                        <ActionIcon variant="subtle" aria-label="Edit App" onClick={() => onEdit(app)}>
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Archive App">
-                        <ActionIcon
-                          color="red"
-                          variant="subtle"
-                          aria-label="Archive App"
-                          onClick={() => confirmArchive(app)}
-                        >
-                          <IconArchive size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </>
-                  )}
-                </Group>
+                {!app.archivedAt && (
+                  <Group gap="xs" onClick={(event) => event.stopPropagation()}>
+                    <Tooltip label="Edit App">
+                      <ActionIcon variant="subtle" aria-label="Edit App" onClick={() => onEdit(app)}>
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Archive App">
+                      <ActionIcon
+                        color="red"
+                        variant="subtle"
+                        aria-label="Archive App"
+                        onClick={() => confirmArchive(app)}
+                      >
+                        <IconArchive size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                )}
               </Table.Td>
             </Table.Tr>
           ))}

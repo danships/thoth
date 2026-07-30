@@ -4,6 +4,7 @@ import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { pageColumnRetriever } from '@/lib/database/retrievers/page-column-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import type {
   GetPageDetailsParameters,
   GetPageDetailsQuery,
@@ -109,6 +110,8 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
       ...filteredBody,
       lastUpdated: new Date().toISOString(),
     });
+
+    scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
 
     return {
       id: updatedPage.id,

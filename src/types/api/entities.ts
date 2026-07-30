@@ -4,6 +4,8 @@ import { containerAccessSchema as containerAccessSchemaEntity } from '../schemas
 import { workspaceSchema as workspaceSchemaEntity } from '../schemas/entities/workspace';
 import { appSchema as appSchemaEntity } from '../schemas/entities/app';
 import { apiKeyPublicSchema as apiKeyPublicSchemaEntity } from '../schemas/entities/api-key';
+import { webhookPublicSchema as webhookPublicSchemaEntity } from '../schemas/entities/webhook';
+import { webhookDeliverySchema as webhookDeliverySchemaEntity } from '../schemas/entities/webhook-delivery';
 import { z } from 'zod';
 
 export { pageCoverSchema } from '../schemas/entities/container';
@@ -85,3 +87,35 @@ export const apiKeySchema = apiKeyPublicSchemaEntity.pick({
   createdAt: true,
 });
 export type ApiKeyApi = z.infer<typeof apiKeySchema>;
+
+// API-facing representation of a Webhook (see THOTH-031): never includes the raw `secret` —
+// callers get a masked form (`secretMasked`, attached in `WebhookResponse`) plus the raw value
+// only once, on create/rotate.
+export const webhookSchema = webhookPublicSchemaEntity.pick({
+  id: true,
+  appId: true,
+  workspaceId: true,
+  label: true,
+  url: true,
+  enabled: true,
+  suppressOwnChanges: true,
+  createdAt: true,
+  lastUpdated: true,
+});
+export type WebhookApi = z.infer<typeof webhookSchema>;
+
+// API-facing representation of a delivery-attempt history row: never includes the stored
+// `payload` (kept internal for verbatim resend) or the `webhookId`/`appId` FKs (implied by the
+// route path).
+export const webhookDeliverySchema = webhookDeliverySchemaEntity.pick({
+  id: true,
+  event: true,
+  containerId: true,
+  status: true,
+  httpStatus: true,
+  error: true,
+  attempts: true,
+  createdAt: true,
+  lastAttemptAt: true,
+});
+export type WebhookDeliveryApi = z.infer<typeof webhookDeliverySchema>;
