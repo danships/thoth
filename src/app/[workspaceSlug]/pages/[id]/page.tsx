@@ -18,7 +18,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mutate as mutateGlobal } from 'swr';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
-import { PageDetailEditor } from '@/components/organisms/page-detail-editor';
 import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
 import { IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
@@ -34,7 +33,8 @@ import { useToggleFavorite } from '@/lib/hooks/api/use-toggle-page-favorite';
 import { PageBreadcrumb } from '@/components/molecules/page-breadcrumb';
 import { PageCoverEditor } from '@/components/molecules/page-cover-editor';
 import { PageEmojiPicker } from '@/components/molecules/page-emoji-picker';
-import { PageAppsMenu } from '@/components/organisms/page-apps-menu';
+import { PageDetailMenu } from '@/components/organisms/page-detail-menu';
+import { PageDetailEditor, type PageDetailEditorHandle } from '@/components/organisms/page-detail-editor';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import { GET_PAGES_ENDPOINT } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
@@ -54,6 +54,7 @@ export default function PageDetailsPage() {
 
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);
   const titleReference = useRef<HTMLHeadingElement>(null);
+  const editorReference = useRef<PageDetailEditorHandle>(null);
 
   const { showError } = useNotification();
   const { updatePage } = useUpdatePage({ mutatePageDetails: mutate });
@@ -105,6 +106,22 @@ export default function PageDetailsPage() {
       }
     },
     [pageId, setPageContent, showError]
+  );
+
+  // Imports a Markdown file's contents into the editor (see the "Import from Markdown" menu
+  // action) and persists the normalised result through the same content-save flow as regular
+  // edits. Throws if the editor hasn't mounted yet so the caller's error handling (and toast)
+  // reflects the failed import instead of a false success.
+  const handleImportMarkdown = useCallback(
+    async (markdown: string) => {
+      if (!editorReference.current || !pageId) {
+        throw new Error('Editor is not ready to import markdown');
+      }
+
+      const normalizedMarkdown = await editorReference.current.replaceWithMarkdown(markdown);
+      await setPageContent(pageId, normalizedMarkdown);
+    },
+    [pageId, setPageContent]
   );
 
   const doViewCreated = useCallback(
@@ -228,7 +245,11 @@ export default function PageDetailsPage() {
             </ActionIcon>
           </Group>
           <Group justify="flex-end">
-            <PageAppsMenu pageId={pageId} />
+            <PageDetailMenu
+              pageId={pageId}
+              hasContent={Boolean(pageDetails.content)}
+              onImportMarkdown={handleImportMarkdown}
+            />
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (
             <PageFieldsEditor
@@ -269,7 +290,12 @@ export default function PageDetailsPage() {
                 </Button>
               </Group>
               <Tabs.Panel value="contents" className={styles['tabsPanel'] ?? ''}>
-                <PageDetailEditor key={pageId} initialContent={pageDetails.content ?? ''} onUpdate={updateContent} />
+                <PageDetailEditor
+                  ref={editorReference}
+                  key={pageId}
+                  initialContent={pageDetails.content ?? ''}
+                  onUpdate={updateContent}
+                />
               </Tabs.Panel>
 
               {pageDetails.views?.map((view) => (
