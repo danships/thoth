@@ -7,12 +7,14 @@ FROM base AS deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY patches ./patches
 RUN pnpm install --frozen-lockfile --prod
 
 FROM base AS builder
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
