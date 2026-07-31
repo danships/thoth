@@ -6,6 +6,8 @@ import {
   type CreateSingleSelectOptionResponse,
 } from '@/types/api';
 
+// Also used by multi-select columns — both column types share the identical option model
+// (id/label/color) and the same server-side option-create endpoint.
 export function useCreateSingleSelectOption(dataSourceId: string) {
   const { post, inProgress } = useCudApi();
 

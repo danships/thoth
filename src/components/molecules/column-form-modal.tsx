@@ -10,7 +10,7 @@ import {
 
 type ColumnFormValues = {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'single-select';
+  type: 'string' | 'number' | 'boolean' | 'date' | 'single-select' | 'multi-select';
   mode: DateMode;
   displayFormat: string;
   options: SingleSelectOptionDraft[];
@@ -27,7 +27,9 @@ type ColumnFormModalProperties = {
 };
 
 function getInitialOptions(initialValues: Column | undefined): SingleSelectOptionDraft[] {
-  return initialValues?.type === 'single-select' ? initialValues.options.map((option) => ({ ...option })) : [];
+  return initialValues?.type === 'single-select' || initialValues?.type === 'multi-select'
+    ? initialValues.options.map((option) => ({ ...option }))
+    : [];
 }
 
 function hasDuplicateOptionLabels(options: SingleSelectOptionDraft[]): boolean {
@@ -66,7 +68,7 @@ export function ColumnFormModal({
       displayFormat: (value, values) =>
         values.type === 'date' && !value ? 'Display format is required for date columns' : null,
       options: (value, values) => {
-        if (values.type !== 'single-select') {
+        if (values.type !== 'single-select' && values.type !== 'multi-select') {
           return null;
         }
         if (value.some((option) => !option.label.trim())) {
@@ -116,9 +118,9 @@ export function ColumnFormModal({
       const currentMode = form.values.mode ?? 'date';
       form.setFieldValue('displayFormat', getDefaultFormatForMode(currentMode));
     }
-    // Single-select columns can be created with zero options — options are typically added
-    // inline from the table cell (via the "+ Create" option in the dropdown) rather than being
-    // required up-front here.
+    // Single-select and multi-select columns can be created with zero options — options are
+    // typically added inline from the table cell (via the "+ Create" option in the dropdown)
+    // rather than being required up-front here.
   };
 
   const handleModeChange = (value: string | null) => {
@@ -145,6 +147,7 @@ export function ColumnFormModal({
               { value: 'boolean', label: 'Checkbox' },
               { value: 'date', label: 'Date' },
               { value: 'single-select', label: 'Single select' },
+              { value: 'multi-select', label: 'Multi select' },
             ]}
             {...form.getInputProps('type')}
             onChange={handleTypeChange}
@@ -166,7 +169,7 @@ export function ColumnFormModal({
               <Select label="Display Format" data={formatPresets} {...form.getInputProps('displayFormat')} required />
             </>
           )}
-          {form.values.type === 'single-select' && (
+          {(form.values.type === 'single-select' || form.values.type === 'multi-select') && (
             <SingleSelectOptionsEditor
               options={form.values.options}
               onChange={(options) => form.setFieldValue('options', options)}

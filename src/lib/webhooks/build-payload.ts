@@ -11,8 +11,9 @@ export type ValueChangeInput = Record<string, { previous: PageValue | null; new:
 
 /**
  * Resolves a stored `PageValue` to the primitive the payload should carry: for `single-select`,
- * the option's `label` (or `null` if unset/the option no longer exists); otherwise the raw
- * `.value`. The single place internal option ids are turned into human-readable labels.
+ * the option's `label` (or `null` if unset/the option no longer exists); for `multi-select`, an
+ * array of option labels (stale/deleted ids are filtered out); otherwise the raw `.value`. The
+ * single place internal option ids are turned into human-readable labels.
  */
 function toDisplayValue(column: Column, value: PageValue | null | undefined): WebhookRawValue {
   if (!value) {
@@ -24,6 +25,10 @@ function toDisplayValue(column: Column, value: PageValue | null | undefined): We
     }
     const option = column.options.find((candidate) => candidate.id === value.value);
     return option?.label ?? null;
+  }
+  if (column.type === 'multi-select' && value.type === 'multi-select') {
+    const optionsById = new Map(column.options.map((option) => [option.id, option] as const));
+    return value.value.map((optionId) => optionsById.get(optionId)?.label).filter((label) => label !== undefined);
   }
   if ('value' in value) {
     return value.value;

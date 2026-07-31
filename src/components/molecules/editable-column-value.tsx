@@ -3,6 +3,7 @@ import { EditableTextCell } from '@/components/atoms/editable-text-cell';
 import { EditableBooleanCell } from '@/components/atoms/editable-boolean-cell';
 import { EditableDateCell } from '@/components/atoms/editable-date-cell';
 import { EditableSingleSelectCell } from '@/components/atoms/editable-single-select-cell';
+import { EditableMultiSelectCell } from '@/components/atoms/editable-multi-select-cell';
 import type { Column, PageValue, SingleSelectOption } from '@/types/schemas/entities/container';
 
 type EditableColumnValueProperties = {
@@ -56,6 +57,23 @@ export function EditableColumnValue({
         onCreateOption={async (label) => {
           if (!onCreateOption) {
             throw new Error('onCreateOption is required for single-select columns');
+          }
+          return onCreateOption(column.id, label);
+        }}
+        disabled={disabled}
+      />
+    );
+  }
+
+  if (column.type === 'multi-select') {
+    return (
+      <EditableMultiSelectCell
+        value={value?.type === 'multi-select' ? value.value : []}
+        options={column.options}
+        onChange={(optionIds) => onChange({ type: 'multi-select', value: optionIds })}
+        onCreateOption={async (label) => {
+          if (!onCreateOption) {
+            throw new Error('onCreateOption is required for multi-select columns');
           }
           return onCreateOption(column.id, label);
         }}

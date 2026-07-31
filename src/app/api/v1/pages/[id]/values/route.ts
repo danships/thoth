@@ -44,6 +44,17 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
           throw new BadRequestError(`Unknown option for column: ${columnId}`);
         }
       }
+      if (column.type === 'multi-select' && value.type === 'multi-select') {
+        if (!Array.isArray(value.value)) {
+          throw new BadRequestError(`Invalid value for column: ${columnId}`);
+        }
+        const validOptionIds = new Set(column.options.map((option) => option.id));
+        for (const optionId of value.value) {
+          if (!validOptionIds.has(optionId)) {
+            throw new BadRequestError(`Unknown option for column: ${columnId}`);
+          }
+        }
+      }
     }
 
     const mergedValues = { ...page.values, ...body };

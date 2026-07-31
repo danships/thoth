@@ -366,6 +366,10 @@ async function seedAppData() {
         [SEED.dataSource.columns[1].id]: { type: 'boolean', value: false },
         [SEED.dataSource.columns[2].id]: { type: 'date', value: '2026-01-31T00:00:00.000Z' },
         [SEED.dataSource.columns[3].id]: { type: 'single-select', value: SEED.dataSource.columns[3].options[1].id },
+        [SEED.dataSource.columns[4].id]: {
+          type: 'multi-select',
+          value: [SEED.dataSource.columns[4].options[0].id, SEED.dataSource.columns[4].options[2].id],
+        },
       },
     },
     { lastAccessedAt: OLD_ACCESS_TIMESTAMP }

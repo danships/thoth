@@ -19,7 +19,7 @@ export const POST = apiRoute<z.infer<typeof columnSchema>, undefined, { id: stri
     const newColumn: Column =
       body.type === 'date'
         ? { id: randomUUID(), name: body.name, type: body.type, mode: body.mode, displayFormat: body.displayFormat }
-        : body.type === 'single-select'
+        : body.type === 'single-select' || body.type === 'multi-select'
           ? {
               id: randomUUID(),
               name: body.name,

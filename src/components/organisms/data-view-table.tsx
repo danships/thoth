@@ -67,7 +67,7 @@ export function DataViewTable({
 
   const handleColumnSubmit = async (values: {
     name: string;
-    type: 'string' | 'number' | 'boolean' | 'date' | 'single-select';
+    type: 'string' | 'number' | 'boolean' | 'date' | 'single-select' | 'multi-select';
     mode?: 'date' | 'time' | 'datetime';
     displayFormat?: string;
     options?: { id: string; label: string; color: SelectColor }[];
@@ -81,10 +81,10 @@ export function DataViewTable({
               mode: values.mode,
               displayFormat: values.displayFormat,
             }
-          : values.type === 'single-select'
+          : values.type === 'single-select' || values.type === 'multi-select'
             ? {
                 name: values.name.trim(),
-                type: 'single-select',
+                type: values.type,
                 options: (values.options ?? []).map((option) => ({ ...option, label: option.label.trim() })),
               }
             : { name: values.name.trim(), type: values.type };
@@ -98,10 +98,10 @@ export function DataViewTable({
               mode: values.mode ?? 'date',
               displayFormat: values.displayFormat ?? '',
             }
-          : values.type === 'single-select'
+          : values.type === 'single-select' || values.type === 'multi-select'
             ? {
                 name: values.name.trim(),
-                type: 'single-select',
+                type: values.type,
                 options: (values.options ?? []).map((option) => ({
                   label: option.label.trim(),
                   color: option.color,
