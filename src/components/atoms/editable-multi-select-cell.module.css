@@ -12,3 +12,16 @@
 .pillWrap {
   flex-wrap: wrap;
 }
+
+.openTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mantine-color-gray-6);
+  padding: 2px;
+  border-radius: var(--mantine-radius-sm);
+}
+
+.openTrigger:hover {
+  color: var(--mantine-color-gray-9);
+}

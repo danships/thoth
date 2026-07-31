@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Combobox, Group, Text, useCombobox, CloseButton, Box, Loader } from '@mantine/core';
+import { Combobox, Group, Text, useCombobox, CloseButton, Box, Loader, UnstyledButton } from '@mantine/core';
+import { IconChevronDown } from '@tabler/icons-react';
 import { SelectOptionBadge } from '@/components/atoms/select-option-badge';
 import { useNotification } from '@/lib/hooks/use-notification';
 import type { SingleSelectOption } from '@/types/schemas/entities/container';
@@ -39,11 +40,15 @@ export function EditableMultiSelectCell({
     },
   });
 
-  // Stale/deleted option ids are filtered out rather than crashing — mirrors the defensive
-  // filtering used for single-select's stale value.
+  // Stale/deleted option ids (and any accidental duplicates) are filtered out rather than
+  // crashing — mirrors the defensive filtering used for single-select's stale value.
   const selectedOptions = value
+    .filter((optionId, index, ids) => ids.indexOf(optionId) === index)
     .map((optionId) => options.find((option) => option.id === optionId))
     .filter((option): option is SingleSelectOption => option !== undefined);
+  // Every update below is derived from this sanitized list instead of the raw `value` prop so a
+  // stale/deleted option id already stored on the row is dropped rather than resubmitted.
+  const selectedOptionIds = selectedOptions.map((option) => option.id);
 
   const normalizedSearch = search.trim().toLowerCase();
   const filteredOptions = normalizedSearch
@@ -57,7 +62,7 @@ export function EditableMultiSelectCell({
     setCreating(true);
     try {
       const newOption = await onCreateOption(search.trim());
-      onChange([...value, newOption.id]);
+      onChange([...selectedOptionIds, newOption.id]);
       setSearch('');
     } catch (error) {
       // Surface the failure via the shared notification system rather than swallowing it —
@@ -69,10 +74,10 @@ export function EditableMultiSelectCell({
   };
 
   const toggleOption = (optionId: string) => {
-    if (value.includes(optionId)) {
-      onChange(value.filter((id) => id !== optionId));
+    if (selectedOptionIds.includes(optionId)) {
+      onChange(selectedOptionIds.filter((id) => id !== optionId));
     } else {
-      onChange([...value, optionId]);
+      onChange([...selectedOptionIds, optionId]);
     }
   };
 
@@ -94,22 +99,29 @@ export function EditableMultiSelectCell({
 
   const handleRemove = (event: React.MouseEvent, optionId: string) => {
     event.stopPropagation();
-    onChange(value.filter((id) => id !== optionId));
+    onChange(selectedOptionIds.filter((id) => id !== optionId));
   };
 
   return (
     <Combobox store={combobox} onOptionSubmit={handleOptionSubmit} disabled={disabled}>
-      <Combobox.Target>
+      {/*
+       * Unlike the single-select cell, this target has to hold several independently
+       * interactive `CloseButton`s alongside the "open dropdown" trigger. Nesting real buttons
+       * inside a single `role="button"` container (the previous implementation) produces
+       * invalid, ambiguously-focusable markup that mobile browsers handle inconsistently —
+       * tapping to focus the search input inside the dropdown could bounce focus back to the
+       * outer container and close the dropdown (and the on-screen keyboard) immediately.
+       * `Combobox.DropdownTarget` anchors the dropdown to the whole pill container (click
+       * anywhere in the cell still opens it), while a dedicated `Combobox.EventsTarget` button
+       * — a sibling of the `CloseButton`s, not their ancestor — provides the keyboard-accessible
+       * (Enter/Space) way to open it, per Mantine's supported pattern for custom Combobox
+       * targets with independently removable controls.
+       */}
+      <Combobox.DropdownTarget>
         <Box
           className={styles['target'] ?? ''}
           onClick={() => !disabled && combobox.toggleDropdown()}
-          role="button"
-          tabIndex={disabled ? -1 : 0}
           data-testid="multi-select-cell-target"
-          // Explicit label so this element's accessible name doesn't shift based on its
-          // pill/close-button descendants (their labels would otherwise be included in the
-          // computed name for a role="button" element with no explicit label).
-          aria-label="Select options"
         >
           <Group gap="xs" wrap="wrap" className={styles['pillWrap'] ?? ''} justify="space-between" w="100%">
             {selectedOptions.length > 0 ? (
@@ -132,9 +144,27 @@ export function EditableMultiSelectCell({
                 —
               </Text>
             )}
+            {!disabled && (
+              <Combobox.EventsTarget targetType="button">
+                <UnstyledButton
+                  type="button"
+                  className={styles['openTrigger'] ?? ''}
+                  aria-label="Select options"
+                  onClick={(event) => {
+                    // Stop propagation so this button's own click (handled above by Mantine's
+                    // keyboard-target wiring) doesn't also bubble up to the outer Box's onClick
+                    // and toggle the dropdown a second time in the same interaction.
+                    event.stopPropagation();
+                    combobox.toggleDropdown();
+                  }}
+                >
+                  <IconChevronDown size={14} />
+                </UnstyledButton>
+              </Combobox.EventsTarget>
+            )}
           </Group>
         </Box>
-      </Combobox.Target>
+      </Combobox.DropdownTarget>
 
       <Combobox.Dropdown>
         <Combobox.Search
@@ -144,10 +174,10 @@ export function EditableMultiSelectCell({
         />
         <Combobox.Options>
           {filteredOptions.map((option) => (
-            <Combobox.Option value={option.id} key={option.id} active={value.includes(option.id)}>
+            <Combobox.Option value={option.id} key={option.id} active={selectedOptionIds.includes(option.id)}>
               <Group gap="xs" wrap="nowrap" justify="space-between">
                 <SelectOptionBadge label={option.label} color={option.color} />
-                {value.includes(option.id) && (
+                {selectedOptionIds.includes(option.id) && (
                   <Text size="xs" c="dimmed">
                     Selected
                   </Text>

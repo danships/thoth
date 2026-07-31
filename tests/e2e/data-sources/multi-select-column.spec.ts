@@ -38,6 +38,14 @@ test('can select an additional option for a multi-select cell', async ({ page })
   await expect(tagsCell.getByText(tagsColumn.options[0].label)).toBeVisible();
   await expect(tagsCell.getByText(tagsColumn.options[1].label)).toBeVisible();
   await expect(tagsCell.getByText(tagsColumn.options[2].label)).toBeVisible();
+
+  // Restore the seeded selection so this test doesn't leave shared backend state behind for
+  // other tests in this file (they run sequentially against the same seeded row).
+  await tagsCell
+    .getByTestId('multi-select-cell-target')
+    .getByRole('button', { name: `Remove ${tagsColumn.options[1].label}` })
+    .click();
+  await expect(tagsCell.getByText(tagsColumn.options[1].label)).not.toBeVisible();
 });
 
 test('can deselect an option from a multi-select cell', async ({ page }) => {
@@ -47,10 +55,18 @@ test('can deselect an option from a multi-select cell', async ({ page }) => {
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
   const tagsCell = row.getByRole('cell').nth(5);
 
-  // Remove the "Backend" pill added by the previous test via its own close button. Scope to
-  // the target's descendant buttons first — the target `div` itself has `role="button"` and,
-  // with no explicit label, its accessible name is computed from its pill/close-button
-  // descendants, so an unscoped `getByRole('button', { name })` on the cell would also match it.
+  // Select "Backend" first so this test is self-contained and doesn't depend on state left
+  // behind by the "can select an additional option" test (which would break on a retry after a
+  // prior attempt already removed it, or when run in isolation).
+  await tagsCell.getByTestId('multi-select-cell-target').click();
+  await page.getByRole('option', { name: tagsColumn.options[1].label }).click();
+  await page.keyboard.press('Escape');
+  await expect(tagsCell.getByText(tagsColumn.options[1].label)).toBeVisible();
+
+  // Remove the "Backend" pill via its own close button. Scope to the target's descendant
+  // buttons first — the target `div` itself has `role="button"` and, with no explicit label,
+  // its accessible name is computed from its pill/close-button descendants, so an unscoped
+  // `getByRole('button', { name })` on the cell would also match it.
   await tagsCell
     .getByTestId('multi-select-cell-target')
     .getByRole('button', { name: `Remove ${tagsColumn.options[1].label}` })
@@ -77,11 +93,12 @@ test('can create a new option from the multi-select cell dropdown and re-searchi
 
   await expect(tagsCell.getByText('Design')).toBeVisible();
 
-  // Searching for the label just created should offer the existing option rather than a second
-  // "+ Create" action, verifying the case-insensitive idempotency of the shared create endpoint.
-  await searchInput.fill('Design');
+  // Searching for the label just created (in a different case) should offer the existing
+  // option rather than a second "+ Create" action, verifying the case-insensitive idempotency
+  // of the shared create endpoint.
+  await searchInput.fill('design');
   await expect(page.getByRole('option', { name: 'Design' })).toBeVisible();
-  await expect(page.getByRole('option', { name: '+ Create "Design"' })).toHaveCount(0);
+  await expect(page.getByRole('option', { name: '+ Create "design"' })).toHaveCount(0);
 });
 
 test('can create a multi-select column with options via the Add Column modal', async ({ page }) => {
@@ -105,6 +122,16 @@ test('can create a multi-select column with options via the Add Column modal', a
 
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'Labels' })).toBeVisible();
+
+  // Verify the initially configured options actually persisted through column creation rather
+  // than being discarded — reload and check both options are offered in the new cell's dropdown.
+  await page.reload();
+  await page.getByRole('tab', { name: SEED.dataView.name }).click();
+  const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
+  const labelsCell = row.getByRole('cell').last();
+  await labelsCell.getByTestId('multi-select-cell-target').click();
+  await expect(page.getByRole('option', { name: 'Bug' })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Feature' })).toBeVisible();
 });
 
 test('can create a multi-select column with zero options and add options inline from the table', async ({
