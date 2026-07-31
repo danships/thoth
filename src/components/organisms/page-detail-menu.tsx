@@ -3,7 +3,15 @@
 import { useRef, useState } from 'react';
 import { ActionIcon, Badge, Box, Divider, Group, Loader, Menu, Text, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconDots, IconFilePlus, IconFileImport, IconLink, IconPlugConnected, IconTrash, IconUnlink } from '@tabler/icons-react';
+import {
+  IconDots,
+  IconFilePlus,
+  IconFileImport,
+  IconLink,
+  IconPlugConnected,
+  IconTrash,
+  IconUnlink,
+} from '@tabler/icons-react';
 import { usePageApps } from '@/lib/hooks/api/use-page-apps';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
@@ -155,7 +163,14 @@ export function PageDetailMenu({
 
   return (
     <>
-      <Menu shadow="md" width={300} closeOnItemClick={false} position="bottom-end" opened={menuOpened} onChange={setMenuOpened}>
+      <Menu
+        shadow="md"
+        width={300}
+        closeOnItemClick={false}
+        position="bottom-end"
+        opened={menuOpened}
+        onChange={setMenuOpened}
+      >
         <Menu.Target>
           <Tooltip label="Menu">
             <ActionIcon variant="subtle" color="gray" aria-label="Page menu">

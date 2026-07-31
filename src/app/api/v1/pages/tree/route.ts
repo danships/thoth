@@ -218,7 +218,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
               .sort('lastUpdated', 'desc')
           )
         : [];
-    const visibleChildren = databaseChildren.filter((child) => !child.deletedAt);
+    const visibleChildren = databaseChildren.filter((child) => !child.deletedAt && child.type === 'page');
 
     const childCountByParent = new Map<string, number>();
     for (const child of visibleChildren) {
@@ -250,8 +250,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
           container.type === 'page' && 'views' in container && container.views && container.views.length > 0;
 
         // Children always contains only pages, capped to CHILD_PREVIEW_LIMIT for preview.
-        const children: Array<{ page: Page }> = databaseChildren
-          .filter((child) => !child.deletedAt)
+        const children: Array<{ page: Page }> = visibleChildren
           .filter((child) => child.parentId === container.id)
           .slice(0, CHILD_PREVIEW_LIMIT)
           .map((child): { page: Page } => ({

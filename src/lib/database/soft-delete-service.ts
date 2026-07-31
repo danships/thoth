@@ -1,12 +1,12 @@
 import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from './index';
-import { getPageDeleteGracePeriodDays } from './page-grace-period';
+import { getPageDeleteGracePeriodDays, isPageDeleteGracePeriodExpired } from './page-grace-period';
 import { addUserIdToQuery, addWorkspaceIdToQuery } from './helpers';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import { getLogger } from '@/lib/logger';
 import type { Container, PageContainer } from '@/types/database';
 
 const MAX_DESCENDANT_DEPTH = 50;
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 type TrashRoot = {
   id: string;
@@ -20,11 +20,13 @@ type BatchFailure = {
   reason: string;
 };
 
-function isGracePeriodExpired(deletedAt: string, gracePeriodDays: number): boolean {
-  const deletedAtMs = Date.parse(deletedAt);
-  const graceThresholdMs = Date.now() - gracePeriodDays * DAY_IN_MS;
-  return Number.isNaN(deletedAtMs) || deletedAtMs <= graceThresholdMs;
-}
+// Generic, user-facing failure messages for batch operations — never surface a raw
+// `error.message` from the repository/driver layer, which can leak internal details.
+const RESTORE_GENERIC_FAILURE_REASON = 'Failed to restore item';
+const RESTORE_GRACE_PERIOD_EXPIRED_REASON = 'Grace period has expired';
+const PERMANENT_DELETE_GENERIC_FAILURE_REASON = 'Failed to permanently delete item';
+
+class GracePeriodExpiredError extends Error {}
 
 async function resolveTrashRootForUser(id: string, userId: string): Promise<TrashRoot> {
   const containerRepository = await getContainerRepository();
@@ -94,6 +96,16 @@ export async function collectDescendantPageIds(rootPageId: string, workspaceId: 
     }
 
     frontier = nextFrontier;
+  }
+
+  if (frontier.length > 0 && depth >= MAX_DESCENDANT_DEPTH) {
+    const logger = await getLogger();
+    logger.warn('soft-delete.descendant-collection-truncated', {
+      rootPageId,
+      workspaceId,
+      maxDepth: MAX_DESCENDANT_DEPTH,
+      remainingFrontierSize: frontier.length,
+    });
   }
 
   return descendantIds;
@@ -283,11 +295,24 @@ export async function permanentlyDeleteByDeletedRootId(
     )
   );
 
+  // Defensively require `deletedAt` on every resolved record regardless of what the caller's
+  // query conditions matched — a container/view could have been restored (its `deletedAt`
+  // cleared) between the caller's own validation and this fetch, and SuperSave has no
+  // transaction support to prevent that interleaving. Any live record found here is silently
+  // skipped rather than deleted.
   const deletedContainerIds = [
-    ...new Set((rootContainer ? [rootContainer, ...cascadedContainers] : cascadedContainers).map((item) => item.id)),
+    ...new Set(
+      (rootContainer ? [rootContainer, ...cascadedContainers] : cascadedContainers)
+        .filter((item) => Boolean(item.deletedAt))
+        .map((item) => item.id)
+    ),
   ];
   const deletedViewIds = [
-    ...new Set((rootDataView ? [rootDataView, ...cascadedDataViews] : cascadedDataViews).map((item) => item.id)),
+    ...new Set(
+      (rootDataView ? [rootDataView, ...cascadedDataViews] : cascadedDataViews)
+        .filter((item) => Boolean(item.deletedAt))
+        .map((item) => item.id)
+    ),
   ];
 
   if (deletedContainerIds.length > 0) {
@@ -299,15 +324,42 @@ export async function permanentlyDeleteByDeletedRootId(
     }
   }
 
+  // Re-check `deletedAt` immediately before each delete to narrow (though, absent DB
+  // transactions, not fully close) the window in which a concurrent restore could otherwise
+  // cause a now-live record to be permanently deleted. Only records actually removed are
+  // reported back to the caller.
+  const removedViewIds: string[] = [];
   for (const dataViewId of deletedViewIds) {
+    const current = await dataViewRepository.getOneByQuery(dataViewRepository.createQuery().eq('id', dataViewId));
+    if (!current?.deletedAt) {
+      continue;
+    }
     await dataViewRepository.deleteUsingId(dataViewId);
+    removedViewIds.push(dataViewId);
   }
 
+  const removedContainerIds: string[] = [];
   for (const containerId of deletedContainerIds) {
+    const current = await containerRepository.getOneByQuery(containerRepository.createQuery().eq('id', containerId));
+    if (!current?.deletedAt) {
+      continue;
+    }
     await containerRepository.deleteUsingId(containerId);
+    removedContainerIds.push(containerId);
   }
 
-  return { deletedContainerIds, deletedViewIds };
+  return { deletedContainerIds: removedContainerIds, deletedViewIds: removedViewIds };
+}
+
+// Maps a caught error to a safe, user-facing reason string for batch restore/delete results.
+// Only errors we deliberately throw with curated messages (`NotFoundError`,
+// `GracePeriodExpiredError`) are surfaced as-is; anything else (repository/driver errors, etc.)
+// falls back to a fixed generic message so internal details are never leaked to the client.
+function toSafeBatchFailureReason(error: unknown, genericReason: string): string {
+  if (error instanceof NotFoundError || error instanceof GracePeriodExpiredError) {
+    return error.message;
+  }
+  return genericReason;
 }
 
 export async function restoreManyByIds(
@@ -321,14 +373,14 @@ export async function restoreManyByIds(
   for (const id of ids) {
     try {
       const root = await resolveTrashRootForUser(id, userId);
-      if (isGracePeriodExpired(root.deletedAt, gracePeriodDays)) {
-        throw new Error('Grace period has expired');
+      if (isPageDeleteGracePeriodExpired(root.deletedAt, gracePeriodDays)) {
+        throw new GracePeriodExpiredError(RESTORE_GRACE_PERIOD_EXPIRED_REASON);
       }
 
       await restoreByDeletedRootId(root.id, userId, root.workspaceId);
       restored.push(id);
     } catch (error) {
-      failed.push({ id, reason: error instanceof Error ? error.message : 'Failed to restore item' });
+      failed.push({ id, reason: toSafeBatchFailureReason(error, RESTORE_GENERIC_FAILURE_REASON) });
     }
   }
 
@@ -348,7 +400,7 @@ export async function permanentlyDeleteManyByIds(
       await permanentlyDeleteByDeletedRootId(root.id, userId, root.workspaceId);
       deleted.push(id);
     } catch (error) {
-      failed.push({ id, reason: error instanceof Error ? error.message : 'Failed to permanently delete item' });
+      failed.push({ id, reason: toSafeBatchFailureReason(error, PERMANENT_DELETE_GENERIC_FAILURE_REASON) });
     }
   }
 

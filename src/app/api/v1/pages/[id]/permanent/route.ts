@@ -1,6 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { permanentlyDeleteByDeletedRootId } from '@/lib/database/soft-delete-service';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
+import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { getLogger } from '@/lib/logger';
 import type { PermanentDeletePageParameters } from '@/types/api';
@@ -13,6 +14,7 @@ export const DELETE = apiRoute<void, undefined, PermanentDeletePageParameters, {
   },
   async ({ params }, session) => {
     const page = await pageRetriever.retrievePageIncludingDeleted(params.id, session.user.id);
+    await assertWorkspaceAccess(session.user.id, page.workspaceId);
     if (!page.deletedAt || page.deletedRootId !== page.id) {
       throw new NotFoundError('Page not found');
     }

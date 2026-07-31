@@ -8,7 +8,7 @@ export const batchTrashBodySchema = z.object({
 });
 export type BatchTrashBody = z.infer<typeof batchTrashBodySchema>;
 
-const batchFailureSchema = z.object({
+export const batchFailureSchema = z.object({
   id: z.string().min(1),
   reason: z.string().min(1),
 });

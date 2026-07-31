@@ -103,7 +103,7 @@ export function LoggedInContainer() {
       >
         Trash
       </Button>
-      <TrashModal opened={trashOpened} onClose={() => setTrashOpened(false)} />
+      {trashOpened && <TrashModal opened={trashOpened} onClose={() => setTrashOpened(false)} />}
     </Box>
   );
 }

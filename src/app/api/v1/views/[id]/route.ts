@@ -80,11 +80,12 @@ export const DELETE = apiRoute<void, undefined, DeleteViewParameters, {}>(
     const dataView = await dataViewRetriever.retrieveDataView(params.id, session.user.id);
     await assertGrantAllowsContainerForSession(session, dataView);
 
+    const now = new Date().toISOString();
     await dataViewRepository.update({
       ...dataView,
-      deletedAt: new Date().toISOString(),
+      deletedAt: now,
       deletedRootId: dataView.id,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now,
     });
 
     const logger = await getLogger();

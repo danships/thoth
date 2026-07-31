@@ -1,6 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { restoreByDeletedRootId } from '@/lib/database/soft-delete-service';
-import { getPageDeleteGracePeriodDays } from '@/lib/database/page-grace-period';
+import { getPageDeleteGracePeriodDays, isPageDeleteGracePeriodExpired } from '@/lib/database/page-grace-period';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { HttpError } from '@/lib/errors/http-error';
@@ -22,9 +22,7 @@ export const POST = apiRoute<RestorePageResponse, undefined, RestorePageParamete
     }
 
     const gracePeriodDays = await getPageDeleteGracePeriodDays();
-    const deletedAtMs = Date.parse(page.deletedAt);
-    const graceThresholdMs = Date.now() - gracePeriodDays * 24 * 60 * 60 * 1000;
-    if (Number.isNaN(deletedAtMs) || deletedAtMs <= graceThresholdMs) {
+    if (isPageDeleteGracePeriodExpired(page.deletedAt, gracePeriodDays)) {
       throw new HttpError('Grace period has expired for this page', 410, true);
     }
 

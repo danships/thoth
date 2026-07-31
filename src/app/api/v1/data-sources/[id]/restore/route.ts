@@ -1,5 +1,5 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getPageDeleteGracePeriodDays } from '@/lib/database/page-grace-period';
+import { getPageDeleteGracePeriodDays, isPageDeleteGracePeriodExpired } from '@/lib/database/page-grace-period';
 import { restoreByDeletedRootId } from '@/lib/database/soft-delete-service';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
@@ -22,9 +22,7 @@ export const POST = apiRoute<RestoreDataSourceResponse, undefined, RestoreDataSo
     }
 
     const gracePeriodDays = await getPageDeleteGracePeriodDays();
-    const deletedAtMs = Date.parse(dataSource.deletedAt);
-    const graceThresholdMs = Date.now() - gracePeriodDays * 24 * 60 * 60 * 1000;
-    if (Number.isNaN(deletedAtMs) || deletedAtMs <= graceThresholdMs) {
+    if (isPageDeleteGracePeriodExpired(dataSource.deletedAt, gracePeriodDays)) {
       throw new HttpError('Grace period has expired for this data source', 410, true);
     }
 

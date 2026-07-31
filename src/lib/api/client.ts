@@ -7,6 +7,7 @@ import type {
   CreateWorkspaceBody,
   GetDeletedPagesResponse,
   GetDeletedWorkspacesResponse,
+  GetPageBreadcrumbsResponse,
   GetWorkspacesResponse,
   GetWorkspaceSlugAvailabilityResponse,
   RestoreDataSourceResponse,
@@ -80,6 +81,8 @@ export const api = {
       }),
 
     getDetails: (id: string) => apiClient.get(`/pages/${id}`),
+
+    getBreadcrumbs: (id: string) => apiClient.get<DataWrapper<GetPageBreadcrumbsResponse>>(`/pages/${id}/breadcrumbs`),
 
     create: (data: { name: string; emoji?: string | null; parentId?: string | null; workspaceId?: string }) =>
       apiClient.post('/pages', data),

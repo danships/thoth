@@ -51,6 +51,11 @@ async function purgeDeletedPages() {
         continue;
       }
 
+      // `permanentlyDeleteByDeletedRootId` re-verifies `deletedAt` for every record it resolves
+      // (including the root) immediately before deleting it, so a restore racing with this
+      // revalidation still can't cause an already-restored record to be deleted. SuperSave has
+      // no transaction support, so this per-record re-check right before the delete is the
+      // closest available approximation of atomicity between the two operations.
       await permanentlyDeleteByDeletedRootId(revalidated.id, revalidated.userId, revalidated.workspaceId);
       purgedCount += 1;
       console.log(`Purged ${revalidated.type} ${revalidated.id} (${revalidated.name})`);

@@ -40,6 +40,7 @@ import { PageSubpagesList } from '@/components/organisms/page-subpages-list';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import { GET_PAGES_ENDPOINT, SUBPAGES_TAB_VALUE } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
 import styles from './page.module.css';
 
 export default function PageDetailsPage() {
@@ -201,11 +202,12 @@ export default function PageDetailsPage() {
   const handleMoveToTrash = useCallback(async () => {
     try {
       await api.pages.remove(pageId);
-      globalThis.location.assign(`/${workspaceSlug}/pages`);
+      await revalidateWorkspacePageData(workspaceId, pageDetails?.page.parentId ?? undefined);
+      router.push(`/${workspaceSlug}/pages`);
     } catch {
       throw new Error('Failed to move page to Trash');
     }
-  }, [pageId, workspaceSlug]);
+  }, [pageId, pageDetails, router, workspaceId, workspaceSlug]);
 
   if (isLoading) {
     return (

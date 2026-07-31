@@ -34,6 +34,27 @@ export function PagesTree({ branches }: PagesTreeProperties) {
       parentPageId?: string;
     }) => {
       try {
+        // For a page deletion, determine — before the delete request removes it — whether the
+        // currently viewed page is the page being deleted or nested beneath it (a cascade-deleted
+        // descendant), so we know to navigate away. Routes are flat (`/pages/[id]`), so a
+        // descendant can't be detected from the pathname alone; the breadcrumb ancestor chain is
+        // fetched instead. Failures here are non-fatal — worst case we skip the redirect.
+        let shouldRedirectAwayFromPage = false;
+        if (!isView) {
+          const currentPageIdMatch = /^\/[^/]+\/pages\/([^/]+)$/.exec(pathname);
+          const currentPageId = currentPageIdMatch?.[1];
+          if (currentPageId === id) {
+            shouldRedirectAwayFromPage = true;
+          } else if (currentPageId) {
+            try {
+              const response = await api.pages.getBreadcrumbs(currentPageId);
+              shouldRedirectAwayFromPage = response.data.data.some((breadcrumb) => breadcrumb.id === id);
+            } catch {
+              shouldRedirectAwayFromPage = false;
+            }
+          }
+        }
+
         await (isView ? api.views.remove(id) : api.pages.remove(id));
 
         await revalidateWorkspacePageData(workspaceId, parentPageId);
@@ -42,13 +63,13 @@ export function PagesTree({ branches }: PagesTreeProperties) {
           router.replace(`/${workspaceSlug}/pages/${parentPageId}`);
         }
 
-        if (!isView && pathname.startsWith(`/${workspaceSlug}/pages/${id}`)) {
+        if (shouldRedirectAwayFromPage) {
           router.push(`/${workspaceSlug}/pages`);
         }
 
-        showSuccess(isView ? `Moved "${name}" to Trash` : `Moved "${name}" to Trash`);
+        showSuccess(`Moved "${name}" to Trash`);
       } catch {
-        showError(isView ? `Failed to delete "${name}"` : `Failed to delete "${name}"`);
+        showError(`Failed to delete "${name}"`);
       }
     },
     [pathname, router, searchParameters, showError, showSuccess, workspaceId, workspaceSlug]

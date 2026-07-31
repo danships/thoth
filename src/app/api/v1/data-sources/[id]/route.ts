@@ -83,13 +83,10 @@ export const DELETE = apiRoute<void, undefined, DeleteDataSourceParameters, {}>(
     await assertGrantAllowsContainerForSession(session, dataSource);
 
     const now = new Date().toISOString();
-    await containerRepository.update({
-      ...dataSource,
-      deletedAt: now,
-      deletedRootId: dataSource.id,
-      lastUpdated: now,
-    });
 
+    // Update all active linked views first, and only mark the data source itself deleted once
+    // every view update has succeeded — if a view update throws partway through, the data
+    // source stays live rather than being left in an inconsistent, partially-cascaded state.
     const linkedViews = await dataViewRepository.getByQuery(
       addUserIdToQuery(dataViewRepository.createQuery().eq('dataSourceId', dataSource.id), session.user.id).eq(
         'workspaceId',
@@ -111,6 +108,13 @@ export const DELETE = apiRoute<void, undefined, DeleteDataSourceParameters, {}>(
       });
       deletedViewCount += 1;
     }
+
+    await containerRepository.update({
+      ...dataSource,
+      deletedAt: now,
+      deletedRootId: dataSource.id,
+      lastUpdated: now,
+    });
 
     const logger = await getLogger();
     logger.info('data-source.delete', {

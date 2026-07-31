@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Badge, Button, Checkbox, Group, Loader, Modal, Stack, Table, Text } from '@mantine/core';
+import { modals } from '@mantine/modals';
 import { api } from '@/lib/api/client';
 import { useDeletedPages } from '@/lib/hooks/api/use-deleted-pages';
 import { useNotification } from '@/lib/hooks/use-notification';
@@ -13,6 +14,9 @@ type TrashModalProperties = {
   onClose: () => void;
 };
 
+// Rendered by the caller only while `opened` is true (see `LoggedInContainer`), so each open
+// mounts a fresh instance — the `selectedIds` state below is naturally reset on close without
+// needing an extra effect.
 export function TrashModal({ opened, onClose }: TrashModalProperties) {
   const { id: workspaceId } = useCurrentWorkspace();
   const { data, isLoading, error, mutate } = useDeletedPages();
@@ -20,7 +24,18 @@ export function TrashModal({ opened, onClose }: TrashModalProperties) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [inProgress, setInProgress] = useState(false);
 
-  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  // Only ids that are still present in the current data and still eligible (grace period not
+  // expired) count towards the selection — an item can disappear or expire between renders
+  // (e.g. after a background refresh) while still being referenced by `selectedIds`.
+  const effectiveSelectedIds = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+    const eligibleIds = new Set(data.filter((item) => item.daysRemaining > 0).map((item) => item.id));
+    return selectedIds.filter((id) => eligibleIds.has(id));
+  }, [data, selectedIds]);
+
+  const selectedSet = useMemo(() => new Set(effectiveSelectedIds), [effectiveSelectedIds]);
 
   const toggleId = (id: string) => {
     setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
@@ -66,6 +81,22 @@ export function TrashModal({ opened, onClose }: TrashModalProperties) {
     }
   };
 
+  const confirmPermanentDelete = (ids: string[]) => {
+    modals.openConfirmModal({
+      title: 'Delete permanently',
+      children: (
+        <Text size="sm">
+          {ids.length === 1
+            ? 'This item will be permanently deleted. This cannot be undone.'
+            : `These ${ids.length} items will be permanently deleted. This cannot be undone.`}
+        </Text>
+      ),
+      labels: { confirm: 'Delete permanently', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => void handlePermanentDelete(ids),
+    });
+  };
+
   return (
     <Modal opened={opened} onClose={onClose} title="Trash" centered size="xl">
       {isLoading && (
@@ -99,8 +130,8 @@ export function TrashModal({ opened, onClose }: TrashModalProperties) {
                     <Table.Th w={44}>
                       <Checkbox
                         aria-label="Select all deleted items"
-                        checked={data.length > 0 && selectedIds.length === data.length}
-                        indeterminate={selectedIds.length > 0 && selectedIds.length < data.length}
+                        checked={data.length > 0 && effectiveSelectedIds.length === data.length}
+                        indeterminate={effectiveSelectedIds.length > 0 && effectiveSelectedIds.length < data.length}
                         onChange={(event) =>
                           setSelectedIds(event.currentTarget.checked ? data.map((item) => item.id) : [])
                         }
@@ -146,7 +177,7 @@ export function TrashModal({ opened, onClose }: TrashModalProperties) {
                             color="red"
                             variant="outline"
                             disabled={inProgress}
-                            onClick={() => void handlePermanentDelete([item.id])}
+                            onClick={() => confirmPermanentDelete([item.id])}
                           >
                             Delete permanently
                           </Button>
@@ -161,20 +192,20 @@ export function TrashModal({ opened, onClose }: TrashModalProperties) {
 
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
-              {selectedIds.length} selected
+              {effectiveSelectedIds.length} selected
             </Text>
             <Group gap="xs">
               <Button
                 variant="default"
-                disabled={selectedIds.length === 0 || inProgress}
-                onClick={() => void handleRestore(selectedIds)}
+                disabled={effectiveSelectedIds.length === 0 || inProgress}
+                onClick={() => void handleRestore(effectiveSelectedIds)}
               >
                 Restore selected
               </Button>
               <Button
                 color="red"
-                disabled={selectedIds.length === 0 || inProgress}
-                onClick={() => void handlePermanentDelete(selectedIds)}
+                disabled={effectiveSelectedIds.length === 0 || inProgress}
+                onClick={() => confirmPermanentDelete(effectiveSelectedIds)}
               >
                 Delete selected permanently
               </Button>
