@@ -2,12 +2,13 @@
 import { PagesTree } from '../pages-tree';
 import { RecentSection } from './recent-section';
 import { FavoritesSection } from './favorites-section';
+import { TrashModal } from './trash-modal';
 import { usePagesTree } from '@/lib/hooks/api/use-pages-tree';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
-import { ActionIcon, Anchor, Box, Group, Loader, Text, Title } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { ActionIcon, Anchor, Box, Button, Group, Loader, Text, Title } from '@mantine/core';
+import { IconPlus, IconTrash } from '@tabler/icons-react';
 import Link from 'next/link';
-import { useCallback, useRef, type UIEvent } from 'react';
+import { useCallback, useRef, useState, type UIEvent } from 'react';
 import styles from './logged-in-container.module.css';
 
 // Distance (in px) from the bottom of the pane at which we consider the user to have
@@ -18,6 +19,7 @@ export function LoggedInContainer() {
   const { isLoading, data: rootPagesTree, isLoadingMore, hasMore, loadMore, error, mutate } = usePagesTree();
   const scrollPaneReference = useRef<HTMLDivElement>(null);
   const { slug: workspaceSlug } = useCurrentWorkspace();
+  const [trashOpened, setTrashOpened] = useState(false);
 
   // Lazily fetch additional root pages as the user actually scrolls to the bottom of the pane,
   // rather than eagerly loading whenever a "load more" marker happens to be within the pane's
@@ -91,6 +93,17 @@ export function LoggedInContainer() {
           )}
         </Box>
       )}
+      <Button
+        variant="subtle"
+        justify="flex-start"
+        leftSection={<IconTrash size={16} />}
+        mt="sm"
+        px={0}
+        onClick={() => setTrashOpened(true)}
+      >
+        Trash
+      </Button>
+      {trashOpened && <TrashModal opened={trashOpened} onClose={() => setTrashOpened(false)} />}
     </Box>
   );
 }

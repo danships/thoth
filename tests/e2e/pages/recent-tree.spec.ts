@@ -145,14 +145,17 @@ test.describe('recent sidebar section and GET /pages?recent filter', () => {
       const recentTree = page.getByTestId('recent-tree');
       await expect(recentTree.getByText(lowerRankedPage.name)).toBeVisible();
 
-      // Assert rank via DOM order (see the equivalent comment in the previous test) rather than
-      // pixel position, which is sensitive to in-flight Collapse animations.
-      const linkNames = await recentTree.getByRole('link').allInnerTexts();
-      const bumpedIndex = linkNames.findIndex((linkName) => linkName.includes(lowerRankedPage.name));
-      const rootIndex = linkNames.findIndex((linkName) => linkName.includes(SEED.pages.root.name));
-      expect(bumpedIndex).toBeGreaterThanOrEqual(0);
-      expect(rootIndex).toBeGreaterThanOrEqual(0);
-      expect(bumpedIndex).toBeLessThan(rootIndex);
+      // The sidebar list is fetched asynchronously after reload, so poll until the refreshed
+      // order reflects the newly-accessed page's higher rank.
+      await expect
+        .poll(async () => {
+          const linkNames = await recentTree.getByRole('link').allInnerTexts();
+          const bumpedIndex = linkNames.findIndex((linkName) => linkName.includes(lowerRankedPage.name));
+          const rootIndex = linkNames.findIndex((linkName) => linkName.includes(SEED.pages.root.name));
+
+          return bumpedIndex !== -1 && rootIndex !== -1 && bumpedIndex < rootIndex;
+        })
+        .toBe(true);
     } finally {
       setLastAccessedAt(lowerRankedPage.id, originalLastAccessedAt);
     }

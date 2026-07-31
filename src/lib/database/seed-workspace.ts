@@ -83,6 +83,8 @@ export async function createWorkspaceForUser(
       emoji: '👋',
       parentId: null,
       content: buildWelcomeMarkdown(workspace.name, workspace.slug),
+      deletedAt: null,
+      deletedRootId: null,
     };
 
     const createdPage = await containerRepository.create(pageData);

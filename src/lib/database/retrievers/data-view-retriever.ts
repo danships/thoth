@@ -5,7 +5,7 @@ import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 
 class DataViewRetriever {
-  public async retrieveDataView(id: string, userId: string): Promise<DataView> {
+  private async retrieveDataViewInternal(id: string, userId: string): Promise<DataView> {
     const dataViewRepository = await getDataViewRepository();
 
     const existingDataView = await dataViewRepository.getOneByQuery(
@@ -19,6 +19,18 @@ class DataViewRetriever {
     await assertWorkspaceAccess(userId, existingDataView.workspaceId);
 
     return existingDataView;
+  }
+
+  public async retrieveDataView(id: string, userId: string): Promise<DataView> {
+    const dataView = await this.retrieveDataViewInternal(id, userId);
+    if (dataView.deletedAt) {
+      throw new NotFoundError('Data view not found', true);
+    }
+    return dataView;
+  }
+
+  public async retrieveDataViewIncludingDeleted(id: string, userId: string): Promise<DataView> {
+    return this.retrieveDataViewInternal(id, userId);
   }
 }
 

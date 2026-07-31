@@ -23,13 +23,15 @@ export const GET = apiRoute<GetDataViewsResponse, GetDataViewsQuery, {}>(
 
     const dataViews = await dataViewRepository.getByQuery(databaseQuery);
 
-    return dataViews.map((dataView) => ({
-      id: dataView.id,
-      name: dataView.name,
-      dataSourceId: dataView.dataSourceId,
-      createdAt: dataView.createdAt,
-      lastUpdated: dataView.lastUpdated,
-    }));
+    return dataViews
+      .filter((dataView) => !dataView.deletedAt)
+      .map((dataView) => ({
+        id: dataView.id,
+        name: dataView.name,
+        dataSourceId: dataView.dataSourceId,
+        createdAt: dataView.createdAt,
+        lastUpdated: dataView.lastUpdated,
+      }));
   }
 );
 
@@ -38,13 +40,25 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
     expectedBodySchema: createDataViewBodySchema,
   },
   async ({ body }, session) => {
-    // No existing entity to derive the workspace from — `workspaceId` (falling back to the
-    // caller's default workspace for backwards compatibility) is required and validated here.
-    let workspaceId = body.workspaceId;
-    if (!workspaceId) {
-      workspaceId = await resolveDefaultWorkspaceId(session.user.id);
+    const containerRepository = await getContainerRepository();
+    const dataSource = await containerRepository.getOneByQuery(
+      addUserIdToQuery(containerRepository.createQuery().eq('id', body.dataSourceId), session.user.id).eq(
+        'type',
+        'data-source'
+      )
+    );
+
+    if (!dataSource || dataSource.deletedAt) {
+      throw new NotFoundError('Data source not found or access denied.');
     }
+
+    const workspaceId =
+      body.workspaceId ?? dataSource.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
     await assertWorkspaceAccess(session.user.id, workspaceId);
+
+    if (workspaceId !== dataSource.workspaceId) {
+      throw new NotFoundError('Data source not found or access denied.');
+    }
 
     const workspaceRepository = await getWorkspaceRepository();
     const workspace = await workspaceRepository.getOneByQuery(workspaceRepository.createQuery().eq('id', workspaceId));
@@ -53,25 +67,15 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
       throw new NotFoundError('Workspace not found');
     }
 
-    // Verify that the data source exists and belongs to the user
-    const containerRepository = await getContainerRepository();
-    const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', body.dataSourceId), session.user.id)
-        .eq('workspaceId', workspace.id)
-        .eq('type', 'data-source')
-    );
-
-    if (!dataSource) {
-      throw new NotFoundError('Data source not found or access denied.');
-    }
-
     let pageToLink: Container | undefined | null;
     if (body.pageId) {
       pageToLink = await containerRepository.getOneByQuery(
-        addUserIdToQuery(containerRepository.createQuery().eq('id', body.pageId), session.user.id)
-          .eq('workspaceId', workspace.id)
-          .eq('type', 'page')
+        addUserIdToQuery(containerRepository.createQuery().eq('id', body.pageId), session.user.id).eq('type', 'page')
       );
+
+      if (!pageToLink || pageToLink.deletedAt || pageToLink.workspaceId !== workspace.id) {
+        throw new NotFoundError('Page not found or access denied.');
+      }
     }
 
     const dataViewRepository = await getDataViewRepository();
@@ -83,6 +87,8 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
       lastUpdated: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       columns: [],
+      deletedAt: null,
+      deletedRootId: null,
     };
 
     const createdDataView = await dataViewRepository.create(dataViewData);

@@ -13,6 +13,7 @@ test('can create a data view through the UI and the new tab appears', async ({ p
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
   await page.getByRole('button', { name: 'Add View' }).click();
   const dialog = page.getByRole('dialog', { name: 'Create View' });
+  const viewName = `UI-Created View ${Date.now()}`;
 
   // Step 1: pick an existing data source. Mantine's Select renders a combobox, not a
   // native <select>, so it must be driven by clicking the input and then the option.
@@ -20,9 +21,9 @@ test('can create a data view through the UI and the new tab appears', async ({ p
   await page.getByRole('option', { name: SEED.dataSource.name }).click();
 
   // Step 2: name the new view and submit.
-  await dialog.getByLabel('View Name').fill('UI-Created View');
+  await dialog.getByLabel('View Name').fill(viewName);
   await dialog.getByRole('button', { name: 'Create View', exact: true }).click();
 
   await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
-  await expect(page.getByRole('tab', { name: 'UI-Created View' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: viewName })).toBeVisible();
 });

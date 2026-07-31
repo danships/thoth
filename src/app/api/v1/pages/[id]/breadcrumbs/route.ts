@@ -20,12 +20,13 @@ async function findHostPageForDataSource(dataSourceId: string, userId: string): 
   const dataViews = await dataViewRepository.getByQuery(
     addUserIdToQuery(dataViewRepository.createQuery().eq('dataSourceId', dataSourceId), userId)
   );
+  const activeDataViews = dataViews.filter((dataView) => !dataView.deletedAt);
 
-  if (dataViews.length === 0) {
+  if (activeDataViews.length === 0) {
     return null;
   }
 
-  const dataViewIds = new Set(dataViews.map((dataView) => dataView.id));
+  const dataViewIds = new Set(activeDataViews.map((dataView) => dataView.id));
 
   const containerRepository = await getContainerRepository();
   const pages = await containerRepository.getByQuery(
@@ -34,7 +35,9 @@ async function findHostPageForDataSource(dataSourceId: string, userId: string): 
 
   const hostPage = pages.find(
     (candidate): candidate is PageContainer =>
-      candidate.type === 'page' && (candidate.views ?? []).some((viewId) => dataViewIds.has(viewId))
+      candidate.type === 'page' &&
+      !candidate.deletedAt &&
+      (candidate.views ?? []).some((viewId) => dataViewIds.has(viewId))
   );
 
   return hostPage ?? null;
@@ -84,6 +87,10 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
         const parentContainer = await containerRepository.getOneByQuery(
           addUserIdToQuery(containerRepository.createQuery().eq('id', currentContainer.parentId), session.user.id)
         );
+
+        if (parentContainer?.deletedAt) {
+          break;
+        }
 
         currentContainer = parentContainer ?? null;
       } else {

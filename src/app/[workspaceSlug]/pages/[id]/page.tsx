@@ -18,6 +18,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mutate as mutateGlobal } from 'swr';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
+import { api } from '@/lib/api/client';
 import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
 import { IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
@@ -39,6 +40,7 @@ import { PageSubpagesList } from '@/components/organisms/page-subpages-list';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import { GET_PAGES_ENDPOINT, SUBPAGES_TAB_VALUE } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
 import styles from './page.module.css';
 
 export default function PageDetailsPage() {
@@ -197,6 +199,16 @@ export default function PageDetailsPage() {
     }
   }, [pageDetails, pageId, toggleFavorite, showError]);
 
+  const handleMoveToTrash = useCallback(async () => {
+    try {
+      await api.pages.remove(pageId);
+      await revalidateWorkspacePageData(workspaceId, pageDetails?.page.parentId ?? undefined);
+      router.push(`/${workspaceSlug}/pages`);
+    } catch {
+      throw new Error('Failed to move page to Trash');
+    }
+  }, [pageId, pageDetails, router, workspaceId, workspaceSlug]);
+
   if (isLoading) {
     return (
       <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
@@ -262,6 +274,7 @@ export default function PageDetailsPage() {
               hasContent={Boolean(pageDetails.content)}
               onImportMarkdown={handleImportMarkdown}
               onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
+              onMoveToTrash={handleMoveToTrash}
             />
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (

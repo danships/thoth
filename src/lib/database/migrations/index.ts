@@ -2,6 +2,7 @@ import type { Migration, SuperSave } from 'supersave';
 import type { Database } from 'better-sqlite3';
 import type { Pool } from 'mysql2/promise';
 import { BETTER_AUTH_SQLITE_SQL, BETTER_AUTH_MYSQL_SQL } from './better-auth';
+import { backfillSoftDeleteFields } from './soft-delete-backfill';
 import { backfillWorkspaces } from './workspace-backfill';
 
 export const migrations: Migration[] = [
@@ -35,6 +36,12 @@ export const migrations: Migration[] = [
     name: 'workspace-multi-tenancy-backfill',
     run: async (superSave: SuperSave) => {
       await backfillWorkspaces(superSave);
+    },
+  },
+  {
+    name: 'soft-delete-pages-views-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillSoftDeleteFields(superSave);
     },
   },
 ];

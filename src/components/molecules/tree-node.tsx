@@ -1,6 +1,7 @@
-import { ActionIcon, Box, Text } from '@mantine/core';
+import { ActionIcon, Box, Menu, Text } from '@mantine/core';
+import { modals } from '@mantine/modals';
 import { useStore } from '@nanostores/react';
-import { IconPlus } from '@tabler/icons-react';
+import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import { computed } from 'nanostores';
 import Link from 'next/link';
 import { $expandedPages, togglePageExpanded } from '@/lib/store/tree-expanded-state';
@@ -32,6 +33,7 @@ type TreeNodeProperties = {
   level?: number;
   parentPageId?: string;
   isView?: boolean;
+  onDelete?: (item: { id: string; name: string; isView: boolean; parentPageId?: string }) => Promise<void>;
 };
 
 export function TreeNode({
@@ -42,6 +44,7 @@ export function TreeNode({
   level = 0,
   parentPageId,
   isView,
+  onDelete,
 }: TreeNodeProperties) {
   const $isExpanded = computed($expandedPages, (expandedPages) => expandedPages.get(page.id) ?? false);
 
@@ -52,6 +55,30 @@ export function TreeNode({
 
   const handleToggle = () => {
     togglePageExpanded(page.id);
+  };
+
+  const handleDelete = () => {
+    if (!onDelete) {
+      return;
+    }
+
+    modals.openConfirmModal({
+      title: isView ? 'Delete view' : 'Delete page',
+      children: (
+        <Text size="sm">
+          {isView ? `Move "${page.name}" to Trash?` : `Move "${page.name}" and any nested content to Trash?`}
+        </Text>
+      ),
+      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () =>
+        void onDelete({
+          id: page.id,
+          name: page.name,
+          isView: Boolean(isView),
+          ...(parentPageId ? { parentPageId } : {}),
+        }),
+    });
   };
 
   // Determine the link URL - if this is a view, link to parent page with view query param
@@ -75,21 +102,50 @@ export function TreeNode({
       >
         <TreeToggle isExpanded={isExpanded} onToggle={handleToggle} hasChildren={hasChildren} />
         <TreeItem name={page.name} emoji={page.emoji ?? null} to={getPageUrl()} />
-        {level === 0 && !isView && (
-          <ActionIcon
-            variant="subtle"
-            size="xs"
-            component={Link}
-            href={`/${workspaceSlug}/pages/${page.id}/create`}
-            aria-label="Add child page"
-            style={{ marginLeft: 'auto' }}
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-          >
-            <IconPlus size={12} />
-          </ActionIcon>
-        )}
+        <Box style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+          {level === 0 && !isView && (
+            <ActionIcon
+              variant="subtle"
+              size="xs"
+              component={Link}
+              href={`/${workspaceSlug}/pages/${page.id}/create`}
+              aria-label="Add child page"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+            >
+              <IconPlus size={12} />
+            </ActionIcon>
+          )}
+          {onDelete && (
+            <Menu shadow="md" width={180} position="bottom-end">
+              <Menu.Target>
+                <ActionIcon
+                  variant="subtle"
+                  size="xs"
+                  aria-label={isView ? 'View actions' : 'Page actions'}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  <IconDots size={12} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item
+                  color="red"
+                  leftSection={<IconTrash size={14} />}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDelete();
+                  }}
+                >
+                  Delete
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          )}
+        </Box>
       </Box>
 
       {/* Views (shown as children when expanded) */}
@@ -108,6 +164,7 @@ export function TreeNode({
               level={level + 1}
               parentPageId={page.id}
               isView={true}
+              {...(onDelete ? { onDelete } : {})}
             />
           ))}
         </Box>
@@ -128,6 +185,7 @@ export function TreeNode({
               views={[]}
               level={level + 1}
               parentPageId={page.id}
+              {...(onDelete ? { onDelete } : {})}
             />
           ))}
           {hasMoreChildren && (

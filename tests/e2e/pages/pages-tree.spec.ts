@@ -1,5 +1,11 @@
+import type { APIResponse } from '@playwright/test';
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
+
+async function getData<T>(response: APIResponse) {
+  const body = await response.json();
+  return body.data as T;
+}
 
 test('sidebar shows Pages heading', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages`);
@@ -9,6 +15,11 @@ test('sidebar shows Pages heading', async ({ page }) => {
 test('sidebar shows add-page link', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages`);
   await expect(page.getByRole('link', { name: 'Add page' })).toBeVisible();
+});
+
+test('sidebar shows Trash button', async ({ page }) => {
+  await page.goto(`/${SEED.workspace.slug}/pages`);
+  await expect(page.getByRole('button', { name: 'Trash' })).toBeVisible();
 });
 
 test('seeded root page appears in sidebar', async ({ page }) => {
@@ -24,6 +35,16 @@ test('seeded data source host page appears in sidebar', async ({ page }) => {
 });
 
 test('/ redirects through /pages to the most recently updated root page', async ({ page }) => {
+  const workspacesResponse = await page.request.get('/api/v1/workspaces');
+  const workspaces = await getData<Array<{ id: string; slug: string; lastUpdated: string }>>(workspacesResponse);
+  const targetWorkspace = workspaces.toSorted((a, b) => (a.lastUpdated < b.lastUpdated ? 1 : -1))[0];
+
+  expect(targetWorkspace).toBeTruthy();
+
+  const treeResponse = await page.request.get(`/api/v1/pages/tree?workspaceId=${targetWorkspace!.id}`);
+  const tree = await getData<{ branches: Array<{ page: { id: string } }> }>(treeResponse);
+  const expectedPageId = tree.branches[0]?.page.id;
+
   await page.goto('/');
-  await expect(page).toHaveURL(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`, { timeout: 10_000 });
+  await expect(page).toHaveURL(`/${targetWorkspace!.slug}/pages/${expectedPageId}`, { timeout: 10_000 });
 });

@@ -8,6 +8,7 @@ import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import type { PageContainer } from '@/types/database';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
 import { createPageBodySchema, getPagesQuerySchema, FAVORITES_MAX_LIMIT, RECENT_MAX_LIMIT } from '@/types/api';
 
@@ -47,7 +48,10 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
             .eq('type', 'page')
             .in('id', containerIds)
         );
-        const scopedContainers = await filterContainersByGrantForSession(session, fetchedContainers);
+        const scopedContainers = await filterContainersByGrantForSession(
+          session,
+          fetchedContainers.filter((container) => !container.deletedAt)
+        );
         for (const container of scopedContainers) {
           containersById.set(container.id, container);
         }
@@ -105,7 +109,10 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
             .eq('type', 'page')
             .in('id', containerIds)
         );
-        const scopedContainers = await filterContainersByGrantForSession(session, fetchedContainers);
+        const scopedContainers = await filterContainersByGrantForSession(
+          session,
+          fetchedContainers.filter((container) => !container.deletedAt)
+        );
         for (const container of scopedContainers) {
           containersById.set(container.id, container);
         }
@@ -152,7 +159,7 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
 
     const scopedPages = await filterContainersByGrantForSession(
       session,
-      pages.filter((page) => page.type === 'page')
+      pages.filter((page): page is PageContainer => page.type === 'page' && !page.deletedAt)
     );
 
     return scopedPages.map((page) => {
@@ -198,7 +205,11 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
         containerRepository.createQuery().eq('id', body.parentId)
       );
 
-      if (!parentContainer || (parentContainer.type !== 'page' && parentContainer.type !== 'data-source')) {
+      if (
+        !parentContainer ||
+        parentContainer.deletedAt ||
+        (parentContainer.type !== 'page' && parentContainer.type !== 'data-source')
+      ) {
         throw new NotFoundError('Parent page not found or access denied');
       }
 
@@ -228,6 +239,8 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       userId: session.user.id,
       lastUpdated: new Date().toISOString(),
       createdAt: new Date().toISOString(),
+      deletedAt: null,
+      deletedRootId: null,
     };
 
     const createdPage = await containerRepository.create(pageData);

@@ -67,7 +67,7 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
           workspace.id
         )
       );
-      const existingRootPage = pages.find((page) => page.type === 'page' && !page.parentId);
+      const existingRootPage = pages.find((page) => page.type === 'page' && !page.parentId && !page.deletedAt);
 
       if (existingRootPage && existingRootPage.type === 'page') {
         return {
@@ -89,6 +89,8 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
         workspaceId: workspace.id,
         emoji: '👋',
         parentId: null,
+        deletedAt: null,
+        deletedRootId: null,
       };
 
       const createdPage = await containerRepository.create(pageData);

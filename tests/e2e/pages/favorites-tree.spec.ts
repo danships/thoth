@@ -41,7 +41,7 @@ test.describe('favorites sidebar section and GET /pages?favorited filter', () =>
   });
 
   test('GET /pages?favorited=true satisfies the "one selector required" validation on its own', async ({ page }) => {
-    const response = await page.request.get('/api/v1/pages?favorited=true');
+    const response = await page.request.get(`/api/v1/pages?favorited=true&workspaceId=${SEED.workspace.id}`);
     expect(response.ok()).toBe(true);
   });
 
@@ -76,7 +76,7 @@ test.describe('favorites sidebar section and GET /pages?favorited filter', () =>
       await expect(page.getByRole('heading', { name: 'Favorites' })).toBeVisible();
       await expect(page.getByText(/there may be more/i)).toBeVisible();
 
-      const favoritesResponse = await page.request.get('/api/v1/pages?favorited=true');
+      const favoritesResponse = await page.request.get(`/api/v1/pages?favorited=true&workspaceId=${SEED.workspace.id}`);
       expect(favoritesResponse.ok()).toBe(true);
       const favoritesBody = await favoritesResponse.json();
       expect(favoritesBody.data).toHaveLength(FAVORITES_MAX_LIMIT);

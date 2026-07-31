@@ -6,12 +6,7 @@ import type { DataWrapper } from '../utilities';
 export const GET_DATA_VIEW_ENDPOINT = '/views/:id';
 
 // Get single data view
-export const getDataViewResponseSchema = dataViewSchema.pick({
-  id: true,
-  name: true,
-  lastUpdated: true,
-  createdAt: true,
-});
+export const getDataViewResponseSchema = dataViewSchema;
 export type GetDataViewResponse = z.infer<typeof getDataViewResponseSchema>;
 export type GetDataViewResponseData = DataWrapper<GetDataViewResponse>;
 

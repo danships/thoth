@@ -14,5 +14,7 @@ export const Container: EntityDefinition = {
     workspaceId: 'string',
     userId: 'string',
     type: 'string',
+    deletedAt: 'string',
+    deletedRootId: 'string',
   },
 };

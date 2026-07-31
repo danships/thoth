@@ -207,11 +207,23 @@ async function seedAppData() {
         } as unknown as ContainerAccessCreate));
   }
 
-  async function upsertPage(data: PageContainerCreate & { id: string }, options?: { lastAccessedAt?: string }) {
+  async function upsertPage(
+    data: Omit<PageContainerCreate, 'deletedAt' | 'deletedRootId'> & {
+      id: string;
+      deletedAt?: string | null;
+      deletedRootId?: string | null;
+    },
+    options?: { lastAccessedAt?: string }
+  ) {
+    const normalizedData = {
+      ...data,
+      deletedAt: data.deletedAt ?? null,
+      deletedRootId: data.deletedRootId ?? null,
+    } satisfies PageContainerCreate & { id: string };
     const existing = await containerRepository.getOneByQuery(containerRepository.createQuery().eq('id', data.id));
     await (existing
-      ? containerRepository.update({ ...existing, ...data, lastUpdated: now })
-      : containerRepository.create(data as unknown as PageContainerCreate));
+      ? containerRepository.update({ ...existing, ...normalizedData, lastUpdated: now })
+      : containerRepository.create(normalizedData as unknown as PageContainerCreate));
 
     // Mirrors the app's own page-creation flow: every page gets a `ContainerAccess` row for
     // its owning user, `parentId` denormalized from the container's own `parentId`.
@@ -320,6 +332,8 @@ async function seedAppData() {
         ...(existingDs as DataSourceContainer),
         name: SEED.dataSource.name,
         columns: [...SEED.dataSource.columns] as Column[],
+        deletedAt: existingDs.deletedAt ?? null,
+        deletedRootId: existingDs.deletedRootId ?? null,
         lastUpdated: now,
       })
     : containerRepository.create({
@@ -332,6 +346,8 @@ async function seedAppData() {
         columns: [...SEED.dataSource.columns] as Column[],
         createdAt: now,
         lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
       } as unknown as DataSourceContainerCreate));
 
   await upsertPage(
@@ -363,6 +379,8 @@ async function seedAppData() {
         ...existingView,
         name: SEED.dataView.name,
         columns: SEED.dataSource.columns.map((c) => c.id),
+        deletedAt: existingView.deletedAt ?? null,
+        deletedRootId: existingView.deletedRootId ?? null,
         lastUpdated: now,
       })
     : dataViewRepository.create({
@@ -374,6 +392,8 @@ async function seedAppData() {
         columns: SEED.dataSource.columns.map((c) => c.id),
         createdAt: now,
         lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
       } as unknown as DataViewCreate));
 
   // ── Breadcrumb test fixtures ─────────────────────────────────────────────────
@@ -389,6 +409,8 @@ async function seedAppData() {
         ...(existingBreadcrumbDs as DataSourceContainer),
         name: SEED.breadcrumbDataSource.name,
         columns: [...SEED.breadcrumbDataSource.columns],
+        deletedAt: existingBreadcrumbDs.deletedAt ?? null,
+        deletedRootId: existingBreadcrumbDs.deletedRootId ?? null,
         lastUpdated: now,
       })
     : containerRepository.create({
@@ -401,6 +423,8 @@ async function seedAppData() {
         columns: [...SEED.breadcrumbDataSource.columns],
         createdAt: now,
         lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
       } as unknown as DataSourceContainerCreate));
 
   const existingBreadcrumbView = await dataViewRepository.getOneByQuery(
@@ -411,6 +435,8 @@ async function seedAppData() {
         ...existingBreadcrumbView,
         name: SEED.breadcrumbDataView.name,
         columns: SEED.breadcrumbDataSource.columns.map((c) => c.id),
+        deletedAt: existingBreadcrumbView.deletedAt ?? null,
+        deletedRootId: existingBreadcrumbView.deletedRootId ?? null,
         lastUpdated: now,
       })
     : dataViewRepository.create({
@@ -422,6 +448,8 @@ async function seedAppData() {
         columns: SEED.breadcrumbDataSource.columns.map((c) => c.id),
         createdAt: now,
         lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
       } as unknown as DataViewCreate));
 
   await upsertPage(
@@ -455,6 +483,8 @@ async function seedAppData() {
         ...(existingFieldsDs as DataSourceContainer),
         name: fieldsSeed.dataSource.name,
         columns: [...fieldsSeed.dataSource.columns] as Column[],
+        deletedAt: existingFieldsDs.deletedAt ?? null,
+        deletedRootId: existingFieldsDs.deletedRootId ?? null,
         lastUpdated: now,
       })
     : containerRepository.create({
@@ -467,6 +497,8 @@ async function seedAppData() {
         columns: [...fieldsSeed.dataSource.columns] as Column[],
         createdAt: now,
         lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
       } as unknown as DataSourceContainerCreate));
 
   // Reversed relative to fieldsSeed.dataSource.columns' own stored order, so the Fields tab
@@ -481,6 +513,8 @@ async function seedAppData() {
         ...existingFieldsView,
         name: fieldsSeed.dataView.name,
         columns: reorderedColumnIds,
+        deletedAt: existingFieldsView.deletedAt ?? null,
+        deletedRootId: existingFieldsView.deletedRootId ?? null,
         lastUpdated: now,
       })
     : dataViewRepository.create({
@@ -492,6 +526,8 @@ async function seedAppData() {
         columns: reorderedColumnIds,
         createdAt: now,
         lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
       } as unknown as DataViewCreate));
 
   await upsertPage(

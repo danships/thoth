@@ -90,6 +90,8 @@ export type Column = z.infer<typeof columnSchema>;
 export const containerSchema = z
   .object({
     name: z.string().min(1),
+    deletedAt: z.string().nullable(),
+    deletedRootId: z.string().nullable(),
   })
   .extend(withTrackUpdatesSchema.shape)
   .extend(withWorkspaceIdSchema.shape)
