@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import { ActionIcon, Badge, Box, Divider, Group, Loader, Menu, Text, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconDots, IconFileImport, IconLink, IconPlugConnected, IconUnlink } from '@tabler/icons-react';
+import { IconDots, IconFilePlus, IconFileImport, IconLink, IconPlugConnected, IconUnlink } from '@tabler/icons-react';
 import { usePageApps } from '@/lib/hooks/api/use-page-apps';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
@@ -18,6 +18,7 @@ type PageDetailMenuProperties = {
   pageId: string;
   hasContent: boolean;
   onImportMarkdown: (markdown: string) => Promise<void>;
+  onAddChildPage: () => void;
 };
 
 // The badge shown next to a connected App: where its access comes from. Extracted to a plain
@@ -40,7 +41,7 @@ function connectedBadgeLabel(app: ConnectedPageApp): string {
 //    never managed here — only the page's own connections.
 //  - "Import from Markdown" (THOTH-041): lets the user replace the page's content by picking a
 //    local `.md`/`.markdown` file, parsed entirely client-side via BlockNote.
-export function PageDetailMenu({ pageId, hasContent, onImportMarkdown }: PageDetailMenuProperties) {
+export function PageDetailMenu({ pageId, hasContent, onImportMarkdown, onAddChildPage }: PageDetailMenuProperties) {
   const { data, isLoading, mutate } = usePageApps(pageId);
   const { post, delete: remove, inProgress } = useCudApi();
   const { showError, showSuccess } = useNotification();
@@ -133,6 +134,10 @@ export function PageDetailMenu({ pageId, hasContent, onImportMarkdown }: PageDet
         </Menu.Target>
 
         <Menu.Dropdown>
+          <Menu.Item leftSection={<IconFilePlus size={14} />} onClick={onAddChildPage}>
+            Add Child Page
+          </Menu.Item>
+
           <Menu.Item leftSection={<IconFileImport size={14} />} onClick={handleImportClick}>
             Import from Markdown
           </Menu.Item>

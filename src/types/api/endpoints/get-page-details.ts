@@ -7,6 +7,11 @@ import { columnSchema } from '@/types/schemas/entities/container';
 
 export const GET_PAGE_DETAILS_ENDPOINT = '/pages/:id';
 
+// Reserved `?v=` tab value for the "Sub Pages" tab (THOTH-034). Data-view ids are generated
+// id strings, so this literal can never collide with a real view id or the existing
+// `'contents'` tab value.
+export const SUBPAGES_TAB_VALUE = 'subpages';
+
 export const getPageDetailsResponseSchema = z.object({
   page: pageSchema,
   content: getPageContentResponseSchema.shape.content.optional(),
@@ -14,6 +19,10 @@ export const getPageDetailsResponseSchema = z.object({
   views: z.array(dataViewSchema).optional(),
   columns: z.array(columnSchema).optional(),
   starred: z.boolean(),
+  // Minimal additive flag: whether this page has at least one direct child `page` container.
+  // Drives whether the "Sub Pages" tab is shown, without eagerly fetching the full child list
+  // (which is instead fetched lazily via `usePagesByParent` only once the tab is opened).
+  hasChildren: z.boolean(),
 });
 
 export type GetPageDetailsResponse = z.infer<typeof getPageDetailsResponseSchema>;

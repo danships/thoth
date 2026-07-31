@@ -35,8 +35,9 @@ import { PageCoverEditor } from '@/components/molecules/page-cover-editor';
 import { PageEmojiPicker } from '@/components/molecules/page-emoji-picker';
 import { PageDetailMenu } from '@/components/organisms/page-detail-menu';
 import { PageDetailEditor, type PageDetailEditorHandle } from '@/components/organisms/page-detail-editor';
+import { PageSubpagesList } from '@/components/organisms/page-subpages-list';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
-import { GET_PAGES_ENDPOINT } from '@/types/api';
+import { GET_PAGES_ENDPOINT, SUBPAGES_TAB_VALUE } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import styles from './page.module.css';
 
@@ -52,6 +53,8 @@ export default function PageDetailsPage() {
   const { data: pageDetails, isLoading, error, mutate } = usePageDetails(pageId);
   const { data: breadcrumbs, isLoading: isLoadingBreadcrumbs } = usePageBreadcrumbs(pageId);
 
+  const hasSubpages = pageDetails?.hasChildren ?? false;
+
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);
   const titleReference = useRef<HTMLHeadingElement>(null);
   const editorReference = useRef<PageDetailEditorHandle>(null);
@@ -61,7 +64,7 @@ export default function PageDetailsPage() {
   const { setPageContent } = useSetPageContent({ mutatePageDetails: mutate });
   const { registerAccess } = useRegisterPageAccess();
   const { toggleFavorite, inProgress: isTogglingFavorite } = useToggleFavorite({ mutatePageDetails: mutate });
-  const { id: workspaceId } = useCurrentWorkspace();
+  const { id: workspaceId, slug: workspaceSlug } = useCurrentWorkspace();
 
   // Explicitly register that this page was opened, once per navigation (guarded on `pageId`
   // alone so it doesn't re-fire on every re-render). Kept fully separate from `usePageDetails`
@@ -85,6 +88,15 @@ export default function PageDetailsPage() {
       }
     }
   }, [pageDetails, searchParameters, router]);
+
+  // Guard against a stale/hand-crafted `?v=subpages` when the page turns out to have no
+  // direct children (e.g. its last child was deleted since the URL was bookmarked): redirect
+  // back to Contents rather than rendering a missing panel.
+  useEffect(() => {
+    if (pageDetails && !hasSubpages && searchParameters.get('v') === SUBPAGES_TAB_VALUE) {
+      router.replace('?v=contents');
+    }
+  }, [pageDetails, hasSubpages, searchParameters, router]);
 
   // Sync the contentEditable title when pageDetails changes (e.g., after update)
   useEffect(() => {
@@ -249,6 +261,7 @@ export default function PageDetailsPage() {
               pageId={pageId}
               hasContent={Boolean(pageDetails.content)}
               onImportMarkdown={handleImportMarkdown}
+              onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
             />
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (
@@ -278,6 +291,7 @@ export default function PageDetailsPage() {
                       {view.name}
                     </Tabs.Tab>
                   ))}
+                  {hasSubpages && <Tabs.Tab value={SUBPAGES_TAB_VALUE}>Sub Pages</Tabs.Tab>}
                   <Tabs.Tab value="contents">Contents</Tabs.Tab>
                 </Tabs.List>
                 <Button
@@ -297,6 +311,14 @@ export default function PageDetailsPage() {
                   onUpdate={updateContent}
                 />
               </Tabs.Panel>
+
+              {hasSubpages && (
+                <Tabs.Panel value={SUBPAGES_TAB_VALUE} className={styles['tabsPanel'] ?? ''}>
+                  {/* Only mounted while the tab is active (Mantine only renders the active
+                      panel's children by default), so `usePagesByParent` fires lazily. */}
+                  <PageSubpagesList pageId={pageId} />
+                </Tabs.Panel>
+              )}
 
               {pageDetails.views?.map((view) => (
                 <Tabs.Panel key={view.id} value={view.id} className={styles['tabsPanel'] ?? ''}>

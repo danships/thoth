@@ -47,6 +47,14 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
       addUserIdToQuery(containerAccessRepository.createQuery().eq('containerId', page.id), session.user.id)
     );
 
+    // Bounded existence check only — used purely to decide whether the "Sub Pages" tab is
+    // shown, so we never fetch (or return) the full child list here. Scoped by user id like
+    // every other read on this container.
+    const containerRepository = await getContainerRepository();
+    const childPage = await containerRepository.getOneByQuery(
+      addUserIdToQuery(containerRepository.createQuery().eq('parentId', page.id).eq('type', 'page'), session.user.id)
+    );
+
     const returnValue: GetPageDetailsResponse = {
       page: {
         id: page.id,
@@ -58,6 +66,7 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
         parentId: page.parentId || null,
       },
       starred: containerAccess?.starred ?? false,
+      hasChildren: Boolean(childPage),
     };
 
     if (linkedViews.length > 0) {
