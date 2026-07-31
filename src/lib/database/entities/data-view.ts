@@ -18,5 +18,8 @@ export const DataView: EntityDefinition = {
     workspaceId: 'string',
     userId: 'string',
     createdAt: 'string',
+    lastUpdated: 'string',
+    deletedAt: 'string',
+    deletedRootId: 'string',
   },
 };

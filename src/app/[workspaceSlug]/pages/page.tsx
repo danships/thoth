@@ -28,7 +28,7 @@ async function PagesLandingPage({ params, session }: Properties & { session: { u
       workspace.id
     ).sort('lastUpdated', 'desc')
   );
-  const rootPages = pages.filter((page) => page.type === 'page' && !page.parentId);
+  const rootPages = pages.filter((page) => page.type === 'page' && !page.parentId && !page.deletedAt);
 
   if (rootPages.length === 0) {
     return <PagesEmptyState />;

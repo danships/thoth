@@ -1,9 +1,9 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ActionIcon, Badge, Box, Divider, Group, Loader, Menu, Text, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconDots, IconFilePlus, IconFileImport, IconLink, IconPlugConnected, IconUnlink } from '@tabler/icons-react';
+import { IconDots, IconFilePlus, IconFileImport, IconLink, IconPlugConnected, IconTrash, IconUnlink } from '@tabler/icons-react';
 import { usePageApps } from '@/lib/hooks/api/use-page-apps';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
@@ -19,6 +19,7 @@ type PageDetailMenuProperties = {
   hasContent: boolean;
   onImportMarkdown: (markdown: string) => Promise<void>;
   onAddChildPage: () => void;
+  onMoveToTrash?: () => Promise<void>;
 };
 
 // The badge shown next to a connected App: where its access comes from. Extracted to a plain
@@ -41,11 +42,18 @@ function connectedBadgeLabel(app: ConnectedPageApp): string {
 //    never managed here — only the page's own connections.
 //  - "Import from Markdown" (THOTH-041): lets the user replace the page's content by picking a
 //    local `.md`/`.markdown` file, parsed entirely client-side via BlockNote.
-export function PageDetailMenu({ pageId, hasContent, onImportMarkdown, onAddChildPage }: PageDetailMenuProperties) {
+export function PageDetailMenu({
+  pageId,
+  hasContent,
+  onImportMarkdown,
+  onAddChildPage,
+  onMoveToTrash,
+}: PageDetailMenuProperties) {
   const { data, isLoading, mutate } = usePageApps(pageId);
   const { post, delete: remove, inProgress } = useCudApi();
   const { showError, showSuccess } = useNotification();
   const fileInputReference = useRef<HTMLInputElement>(null);
+  const [menuOpened, setMenuOpened] = useState(false);
 
   const handleConnect = async (app: PageAppSummary) => {
     try {
@@ -69,6 +77,29 @@ export function PageDetailMenu({ pageId, hasContent, onImportMarkdown, onAddChil
 
   const handleImportClick = () => {
     fileInputReference.current?.click();
+  };
+
+  const handleMoveToTrash = () => {
+    if (!onMoveToTrash) {
+      return;
+    }
+
+    setMenuOpened(false);
+    modals.openConfirmModal({
+      title: 'Move page to Trash',
+      children: (
+        <Text size="sm">This page and its nested content will be moved to Trash. You can restore it later.</Text>
+      ),
+      labels: { confirm: 'Move to Trash', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          await onMoveToTrash();
+        } catch {
+          showError('Failed to move page to Trash');
+        }
+      },
+    });
   };
 
   const runImport = async (markdown: string) => {
@@ -124,7 +155,7 @@ export function PageDetailMenu({ pageId, hasContent, onImportMarkdown, onAddChil
 
   return (
     <>
-      <Menu shadow="md" width={300} closeOnItemClick={false} position="bottom-end">
+      <Menu shadow="md" width={300} closeOnItemClick={false} position="bottom-end" opened={menuOpened} onChange={setMenuOpened}>
         <Menu.Target>
           <Tooltip label="Menu">
             <ActionIcon variant="subtle" color="gray" aria-label="Page menu">
@@ -141,13 +172,18 @@ export function PageDetailMenu({ pageId, hasContent, onImportMarkdown, onAddChil
           <Menu.Item leftSection={<IconFileImport size={14} />} onClick={handleImportClick}>
             Import from Markdown
           </Menu.Item>
+          {onMoveToTrash && (
+            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={handleMoveToTrash}>
+              Move to Trash
+            </Menu.Item>
+          )}
 
           {/* `closeDelay` guards against the hover-based submenu closing itself the instant a
               connect/disconnect click shrinks or grows the dropdown: with no delay, the cursor
               can end up outside the resized floating panel mid-click, and Mantine's `useHover`
               would immediately treat that as "mouse left" and close the submenu before the
               updated (dis)connected row ever renders. */}
-          <Menu.Sub position="right-start" closeDelay={300}>
+          <Menu.Sub position="right-start" closeDelay={1000}>
             <Menu.Sub.Target>
               <Menu.Sub.Item leftSection={<IconPlugConnected size={14} />}>App connections</Menu.Sub.Item>
             </Menu.Sub.Target>

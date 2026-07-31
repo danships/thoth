@@ -1,11 +1,14 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '@/lib/database';
+import { cascadeSoftDeletePage } from '@/lib/database/soft-delete-service';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { pageColumnRetriever } from '@/lib/database/retrievers/page-column-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { getLogger } from '@/lib/logger';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import type {
+  DeletePageParameters,
   GetPageDetailsParameters,
   GetPageDetailsQuery,
   GetPageDetailsResponse,
@@ -14,6 +17,7 @@ import type {
   UpdatePageResponse,
 } from '@/types/api';
 import {
+  deletePageParametersSchema,
   getPageDetailsParametersSchema,
   getPageDetailsQuerySchema,
   updatePageBodySchema,
@@ -33,11 +37,20 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
     const dataViewRepository = await getDataViewRepository();
     let linkedViews: GetPageDetailsResponse['views'] = [];
     if (page.views && page.views.length > 0) {
-      linkedViews = await dataViewRepository.getByQuery(
+      const fetchedViews = await dataViewRepository.getByQuery(
         addUserIdToQuery(dataViewRepository.createQuery(), session.user.id)
           .in('id', page.views)
           .eq('workspaceId', page.workspaceId)
       );
+      linkedViews = fetchedViews
+        .filter((view) => !view.deletedAt)
+        .map((view) => ({
+          id: view.id,
+          name: view.name,
+          dataSourceId: view.dataSourceId,
+          createdAt: view.createdAt,
+          lastUpdated: view.lastUpdated,
+        }));
     }
 
     // Look up the per-user starred status for this page, same lookup pattern as
@@ -131,5 +144,26 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
       createdAt: updatedPage.createdAt,
       parentId: updatedPage.parentId || null,
     } satisfies UpdatePageResponse;
+  }
+);
+
+export const DELETE = apiRoute<void, undefined, DeletePageParameters, {}>(
+  {
+    expectedParamsSchema: deletePageParametersSchema,
+  },
+  async ({ params }, session) => {
+    const page = await pageRetriever.retrievePage(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, page);
+
+    const result = await cascadeSoftDeletePage(page, session.user.id);
+
+    const logger = await getLogger();
+    logger.info('page.delete', {
+      actorUserId: session.user.id,
+      pageId: page.id,
+      workspaceId: page.workspaceId,
+      deletedPageCount: result.deletedPageCount,
+      deletedViewCount: result.deletedViewCount,
+    });
   }
 );

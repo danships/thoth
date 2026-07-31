@@ -1,19 +1,32 @@
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
+import type { APIRequestContext } from '@playwright/test';
+
+async function setPageEmoji(request: APIRequestContext, emoji: string | null) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await request.patch(`/api/v1/pages/${SEED.pages.root.id}`, { data: { emoji } });
+      expect(response.ok()).toBe(true);
+      return;
+    } catch (error) {
+      if (attempt === 3) {
+        throw error;
+      }
+    }
+  }
+}
 
 test.describe('page emoji', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ request }) => {
     // The seeded root page ships with a default emoji (📄), so start every test from a known
     // "no emoji" baseline regardless of the seed's default or leftover state from other specs.
-    const response = await page.request.patch(`/api/v1/pages/${SEED.pages.root.id}`, { data: { emoji: null } });
-    expect(response.ok()).toBe(true);
+    await setPageEmoji(request, null);
   });
 
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async ({ request }) => {
     // Restore the seeded root page emoji (📄) so other specs that load `SEED.pages.root`
     // aren't affected by leftover state from this suite.
-    const response = await page.request.patch(`/api/v1/pages/${SEED.pages.root.id}`, { data: { emoji: '📄' } });
-    expect(response.ok()).toBe(true);
+    await setPageEmoji(request, '📄');
   });
 
   test('shows an "add emoji" affordance when none set', async ({ page }) => {

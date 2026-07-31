@@ -5,7 +5,7 @@ import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 
 class DataSourceRetriever {
-  public async retrieveDataSource(id: string, userId: string): Promise<DataSourceContainer> {
+  private async retrieveDataSourceInternal(id: string, userId: string): Promise<DataSourceContainer> {
     const containerRepository = await getContainerRepository();
 
     const existingDataSource = await containerRepository.getOneByQuery(
@@ -19,6 +19,18 @@ class DataSourceRetriever {
     await assertWorkspaceAccess(userId, existingDataSource.workspaceId);
 
     return existingDataSource;
+  }
+
+  public async retrieveDataSource(id: string, userId: string): Promise<DataSourceContainer> {
+    const dataSource = await this.retrieveDataSourceInternal(id, userId);
+    if (dataSource.deletedAt) {
+      throw new NotFoundError('Data source not found', true);
+    }
+    return dataSource;
+  }
+
+  public async retrieveDataSourceIncludingDeleted(id: string, userId: string): Promise<DataSourceContainer> {
+    return this.retrieveDataSourceInternal(id, userId);
   }
 }
 

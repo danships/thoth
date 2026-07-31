@@ -136,7 +136,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       const parent = await containerRepository.getOneByQuery(
         containerRepository.createQuery().eq('id', query.parentId).eq('type', 'page')
       );
-      if (!parent || parent.type !== 'page') {
+      if (!parent || parent.type !== 'page' || parent.deletedAt) {
         throw new NotFoundError('Parent page not found');
       }
       await assertWorkspaceAccess(session.user.id, parent.workspaceId);
@@ -149,6 +149,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
           .eq('parentId', query.parentId)
           .sort('lastUpdated', 'desc')
       );
+      containers = containers.filter((container) => !container.deletedAt);
       pagination = { nextCursor: null, hasMore: false };
     } else {
       // Root list: no existing entity to derive the workspace from, so `workspaceId` is
@@ -173,7 +174,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
             .eq('type', 'page')
             .in('id', containerIds)
         );
-        for (const container of fetchedContainers) {
+        for (const container of fetchedContainers.filter((candidate) => !candidate.deletedAt)) {
           containersById.set(container.id, container);
         }
       }
@@ -203,9 +204,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
     const containersWithViews = containers.filter(
       (container) => container.type === 'page' && 'views' in container && container.views && container.views.length > 0
     );
-    const containersWithoutViews = containers.filter((container) => !containersWithViews.includes(container));
-
-    const parentIds = containersWithoutViews.map((container) => container.id).filter(Boolean);
+    const parentIds = containers.map((container) => container.id).filter(Boolean);
 
     // Query for child pages only for containers without views. Fetched unbounded (no per-parent
     // DB limit, since SuperSave's `in` query can't express a per-group limit) and then capped to
@@ -219,9 +218,10 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
               .sort('lastUpdated', 'desc')
           )
         : [];
+    const visibleChildren = databaseChildren.filter((child) => !child.deletedAt);
 
     const childCountByParent = new Map<string, number>();
-    for (const child of databaseChildren) {
+    for (const child of visibleChildren) {
       if (!child.parentId) {
         continue;
       }
@@ -239,7 +239,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       const views = await dataViewRepository.getByQuery(
         addUserIdToQuery(dataViewRepository.createQuery(), session.user.id).in('id', allViewIds)
       );
-      for (const view of views) {
+      for (const view of views.filter((candidate) => !candidate.deletedAt)) {
         viewsMap.set(view.id, view);
       }
     }
@@ -251,6 +251,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
 
         // Children always contains only pages, capped to CHILD_PREVIEW_LIMIT for preview.
         const children: Array<{ page: Page }> = databaseChildren
+          .filter((child) => !child.deletedAt)
           .filter((child) => child.parentId === container.id)
           .slice(0, CHILD_PREVIEW_LIMIT)
           .map((child): { page: Page } => ({

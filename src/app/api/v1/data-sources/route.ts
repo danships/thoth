@@ -6,7 +6,7 @@ import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateDataSourceBody, CreateDataSourceResponse, GetDataSourcesResponse } from '@/types/api';
 import { createDataSourceBodySchema } from '@/types/api';
-import { DataSourceContainerCreate } from '@/types/database';
+import { DataSourceContainer, DataSourceContainerCreate } from '@/types/database';
 import { randomUUID } from 'node:crypto';
 
 export const GET = apiRoute<GetDataSourcesResponse, {}, {}>({}, async (_, session) => {
@@ -16,7 +16,7 @@ export const GET = apiRoute<GetDataSourcesResponse, {}, {}>({}, async (_, sessio
   );
 
   return dataSources
-    .filter((container) => container.type === 'data-source')
+    .filter((container): container is DataSourceContainer => container.type === 'data-source' && !container.deletedAt)
     .map((dataSource) => ({
       id: dataSource.id,
       name: dataSource.name,
@@ -57,6 +57,8 @@ export const POST = apiRoute<CreateDataSourceResponse, {}, {}, CreateDataSourceB
       parentId: null,
       type: 'data-source',
       columns: body.columns?.map((column) => ({ id: randomUUID(), ...column })) ?? [],
+      deletedAt: null,
+      deletedRootId: null,
     };
 
     const createdDataSource = await containerRepository.create(dataSourceData);

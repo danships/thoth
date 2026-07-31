@@ -68,7 +68,8 @@ test('can create a new option from the single-select cell dropdown', async ({ pa
   const selectCell = row.getByRole('cell').nth(4);
 
   await selectCell.getByTestId('single-select-cell-target').click();
-  await page.getByPlaceholder('Search or create option').fill('Urgent');
+  const searchInput = page.locator('input[placeholder="Search or create option"][data-expanded="true"]');
+  await searchInput.fill('Urgent');
   await page.getByRole('option', { name: `+ Create "Urgent"` }).click();
 
   await expect(selectCell.getByText('Urgent')).toBeVisible();
@@ -79,7 +80,7 @@ test('can create a new option from the single-select cell dropdown', async ({ pa
 
   // Searching for the label just created should offer the existing option rather than a second
   // "+ Create" action, verifying the case-insensitive idempotency of the create endpoint.
-  await page.getByPlaceholder('Search or create option').fill('Urgent');
+  await searchInput.fill('Urgent');
   await expect(page.getByRole('option', { name: 'Urgent' })).toBeVisible();
   await expect(page.getByRole('option', { name: '+ Create "Urgent"' })).toHaveCount(0);
 });

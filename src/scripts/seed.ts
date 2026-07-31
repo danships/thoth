@@ -104,6 +104,8 @@ for (const page of samplePages) {
     lastUpdated: now,
     emoji: page.emoji,
     parentId,
+    deletedAt: null,
+    deletedRootId: null,
   };
 
   const created = await containerRepository.create(pageData);

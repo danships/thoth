@@ -1,8 +1,11 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository } from '@/lib/database';
+import { getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { addUserIdToQuery } from '@/lib/database/helpers';
+import { getLogger } from '@/lib/logger';
 import type {
+  DeleteDataSourceParameters,
   GetDataSourceResponse,
   GetDataSourceParameters,
   UpdateDataSourceBody,
@@ -10,6 +13,7 @@ import type {
   UpdateDataSourceParameters,
 } from '@/types/api';
 import {
+  deleteDataSourceParametersSchema,
   getDataSourceParametersSchema,
   updateDataSourceBodySchema,
   updateDataSourceParametersSchema,
@@ -65,5 +69,55 @@ export const PATCH = apiRoute<UpdateDataSourceResponse, undefined, UpdateDataSou
       lastUpdated: updatedDataSource.lastUpdated,
       columns: 'columns' in updatedDataSource ? updatedDataSource.columns : [],
     } satisfies UpdateDataSourceResponse;
+  }
+);
+
+export const DELETE = apiRoute<void, undefined, DeleteDataSourceParameters, {}>(
+  {
+    expectedParamsSchema: deleteDataSourceParametersSchema,
+  },
+  async ({ params }, session) => {
+    const containerRepository = await getContainerRepository();
+    const dataViewRepository = await getDataViewRepository();
+    const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, dataSource);
+
+    const now = new Date().toISOString();
+    await containerRepository.update({
+      ...dataSource,
+      deletedAt: now,
+      deletedRootId: dataSource.id,
+      lastUpdated: now,
+    });
+
+    const linkedViews = await dataViewRepository.getByQuery(
+      addUserIdToQuery(dataViewRepository.createQuery().eq('dataSourceId', dataSource.id), session.user.id).eq(
+        'workspaceId',
+        dataSource.workspaceId
+      )
+    );
+
+    let deletedViewCount = 0;
+    for (const linkedView of linkedViews) {
+      if (linkedView.deletedAt) {
+        continue;
+      }
+
+      await dataViewRepository.update({
+        ...linkedView,
+        deletedAt: now,
+        deletedRootId: dataSource.id,
+        lastUpdated: now,
+      });
+      deletedViewCount += 1;
+    }
+
+    const logger = await getLogger();
+    logger.info('data-source.delete', {
+      actorUserId: session.user.id,
+      dataSourceId: dataSource.id,
+      workspaceId: dataSource.workspaceId,
+      deletedViewCount,
+    });
   }
 );

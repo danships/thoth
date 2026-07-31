@@ -5,7 +5,7 @@ import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 
 class PageRetriever {
-  public async retrievePage(id: string, userId: string): Promise<PageContainer> {
+  private async retrievePageInternal(id: string, userId: string): Promise<PageContainer> {
     const containerRepository = await getContainerRepository();
 
     const existingPage = await containerRepository.getOneByQuery(
@@ -22,6 +22,18 @@ class PageRetriever {
     await assertWorkspaceAccess(userId, existingPage.workspaceId);
 
     return existingPage;
+  }
+
+  public async retrievePage(id: string, userId: string): Promise<PageContainer> {
+    const page = await this.retrievePageInternal(id, userId);
+    if (page.deletedAt) {
+      throw new NotFoundError('Page not found', true);
+    }
+    return page;
+  }
+
+  public async retrievePageIncludingDeleted(id: string, userId: string): Promise<PageContainer> {
+    return this.retrievePageInternal(id, userId);
   }
 }
 

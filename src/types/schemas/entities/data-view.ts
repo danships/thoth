@@ -6,6 +6,8 @@ export const dataViewSchema = z
     name: z.string().min(1),
     dataSourceId: z.string().min(1),
     columns: z.array(z.string().min(1)),
+    deletedAt: z.string().nullable(),
+    deletedRootId: z.string().nullable(),
   })
   .extend(withTrackUpdatesSchema.shape)
   .extend(withWorkspaceIdSchema.shape)

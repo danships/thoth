@@ -3,14 +3,21 @@ import { getDataViewRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { dataViewRetriever } from '@/lib/database/retrievers/data-view-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { getLogger } from '@/lib/logger';
 import type {
+  DeleteViewParameters,
   GetDataViewResponse,
   GetDataViewParameters,
   UpdateDataViewBody,
   UpdateDataViewResponse,
   UpdateDataViewParameters,
 } from '@/types/api';
-import { getDataViewParametersSchema, updateDataViewBodySchema, updateDataViewParametersSchema } from '@/types/api';
+import {
+  deleteViewParametersSchema,
+  getDataViewParametersSchema,
+  updateDataViewBodySchema,
+  updateDataViewParametersSchema,
+} from '@/types/api';
 export const GET = apiRoute<GetDataViewResponse, undefined, GetDataViewParameters>(
   {
     expectedParamsSchema: getDataViewParametersSchema,
@@ -61,5 +68,30 @@ export const PATCH = apiRoute<UpdateDataViewResponse, undefined, UpdateDataViewP
       lastUpdated: updatedDataView.lastUpdated,
       dataSourceId: updatedDataView.dataSourceId,
     } satisfies UpdateDataViewResponse;
+  }
+);
+
+export const DELETE = apiRoute<void, undefined, DeleteViewParameters, {}>(
+  {
+    expectedParamsSchema: deleteViewParametersSchema,
+  },
+  async ({ params }, session) => {
+    const dataViewRepository = await getDataViewRepository();
+    const dataView = await dataViewRetriever.retrieveDataView(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, dataView);
+
+    await dataViewRepository.update({
+      ...dataView,
+      deletedAt: new Date().toISOString(),
+      deletedRootId: dataView.id,
+      lastUpdated: new Date().toISOString(),
+    });
+
+    const logger = await getLogger();
+    logger.info('view.delete', {
+      actorUserId: session.user.id,
+      viewId: dataView.id,
+      workspaceId: dataView.workspaceId,
+    });
   }
 );

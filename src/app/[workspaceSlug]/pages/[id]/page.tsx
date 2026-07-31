@@ -18,6 +18,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mutate as mutateGlobal } from 'swr';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
+import { api } from '@/lib/api/client';
 import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
 import { IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
@@ -197,6 +198,15 @@ export default function PageDetailsPage() {
     }
   }, [pageDetails, pageId, toggleFavorite, showError]);
 
+  const handleMoveToTrash = useCallback(async () => {
+    try {
+      await api.pages.remove(pageId);
+      globalThis.location.assign(`/${workspaceSlug}/pages`);
+    } catch {
+      throw new Error('Failed to move page to Trash');
+    }
+  }, [pageId, workspaceSlug]);
+
   if (isLoading) {
     return (
       <Container size="md" py={{ base: 'sm', sm: 'xl' }} px={{ base: 'sm', sm: 'md' }}>
@@ -262,6 +272,7 @@ export default function PageDetailsPage() {
               hasContent={Boolean(pageDetails.content)}
               onImportMarkdown={handleImportMarkdown}
               onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
+              onMoveToTrash={handleMoveToTrash}
             />
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (

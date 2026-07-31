@@ -61,7 +61,9 @@ test.describe('workspace menu', () => {
 
     await page.goto(`/${SEED.workspace.slug}/pages`);
     await page.getByRole('button', { name: 'Workspace menu' }).click();
-    await page.getByRole('menuitem', { name: created.name }).click();
+    const targetWorkspaceItem = page.getByRole('menuitem', { name: created.name });
+    await targetWorkspaceItem.scrollIntoViewIfNeeded();
+    await targetWorkspaceItem.click();
 
     // Switching lands on the target workspace's Pages view, which forwards on to its landing
     // page, so match the slug prefix rather than an exact `/pages` URL.

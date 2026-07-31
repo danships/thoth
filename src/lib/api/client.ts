@@ -2,10 +2,16 @@ import axios from 'axios';
 import { notifications } from '@mantine/notifications';
 import type { DataWrapper } from '@/types/api';
 import type {
+  BatchDeletePagesResponse,
+  BatchRestorePagesResponse,
   CreateWorkspaceBody,
+  GetDeletedPagesResponse,
   GetDeletedWorkspacesResponse,
   GetWorkspacesResponse,
   GetWorkspaceSlugAvailabilityResponse,
+  RestoreDataSourceResponse,
+  RestorePageResponse,
+  RestoreViewResponse,
   UpdateWorkspaceBody,
   WorkspaceApi,
   CreateAppBody,
@@ -84,6 +90,17 @@ export const api = {
     registerAccess: (id: string) => apiClient.post(`/pages/${id}/access`),
 
     setFavorite: (id: string, starred: boolean) => apiClient.put(`/pages/${id}/favorite`, { starred }),
+    remove: (id: string) => apiClient.delete(`/pages/${id}`),
+    restore: (id: string) => apiClient.post<DataWrapper<RestorePageResponse>>(`/pages/${id}/restore`),
+    removePermanently: (id: string) => apiClient.delete(`/pages/${id}/permanent`),
+    listDeleted: (workspaceId?: string) =>
+      apiClient.get<DataWrapper<GetDeletedPagesResponse>>('/pages/deleted', {
+        params: workspaceId ? { workspaceId } : undefined,
+      }),
+    restoreMany: (ids: string[]) =>
+      apiClient.post<DataWrapper<BatchRestorePagesResponse>>('/pages/deleted/restore', { ids }),
+    removeManyPermanently: (ids: string[]) =>
+      apiClient.post<DataWrapper<BatchDeletePagesResponse>>('/pages/deleted/delete', { ids }),
 
     listApps: (id: string) => apiClient.get<DataWrapper<GetPageAppsResponse>>(`/pages/${id}/apps`),
     connectApp: (id: string, appId: string) =>
@@ -94,6 +111,16 @@ export const api = {
       apiClient.post<DataWrapper<MutatePageContentResponse>>(`/pages/${id}/append`, { content }),
     prependContent: (id: string, content: string) =>
       apiClient.post<DataWrapper<MutatePageContentResponse>>(`/pages/${id}/prepend`, { content }),
+  },
+
+  views: {
+    remove: (id: string) => apiClient.delete(`/views/${id}`),
+    restore: (id: string) => apiClient.post<DataWrapper<RestoreViewResponse>>(`/views/${id}/restore`),
+  },
+
+  dataSources: {
+    remove: (id: string) => apiClient.delete(`/data-sources/${id}`),
+    restore: (id: string) => apiClient.post<DataWrapper<RestoreDataSourceResponse>>(`/data-sources/${id}/restore`),
   },
 
   // Workspaces API
