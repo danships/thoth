@@ -19,6 +19,16 @@ import type { Column } from '@/types/schemas/entities/container';
 import type { SelectColor } from '@/types/schemas/entities/container';
 import type { CreateDataSourceColumnBody, GetPagesResponse, UpdateDataSourceColumnBody } from '@/types/api';
 
+// Each data column needs at least this much room for its editable control (select/multi-select
+// targets, date pickers, etc.) to render without being squeezed. With `tableLayout: 'fixed'`, the
+// browser divides the available width evenly across columns without shrinking any of them
+// individually to fit content, so once there are enough columns the data columns could otherwise
+// be compressed below their controls' min-width, causing those controls to overflow their cell
+// and visually bleed into (and intercept clicks on) neighbouring cells.
+const NAME_COLUMN_MIN_WIDTH = 260;
+const DATA_COLUMN_MIN_WIDTH = 140;
+const DEFAULT_TABLE_MIN_WIDTH = 520;
+
 type DataViewTableProperties = {
   dataSourceId: string;
   columns: Column[];
@@ -167,6 +177,15 @@ export function DataViewTable({
     return createPageInProgress || columnOperationInProgress || valueUpdateInProgress || pageUpdateInProgress;
   }, [createPageInProgress, columnOperationInProgress, valueUpdateInProgress, pageUpdateInProgress]);
 
+  // Scaling the scroll container's minWidth with the column count keeps every column at least as
+  // wide as its editable control, falling back to horizontal scrolling instead of squeezing
+  // columns (see the constants above for rationale).
+  const tableMinWidth = useMemo(
+    () =>
+      columns.length > 0 ? NAME_COLUMN_MIN_WIDTH + columns.length * DATA_COLUMN_MIN_WIDTH : DEFAULT_TABLE_MIN_WIDTH,
+    [columns.length]
+  );
+
   if (isLoading) {
     return (
       <Stack align="center" py="xl">
@@ -190,7 +209,7 @@ export function DataViewTable({
           Add Column
         </Button>
       </Group>
-      <Table.ScrollContainer minWidth={520} mt="lg" type="native" data-testid="data-table-scroll-container">
+      <Table.ScrollContainer minWidth={tableMinWidth} mt="lg" type="native" data-testid="data-table-scroll-container">
         <Table striped highlightOnHover w="100%" style={columns.length > 0 ? { tableLayout: 'fixed' } : undefined}>
           <Table.Thead>
             <Table.Tr>
