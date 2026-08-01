@@ -11,3 +11,4 @@ export { Webhook, NAME as WEBHOOK_NAME } from './webhook';
 export { WebhookDelivery, NAME as WEBHOOK_DELIVERY_NAME } from './webhook-delivery';
 export { UploadedFile, NAME as UPLOADED_FILE_NAME } from './uploaded-file';
 export { FileUsage, NAME as FILE_USAGE_NAME } from './file-usage';
+export { PageRevision, NAME as PAGE_REVISION_NAME } from './page-revision';

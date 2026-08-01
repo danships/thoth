@@ -5,6 +5,7 @@ import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
+import { recordValuesRevision } from '@/lib/history/revision-service';
 import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
 import type { PageValue } from '@/types/schemas/entities/container';
@@ -69,6 +70,8 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
         valueChanges[columnId] = { previous: previousValue, new: newValue };
       }
     }
+
+    await recordValuesRevision({ page, changed: body, author: session.user.id });
 
     const updatedPage = await containerRepository.update({
       ...page,

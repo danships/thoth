@@ -8,6 +8,11 @@ import type {
   GetDeletedPagesResponse,
   GetDeletedWorkspacesResponse,
   GetPageBreadcrumbsResponse,
+  GetPageHistoryResponse,
+  GetPageRevisionResponse,
+  RestorePageRevisionResponse,
+  ForkPageRevisionResponse,
+  ForkPageRevisionBody,
   GetWorkspacesResponse,
   GetWorkspaceSlugAvailabilityResponse,
   RestoreDataSourceResponse,
@@ -118,6 +123,21 @@ export const api = {
       apiClient.post<DataWrapper<MutatePageContentResponse>>(`/pages/${id}/append`, { content }),
     prependContent: (id: string, content: string) =>
       apiClient.post<DataWrapper<MutatePageContentResponse>>(`/pages/${id}/prepend`, { content }),
+
+    getHistory: (id: string, options?: { cursor?: string; limit?: number; target?: 'content' | 'values' | 'all' }) =>
+      apiClient.get<DataWrapper<GetPageHistoryResponse>>(`/pages/${id}/history`, {
+        params: {
+          ...(options?.cursor && { cursor: options.cursor }),
+          ...(options?.limit && { limit: options.limit }),
+          ...(options?.target && { target: options.target }),
+        },
+      }),
+    getRevision: (id: string, revisionId: string) =>
+      apiClient.get<DataWrapper<GetPageRevisionResponse>>(`/pages/${id}/history/${revisionId}`),
+    restoreRevision: (id: string, revisionId: string) =>
+      apiClient.post<DataWrapper<RestorePageRevisionResponse>>(`/pages/${id}/history/${revisionId}/restore`),
+    forkRevision: (id: string, revisionId: string, body?: ForkPageRevisionBody) =>
+      apiClient.post<DataWrapper<ForkPageRevisionResponse>>(`/pages/${id}/history/${revisionId}/fork`, body ?? {}),
   },
 
   views: {

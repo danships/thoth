@@ -1,0 +1,18 @@
+.diff {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.6;
+}
+
+.inserted {
+  background-color: var(--mantine-color-green-1);
+  color: var(--mantine-color-green-9);
+}
+
+.deleted {
+  background-color: var(--mantine-color-red-1);
+  color: var(--mantine-color-red-9);
+  text-decoration: line-through;
+}

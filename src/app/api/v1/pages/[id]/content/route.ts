@@ -5,6 +5,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { extractFileIdsFromContent, syncFileUsageForPage } from '@/lib/files/usage';
 import { getLogger } from '@/lib/logger';
+import { recordContentRevision } from '@/lib/history/revision-service';
 import {
   GetPageContentParameters,
   getPageContentParametersSchema,
@@ -36,6 +37,10 @@ export const POST = apiRoute(
 
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
     await assertGrantAllowsContainerForSession(session, page);
+
+    // Record the revision against the *pre-update* content, before the container row itself is
+    // overwritten below.
+    await recordContentRevision({ page, newContent: body.content, author: session.user.id });
 
     const updatedPage = await containerRepository.update({
       ...page,
