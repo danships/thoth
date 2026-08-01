@@ -1,4 +1,4 @@
-// scripts/files-purge.ts
+// scripts/purge-deleted-files.ts
 //
 // Orphan-cleanup background job for uploaded files (THOTH-040). Hard-deletes `uploaded-file`
 // rows that have zero `file-usage` rows and are older than a grace period (default 24h, via
@@ -35,15 +35,22 @@ async function purgeFiles() {
   const containerRepository = await getContainerRepository();
   const storageAdapter = await getStorageAdapter();
 
-  // First, prune `file-usage` rows whose `containerId` no longer exists (e.g. the page was hard
-  // deleted) — this can turn a previously-in-use file into an orphan candidate below.
+  // Load all usage rows and containers once up front, rather than issuing a repository query
+  // per row/file below.
   const allUsageRows = await fileUsageRepository.getByQuery(fileUsageRepository.createQuery());
+  const allContainers = await containerRepository.getByQuery(containerRepository.createQuery());
+  const liveContainerIds = new Set(allContainers.map((container) => container.id));
+
+  // Prune `file-usage` rows whose `containerId` no longer exists (e.g. the page was hard
+  // deleted) — this can turn a previously-in-use file into an orphan candidate below. Collect the
+  // fileIds referenced by the remaining, valid usage rows so the purge loop can do an in-memory
+  // lookup instead of a query per file.
   let prunedUsageCount = 0;
+  const liveFileIds = new Set<string>();
   for (const usageRow of allUsageRows) {
-    const container = await containerRepository.getOneByQuery(
-      containerRepository.createQuery().eq('id', usageRow.containerId)
-    );
-    if (!container) {
+    if (liveContainerIds.has(usageRow.containerId)) {
+      liveFileIds.add(usageRow.fileId);
+    } else {
       await fileUsageRepository.deleteUsingId(usageRow.id);
       prunedUsageCount += 1;
     }
@@ -59,15 +66,17 @@ async function purgeFiles() {
       continue;
     }
 
-    const usageRows = await fileUsageRepository.getByQuery(fileUsageRepository.createQuery().eq('fileId', file.id));
-    if (usageRows.length > 0) {
+    if (liveFileIds.has(file.id)) {
       continue;
     }
 
     try {
       await storageAdapter.delete(file.storageKey);
     } catch (error) {
-      console.error(`Failed to delete storage bytes for file ${file.id} (${file.storageKey})`, error);
+      // Keep the database row so this file is retried on the next run rather than losing track
+      // of storage bytes that failed to delete.
+      console.error(`Failed to delete storage bytes for file ${file.id} (${file.storageKey}), will retry later`, error);
+      continue;
     }
 
     await uploadedFileRepository.deleteUsingId(file.id);

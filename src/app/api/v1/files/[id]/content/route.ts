@@ -62,7 +62,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       headers: {
         'Content-Type': contentType,
         'Content-Disposition': `${disposition}; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`,
-        'Content-Length': String(file.size),
         'X-Content-Type-Options': 'nosniff',
         'Cache-Control': 'private, max-age=0, must-revalidate',
       },

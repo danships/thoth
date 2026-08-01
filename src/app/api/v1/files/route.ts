@@ -41,6 +41,22 @@ export async function POST(request: NextRequest) {
       assertGrantAllowsWrite(session.appContext.accessGrant);
     }
 
+    const environment = await getEnvironment();
+
+    // Reject oversized uploads before buffering the full multipart body in memory. This is a
+    // best-effort check based on the client-supplied `Content-Length` header — the per-file size
+    // check below (using the actual parsed `File.size`) is the authoritative guard. The reverse
+    // proxy / hosting platform should also enforce a hard request body-size limit.
+    const contentLength = request.headers.get('content-length');
+    if (contentLength) {
+      const contentLengthBytes = Number.parseInt(contentLength, 10);
+      if (Number.isFinite(contentLengthBytes) && contentLengthBytes > environment.MAX_UPLOAD_SIZE_BYTES) {
+        throw new PayloadTooLargeError(
+          `Request exceeds the maximum upload size of ${environment.MAX_UPLOAD_SIZE_BYTES} bytes`
+        );
+      }
+    }
+
     const formData = await request.formData();
     const file = formData.get('file');
     const pageId = formData.get('pageId');
@@ -49,7 +65,6 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('A non-empty file is required');
     }
 
-    const environment = await getEnvironment();
     if (file.size > environment.MAX_UPLOAD_SIZE_BYTES) {
       throw new PayloadTooLargeError(
         `File exceeds the maximum upload size of ${environment.MAX_UPLOAD_SIZE_BYTES} bytes`

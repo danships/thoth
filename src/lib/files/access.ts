@@ -2,6 +2,7 @@ import { getFileUsageRepository } from '@/lib/database';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
+import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { ApiKeySession } from '@/lib/auth/session';
 import type { UploadedFile } from '@/types/database';
 
@@ -26,8 +27,14 @@ export async function assertFileAccess(session: ApiKeySession, file: UploadedFil
       const page = await pageRetriever.retrievePage(usageRow.containerId, session.user.id);
       await assertGrantAllowsContainerForSession(session, page);
       return;
-    } catch {
-      // This particular linking page isn't accessible to the caller — try the next one.
+    } catch (error) {
+      // Only an authorization/access-denied failure for *this particular* linking page means
+      // try the next one — any other error (storage/database failure, a programming bug, etc.)
+      // must propagate rather than being silently swallowed into an eventual `ForbiddenError`.
+      if (error instanceof NotFoundError || error instanceof ForbiddenError) {
+        continue;
+      }
+      throw error;
     }
   }
 

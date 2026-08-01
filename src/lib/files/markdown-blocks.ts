@@ -39,13 +39,17 @@ export type MarkdownBlockEditor = {
 
 function encodeToken(block: FileBlockLike): string {
   const payload = JSON.stringify(block.props ?? {});
-  return `<!--thoth-file-block:${block.type}:${payload}-->`;
+  // Percent-encode the payload so it can never contain a literal `>` or the token's own `-->`
+  // closing sequence — otherwise a file/video/audio prop value (e.g. a filename or URL)
+  // containing `-->` could prematurely close the HTML comment and corrupt the surrounding
+  // Markdown, or truncate the JSON payload when re-parsed by `TOKEN_REGEX`'s non-greedy match.
+  return `<!--thoth-file-block:${block.type}:${encodeURIComponent(payload)}-->`;
 }
 
 function decodeToken(type: string, payload: string): FileBlockLike {
   let properties: Record<string, unknown> = {};
   try {
-    properties = JSON.parse(payload) as Record<string, unknown>;
+    properties = JSON.parse(decodeURIComponent(payload)) as Record<string, unknown>;
   } catch {
     properties = {};
   }
@@ -125,7 +129,7 @@ export function extractFileBlockTokens(markdown: string): Array<{ type: string; 
   while ((match = regex.exec(markdown)) !== null) {
     const [, type, payload] = match;
     try {
-      results.push({ type: type!, props: JSON.parse(payload ?? '{}') as Record<string, unknown> });
+      results.push({ type: type!, props: JSON.parse(decodeURIComponent(payload ?? '')) as Record<string, unknown> });
     } catch {
       results.push({ type: type!, props: {} });
     }

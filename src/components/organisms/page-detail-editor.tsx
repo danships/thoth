@@ -186,7 +186,16 @@ export const PageDetailEditor = React.forwardRef<PageDetailEditorHandle, PageDet
     // (images embedded inline via `<img>` are not intercepted — only clickable file/video/audio
     // open affordances) and warns before opening a file whose extension/MIME is on the
     // dangerous-type denylist, mirroring the server-side upload rejection.
+    //
+    // Only Ctrl/Cmd+click actually navigates a link rendered inside BlockNote's contentEditable
+    // surface (a plain click places the cursor, per BlockNote/browser default contentEditable
+    // link behaviour) — so an unmodified click must be left completely alone here too, or normal
+    // cursor placement and editing inside/near links would break.
     const handleClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+
       const target = event.target as HTMLElement;
       const anchor = target.closest('a[href]');
       if (!anchor) {

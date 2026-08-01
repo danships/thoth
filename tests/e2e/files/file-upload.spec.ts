@@ -28,7 +28,7 @@ test('upload happy path: a small text file is accepted and served back', async (
   expect(await served.text()).toBe(buffer.toString('utf8'));
 });
 
-test('oversized upload is rejected with a validation error', async ({ page }) => {
+test('oversized upload is rejected with HTTP 413 Payload Too Large', async ({ page }) => {
   // 11 MB, larger than the 10 MB per-file cap — no notification/UI round trip needed here,
   // the manual upload handler must reject it before any bytes are written.
   const oversized = Buffer.alloc(11 * 1024 * 1024, 'a');

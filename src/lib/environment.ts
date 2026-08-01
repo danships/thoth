@@ -31,7 +31,7 @@ const environmentSchema = {
   // Number of hours an orphaned uploaded file (zero `file-usage` rows) is retained before the
   // external purge job (`pnpm files:purge`) permanently removes it, to tolerate in-progress
   // edits that haven't yet synced their `file-usage` rows.
-  FILES_PURGE_GRACE_PERIOD_HOURS: str({ default: '24' }),
+  FILES_PURGE_GRACE_PERIOD_HOURS: num({ default: 24 }),
 } as const;
 
 type Environment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;

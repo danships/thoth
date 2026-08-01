@@ -1,4 +1,5 @@
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
@@ -23,7 +24,11 @@ export class LocalStorageAdapter implements StorageAdapter {
 
   private resolveKeyPath(key: string): string {
     const resolved = path.resolve(this.rootFolder, key);
-    if (resolved !== this.rootFolder && !resolved.startsWith(`${this.rootFolder}/`)) {
+    // `path.relative` is used (rather than a hardcoded `${rootFolder}/` prefix check) so
+    // traversal is detected correctly across platform-specific separators, and the root itself
+    // (relative === '') is still accepted.
+    const relative = path.relative(this.rootFolder, resolved);
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
       throw new BadRequestError('Invalid storage key');
     }
     return resolved;
@@ -37,8 +42,9 @@ export class LocalStorageAdapter implements StorageAdapter {
 
   public async read(key: string): Promise<ReadableStream> {
     const filePath = this.resolveKeyPath(key);
-    const buffer = await readFile(filePath);
-    return Readable.toWeb(Readable.from(buffer)) as ReadableStream;
+    // Streams directly from disk instead of buffering the whole file in memory first — the
+    // content route's own `exists()` check already handles the missing-file case.
+    return Readable.toWeb(createReadStream(filePath)) as ReadableStream;
   }
 
   public async delete(key: string): Promise<void> {
@@ -55,8 +61,4 @@ export class LocalStorageAdapter implements StorageAdapter {
       return false;
     }
   }
-}
-
-export function buildStorageKey(...segments: string[]): string {
-  return path.join(...segments);
 }

@@ -4,6 +4,7 @@ import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { extractFileIdsFromContent, syncFileUsageForPage } from '@/lib/files/usage';
+import { getLogger } from '@/lib/logger';
 import {
   GetPageContentParameters,
   getPageContentParametersSchema,
@@ -42,7 +43,14 @@ export const POST = apiRoute(
       lastUpdated: new Date().toISOString(),
     });
 
-    await syncFileUsageForPage(params.id, session, extractFileIdsFromContent(body.content));
+    // Reconcile file usage after the content is durably persisted. A failure here shouldn't fail
+    // the whole request or skip the change notification — log and continue.
+    try {
+      await syncFileUsageForPage(params.id, session, extractFileIdsFromContent(body.content));
+    } catch (error) {
+      const logger = await getLogger();
+      logger.error('pages.set-content.sync-file-usage-failed', { pageId: params.id, error });
+    }
 
     scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
   }

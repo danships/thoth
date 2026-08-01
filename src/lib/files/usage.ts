@@ -1,7 +1,33 @@
-import { getContainerRepository, getFileUsageRepository } from '@/lib/database';
+import { getContainerRepository, getFileUsageRepository, getUploadedFileRepository } from '@/lib/database';
+import { assertFileAccess } from '@/lib/files/access';
 import type { ApiKeySession } from '@/lib/auth/session';
 
-const FILE_URL_PATTERN = /\/api\/v1\/files\/([\w-]+)\/content/g;
+// SuperSave has no composite-unique-constraint support (see `src/types/schemas/entities/
+// file-usage.ts`), so `(fileId, containerId)` uniqueness cannot be enforced at the database
+// level. This in-process lock, keyed by `containerId` — mirroring the mitigation used for
+// workspace slugs in `src/lib/database/workspace-slug.ts` — serializes concurrent
+// `syncFileUsageForPage` calls for the *same* page so a query-then-create race can't create
+// duplicate rows. It does not protect against races across multiple server instances.
+const containerSyncLocks = new Map<string, Promise<unknown>>();
+
+async function withContainerSyncLock<T>(containerId: string, task: () => Promise<T>): Promise<T> {
+  const previous = containerSyncLocks.get(containerId) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(task);
+  const tracked = run.catch(() => undefined);
+  containerSyncLocks.set(containerId, tracked);
+  try {
+    return await run;
+  } finally {
+    if (containerSyncLocks.get(containerId) === tracked) {
+      containerSyncLocks.delete(containerId);
+    }
+  }
+}
+
+// Anchored with a negative lookbehind so a path segment embedded in an unrelated external URL
+// (e.g. `https://example.com/api/v1/files/some-id/content`, where the character preceding
+// `/api` is part of the hostname) is never mistaken for our own served-file path.
+const FILE_URL_PATTERN = /(?<![\w.])\/api\/v1\/files\/([\w-]+)\/content/g;
 
 /**
  * Scans persisted page markdown for served-file URLs (`/api/v1/files/<id>/content`, emitted by
@@ -27,14 +53,19 @@ export function extractFileIdsFromContent(markdown: string): string[] {
  * *other* containers, so a file that's also used on another page stays retrievable there even
  * after being removed from this one (see the "file used on multiple pages" edge case).
  *
- * Uniqueness of `(fileId, containerId)` is enforced here at the application layer (query, then
- * create only what's missing) rather than via a DB constraint.
+ * Uniqueness of `(fileId, containerId)` is enforced at the application layer (query, then create
+ * only what's missing), serialized per-`containerId` via `withContainerSyncLock` since SuperSave
+ * has no composite-unique-constraint support to fall back on.
  */
 export async function syncFileUsageForPage(
   containerId: string,
   session: ApiKeySession,
   fileIds: string[]
 ): Promise<void> {
+  return withContainerSyncLock(containerId, () => doSyncFileUsageForPage(containerId, session, fileIds));
+}
+
+async function doSyncFileUsageForPage(containerId: string, session: ApiKeySession, fileIds: string[]): Promise<void> {
   const fileUsageRepository = await getFileUsageRepository();
 
   const existingRows = await fileUsageRepository.getByQuery(
@@ -53,7 +84,23 @@ export async function syncFileUsageForPage(
       ? (session.appContext?.accessGrant.workspaceId ?? (await resolveWorkspaceId(containerId)))
       : undefined;
 
+  const uploadedFileRepository = toCreate.length > 0 ? await getUploadedFileRepository() : undefined;
+
   for (const fileId of toCreate) {
+    // A page's content can only grant `file-usage` access to files the caller can already reach
+    // (their own uploads, or files already visible via another page) — otherwise referencing an
+    // arbitrary/nonexistent file id in markdown content would silently grant access to it. Skip
+    // (rather than fail the whole save) for ids that don't validate.
+    const file = await uploadedFileRepository!.getOneByQuery(uploadedFileRepository!.createQuery().eq('id', fileId));
+    if (!file) {
+      continue;
+    }
+    try {
+      await assertFileAccess(session, file);
+    } catch {
+      continue;
+    }
+
     await fileUsageRepository.create({
       fileId,
       containerId,

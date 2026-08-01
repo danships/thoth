@@ -65,6 +65,10 @@ export default function WorkspaceSettingsPage() {
     initialValues: {
       storageQuotaBytes: workspace.storageQuotaBytes,
     },
+    validate: {
+      storageQuotaBytes: (value) =>
+        Number.isSafeInteger(value) && value >= 0 ? null : 'Quota must be a non-negative whole number of bytes',
+    },
   });
   const [quotaSubmitting, setQuotaSubmitting] = useState(false);
 
@@ -108,7 +112,8 @@ export default function WorkspaceSettingsPage() {
   };
 
   const handleQuotaSubmit = async (values: typeof quotaForm.values) => {
-    if (values.storageQuotaBytes === workspace.storageQuotaBytes) {
+    const currentQuotaBytes = storageUsage?.quotaBytes ?? workspace.storageQuotaBytes;
+    if (values.storageQuotaBytes === currentQuotaBytes) {
       return;
     }
     setQuotaSubmitting(true);
@@ -200,6 +205,8 @@ export default function WorkspaceSettingsPage() {
                   label="Storage quota (bytes)"
                   aria-label="Storage quota in bytes"
                   min={0}
+                  allowDecimal={false}
+                  allowNegative={false}
                   {...quotaForm.getInputProps('storageQuotaBytes')}
                 />
                 <Button type="submit" loading={quotaSubmitting}>

@@ -419,7 +419,7 @@ export const operations = [
     auth: 'sessionOrApiKey',
     params: api.getWorkspaceStorageUsageParametersSchema,
     response: api.getWorkspaceStorageUsageResponseSchema,
-    errorStatuses: [404],
+    errorStatuses: [403, 404],
   },
   {
     path: '/files/{id}',

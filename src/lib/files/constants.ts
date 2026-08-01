@@ -63,6 +63,15 @@ export const DANGEROUS_EXTENSIONS: readonly string[] = [
   'js',
   'mjs',
   'jse',
+  // Server-executed scripts — dangerous if an app server is misconfigured to execute uploads
+  // directly out of a served directory
+  'php',
+  'phtml',
+  'cgi',
+  'asp',
+  'aspx',
+  'jsp',
+  'py',
   // Office macro-enabled documents
   'docm',
   'dotm',
@@ -79,6 +88,13 @@ export const DANGEROUS_EXTENSIONS: readonly string[] = [
   'url',
   'desktop',
   'inf',
+  // OS installer / package formats
+  'apk',
+  'ipa',
+  'dmg',
+  'pkg',
+  'deb',
+  'rpm',
 ];
 
 export const DANGEROUS_MIME_TYPES: readonly string[] = [

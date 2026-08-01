@@ -12,15 +12,18 @@ test('owner can edit the storage quota and it persists', async ({ page }) => {
   await quotaInput.fill(String(newQuota));
   await page.getByRole('button', { name: 'Save quota' }).click();
 
-  await expect(page.getByText('Storage quota updated')).toBeVisible({ timeout: 6000 });
-  await page.reload();
-  await expect(page.getByLabel('Storage quota in bytes')).toHaveValue(String(newQuota));
-
-  // Restore the seeded quota afterwards so the "quota exceeded" case below (and other specs
-  // relying on the small seeded quota) still work regardless of test execution order.
-  await page.getByLabel('Storage quota in bytes').fill(String(SEED.workspace.storageQuotaBytes));
-  await page.getByRole('button', { name: 'Save quota' }).click();
-  await expect(page.getByText('Storage quota updated')).toBeVisible({ timeout: 6000 });
+  try {
+    await expect(page.getByText('Storage quota updated')).toBeVisible({ timeout: 6000 });
+    await page.reload();
+    await expect(page.getByLabel('Storage quota in bytes')).toHaveValue(String(newQuota));
+  } finally {
+    // Restore the seeded quota afterwards so the "quota exceeded" case below (and other specs
+    // relying on the small seeded quota) still work regardless of test execution order — even
+    // if an assertion above failed.
+    await page.getByLabel('Storage quota in bytes').fill(String(SEED.workspace.storageQuotaBytes));
+    await page.getByRole('button', { name: 'Save quota' }).click();
+    await expect(page.getByText('Storage quota updated')).toBeVisible({ timeout: 6000 });
+  }
 });
 
 test('uploading past the workspace quota surfaces a storage-limit alert', async ({ page }) => {

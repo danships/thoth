@@ -23,10 +23,10 @@ const document = [
 
 const markdown = serializeBlocksToMarkdown(stubEditor, document);
 
-// The file/video blocks are preserved as stable tokens, not degraded by the (stub) lossy
-// serialiser.
-assert.match(markdown, /<!--thoth-file-block:file:.*"url":"\/api\/v1\/files\/abc\/content".*-->/);
-assert.match(markdown, /<!--thoth-file-block:video:.*"url":"\/api\/v1\/files\/vid\/content".*-->/);
+// The file/video blocks are preserved as stable, percent-encoded tokens, not degraded by the
+// (stub) lossy serialiser.
+assert.match(markdown, /<!--thoth-file-block:file:.*api%2Fv1%2Ffiles%2Fabc%2Fcontent.*-->/);
+assert.match(markdown, /<!--thoth-file-block:video:.*api%2Fv1%2Ffiles%2Fvid%2Fcontent.*-->/);
 
 const roundTripped = parseMarkdownToBlocks(stubEditor, markdown);
 
@@ -47,5 +47,19 @@ assert.doesNotMatch(plainMarkdown, /thoth-file-block/);
 const plainRoundTripped = parseMarkdownToBlocks(stubEditor, plainMarkdown);
 assert.equal(plainRoundTripped.length, 1);
 assert.equal(plainRoundTripped[0]?.type, 'paragraph');
+
+// A prop value containing a literal `-->` (e.g. an attacker/user-controlled filename) must not
+// prematurely close the HTML comment token or corrupt/truncate the payload on round-trip.
+const dangerousDocument = [
+  { type: 'file', props: { url: '/api/v1/files/evil/content', name: '-->malicious<script>', caption: '' } },
+  { type: 'paragraph', props: {}, content: [{ type: 'text', text: 'After' }] },
+];
+const dangerousMarkdown = serializeBlocksToMarkdown(stubEditor, dangerousDocument);
+assert.doesNotMatch(dangerousMarkdown.replace(/-->\n/, ''), /--><\/script>|malicious<script>-->/);
+const dangerousRoundTripped = parseMarkdownToBlocks(stubEditor, dangerousMarkdown);
+assert.equal(dangerousRoundTripped.length, 2);
+assert.equal(dangerousRoundTripped[0]?.type, 'file');
+assert.equal((dangerousRoundTripped[0]?.props as { name: string }).name, '-->malicious<script>');
+assert.equal(dangerousRoundTripped[1]?.type, 'paragraph');
 
 console.log('✅  markdown-blocks round-trip tests passed');

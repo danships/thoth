@@ -15,8 +15,10 @@ assert.deepEqual(
 // No matches
 assert.deepEqual(extractFileIdsFromContent('Just plain text, no files here.'), []);
 
-// Ignores unrelated URLs
-assert.deepEqual(extractFileIdsFromContent('[link](https://example.com/api/v1/files/) not-a-match'), []);
+// Ignores unrelated URLs — a full external URL that happens to embed our exact path shape
+// (id + `/content` suffix) must not be mistaken for a locally-served file link, since the
+// character preceding `/api` here is part of the external hostname, not a link boundary.
+assert.deepEqual(extractFileIdsFromContent('[link](https://example.com/api/v1/files/some-id/content) not-a-match'), []);
 
 // Empty content
 assert.deepEqual(extractFileIdsFromContent(''), []);
