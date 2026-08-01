@@ -2,6 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getWorkspaceMemberRepository, getWorkspaceRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { createWorkspaceForUser } from '@/lib/database/seed-workspace';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
 import type { CreateWorkspaceBody, CreateWorkspaceResponse, GetWorkspacesResponse } from '@/types/api';
 import { createWorkspaceBodySchema } from '@/types/api';
 
@@ -31,6 +32,7 @@ export const GET = apiRoute<GetWorkspacesResponse, {}, {}, {}>({}, async (_reque
       slug: workspace.slug,
       createdAt: workspace.createdAt,
       lastUpdated: workspace.lastUpdated,
+      storageQuotaBytes: workspace.storageQuotaBytes ?? DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
     }));
 });
 
@@ -51,6 +53,7 @@ export const POST = apiRoute<CreateWorkspaceResponse, {}, {}, CreateWorkspaceBod
       slug: workspace.slug,
       createdAt: workspace.createdAt,
       lastUpdated: workspace.lastUpdated,
+      storageQuotaBytes: workspace.storageQuotaBytes ?? DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
     };
   }
 );

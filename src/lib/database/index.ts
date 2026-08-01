@@ -11,6 +11,8 @@ import type {
   AppScopedContainer,
   Webhook,
   WebhookDelivery,
+  UploadedFile,
+  FileUsage,
 } from '@/types/database';
 import { getEnvironment } from '../environment';
 import * as entities from './entities';
@@ -38,6 +40,8 @@ async function initializeDatabase() {
   await database.addEntity(entities.AppScopedContainer);
   await database.addEntity(entities.Webhook);
   await database.addEntity(entities.WebhookDelivery);
+  await database.addEntity(entities.UploadedFile);
+  await database.addEntity(entities.FileUsage);
 
   if (!skipSync) {
     await database.runMigrations();
@@ -115,4 +119,14 @@ export async function getWebhookRepository() {
 export async function getWebhookDeliveryRepository() {
   const database = await getDatabase();
   return database.getRepository<WebhookDelivery>(entities.WEBHOOK_DELIVERY_NAME);
+}
+
+export async function getUploadedFileRepository() {
+  const database = await getDatabase();
+  return database.getRepository<UploadedFile>(entities.UPLOADED_FILE_NAME);
+}
+
+export async function getFileUsageRepository() {
+  const database = await getDatabase();
+  return database.getRepository<FileUsage>(entities.FILE_USAGE_NAME);
 }

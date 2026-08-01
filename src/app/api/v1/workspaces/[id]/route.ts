@@ -11,6 +11,7 @@ import { getLogger } from '@/lib/logger';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
 import type {
   DeleteWorkspaceParameters,
   UpdateWorkspaceBody,
@@ -82,12 +83,21 @@ export const PATCH = apiRoute<UpdateWorkspaceResponse, undefined, UpdateWorkspac
       });
     }
 
+    if (body.storageQuotaBytes !== undefined && body.storageQuotaBytes !== updated.storageQuotaBytes) {
+      updated = await workspaceRepository.update({
+        ...updated,
+        storageQuotaBytes: body.storageQuotaBytes,
+        lastUpdated: now,
+      });
+    }
+
     return {
       id: updated.id,
       name: updated.name,
       slug: updated.slug,
       createdAt: updated.createdAt,
       lastUpdated: updated.lastUpdated,
+      storageQuotaBytes: updated.storageQuotaBytes ?? DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
     };
   }
 );

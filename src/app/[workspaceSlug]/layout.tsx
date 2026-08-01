@@ -2,8 +2,10 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { PropsWithChildren, ReactNode } from 'react';
 import { getAuth } from '@/lib/auth/config';
+import { getWorkspaceMemberRepository } from '@/lib/database';
 import { resolveWorkspaceForSlug } from '@/lib/database/resolve-workspace';
 import { WorkspaceProvider } from '@/lib/store/workspace-context';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
 import Layout from '@/components/layout';
 
 type Properties = PropsWithChildren & {
@@ -30,8 +32,21 @@ export default async function WorkspaceLayout({ children, sidebar, params }: Pro
   const { workspaceSlug } = await params;
   const workspace = await resolveWorkspaceForSlug(workspaceSlug, session.user.id);
 
+  const workspaceMemberRepository = await getWorkspaceMemberRepository();
+  const membership = await workspaceMemberRepository.getOneByQuery(
+    workspaceMemberRepository.createQuery().eq('workspaceId', workspace.id).eq('userId', session.user.id)
+  );
+
   return (
-    <WorkspaceProvider workspace={{ id: workspace.id, slug: workspace.slug, name: workspace.name }}>
+    <WorkspaceProvider
+      workspace={{
+        id: workspace.id,
+        slug: workspace.slug,
+        name: workspace.name,
+        storageQuotaBytes: workspace.storageQuotaBytes ?? DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
+        role: membership?.role ?? 'viewer',
+      }}
+    >
       <Layout sidebar={sidebar}>{children}</Layout>
     </WorkspaceProvider>
   );

@@ -3,6 +3,7 @@ import { getContainerRepository } from '@/lib/database';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { extractFileIdsFromContent, syncFileUsageForPage } from '@/lib/files/usage';
 import {
   GetPageContentParameters,
   getPageContentParametersSchema,
@@ -40,6 +41,8 @@ export const POST = apiRoute(
       content: body.content,
       lastUpdated: new Date().toISOString(),
     });
+
+    await syncFileUsageForPage(params.id, session, extractFileIdsFromContent(body.content));
 
     scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
   }

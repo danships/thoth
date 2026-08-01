@@ -39,6 +39,9 @@ export const SEED = {
   workspace: {
     id: 'e2e-workspace-000-0000-0000-000000000001',
     slug: 'e2e-workspace',
+    // Deliberately small (1 MB) so `workspace-storage-quota.spec.ts` can exercise the
+    // "storage limit reached" (409) path without needing a multi-MB upload fixture.
+    storageQuotaBytes: 1_048_576,
   },
   // A second, independent workspace owned by the same seed user, used to exercise
   // multi-workspace switching, data isolation, and slug/redirect behaviour (THOTH-027). It is
@@ -177,6 +180,19 @@ export const SEED = {
     page: {
       id: 'e2e-page-fields-row-0-0000-000000000001',
       name: 'E2E Fields Row',
+    },
+  },
+  // A pre-seeded `uploaded-file` + `file-usage` row (with a matching byte file written into the
+  // test storage folder by `scripts/end-to-end-seed.ts`), used to exercise the serve endpoint
+  // and the visibility/quota specs without needing to actually perform an upload first.
+  file: {
+    id: 'e2e-file-00000000-0000-0000-0000-000000000001',
+    filename: 'e2e-seed-file.txt',
+    mimeType: 'text/plain',
+    content: 'E2E seeded file content',
+    page: {
+      id: 'e2e-page-file-host-0-0000-0000-000000000001',
+      name: 'E2E File Host Page',
     },
   },
 } as const;

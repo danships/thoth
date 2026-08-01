@@ -3,6 +3,7 @@ import { registerContainerAccessForNewPage } from './container-access-service';
 import { generateUniqueWorkspaceSlug, reserveWorkspaceSlug } from './workspace-slug';
 import { ConflictError } from '../errors/conflict-error';
 import { slugify } from '../utils/slug';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
 import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from '@/types/database';
 
 type CreateWorkspaceOptions = {
@@ -64,6 +65,7 @@ export async function createWorkspaceForUser(
       deletedAt: null,
       createdAt: now,
       lastUpdated: now,
+      storageQuotaBytes: DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
     } satisfies WorkspaceCreate);
 
     await workspaceMemberRepository.create({

@@ -7,15 +7,20 @@ import {
   getContainerRepository,
   getDatabase,
   getDataViewRepository,
+  getFileUsageRepository,
+  getUploadedFileRepository,
   getWorkspaceMemberRepository,
   getWorkspaceRepository,
 } from '../src/lib/database/index.js';
+import { getStorageAdapter } from '../src/lib/storage/index.js';
 import { SEED } from '../tests/e2e/constants.js';
 import type {
   ContainerAccessCreate,
   DataSourceContainer,
   DataSourceContainerCreate,
+  FileUsageCreate,
   PageContainerCreate,
+  UploadedFileCreate,
   WorkspaceCreate,
   WorkspaceMemberCreate,
   DataViewCreate,
@@ -108,6 +113,7 @@ async function seedAppData() {
         slug: SEED.workspace.slug,
         deletedAt: null,
         lastUpdated: now,
+        storageQuotaBytes: SEED.workspace.storageQuotaBytes,
       })
     : workspaceRepository.create({
         id: SEED.workspace.id,
@@ -117,6 +123,7 @@ async function seedAppData() {
         deletedAt: null,
         createdAt: now,
         lastUpdated: now,
+        storageQuotaBytes: SEED.workspace.storageQuotaBytes,
       } as unknown as WorkspaceCreate));
 
   const wsId = SEED.workspace.id;
@@ -664,6 +671,71 @@ async function seedAppData() {
       },
       { lastAccessedAt: new Date(Date.parse(now) - 1_000_000 - index * 1000).toISOString() }
     );
+  }
+
+  // ── File upload fixtures (THOTH-040) ─────────────────────────────────────────
+  // A host page plus a pre-seeded `uploaded-file` + `file-usage` row, so the serve endpoint has
+  // something to return without every spec needing to perform a real upload first. The bytes
+  // are written directly to the configured local storage folder via the same adapter the app
+  // itself uses, keeping this in sync with any future storage backend change.
+  await upsertPage({
+    id: SEED.file.page.id,
+    name: SEED.file.page.name,
+    emoji: null,
+    type: 'page',
+    userId: uid,
+    workspaceId: wsId,
+    parentId: null,
+    createdAt: now,
+    lastUpdated: now,
+  });
+
+  const uploadedFileRepository = await getUploadedFileRepository();
+  const fileUsageRepository = await getFileUsageRepository();
+  const storageAdapter = await getStorageAdapter();
+  const storageKey = `${wsId}/${SEED.file.id}`;
+
+  const existingFile = await uploadedFileRepository.getOneByQuery(
+    uploadedFileRepository.createQuery().eq('id', SEED.file.id)
+  );
+  await (existingFile
+    ? uploadedFileRepository.update({
+        ...existingFile,
+        filename: SEED.file.filename,
+        mimeType: SEED.file.mimeType,
+        size: Buffer.byteLength(SEED.file.content),
+        storageKey,
+        storageType: storageAdapter.type,
+        workspaceId: wsId,
+        lastUpdated: now,
+      })
+    : uploadedFileRepository.create({
+        id: SEED.file.id,
+        filename: SEED.file.filename,
+        mimeType: SEED.file.mimeType,
+        size: Buffer.byteLength(SEED.file.content),
+        extension: 'txt',
+        storageKey,
+        storageType: storageAdapter.type,
+        workspaceId: wsId,
+        userId: uid,
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as UploadedFileCreate));
+
+  await storageAdapter.save(storageKey, Buffer.from(SEED.file.content));
+
+  const existingFileUsage = await fileUsageRepository.getOneByQuery(
+    fileUsageRepository.createQuery().eq('fileId', SEED.file.id).eq('containerId', SEED.file.page.id)
+  );
+  if (!existingFileUsage) {
+    await fileUsageRepository.create({
+      fileId: SEED.file.id,
+      containerId: SEED.file.page.id,
+      workspaceId: wsId,
+      userId: uid,
+      createdAt: now,
+    } as unknown as FileUsageCreate);
   }
 }
 

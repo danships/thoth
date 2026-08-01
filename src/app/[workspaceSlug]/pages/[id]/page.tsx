@@ -322,6 +322,8 @@ export default function PageDetailsPage() {
                   key={pageId}
                   initialContent={pageDetails.content ?? ''}
                   onUpdate={updateContent}
+                  pageId={pageId}
+                  workspaceId={workspaceId}
                 />
               </Tabs.Panel>
 
