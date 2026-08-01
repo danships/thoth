@@ -7,6 +7,9 @@ import type { OperationRegistry } from './types';
  * Intentionally excluded:
  * - `src/app/api/auth/[...auth]/route.ts`: Better Auth catch-all handler, not wrapped by `apiRoute`.
  * - `src/app/api/health/route.ts`: operational health probe, not part of the product API surface.
+ * - `POST /files` and `GET /files/{id}/content` (`src/app/api/v1/files/route.ts`,
+ *   `src/app/api/v1/files/[id]/content/route.ts`): manual handlers (multipart request body /
+ *   binary streaming response), not wrapped by `apiRoute`, so not part of the generated schema.
  *
  * `/config` is registered as `/config` even though `GET_AUTH_CONFIG_ENDPOINT` is `/v1/config`,
  * because the generated document is served with `/api/v1` as its server base URL.
@@ -406,6 +409,40 @@ export const operations = [
     response: api.restoreWorkspaceResponseSchema,
     successStatus: 200,
     errorStatuses: [410],
+  },
+  {
+    path: '/workspaces/{id}/storage-usage',
+    method: 'get',
+    operationId: 'getWorkspaceStorageUsage',
+    summary: "Get a workspace's uploaded-file storage usage",
+    tags: ['Workspaces'],
+    auth: 'sessionOrApiKey',
+    params: api.getWorkspaceStorageUsageParametersSchema,
+    response: api.getWorkspaceStorageUsageResponseSchema,
+    errorStatuses: [403, 404],
+  },
+  {
+    path: '/files/{id}',
+    method: 'get',
+    operationId: 'getFile',
+    summary: 'Get an uploaded file\u2019s metadata',
+    tags: ['Files'],
+    auth: 'sessionOrApiKey',
+    params: api.getFileParametersSchema,
+    response: api.getFileResponseSchema,
+    errorStatuses: [403, 404],
+  },
+  {
+    path: '/files/{id}',
+    method: 'delete',
+    operationId: 'deleteFile',
+    summary: 'Delete an uploaded file',
+    tags: ['Files'],
+    auth: 'sessionOrApiKey',
+    params: api.deleteFileParametersSchema,
+    response: api.deleteFileResponseSchema,
+    successStatus: 200,
+    errorStatuses: [403, 404],
   },
   {
     path: '/data-sources',

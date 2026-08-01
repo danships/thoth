@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { test, expect } from '../fixtures/test';
 import { getDatabase, getWorkspaceMemberRepository, getWorkspaceRepository } from '../../../src/lib/database/index.js';
 import { slugify } from '../../../src/lib/utils/slug.js';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '../../../src/types/schemas/entities/workspace.js';
 import type { WorkspaceCreate, WorkspaceMemberCreate } from '../../../src/types/database/index.js';
 
 // This spec covers the "recreate Welcome page" empty-state flow, which requires a session for
@@ -65,6 +66,7 @@ async function createIsolatedUserWithoutPages() {
     deletedAt: null,
     createdAt: now,
     lastUpdated: now,
+    storageQuotaBytes: DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
   } satisfies WorkspaceCreate);
 
   const workspaceMemberRepository = await getWorkspaceMemberRepository();

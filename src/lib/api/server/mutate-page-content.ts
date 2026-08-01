@@ -2,6 +2,8 @@ import { getContainerRepository } from '@/lib/database';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { extractFileIdsFromContent, syncFileUsageForPage } from '@/lib/files/usage';
+import { getLogger } from '@/lib/logger';
 import type { ApiKeySession } from '@/lib/auth/session';
 import type { MutatePageContentResponse } from '@/types/api';
 
@@ -50,6 +52,17 @@ export async function mutatePageContent(
     content,
     lastUpdated: new Date().toISOString(),
   });
+
+  // Reconcile `file-usage` rows for every append/prepend, same as `POST /pages/:id/content` —
+  // otherwise files referenced only via append/prepend would never gain a usage row and could be
+  // incorrectly purged as orphans. Failure here shouldn't roll back or fail the already-persisted
+  // content change; log and continue so the save and notification still succeed.
+  try {
+    await syncFileUsageForPage(id, session, extractFileIdsFromContent(content));
+  } catch (error) {
+    const logger = await getLogger();
+    logger.error('pages.mutate-content.sync-file-usage-failed', { pageId: id, error });
+  }
 
   scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
 

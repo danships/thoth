@@ -65,6 +65,7 @@ export const workspaceSchema = workspaceSchemaEntity
     slug: true,
     createdAt: true,
     lastUpdated: true,
+    storageQuotaBytes: true,
   })
   .meta({ id: 'Workspace' });
 export type WorkspaceApi = z.infer<typeof workspaceSchema>;

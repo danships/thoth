@@ -9,6 +9,8 @@ export type CurrentWorkspace = {
   id: string;
   slug: string;
   name: string;
+  storageQuotaBytes: number;
+  role: 'owner' | 'editor' | 'viewer' | 'app';
 };
 
 const WorkspaceContext = createContext<CurrentWorkspace | undefined>(undefined);

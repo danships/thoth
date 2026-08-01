@@ -13,6 +13,9 @@ export type UpdateWorkspaceParameters = z.infer<typeof updateWorkspaceParameters
 export const updateWorkspaceBodySchema = z.object({
   name: z.string().min(1).max(100).optional(),
   slug: workspaceSlugSchema.optional(),
+  // Owner-only (THOTH-040): configures the workspace's uploaded-file storage quota. Route
+  // enforces `role === 'owner'` before applying this — see `PATCH /workspaces/:id`.
+  storageQuotaBytes: z.number().int().nonnegative().optional(),
 });
 export type UpdateWorkspaceBody = z.infer<typeof updateWorkspaceBodySchema>;
 

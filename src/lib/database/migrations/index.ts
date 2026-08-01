@@ -4,6 +4,7 @@ import type { Pool } from 'mysql2/promise';
 import { BETTER_AUTH_SQLITE_SQL, BETTER_AUTH_MYSQL_SQL } from './better-auth';
 import { backfillSoftDeleteFields } from './soft-delete-backfill';
 import { backfillWorkspaces } from './workspace-backfill';
+import { backfillWorkspaceStorageQuota } from './workspace-storage-quota-backfill';
 
 export const migrations: Migration[] = [
   {
@@ -42,6 +43,16 @@ export const migrations: Migration[] = [
     name: 'soft-delete-pages-views-backfill',
     run: async (superSave: SuperSave) => {
       await backfillSoftDeleteFields(superSave);
+    },
+  },
+  {
+    // Additive, engine-agnostic safety net (see `workspace-storage-quota-backfill.ts` for why
+    // no separate migration is needed for the new `uploaded-file`/`file-usage` tables
+    // themselves) backfilling `storageQuotaBytes` on pre-existing `Workspace` rows for
+    // THOTH-040 ("Support file uploads").
+    name: 'workspace-storage-quota-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillWorkspaceStorageQuota(superSave);
     },
   },
 ];

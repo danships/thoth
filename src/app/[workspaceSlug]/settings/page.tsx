@@ -1,6 +1,18 @@
 'use client';
 
-import { Alert, Button, Divider, Group, Paper, Stack, Text, TextInput, Title } from '@mantine/core';
+import {
+  Alert,
+  Button,
+  Divider,
+  Group,
+  NumberInput,
+  Paper,
+  Progress,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
 import { useRouter } from 'next/navigation';
@@ -8,11 +20,26 @@ import { useState } from 'react';
 import { SlugAvailabilityIndicator } from '@/components/atoms/slug-availability-indicator';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useSlugAvailability } from '@/lib/hooks/api/use-slug-availability';
+import { useStorageUsage } from '@/lib/hooks/api/use-storage-usage';
 import { useWorkspaces } from '@/lib/hooks/api/use-workspaces';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { workspaceSlugSchema } from '@/types/schemas/entities/workspace';
 import type { UpdateWorkspaceBody, WorkspaceApi } from '@/types/api';
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
 
 export default function WorkspaceSettingsPage() {
   const workspace = useCurrentWorkspace();
@@ -20,6 +47,8 @@ export default function WorkspaceSettingsPage() {
   const { showSuccess, showError } = useNotification();
   const { patch, delete: remove, inProgress, error } = useCudApi();
   const { data: workspaces } = useWorkspaces();
+  const { data: storageUsage, mutate: mutateStorageUsage } = useStorageUsage(workspace.id);
+  const isOwner = workspace.role === 'owner';
 
   const form = useForm({
     initialValues: {
@@ -31,6 +60,17 @@ export default function WorkspaceSettingsPage() {
       slug: (value) => (workspaceSlugSchema.safeParse(value).success ? null : 'Invalid slug format'),
     },
   });
+
+  const quotaForm = useForm({
+    initialValues: {
+      storageQuotaBytes: workspace.storageQuotaBytes,
+    },
+    validate: {
+      storageQuotaBytes: (value) =>
+        Number.isSafeInteger(value) && value >= 0 ? null : 'Quota must be a non-negative whole number of bytes',
+    },
+  });
+  const [quotaSubmitting, setQuotaSubmitting] = useState(false);
 
   const { availability, isBlocking } = useSlugAvailability(form.values.slug, {
     currentSlug: workspace.slug,
@@ -71,6 +111,25 @@ export default function WorkspaceSettingsPage() {
     }
   };
 
+  const handleQuotaSubmit = async (values: typeof quotaForm.values) => {
+    const currentQuotaBytes = storageUsage?.quotaBytes ?? workspace.storageQuotaBytes;
+    if (values.storageQuotaBytes === currentQuotaBytes) {
+      return;
+    }
+    setQuotaSubmitting(true);
+    try {
+      await patch<WorkspaceApi, UpdateWorkspaceBody>(`/workspaces/${workspace.id}`, {
+        storageQuotaBytes: values.storageQuotaBytes,
+      });
+      showSuccess('Storage quota updated');
+      await mutateStorageUsage();
+    } catch {
+      showError('Failed to update storage quota');
+    } finally {
+      setQuotaSubmitting(false);
+    }
+  };
+
   const handleDelete = () => {
     // Require the user to type the workspace name to confirm — a soft-delete is reversible for
     // 30 days, but this still hides the whole workspace, so it shouldn't be a single misclick.
@@ -92,6 +151,10 @@ export default function WorkspaceSettingsPage() {
       showError('Failed to delete workspace');
     }
   };
+
+  const usedBytes = storageUsage?.usedBytes ?? 0;
+  const quotaBytes = storageUsage?.quotaBytes ?? workspace.storageQuotaBytes;
+  const usagePercent = quotaBytes > 0 ? Math.min(100, (usedBytes / quotaBytes) * 100) : 0;
 
   return (
     <Stack gap="xl" maw={560}>
@@ -124,6 +187,39 @@ export default function WorkspaceSettingsPage() {
             </Group>
           </Stack>
         </form>
+      </Paper>
+
+      <Paper withBorder p="lg" radius="md">
+        <Stack gap="sm">
+          <Title order={4}>Storage</Title>
+          <Divider />
+          <Text size="sm" c="dimmed">
+            {formatBytes(usedBytes)} of {formatBytes(quotaBytes)} used
+          </Text>
+          <Progress value={usagePercent} color={usagePercent >= 90 ? 'red' : 'blue'} aria-label="Storage usage" />
+
+          {isOwner ? (
+            <form onSubmit={quotaForm.onSubmit(handleQuotaSubmit)}>
+              <Group align="flex-end" gap="sm">
+                <NumberInput
+                  label="Storage quota (bytes)"
+                  aria-label="Storage quota in bytes"
+                  min={0}
+                  allowDecimal={false}
+                  allowNegative={false}
+                  {...quotaForm.getInputProps('storageQuotaBytes')}
+                />
+                <Button type="submit" loading={quotaSubmitting}>
+                  Save quota
+                </Button>
+              </Group>
+            </form>
+          ) : (
+            <Text size="sm" c="dimmed">
+              Only the workspace owner can change the storage quota.
+            </Text>
+          )}
+        </Stack>
       </Paper>
 
       <Paper withBorder p="lg" radius="md">

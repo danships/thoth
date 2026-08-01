@@ -10,6 +10,8 @@ import { apiKeySchema, apiKeyPublicSchema } from '../schemas/entities/api-key';
 import { appScopedContainerSchema } from '../schemas/entities/app-scoped-container';
 import { webhookSchema } from '../schemas/entities/webhook';
 import { webhookDeliverySchema } from '../schemas/entities/webhook-delivery';
+import { uploadedFileSchema } from '../schemas/entities/uploaded-file';
+import { fileUsageSchema } from '../schemas/entities/file-usage';
 
 /** Container Entity Schema */
 export { pageContainerSchema, dataSourceContainerSchema } from '../schemas/entities/container';
@@ -133,3 +135,21 @@ export const webhookDeliveryCreateSchema = webhookDeliverySchema.omit({ id: true
 export type WebhookDelivery = z.infer<typeof webhookDeliverySchema>;
 export type WebhookDeliveryCreate = z.infer<typeof webhookDeliveryCreateSchema>;
 /** End WebhookDelivery Entity Schema */
+
+/** UploadedFile Entity Schema */
+export { uploadedFileSchema } from '../schemas/entities/uploaded-file';
+
+export const uploadedFileCreateSchema = uploadedFileSchema.omit({ id: true });
+
+export type UploadedFile = z.infer<typeof uploadedFileSchema>;
+export type UploadedFileCreate = z.infer<typeof uploadedFileCreateSchema>;
+/** End UploadedFile Entity Schema */
+
+/** FileUsage Entity Schema */
+export { fileUsageSchema } from '../schemas/entities/file-usage';
+
+export const fileUsageCreateSchema = fileUsageSchema.omit({ id: true });
+
+export type FileUsage = z.infer<typeof fileUsageSchema>;
+export type FileUsageCreate = z.infer<typeof fileUsageCreateSchema>;
+/** End FileUsage Entity Schema */

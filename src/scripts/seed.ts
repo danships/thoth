@@ -29,6 +29,7 @@ import {
   getWorkspaceRepository,
 } from '@/lib/database';
 import { slugify } from '@/lib/utils/slug';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
 
 const PREVIEW_USER_ID = 'preview-user-1';
 
@@ -72,6 +73,7 @@ const workspace = await workspaceRepository.create({
   deletedAt: null,
   createdAt: now,
   lastUpdated: now,
+  storageQuotaBytes: DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
 } satisfies WorkspaceCreate);
 
 const workspaceMemberRepository = await getWorkspaceMemberRepository();

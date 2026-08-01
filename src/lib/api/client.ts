@@ -33,6 +33,10 @@ import type {
   UpdateWebhookResponse,
   GetWebhookDeliveriesResponse,
   ResendWebhookDeliveryResponse,
+  UploadFileResponse,
+  GetFileResponse,
+  DeleteFileResponse,
+  GetWorkspaceStorageUsageResponse,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -139,6 +143,34 @@ export const api = {
       apiClient.get<DataWrapper<GetWorkspaceSlugAvailabilityResponse>>('/workspaces/slug-availability', {
         params: { slug, excludeWorkspaceId },
       }),
+    getStorageUsage: (id: string) =>
+      apiClient.get<DataWrapper<GetWorkspaceStorageUsageResponse>>(`/workspaces/${id}/storage-usage`),
+  },
+
+  // Files API (THOTH-040)
+  files: {
+    // `pageId` associates the upload with a page's `file-usage` immediately; omit it for
+    // uploads that happen before a page exists yet (the editor re-syncs usage on every save via
+    // `syncFileUsageForPage`, so an unassociated upload becomes an orphan candidate for the
+    // `files:purge` job unless a page ends up referencing it).
+    upload: (file: File, options?: { pageId?: string; workspaceId?: string }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (options?.pageId) {
+        formData.append('pageId', options.pageId);
+      }
+      if (options?.workspaceId) {
+        formData.append('workspaceId', options.workspaceId);
+      }
+      // `apiClient.postForm` (rather than `.post`) is required here: the instance's default
+      // `Content-Type: application/json` header would otherwise stick around and stop axios /
+      // the browser from setting the multipart boundary on this `FormData` body, causing the
+      // server to reject it — `postForm` clears/derives the header correctly for `FormData`.
+      return apiClient.postForm<DataWrapper<UploadFileResponse>>('/files', formData);
+    },
+    getDetails: (id: string) => apiClient.get<DataWrapper<GetFileResponse>>(`/files/${id}`),
+    remove: (id: string) => apiClient.delete<DataWrapper<DeleteFileResponse>>(`/files/${id}`),
+    getContentUrl: (id: string) => `/api/v1/files/${id}/content`,
   },
 
   // Apps API
