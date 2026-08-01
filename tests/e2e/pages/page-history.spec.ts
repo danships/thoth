@@ -22,6 +22,13 @@ async function createPage(request: APIRequestContext, name: string): Promise<str
   return page.id;
 }
 
+// "View History" lives at the top of the page detail screen's "..." dropdown menu (rather than
+// its own standalone icon), so opening the history drawer is a two-step interaction.
+async function openHistoryDrawer(page: import('@playwright/test').Page): Promise<void> {
+  await page.getByRole('button', { name: 'Page menu' }).click();
+  await page.getByRole('menuitem', { name: 'View History' }).click();
+}
+
 // Covers THOTH-043: per-page revision history — recording on content/values saves, the history
 // drawer's timeline + diff view, and the restore/fork actions. Each test creates its own fresh
 // page via the API so the seeded, shared pages used by other specs are never mutated.
@@ -39,9 +46,11 @@ test.describe('page history', () => {
     expect(history.revisions.every((revision) => revision.target === 'content')).toBe(true);
 
     await page.goto(`/${SEED.workspace.slug}/pages/${pageId}`);
-    await page.getByRole('button', { name: 'View page history' }).click();
+    await openHistoryDrawer(page);
     await expect(page.getByRole('heading', { name: 'Page history' })).toBeVisible();
-    await expect(page.getByText('Content').first()).toBeVisible();
+    const rows = page.locator('[class*="revisionRow"]');
+    await expect(rows.first()).toBeVisible();
+    await expect(rows.first().getByText('Content')).toBeVisible();
   });
 
   test('selecting a content revision shows a diff and can restore it', async ({ page, request }) => {
@@ -54,7 +63,7 @@ test.describe('page history', () => {
     expect(secondSave.ok()).toBeTruthy();
 
     await page.goto(`/${SEED.workspace.slug}/pages/${pageId}`);
-    await page.getByRole('button', { name: 'View page history' }).click();
+    await openHistoryDrawer(page);
     await expect(page.getByRole('heading', { name: 'Page history' })).toBeVisible();
 
     const rows = page.locator('[class*="revisionRow"]');
@@ -81,7 +90,7 @@ test.describe('page history', () => {
     await request.post(`/api/v1/pages/${pageId}/content`, { data: { content: 'Fork me' } });
 
     await page.goto(`/${SEED.workspace.slug}/pages/${pageId}`);
-    await page.getByRole('button', { name: 'View page history' }).click();
+    await openHistoryDrawer(page);
 
     const rows = page.locator('[class*="revisionRow"]');
     await expect(rows.first()).toBeVisible();

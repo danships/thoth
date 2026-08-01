@@ -10,7 +10,7 @@ import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { reconstructAt, reconstructValuesAt } from '@/lib/history/reconstruct';
 import { createContentBaseline } from '@/lib/history/revision-service';
-import type { PageRevision, PageContainer } from '@/types/database';
+import type { PageRevision, PageContainer, Container } from '@/types/database';
 import {
   forkPageRevisionBodySchema,
   forkPageRevisionParametersSchema,
@@ -58,6 +58,10 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
     // Defaults to the source page's own parent (keeping the fork alongside it) rather than
     // always forking to the workspace root.
     let parentId: string | null = sourcePage.parentId ?? null;
+    // Only set when `body.parentId` overrides the parent — used below to decide whether the
+    // forked page's values need to be filtered against a (possibly different) parent data
+    // source's columns.
+    let newParentContainer: Container | null = null;
 
     if (body?.parentId) {
       const parentContainer = await containerRepository.getOneByQuery(
@@ -73,6 +77,7 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
       await assertWorkspaceAccess(session.user.id, parentContainer.workspaceId);
       workspaceId = parentContainer.workspaceId;
       parentId = body.parentId;
+      newParentContainer = parentContainer;
     } else {
       workspaceId = sourcePage.workspaceId;
       await assertWorkspaceAccess(session.user.id, workspaceId);
@@ -97,6 +102,22 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
     const reconstructedContent = reconstructAt(contentRevisions, contentTargetSeq);
     const reconstructedValues = reconstructValuesAt(sourcePage.values ?? {}, valuesRevisions, valuesTargetSeq);
 
+    // The reconstructed values are keyed by the *source* page's parent data source's column
+    // ids. Only carry them over unchanged when the fork keeps the same parent (no `body.parentId`
+    // override); otherwise filter against the resolved new parent's columns — dropping all
+    // values when the new parent is a plain page (or has no parent at all), matching the restore
+    // route's stale-column handling.
+    let forkedValues: typeof reconstructedValues = reconstructedValues;
+    if (body?.parentId) {
+      forkedValues = {};
+      if (newParentContainer?.type === 'data-source') {
+        const validColumnIds = new Set((newParentContainer.columns ?? []).map((column) => column.id));
+        forkedValues = Object.fromEntries(
+          Object.entries(reconstructedValues).filter(([columnId]) => validColumnIds.has(columnId))
+        );
+      }
+    }
+
     const now = new Date().toISOString();
     const newPageData = {
       name: body?.name ?? `${sourcePage.name} (copy)`,
@@ -106,7 +127,7 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
       workspaceId,
       userId: session.user.id,
       content: reconstructedContent,
-      values: reconstructedValues,
+      values: forkedValues,
       lastUpdated: now,
       createdAt: now,
       deletedAt: null,

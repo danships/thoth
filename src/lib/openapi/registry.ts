@@ -214,7 +214,7 @@ export const operations = [
     params: api.getPageHistoryParametersSchema,
     query: api.getPageHistoryQuerySchema,
     response: api.getPageHistoryResponseSchema,
-    errorStatuses: [404],
+    errorStatuses: [403, 404],
   },
   {
     path: '/pages/{id}/history/{revisionId}',
@@ -225,7 +225,7 @@ export const operations = [
     auth: 'sessionOrApiKey',
     params: api.getPageRevisionParametersSchema,
     response: api.getPageRevisionResponseSchema,
-    errorStatuses: [404],
+    errorStatuses: [403, 404],
   },
   {
     path: '/pages/{id}/history/{revisionId}/restore',

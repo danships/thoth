@@ -71,7 +71,16 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
       }
     }
 
-    await recordValuesRevision({ page, changed: body, author: session.user.id });
+    // Only record columns that actually changed (derived from the diff above) — an unchanged
+    // save shouldn't add a no-op entry to the timeline or consume the `MAX_REVISIONS` budget,
+    // and recording all of `body` would over-report every submitted column as "changed" in the
+    // history summary even when its value was untouched.
+    const changedValues: Record<string, PageValue | null> = Object.fromEntries(
+      Object.entries(valueChanges).map(([columnId, change]) => [columnId, change.new])
+    );
+    if (Object.keys(changedValues).length > 0) {
+      await recordValuesRevision({ page, changed: changedValues, author: session.user.id });
+    }
 
     const updatedPage = await containerRepository.update({
       ...page,

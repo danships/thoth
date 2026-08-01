@@ -197,7 +197,7 @@ export async function recordContentRevision({ page, newContent, author }: Record
     lastUpdated: nowIso,
   });
 
-  await consolidateContentRevisions(page.id, [...revisions, created], now);
+  await consolidateContentRevisions([...revisions, created], now);
   await enforceRetention(page.id, 'content');
 }
 
@@ -206,7 +206,7 @@ export async function recordContentRevision({ page, newContent, author }: Record
  * a single `consolidated` snapshot at the run's last sequence — bounded (touches at most one run
  * per call) so it stays cheap on the hot save path.
  */
-async function consolidateContentRevisions(containerId: string, revisions: PageRevision[], now: Date): Promise<void> {
+async function consolidateContentRevisions(revisions: PageRevision[], now: Date): Promise<void> {
   const run = selectConsolidationRun(
     revisions.map((revision) => ({
       id: revision.id,
@@ -227,27 +227,26 @@ async function consolidateContentRevisions(containerId: string, revisions: PageR
   );
   const lastInRun = revisions.find((revision) => revision.sequence === run.endSequence)!;
 
-  await repo.create({
-    containerId,
-    sequence: run.endSequence,
+  // Convert the existing row at `run.endSequence` (the last patch in the run — always part of
+  // `run.ids`) into the consolidated baseline in place, rather than `create`-ing a second row at
+  // the same sequence and deleting the original afterwards. Two rows sharing a `sequence` would
+  // otherwise exist simultaneously for the duration of the delete loop below, so an interrupted
+  // run (a failed `deleteUsingId`, or the process stopping mid-loop) could leave a genuine
+  // duplicate behind — which row `nearestBaseline`/`revisions.at(-1)` then picks is undefined.
+  await repo.update({
+    ...lastInRun,
     previousSequence: run.previousSequence,
     kind: 'consolidated',
-    target: 'content',
     content,
     patch: '',
-    valuesBefore: '',
-    author: lastInRun.author,
-    charsAdded: 0,
-    charsRemoved: 0,
-    coalesceWindowEnd: lastInRun.coalesceWindowEnd,
     consolidated: true,
-    userId: lastInRun.userId,
-    workspaceId: lastInRun.workspaceId,
-    createdAt: lastInRun.createdAt,
     lastUpdated: now.toISOString(),
   });
 
   for (const id of run.ids) {
+    if (id === lastInRun.id) {
+      continue;
+    }
     await repo.deleteUsingId(id);
   }
 }
@@ -289,7 +288,7 @@ async function enforceRetention(containerId: string, target: 'content' | 'values
 
 type RecordValuesRevisionInput = {
   page: PageContainer;
-  changed: Record<string, PageValue>;
+  changed: Record<string, PageValue | null>;
   author: string;
 };
 

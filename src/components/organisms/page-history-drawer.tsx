@@ -241,10 +241,10 @@ export function PageHistoryDrawer({ pageId, opened, onClose, mutatePageDetails }
 
         {selectedRevisionId && revision && (
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => setForkModalOpened(true)} disabled={isForking}>
+            <Button variant="default" onClick={() => setForkModalOpened(true)} disabled={isForking || isRestoring}>
               Create new page from this version
             </Button>
-            <Button color="orange" onClick={handleRestore} loading={isRestoring}>
+            <Button color="orange" onClick={handleRestore} loading={isRestoring} disabled={isForking}>
               Restore
             </Button>
           </Group>

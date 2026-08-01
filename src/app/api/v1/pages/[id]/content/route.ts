@@ -39,8 +39,11 @@ export const POST = apiRoute(
     await assertGrantAllowsContainerForSession(session, page);
 
     // Record the revision against the *pre-update* content, before the container row itself is
-    // overwritten below.
-    await recordContentRevision({ page, newContent: body.content, author: session.user.id });
+    // overwritten below. Skipped entirely when the content hasn't actually changed, so a no-op
+    // save doesn't add an empty entry to the timeline or consume the `MAX_REVISIONS` budget.
+    if (body.content !== (page.content ?? '')) {
+      await recordContentRevision({ page, newContent: body.content, author: session.user.id });
+    }
 
     const updatedPage = await containerRepository.update({
       ...page,

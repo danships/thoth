@@ -44,6 +44,11 @@ function compareNewestFirst(a: PageRevision, b: PageRevision): number {
   return b.id.localeCompare(a.id);
 }
 
+// Over-fetch buffer used on top of `limit + 1`, to absorb rows sharing the exact same
+// `createdAt` as the cursor position (disambiguated via the `id` tie-break below) without
+// under-fetching real results — mirrors the pattern used by the pages-tree cursor pagination.
+const SAFETY_MARGIN = 5;
+
 function toSummary(revision: PageRevision): PageHistoryRevisionSummary {
   const summary: PageHistoryRevisionSummary = {
     id: revision.id,
@@ -57,7 +62,13 @@ function toSummary(revision: PageRevision): PageHistoryRevisionSummary {
     charsRemoved: revision.charsRemoved,
   };
   if (revision.target === 'values' && revision.valuesBefore) {
-    summary.changedColumns = Object.keys(JSON.parse(revision.valuesBefore) as Record<string, unknown>);
+    try {
+      summary.changedColumns = Object.keys(JSON.parse(revision.valuesBefore) as Record<string, unknown>);
+    } catch {
+      // Malformed `valuesBefore` shouldn't break the whole history list — fall back to an empty
+      // set of changed columns for this one row.
+      summary.changedColumns = [];
+    }
   }
   return summary;
 }
@@ -72,15 +83,28 @@ export const GET = apiRoute<GetPageHistoryResponse, GetPageHistoryQuery, GetPage
     await assertGrantAllowsContainerForSession(session, page);
 
     const repository = await getPageRevisionRepository();
-    let databaseQuery = addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id);
+    const cursor = query.cursor ? decodeCursor(query.cursor) : null;
+
+    // Ordering, the cursor filter, and the page-size bound are all pushed into the repository
+    // query — this fetches at most `limit + 1 + SAFETY_MARGIN` rows instead of the container's
+    // entire revision stream.
+    let databaseQuery = addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
+      .sort('createdAt', 'desc')
+      .sort('id', 'desc')
+      .limit(query.limit + 1 + SAFETY_MARGIN);
     if (query.target !== 'all') {
       databaseQuery = databaseQuery.eq('target', query.target);
     }
+    if (cursor) {
+      databaseQuery = databaseQuery.lte('createdAt', cursor[0]);
+    }
 
     const fetchedRevisions = await repository.getByQuery(databaseQuery);
+    // Re-sort just this bounded batch in-memory: the query engine's tie-break ordering for rows
+    // sharing the exact same `createdAt` isn't guaranteed to match `id desc`, and the cursor
+    // lookup below depends on it.
     const revisions = fetchedRevisions.toSorted(compareNewestFirst);
 
-    const cursor = query.cursor ? decodeCursor(query.cursor) : null;
     const startIndex = cursor
       ? revisions.findIndex((revision) => revision.createdAt === cursor[0] && revision.id === cursor[1]) + 1
       : 0;

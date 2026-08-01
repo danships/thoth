@@ -2,12 +2,12 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getPageRevisionRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
-import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { reconstructAt, reconstructValuesAt } from '@/lib/history/reconstruct';
 import { recordContentRevision, recordValuesRevision } from '@/lib/history/revision-service';
+import type { PageValue } from '@/types/schemas/entities/container';
 import {
   restorePageRevisionParametersSchema,
   type RestorePageRevisionParameters,
@@ -71,19 +71,34 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
 
     // Drop columns that no longer exist on the parent data source (a values restore should
     // never resurrect a stale column id the values route itself would reject going forward).
+    // `page.parentId` can point at either a plain page or a data source — only data sources
+    // carry `columns`, so the filter only applies when the resolved parent is one.
     let filteredValues = reconstructedValues;
     if (page.parentId) {
-      const dataSource = await dataSourceRetriever.retrieveDataSource(page.parentId, session.user.id);
-      const validColumnIds = new Set((dataSource.columns ?? []).map((column) => column.id));
-      filteredValues = Object.fromEntries(
-        Object.entries(reconstructedValues).filter(([columnId]) => validColumnIds.has(columnId))
+      const parentContainer = await containerRepository.getOneByQuery(
+        containerRepository.createQuery().eq('id', page.parentId)
       );
+      if (parentContainer?.type === 'data-source') {
+        const validColumnIds = new Set((parentContainer.columns ?? []).map((column) => column.id));
+        filteredValues = Object.fromEntries(
+          Object.entries(reconstructedValues).filter(([columnId]) => validColumnIds.has(columnId))
+        );
+      }
     }
 
-    const changed: typeof filteredValues = {};
+    const changed: Record<string, PageValue | null> = {};
     for (const [columnId, value] of Object.entries(filteredValues)) {
       if (JSON.stringify(page.values?.[columnId] ?? null) !== JSON.stringify(value)) {
         changed[columnId] = value;
+      }
+    }
+    // Columns present on the page now but dropped by the restore (either filtered out above, or
+    // simply absent from the reconstructed historical state) are removals — the update below
+    // writes `filteredValues` as the complete value set, so without recording these the removal
+    // is silently unrecoverable and missing from the timeline summary.
+    for (const columnId of Object.keys(page.values ?? {})) {
+      if (!(columnId in filteredValues)) {
+        changed[columnId] = null;
       }
     }
 

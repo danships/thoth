@@ -98,7 +98,14 @@ export function reconstructValuesAt(
     .toSorted((a, b) => b.sequence - a.sequence);
 
   for (const revision of toUndo) {
-    const before = JSON.parse(revision.valuesBefore || '{}') as Record<string, PageValue | null>;
+    let before: Record<string, PageValue | null>;
+    try {
+      before = JSON.parse(revision.valuesBefore || '{}') as Record<string, PageValue | null>;
+    } catch {
+      // A malformed `valuesBefore` row shouldn't take down the whole reconstruction — skip it
+      // and keep applying the rest of the (well-formed) undo chain.
+      continue;
+    }
     for (const [columnId, value] of Object.entries(before)) {
       if (value === null) {
         delete result[columnId];

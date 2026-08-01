@@ -39,7 +39,7 @@ import { PageDetailMenu } from '@/components/organisms/page-detail-menu';
 import { PageHistoryDrawer } from '@/components/organisms/page-history-drawer';
 import { PageDetailEditor, type PageDetailEditorHandle } from '@/components/organisms/page-detail-editor';
 import { PageSubpagesList } from '@/components/organisms/page-subpages-list';
-import { IconStar, IconStarFilled, IconHistory } from '@tabler/icons-react';
+import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import { GET_PAGES_ENDPOINT, SUBPAGES_TAB_VALUE } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
@@ -272,21 +272,13 @@ export default function PageDetailsPage() {
             </ActionIcon>
           </Group>
           <Group justify="flex-end">
-            <ActionIcon
-              variant="subtle"
-              size="lg"
-              onClick={openHistoryDrawer}
-              aria-label="View page history"
-              data-testid="page-history-button"
-            >
-              <IconHistory size={20} />
-            </ActionIcon>
             <PageDetailMenu
               pageId={pageId}
               hasContent={Boolean(pageDetails.content)}
               onImportMarkdown={handleImportMarkdown}
               onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
               onMoveToTrash={handleMoveToTrash}
+              onViewHistory={openHistoryDrawer}
             />
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (
