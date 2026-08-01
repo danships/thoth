@@ -44,3 +44,7 @@ export * from './api-key';
 export * from './page-apps';
 export * from './webhook';
 export * from './upload-file';
+export * from './get-page-history';
+export * from './get-page-revision';
+export * from './restore-page-revision';
+export * from './fork-page-revision';

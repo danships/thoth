@@ -1,0 +1,21 @@
+.drawer {
+  height: 100%;
+}
+
+.revisionRow {
+  padding: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.revisionRow:hover {
+  background-color: var(--mantine-color-gray-0);
+}
+
+.revisionRowSelected {
+  background-color: var(--mantine-color-blue-0);
+}
+
+.diffPanel {
+  flex: 1;
+  overflow-y: auto;
+}

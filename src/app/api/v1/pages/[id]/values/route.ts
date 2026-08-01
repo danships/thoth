@@ -5,6 +5,7 @@ import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
+import { recordValuesRevision } from '@/lib/history/revision-service';
 import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
 import type { PageValue } from '@/types/schemas/entities/container';
@@ -68,6 +69,17 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
       if (JSON.stringify(previousValue) !== JSON.stringify(newValue)) {
         valueChanges[columnId] = { previous: previousValue, new: newValue };
       }
+    }
+
+    // Only record columns that actually changed (derived from the diff above) — an unchanged
+    // save shouldn't add a no-op entry to the timeline or consume the `MAX_REVISIONS` budget,
+    // and recording all of `body` would over-report every submitted column as "changed" in the
+    // history summary even when its value was untouched.
+    const changedValues: Record<string, PageValue | null> = Object.fromEntries(
+      Object.entries(valueChanges).map(([columnId, change]) => [columnId, change.new])
+    );
+    if (Object.keys(changedValues).length > 0) {
+      await recordValuesRevision({ page, changed: changedValues, author: session.user.id });
     }
 
     const updatedPage = await containerRepository.update({

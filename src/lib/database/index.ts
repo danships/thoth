@@ -13,6 +13,7 @@ import type {
   WebhookDelivery,
   UploadedFile,
   FileUsage,
+  PageRevision,
 } from '@/types/database';
 import { getEnvironment } from '../environment';
 import * as entities from './entities';
@@ -42,6 +43,7 @@ async function initializeDatabase() {
   await database.addEntity(entities.WebhookDelivery);
   await database.addEntity(entities.UploadedFile);
   await database.addEntity(entities.FileUsage);
+  await database.addEntity(entities.PageRevision);
 
   if (!skipSync) {
     await database.runMigrations();
@@ -129,4 +131,9 @@ export async function getUploadedFileRepository() {
 export async function getFileUsageRepository() {
   const database = await getDatabase();
   return database.getRepository<FileUsage>(entities.FILE_USAGE_NAME);
+}
+
+export async function getPageRevisionRepository() {
+  const database = await getDatabase();
+  return database.getRepository<PageRevision>(entities.PAGE_REVISION_NAME);
 }

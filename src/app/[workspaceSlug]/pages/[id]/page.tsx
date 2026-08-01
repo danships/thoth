@@ -16,6 +16,7 @@ import {
 } from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDisclosure } from '@mantine/hooks';
 import { mutate as mutateGlobal } from 'swr';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
 import { api } from '@/lib/api/client';
@@ -35,6 +36,7 @@ import { PageBreadcrumb } from '@/components/molecules/page-breadcrumb';
 import { PageCoverEditor } from '@/components/molecules/page-cover-editor';
 import { PageEmojiPicker } from '@/components/molecules/page-emoji-picker';
 import { PageDetailMenu } from '@/components/organisms/page-detail-menu';
+import { PageHistoryDrawer } from '@/components/organisms/page-history-drawer';
 import { PageDetailEditor, type PageDetailEditorHandle } from '@/components/organisms/page-detail-editor';
 import { PageSubpagesList } from '@/components/organisms/page-subpages-list';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
@@ -58,6 +60,7 @@ export default function PageDetailsPage() {
   const hasSubpages = pageDetails?.hasChildren ?? false;
 
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);
+  const [historyDrawerOpened, { open: openHistoryDrawer, close: closeHistoryDrawer }] = useDisclosure(false);
   const titleReference = useRef<HTMLHeadingElement>(null);
   const editorReference = useRef<PageDetailEditorHandle>(null);
 
@@ -275,6 +278,7 @@ export default function PageDetailsPage() {
               onImportMarkdown={handleImportMarkdown}
               onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
               onMoveToTrash={handleMoveToTrash}
+              onViewHistory={openHistoryDrawer}
             />
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (
@@ -356,6 +360,12 @@ export default function PageDetailsPage() {
           <ViewCreator pageId={pageId} onCreated={doViewCreated} />
         </Modal>
       )}
+      <PageHistoryDrawer
+        pageId={pageId}
+        opened={historyDrawerOpened}
+        onClose={closeHistoryDrawer}
+        mutatePageDetails={mutate}
+      />
     </>
   );
 }

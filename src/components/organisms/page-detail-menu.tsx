@@ -7,6 +7,7 @@ import {
   IconDots,
   IconFilePlus,
   IconFileImport,
+  IconHistory,
   IconLink,
   IconPlugConnected,
   IconTrash,
@@ -28,6 +29,7 @@ type PageDetailMenuProperties = {
   onImportMarkdown: (markdown: string) => Promise<void>;
   onAddChildPage: () => void;
   onMoveToTrash?: () => Promise<void>;
+  onViewHistory?: () => void;
 };
 
 // The badge shown next to a connected App: where its access comes from. Extracted to a plain
@@ -56,6 +58,7 @@ export function PageDetailMenu({
   onImportMarkdown,
   onAddChildPage,
   onMoveToTrash,
+  onViewHistory,
 }: PageDetailMenuProperties) {
   const { data, isLoading, mutate } = usePageApps(pageId);
   const { post, delete: remove, inProgress } = useCudApi();
@@ -180,6 +183,16 @@ export function PageDetailMenu({
         </Menu.Target>
 
         <Menu.Dropdown>
+          {onViewHistory && (
+            <Menu.Item
+              leftSection={<IconHistory size={14} />}
+              onClick={onViewHistory}
+              data-testid="page-history-button"
+            >
+              View History
+            </Menu.Item>
+          )}
+
           <Menu.Item leftSection={<IconFilePlus size={14} />} onClick={onAddChildPage}>
             Add Child Page
           </Menu.Item>

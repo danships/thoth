@@ -46,9 +46,17 @@ test('sidebar loads more root pages as the user scrolls to the bottom', async ({
   const firstPaginationPage = SEED.pages.paginationSeed[0]!;
   const lastPaginationPage = SEED.pages.paginationSeed.at(-1)!;
 
+  // Wait for the tree pane itself before asserting on its contents — otherwise, on a slow first
+  // render (e.g. a cold dev-server compile), the pane/content may simply not have mounted yet
+  // within the default assertion timeout, which is unrelated to the pagination behaviour under
+  // test.
+  await expect(page.getByTestId('pages-tree-scroll-pane')).toBeVisible({ timeout: 10_000 });
+
   // The most-recently-accessed pagination page is within the first fetch. Scoped to the Pages
   // tree since (per THOTH-035) it now also appears in the sidebar's Recent section.
-  await expect(page.getByTestId('pages-tree-scroll-pane').getByText(firstPaginationPage.name)).toBeVisible();
+  await expect(page.getByTestId('pages-tree-scroll-pane').getByText(firstPaginationPage.name)).toBeVisible({
+    timeout: 10_000,
+  });
   // ...but the least-recently-accessed one is not, until the user scrolls further.
   await expect(page.getByText(lastPaginationPage.name)).not.toBeVisible();
 

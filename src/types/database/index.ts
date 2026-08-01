@@ -12,6 +12,7 @@ import { webhookSchema } from '../schemas/entities/webhook';
 import { webhookDeliverySchema } from '../schemas/entities/webhook-delivery';
 import { uploadedFileSchema } from '../schemas/entities/uploaded-file';
 import { fileUsageSchema } from '../schemas/entities/file-usage';
+import { pageRevisionSchema } from '../schemas/entities/page-revision';
 
 /** Container Entity Schema */
 export { pageContainerSchema, dataSourceContainerSchema } from '../schemas/entities/container';
@@ -153,3 +154,17 @@ export const fileUsageCreateSchema = fileUsageSchema.omit({ id: true });
 export type FileUsage = z.infer<typeof fileUsageSchema>;
 export type FileUsageCreate = z.infer<typeof fileUsageCreateSchema>;
 /** End FileUsage Entity Schema */
+
+/** PageRevision Entity Schema */
+export {
+  pageRevisionSchema,
+  pageRevisionKindSchema,
+  pageRevisionTargetSchema,
+} from '../schemas/entities/page-revision';
+export type { PageRevisionKind, PageRevisionTarget } from '../schemas/entities/page-revision';
+
+export const pageRevisionCreateSchema = pageRevisionSchema.omit({ id: true });
+
+export type PageRevision = z.infer<typeof pageRevisionSchema>;
+export type PageRevisionCreate = z.infer<typeof pageRevisionCreateSchema>;
+/** End PageRevision Entity Schema */
