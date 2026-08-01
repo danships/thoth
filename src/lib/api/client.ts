@@ -162,7 +162,11 @@ export const api = {
       if (options?.workspaceId) {
         formData.append('workspaceId', options.workspaceId);
       }
-      return apiClient.post<DataWrapper<UploadFileResponse>>('/files', formData);
+      // `apiClient.postForm` (rather than `.post`) is required here: the instance's default
+      // `Content-Type: application/json` header would otherwise stick around and stop axios /
+      // the browser from setting the multipart boundary on this `FormData` body, causing the
+      // server to reject it — `postForm` clears/derives the header correctly for `FormData`.
+      return apiClient.postForm<DataWrapper<UploadFileResponse>>('/files', formData);
     },
     getDetails: (id: string) => apiClient.get<DataWrapper<GetFileResponse>>(`/files/${id}`),
     remove: (id: string) => apiClient.delete<DataWrapper<DeleteFileResponse>>(`/files/${id}`),
