@@ -21,6 +21,13 @@ export const singleSelectValueSchema = z.object({
   value: z.string().nullable(),
 });
 
+// Ordered array of SingleSelectOption.id values on the column; empty array = nothing selected,
+// never null (unlike single-select's nullable value).
+export const multiSelectValueSchema = z.object({
+  type: z.literal('multi-select'),
+  value: z.array(z.string()),
+});
+
 // Value union used for page values
 export const pageValueSchema = z.discriminatedUnion('type', [
   stringValueSchema,
@@ -28,6 +35,7 @@ export const pageValueSchema = z.discriminatedUnion('type', [
   booleanValueSchema,
   dateValueSchema,
   singleSelectValueSchema,
+  multiSelectValueSchema,
 ]);
 export type PageValue = z.infer<typeof pageValueSchema>;
 
@@ -77,6 +85,14 @@ export const singleSelectColumnSchema = baseColumnSchema.extend({
   options: z.array(singleSelectOptionSchema),
 });
 
+// Reuses the identical option model (`singleSelectOptionSchema`) — a multi-select column only
+// differs from single-select in its cell value shape (an array of option ids instead of a
+// single nullable id).
+export const multiSelectColumnSchema = baseColumnSchema.extend({
+  type: z.literal('multi-select'),
+  options: z.array(singleSelectOptionSchema),
+});
+
 // Column union used for data source columns
 export const columnSchema = z.discriminatedUnion('type', [
   stringColumnSchema,
@@ -84,6 +100,7 @@ export const columnSchema = z.discriminatedUnion('type', [
   booleanColumnSchema,
   dateColumnSchema,
   singleSelectColumnSchema,
+  multiSelectColumnSchema,
 ]);
 export type Column = z.infer<typeof columnSchema>;
 

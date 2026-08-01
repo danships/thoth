@@ -120,6 +120,16 @@ export const SEED = {
           { id: 'e2e-opt-high-0000-0000-0000-000000000001', label: 'High', color: 'red' as const },
         ],
       },
+      {
+        id: 'e2e-col-multi-000-0000-0000-000000000001',
+        name: 'Tags',
+        type: 'multi-select' as const,
+        options: [
+          { id: 'e2e-opt-frontend-0-0000-0000-000000000001', label: 'Frontend', color: 'blue' as const },
+          { id: 'e2e-opt-backend-00-0000-0000-000000000001', label: 'Backend', color: 'teal' as const },
+          { id: 'e2e-opt-urgent-000-0000-0000-000000000001', label: 'Urgent', color: 'red' as const },
+        ],
+      },
     ],
   },
   dataView: {

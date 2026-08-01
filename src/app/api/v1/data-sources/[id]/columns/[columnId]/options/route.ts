@@ -72,8 +72,8 @@ export const POST = apiRoute<
         throw new NotFoundError('Column not found', true);
       }
 
-      if (foundColumn.type !== 'single-select') {
-        throw new BadRequestError('Column is not a single-select column');
+      if (foundColumn.type !== 'single-select' && foundColumn.type !== 'multi-select') {
+        throw new BadRequestError('Column is not a select column');
       }
 
       // Idempotent on a case-insensitive label match — return the existing option rather than
@@ -100,7 +100,7 @@ export const POST = apiRoute<
       const persisted = await fetchDataSource(containerRepository, params.id, session.user.id);
       const persistedColumn = (persisted.columns ?? []).find((column) => column.id === params.columnId);
       const persistedOption =
-        persistedColumn?.type === 'single-select'
+        persistedColumn?.type === 'single-select' || persistedColumn?.type === 'multi-select'
           ? persistedColumn.options.find((option) => option.id === newOption.id)
           : undefined;
 

@@ -420,6 +420,26 @@
                                     "value"
                                   ],
                                   "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "const": "multi-select"
+                                    },
+                                    "value": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "value"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               ]
                             }
@@ -1262,6 +1282,25 @@
                         "type",
                         "value"
                       ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "multi-select"
+                        },
+                        "value": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "value"
+                      ]
                     }
                   ]
                 }
@@ -1406,6 +1445,26 @@
                                   "value"
                                 ],
                                 "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "multi-select"
+                                  },
+                                  "value": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "value"
+                                ],
+                                "additionalProperties": false
                               }
                             ]
                           }
@@ -1540,6 +1599,68 @@
                                   "type": {
                                     "type": "string",
                                     "const": "single-select"
+                                  },
+                                  "options": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "enum": [
+                                            "blue",
+                                            "cyan",
+                                            "teal",
+                                            "green",
+                                            "lime",
+                                            "yellow",
+                                            "orange",
+                                            "red",
+                                            "pink",
+                                            "grape",
+                                            "gray"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "color"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type",
+                                  "options"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "multi-select"
                                   },
                                   "options": {
                                     "type": "array",
@@ -5475,6 +5596,68 @@
                                   "options"
                                 ],
                                 "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "multi-select"
+                                  },
+                                  "options": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "enum": [
+                                            "blue",
+                                            "cyan",
+                                            "teal",
+                                            "green",
+                                            "lime",
+                                            "yellow",
+                                            "orange",
+                                            "red",
+                                            "pink",
+                                            "grape",
+                                            "gray"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "color"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type",
+                                  "options"
+                                ],
+                                "additionalProperties": false
                               }
                             ]
                           }
@@ -5842,6 +6025,68 @@
                                   "options"
                                 ],
                                 "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "multi-select"
+                                  },
+                                  "options": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "enum": [
+                                            "blue",
+                                            "cyan",
+                                            "teal",
+                                            "green",
+                                            "lime",
+                                            "yellow",
+                                            "orange",
+                                            "red",
+                                            "pink",
+                                            "grape",
+                                            "gray"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "color"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type",
+                                  "options"
+                                ],
+                                "additionalProperties": false
                               }
                             ]
                           }
@@ -6080,6 +6325,68 @@
                                   "type": {
                                     "type": "string",
                                     "const": "single-select"
+                                  },
+                                  "options": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "enum": [
+                                            "blue",
+                                            "cyan",
+                                            "teal",
+                                            "green",
+                                            "lime",
+                                            "yellow",
+                                            "orange",
+                                            "red",
+                                            "pink",
+                                            "grape",
+                                            "gray"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "color"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type",
+                                  "options"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "multi-select"
                                   },
                                   "options": {
                                     "type": "array",
@@ -6521,6 +6828,68 @@
                                   "options"
                                 ],
                                 "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "multi-select"
+                                  },
+                                  "options": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "enum": [
+                                            "blue",
+                                            "cyan",
+                                            "teal",
+                                            "green",
+                                            "lime",
+                                            "yellow",
+                                            "orange",
+                                            "red",
+                                            "pink",
+                                            "grape",
+                                            "gray"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "label",
+                                        "color"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type",
+                                  "options"
+                                ],
+                                "additionalProperties": false
                               }
                             ]
                           }
@@ -6809,6 +7178,68 @@
                             "options"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "multi-select"
+                            },
+                            "options": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blue",
+                                      "cyan",
+                                      "teal",
+                                      "green",
+                                      "lime",
+                                      "yellow",
+                                      "orange",
+                                      "red",
+                                      "pink",
+                                      "grape",
+                                      "gray"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "color"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "type",
+                            "options"
+                          ],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -6977,6 +7408,56 @@
                       "type": {
                         "type": "string",
                         "const": "single-select"
+                      },
+                      "options": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "color": {
+                              "type": "string",
+                              "enum": [
+                                "blue",
+                                "cyan",
+                                "teal",
+                                "green",
+                                "lime",
+                                "yellow",
+                                "orange",
+                                "red",
+                                "pink",
+                                "grape",
+                                "gray"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "label",
+                            "color"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "type"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "multi-select"
                       },
                       "options": {
                         "default": [],
@@ -7219,6 +7700,68 @@
                             "options"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "multi-select"
+                            },
+                            "options": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "enum": [
+                                      "blue",
+                                      "cyan",
+                                      "teal",
+                                      "green",
+                                      "lime",
+                                      "yellow",
+                                      "orange",
+                                      "red",
+                                      "pink",
+                                      "grape",
+                                      "gray"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "color"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "type",
+                            "options"
+                          ],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -7392,6 +7935,59 @@
                           "type": {
                             "type": "string",
                             "const": "single-select"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "label": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "color": {
+                                  "type": "string",
+                                  "enum": [
+                                    "blue",
+                                    "cyan",
+                                    "teal",
+                                    "green",
+                                    "lime",
+                                    "yellow",
+                                    "orange",
+                                    "red",
+                                    "pink",
+                                    "grape",
+                                    "gray"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label",
+                                "color"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "type": {
+                            "type": "string",
+                            "const": "multi-select"
                           },
                           "options": {
                             "type": "array",
@@ -10338,6 +10934,68 @@
                     "type": {
                       "type": "string",
                       "const": "single-select"
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "color": {
+                            "type": "string",
+                            "enum": [
+                              "blue",
+                              "cyan",
+                              "teal",
+                              "green",
+                              "lime",
+                              "yellow",
+                              "orange",
+                              "red",
+                              "pink",
+                              "grape",
+                              "gray"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "color"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "multi-select"
                     },
                     "options": {
                       "type": "array",

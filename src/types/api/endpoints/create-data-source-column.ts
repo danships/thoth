@@ -20,6 +20,12 @@ export const createDataSourceColumnBodySchema = z.discriminatedUnion('type', [
     // No `id` — the server assigns one, matching the existing pattern for the column's own id.
     options: z.array(z.object({ label: z.string().trim().min(1), color: selectColorSchema })).default([]),
   }),
+  z.object({
+    name: z.string().min(1),
+    type: z.literal('multi-select'),
+    // No `id` — the server assigns one, matching the existing pattern for the column's own id.
+    options: z.array(z.object({ label: z.string().trim().min(1), color: selectColorSchema })).default([]),
+  }),
 ]);
 export type CreateDataSourceColumnBody = z.infer<typeof createDataSourceColumnBodySchema>;
 
