@@ -55,7 +55,9 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
     }
 
     let workspaceId: string;
-    let parentId: string | null = null;
+    // Defaults to the source page's own parent (keeping the fork alongside it) rather than
+    // always forking to the workspace root.
+    let parentId: string | null = sourcePage.parentId ?? null;
 
     if (body?.parentId) {
       const parentContainer = await containerRepository.getOneByQuery(

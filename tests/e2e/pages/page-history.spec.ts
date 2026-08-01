@@ -10,8 +10,12 @@ async function getData<T = unknown>(response: APIResponse): Promise<T> {
 type PageApi = { id: string };
 
 async function createPage(request: APIRequestContext, name: string): Promise<string> {
+  // Nested under the seeded root page rather than created at root level: root-level pages are
+  // sorted by `lastAccessedAt` in the sidebar's cursor-paginated root list, and viewing one via
+  // `page.goto` bumps it to "most recently accessed" — which would otherwise displace the
+  // deterministic ordering `pages-tree-pagination.spec.ts` relies on (`SEED.pages.paginationSeed`).
   const response = await request.post('/api/v1/pages', {
-    data: { name, emoji: null, parentId: null, workspaceId: SEED.workspace.id },
+    data: { name, emoji: null, parentId: SEED.pages.root.id, workspaceId: SEED.workspace.id },
   });
   expect(response.ok()).toBeTruthy();
   const page = await getData<PageApi>(response);
