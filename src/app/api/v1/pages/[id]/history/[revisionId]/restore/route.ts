@@ -21,7 +21,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
   async ({ params }, session) => {
     const containerRepository = await getContainerRepository();
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, page);
+    await assertGrantAllowsContainerForSession(session, page, { mutating: true });
 
     const repository = await getPageRevisionRepository();
     const revision = await repository.getOneByQuery(

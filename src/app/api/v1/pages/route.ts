@@ -30,6 +30,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       // `limit` and FAVORITES_MAX_LIMIT.
       const limit = query.limit ? Math.min(query.limit, FAVORITES_MAX_LIMIT) : FAVORITES_MAX_LIMIT;
 
+      // ContainerAccess (starred/last-accessed) is per-user state — stays scoped by userId
+      // (THOTH-042, Category B).
       const containerAccessRepository = await getContainerAccessRepository();
       const starredAccessRows = await containerAccessRepository.getByQuery(
         addWorkspaceIdToQuery(
@@ -43,8 +45,9 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       const containerIds = starredAccessRows.map((row) => row.containerId);
       const containersById = new Map<string, Awaited<ReturnType<typeof containerRepository.getByQuery>>[number]>();
       if (containerIds.length > 0) {
+        // Content is scoped by workspace membership + grant, not creator (THOTH-042).
         const fetchedContainers = await containerRepository.getByQuery(
-          addWorkspaceIdToQuery(addUserIdToQuery(containerRepository.createQuery(), session.user.id), workspaceId)
+          addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId)
             .eq('type', 'page')
             .in('id', containerIds)
         );
@@ -94,6 +97,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       // `limit` (which may be as high as FAVORITES_MAX_LIMIT for the shared query schema).
       const limit = Math.min(query.limit ?? RECENT_MAX_LIMIT, RECENT_MAX_LIMIT);
 
+      // ContainerAccess (starred/last-accessed) is per-user state — stays scoped by userId
+      // (THOTH-042, Category B).
       const containerAccessRepository = await getContainerAccessRepository();
       const recentAccessRows = await containerAccessRepository.getByQuery(
         addWorkspaceIdToQuery(addUserIdToQuery(containerAccessRepository.createQuery(), session.user.id), workspaceId)
@@ -104,8 +109,9 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       const containerIds = recentAccessRows.map((row) => row.containerId);
       const containersById = new Map<string, Awaited<ReturnType<typeof containerRepository.getByQuery>>[number]>();
       if (containerIds.length > 0) {
+        // Content is scoped by workspace membership + grant, not creator (THOTH-042).
         const fetchedContainers = await containerRepository.getByQuery(
-          addWorkspaceIdToQuery(addUserIdToQuery(containerRepository.createQuery(), session.user.id), workspaceId)
+          addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId)
             .eq('type', 'page')
             .in('id', containerIds)
         );
@@ -152,9 +158,11 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       throw new BadRequestError('Either parentId or dataSourceId must be provided.');
     }
 
-    // Get all pages that have this parentId
+    // Get all pages that have this parentId. Content is scoped by workspace membership + grant,
+    // not creator (THOTH-042) — the parent's own workspace is resolved and asserted via
+    // `filterContainersByGrantForSession` below once the parent's siblings are fetched.
     const pages = await containerRepository.getByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('parentId', parentId).eq('type', 'page'), session.user.id)
+      containerRepository.createQuery().eq('parentId', parentId).eq('type', 'page')
     );
 
     const scopedPages = await filterContainersByGrantForSession(

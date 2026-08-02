@@ -52,6 +52,8 @@ function hashPassword(password: string): Promise<string> {
 // ── 1. Seed better-auth tables directly via raw SQLite ─────────────────────────
 async function seedAuthTables() {
   const passwordHash = await hashPassword(SEED.user.password);
+  const secondPasswordHash = await hashPassword(SEED.secondUser.password);
+  const thirdPasswordHash = await hashPassword(SEED.thirdUser.password);
   const database = new Database(DB_PATH);
   database.pragma('journal_mode = WAL');
   const now = new Date().toISOString();
@@ -77,6 +79,58 @@ async function seedAuthTables() {
      VALUES (?, ?, ?, ?, ?, ?)`
     )
     .run(SEED.session.id, farFuture, SEED.session.token, now, now, SEED.user.id);
+
+  // Second and third workspace members (THOTH-042, DECISION 4) — used to exercise the
+  // read / read_write / read-only / non-member access matrix against `SEED.workspace`.
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+     VALUES (?, ?, ?, 1, ?, ?)`
+    )
+    .run(SEED.secondUser.id, SEED.secondUser.name, SEED.secondUser.email, now, now);
+
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO account (id, accountId, providerId, userId, createdAt, updatedAt, password)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      'e2e-account-00000001',
+      SEED.secondUser.id,
+      'credential',
+      SEED.secondUser.id,
+      now,
+      now,
+      secondPasswordHash
+    );
+
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO session (id, expiresAt, token, createdAt, updatedAt, userId)
+     VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(SEED.secondUserSession.id, farFuture, SEED.secondUserSession.token, now, now, SEED.secondUser.id);
+
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+     VALUES (?, ?, ?, 1, ?, ?)`
+    )
+    .run(SEED.thirdUser.id, SEED.thirdUser.name, SEED.thirdUser.email, now, now);
+
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO account (id, accountId, providerId, userId, createdAt, updatedAt, password)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run('e2e-account-00000002', SEED.thirdUser.id, 'credential', SEED.thirdUser.id, now, now, thirdPasswordHash);
+
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO session (id, expiresAt, token, createdAt, updatedAt, userId)
+     VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(SEED.thirdUserSession.id, farFuture, SEED.thirdUserSession.token, now, now, SEED.thirdUser.id);
 
   database.close();
 }
@@ -139,8 +193,42 @@ async function seedAppData() {
       workspaceId: wsId,
       userId: uid,
       role: 'owner',
+      permission: 'read_write',
+      scopeType: 'workspace',
       createdAt: now,
-    } as unknown as WorkspaceMemberCreate);
+    } satisfies WorkspaceMemberCreate);
+  }
+
+  // Second and third members of the *primary* workspace (THOTH-042, DECISION 4) — neither is a
+  // creator of any seeded content, so the read / read_write / read-only access matrix e2e specs
+  // can assert purely on membership + grant, never on creator identity. Deliberately NOT
+  // members of `secondWorkspace` (see below), so non-member isolation can be asserted too.
+  const existingSecondUserMembership = await workspaceMemberRepository.getOneByQuery(
+    workspaceMemberRepository.createQuery().eq('workspaceId', wsId).eq('userId', SEED.secondUser.id)
+  );
+  if (!existingSecondUserMembership) {
+    await workspaceMemberRepository.create({
+      workspaceId: wsId,
+      userId: SEED.secondUser.id,
+      role: 'editor',
+      permission: 'read_write',
+      scopeType: 'workspace',
+      createdAt: now,
+    } satisfies WorkspaceMemberCreate);
+  }
+
+  const existingThirdUserMembership = await workspaceMemberRepository.getOneByQuery(
+    workspaceMemberRepository.createQuery().eq('workspaceId', wsId).eq('userId', SEED.thirdUser.id)
+  );
+  if (!existingThirdUserMembership) {
+    await workspaceMemberRepository.create({
+      workspaceId: wsId,
+      userId: SEED.thirdUser.id,
+      role: 'viewer',
+      permission: 'read',
+      scopeType: 'workspace',
+      createdAt: now,
+    } satisfies WorkspaceMemberCreate);
   }
 
   // ── Second workspace (multi-workspace fixtures) ──────────────────────────────
@@ -181,8 +269,10 @@ async function seedAppData() {
       workspaceId: secondWorkspaceId,
       userId: uid,
       role: 'owner',
+      permission: 'read_write',
+      scopeType: 'workspace',
       createdAt: now,
-    } as unknown as WorkspaceMemberCreate);
+    } satisfies WorkspaceMemberCreate);
   }
 
   const containerAccessRepository = await getContainerAccessRepository();
@@ -253,14 +343,13 @@ async function seedAppData() {
       // Seeded markdown body: verifies markdown -> BlockNote hydration renders a heading on
       // the Contents tab (see `tests/e2e/pages/page-detail.spec.ts`).
       content: `# ${SEED.pages.root.contentHeading}`,
-      // `/pages` redirects to the most-recently-updated root page. This must stay strictly
-      // later than `pages.dataSourceHost.lastUpdated` (both are root pages, `parentId: null`)
-      // so the redirect target is deterministic across test runs/DB engines instead of relying
-      // on a tie-break that could vary.
-      lastUpdated: new Date(Date.parse(now) + 1000).toISOString(),
+      // `/pages` redirects to the most-recently-updated root page, and the sidebar root list
+      // now sorts by `Container.lastUpdated` (THOTH-042, DECISION 1). This must stay strictly
+      // more recent than every other root page's `lastUpdated` below (`dataSourceHost`,
+      // `childOverflowHost`, `paginationSeed`, ...) so both the redirect target and the first
+      // page of the cursor-paginated root list are deterministic across test runs/DB engines.
+      lastUpdated: new Date(Date.parse(now) + 5000).toISOString(),
     },
-    // Keep this comfortably more recent than any `paginationSeed`/`childOverflowHost` entry so
-    // it deterministically lands on the first page of the cursor-paginated root list.
     { lastAccessedAt: new Date(Date.parse(now) + 5000).toISOString() }
   );
 
@@ -289,7 +378,9 @@ async function seedAppData() {
       workspaceId: wsId,
       parentId: null,
       createdAt: now,
-      lastUpdated: now,
+      // Root page: `lastUpdated` drives the sidebar root list's sort order (THOTH-042,
+      // DECISION 1), so this must stay in step with the `lastAccessedAt` value below.
+      lastUpdated: new Date(Date.parse(now) + 4000).toISOString(),
       views: [SEED.dataView.id],
     },
     { lastAccessedAt: new Date(Date.parse(now) + 4000).toISOString() }
@@ -573,7 +664,9 @@ async function seedAppData() {
       workspaceId: wsId,
       parentId: null,
       createdAt: now,
-      lastUpdated: now,
+      // Root page: `lastUpdated` drives the sidebar root list's sort order (THOTH-042,
+      // DECISION 1), so this must stay in step with the `lastAccessedAt` value below.
+      lastUpdated: new Date(Date.parse(now) + 3000).toISOString(),
     },
     { lastAccessedAt: new Date(Date.parse(now) + 3000).toISOString() }
   );
@@ -596,9 +689,11 @@ async function seedAppData() {
   }
 
   // ── Root-list pagination test fixtures ───────────────────────────────────────
-  // 30 root-level pages with staggered, strictly descending `lastAccessedAt` values (each one
-  // second earlier than the previous), giving a deterministic cursor-pagination sort order:
-  // pagination page 0 is the most-recently-accessed of the batch, page 29 the least.
+  // 30 root-level pages with staggered, strictly descending `lastUpdated` values (each one
+  // second earlier than the previous), giving a deterministic cursor-pagination sort order
+  // (THOTH-042, DECISION 1 — root list ordering moved from per-user `lastAccessedAt` to
+  // workspace-scoped `lastUpdated`): pagination page 0 is the most-recently-updated of the
+  // batch, page 29 the least.
   for (const [index, page] of SEED.pages.paginationSeed.entries()) {
     await upsertPage(
       {
@@ -610,7 +705,10 @@ async function seedAppData() {
         workspaceId: wsId,
         parentId: null,
         createdAt: now,
-        lastUpdated: now,
+        // Root page: `lastUpdated` drives the sidebar root list's sort order (THOTH-042,
+        // DECISION 1) — staggered one second apart, strictly descending, matching this
+        // array's order (page 0 most-recently-updated).
+        lastUpdated: new Date(Date.parse(now) - index * 1000).toISOString(),
       },
       { lastAccessedAt: new Date(Date.parse(now) - index * 1000).toISOString() }
     );
@@ -634,8 +732,8 @@ async function seedAppData() {
   // ── Favorites test fixtures ───────────────────────────────────────────────────
   // A dedicated root page, seeded unstarred, used to exercise starring/unstarring from the
   // page detail header and the resulting Favorites sidebar section. Seeded with a
-  // deliberately old `lastAccessedAt` (well before the pagination fixtures below) so it
-  // doesn't shift the root-list pagination tests' expected first-page ordering.
+  // deliberately old `lastUpdated` (well before the pagination fixtures above) so it doesn't
+  // shift the root-list pagination tests' expected first-page ordering (THOTH-042, DECISION 1).
   await upsertPage(
     {
       id: SEED.pages.favoriteToggle.id,
@@ -646,7 +744,7 @@ async function seedAppData() {
       workspaceId: wsId,
       parentId: null,
       createdAt: now,
-      lastUpdated: now,
+      lastUpdated: new Date(Date.parse(now) - 1_000_000).toISOString(),
     },
     { lastAccessedAt: new Date(Date.parse(now) - 1_000_000).toISOString() }
   );
@@ -654,7 +752,7 @@ async function seedAppData() {
   // A pool of unstarred root pages the favorites-overflow e2e spec stars/unstars on demand
   // (via the API) to exceed FAVORITES_MAX_LIMIT and verify the "may be more" indicator,
   // without permanently seeding starred state that would break the "no favorites" test.
-  // Seeded with deliberately old, strictly descending `lastAccessedAt` values (same rationale
+  // Seeded with deliberately old, strictly descending `lastUpdated` values (same rationale
   // as `favoriteToggle` above) so this pool never shifts the root-list pagination ordering.
   for (const [index, page] of SEED.pages.favoritesOverflowSeed.entries()) {
     await upsertPage(
@@ -667,11 +765,27 @@ async function seedAppData() {
         workspaceId: wsId,
         parentId: null,
         createdAt: now,
-        lastUpdated: now,
+        lastUpdated: new Date(Date.parse(now) - 1_000_000 - index * 1000).toISOString(),
       },
       { lastAccessedAt: new Date(Date.parse(now) - 1_000_000 - index * 1000).toISOString() }
     );
   }
+
+  // ── Shared multi-user access matrix fixtures (THOTH-042, DECISION 4) ─────────
+  // A dedicated root page, owned by the primary seed user, that only
+  // `workspaces/shared-workspace-access.spec.ts` reads/mutates — kept isolated from every
+  // other fixture so cross-member mutation assertions never affect unrelated specs.
+  await upsertPage({
+    id: SEED.sharedAccess.page.id,
+    name: SEED.sharedAccess.page.name,
+    emoji: null,
+    type: 'page',
+    userId: uid,
+    workspaceId: wsId,
+    parentId: null,
+    createdAt: now,
+    lastUpdated: new Date(Date.parse(now) - 900_000).toISOString(),
+  });
 
   // ── File upload fixtures (THOTH-040) ─────────────────────────────────────────
   // A host page plus a pre-seeded `uploaded-file` + `file-usage` row, so the serve endpoint has

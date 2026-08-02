@@ -1,6 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import type { Container, PageContainer } from '@/types/database';
@@ -15,10 +15,12 @@ import { getPageBreadcrumbsParametersSchema } from '@/types/api';
  * This looks up a page that hosts the given data source so breadcrumb traversal can continue
  * past the data source and up to that page (and its own ancestors).
  */
-async function findHostPageForDataSource(dataSourceId: string, userId: string): Promise<PageContainer | null> {
+async function findHostPageForDataSource(dataSourceId: string, workspaceId: string): Promise<PageContainer | null> {
   const dataViewRepository = await getDataViewRepository();
+  // Pattern C: anchored on the already-authorised starting page's own workspace, not the caller
+  // (THOTH-042).
   const dataViews = await dataViewRepository.getByQuery(
-    addUserIdToQuery(dataViewRepository.createQuery().eq('dataSourceId', dataSourceId), userId)
+    addWorkspaceIdToQuery(dataViewRepository.createQuery().eq('dataSourceId', dataSourceId), workspaceId)
   );
   const activeDataViews = dataViews.filter((dataView) => !dataView.deletedAt);
 
@@ -30,7 +32,7 @@ async function findHostPageForDataSource(dataSourceId: string, userId: string): 
 
   const containerRepository = await getContainerRepository();
   const pages = await containerRepository.getByQuery(
-    addUserIdToQuery(containerRepository.createQuery().eq('type', 'page'), userId)
+    addWorkspaceIdToQuery(containerRepository.createQuery().eq('type', 'page'), workspaceId)
   );
 
   const hostPage = pages.find(
@@ -51,7 +53,8 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
     const breadcrumbs: Page[] = [];
     const visitedIds = new Set<string>();
 
-    // Start with the current page
+    // Start with the current page. Pattern P: fetched by id, workspace membership asserted on
+    // the row's own workspaceId inside the retriever (THOTH-042).
     const startingPage = await pageRetriever.retrievePage(params.id, session.user.id);
     await assertGrantAllowsContainerForSession(session, startingPage);
 
@@ -83,9 +86,14 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
           break;
         }
 
+        // Pattern C: anchored on the starting page's own (already-authorised) workspace, not
+        // the caller (THOTH-042).
         const containerRepository = await getContainerRepository();
         const parentContainer = await containerRepository.getOneByQuery(
-          addUserIdToQuery(containerRepository.createQuery().eq('id', currentContainer.parentId), session.user.id)
+          addWorkspaceIdToQuery(
+            containerRepository.createQuery().eq('id', currentContainer.parentId),
+            startingPage.workspaceId
+          )
         );
 
         if (parentContainer?.deletedAt) {
@@ -96,7 +104,7 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
       } else {
         // Data sources have no `page` ancestor via parentId — look up the page hosting it
         // via its views instead.
-        currentContainer = await findHostPageForDataSource(currentContainer.id, session.user.id);
+        currentContainer = await findHostPageForDataSource(currentContainer.id, startingPage.workspaceId);
       }
     }
 

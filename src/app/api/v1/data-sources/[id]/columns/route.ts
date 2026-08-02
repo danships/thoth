@@ -14,7 +14,7 @@ export const POST = apiRoute<z.infer<typeof columnSchema>, undefined, { id: stri
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
     const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, dataSource);
+    await assertGrantAllowsContainerForSession(session, dataSource, { mutating: true });
 
     const newColumn: Column =
       body.type === 'date'

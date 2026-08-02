@@ -5,13 +5,13 @@ import { SEED } from '../constants';
 // the form modal, minting a key and seeing its one-time secret, and archiving the App.
 test.describe('Apps settings UI', () => {
   test('Apps link is reachable from the workspace menu', async ({ page }) => {
-    await page.goto(`/${SEED.workspace.slug}/pages`);
-
-    // `/[slug]/pages` redirects on to the landing page, which may then append a `?v=` view param
-    // via a client-side replace. Let that settle before interacting with the menu, otherwise the
-    // late replace can race with (and clobber) the settings navigation triggered below (see the
-    // matching comment in `workspace-menu.spec.ts`).
-    await page.waitForURL(/\/pages\/(?!create)[^/]+/);
+    // Navigate directly to a known page without any linked views, rather than the generic
+    // `/pages` redirect-to-most-recently-updated-page flow: since DECISION 1 (THOTH-042) made
+    // that landing page workspace-scoped (any root page, not just `SEED.pages.root`), it can
+    // land on a page with a view (e.g. `dataSourceHost`), whose client-side `?v=` replace can
+    // race with (and clobber) the settings navigation triggered below (see the matching comment
+    // in `workspace-menu.spec.ts`). `SEED.pages.root` has no views, so this sidesteps the race.
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
     await page.waitForLoadState('networkidle');
 
     await page.getByRole('button', { name: 'Workspace menu' }).click();

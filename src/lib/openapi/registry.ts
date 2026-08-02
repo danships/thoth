@@ -499,6 +499,7 @@ export const operations = [
     summary: 'List data sources',
     tags: ['Data Sources'],
     auth: 'sessionOrApiKey',
+    query: api.getDataSourcesQuerySchema,
     response: api.getDataSourcesResponseSchema,
   },
   {

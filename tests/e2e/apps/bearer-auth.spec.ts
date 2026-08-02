@@ -212,12 +212,13 @@ test.describe('bearer-token API authentication', () => {
       });
       expect(readResponse.ok()).toBeTruthy();
 
-      // Workspace-wide container visibility is explicitly out of scope for this ticket: root
-      // listing is still driven by per-user `ContainerAccess` rows, so a page attributed to the
-      // App's own synthetic owner id does not show up in the human creator's own root list.
+      // THOTH-042: root listing is workspace-scoped (`Container.lastUpdated`), not per-user
+      // `ContainerAccess` rows, so a page attributed to the App's own synthetic owner id is
+      // still visible to every workspace member's root tree -- `userId`/attribution is never a
+      // visibility gate for content.
       const treeResponse = await request.get('/api/v1/pages/tree', { params: { workspaceId: SEED.workspace.id } });
       const tree = await getData<{ branches: { page: { id: string } }[] }>(treeResponse);
-      expect(tree.branches.some((branch) => branch.page.id === created.id)).toBeFalsy();
+      expect(tree.branches.some((branch) => branch.page.id === created.id)).toBeTruthy();
     } finally {
       await bearerContext.dispose();
     }

@@ -44,7 +44,7 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
   async ({ params, body }, session) => {
     const containerRepository = await getContainerRepository();
     const sourcePage = await pageRetriever.retrievePage(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, sourcePage);
+    await assertGrantAllowsContainerForSession(session, sourcePage, { mutating: true });
 
     const repository = await getPageRevisionRepository();
     const revision = await repository.getOneByQuery(

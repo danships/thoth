@@ -19,7 +19,7 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, page);
+    await assertGrantAllowsContainerForSession(session, page, { mutating: true });
 
     if (!page.parentId) {
       throw new BadRequestError('Page does not have a data source parent');

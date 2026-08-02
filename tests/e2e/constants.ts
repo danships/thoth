@@ -1,6 +1,8 @@
 // 30 root-level pages used to exercise cursor-based pagination of the sidebar's root list.
-// `lastAccessedAt` values are assigned (in the seed script) in descending order matching this
-// array's order, so page 0 is expected to be the most-recently-accessed / first to appear.
+// `lastUpdated` values are assigned (in the seed script) in descending order matching this
+// array's order, so page 0 is expected to be the most-recently-updated / first to appear
+// (THOTH-042, DECISION 1 — root list ordering moved from per-user `lastAccessedAt` to
+// workspace-scoped `lastUpdated`).
 const PAGINATION_SEED_COUNT = 30;
 const paginationSeed = Array.from({ length: PAGINATION_SEED_COUNT }, (_, index) => ({
   id: `e2e-page-pag-${String(index).padStart(2, '0')}-0000-0000-000000000001`,
@@ -35,6 +37,33 @@ export const SEED = {
   session: {
     id: 'e2e-session-0000-0000-0000-000000000001',
     token: 'e2e-session-token-do-not-use-outside-of-tests',
+  },
+  // A second member of `SEED.workspace` (not `secondWorkspace`), seeded with `read_write`
+  // permission and full (`workspace`) scope. Used, along with `thirdUser`, to exercise
+  // THOTH-042's multi-user access model: a fellow workspace member can read/write content
+  // created by another member, without being its creator.
+  secondUser: {
+    id: 'e2e-user-00000000-0000-0000-0000-000000000002',
+    email: 'e2e-member@test.local',
+    name: 'E2E Second Member',
+    password: 'e2e-test-password-2',
+  },
+  secondUserSession: {
+    id: 'e2e-session-0000-0000-0000-000000000002',
+    token: 'e2e-second-session-token-do-not-use-outside-of-tests',
+  },
+  // A third member of `SEED.workspace`, seeded with `read`-only permission and full
+  // (`workspace`) scope. Used to verify read-only members can view but not mutate shared
+  // content, and that non-members of `secondWorkspace` are correctly denied access to it.
+  thirdUser: {
+    id: 'e2e-user-00000000-0000-0000-0000-000000000003',
+    email: 'e2e-readonly@test.local',
+    name: 'E2E Third Member',
+    password: 'e2e-test-password-3',
+  },
+  thirdUserSession: {
+    id: 'e2e-session-0000-0000-0000-000000000003',
+    token: 'e2e-third-session-token-do-not-use-outside-of-tests',
   },
   workspace: {
     id: 'e2e-workspace-000-0000-0000-000000000001',
@@ -193,6 +222,16 @@ export const SEED = {
     page: {
       id: 'e2e-page-file-host-0-0000-0000-000000000001',
       name: 'E2E File Host Page',
+    },
+  },
+  // A dedicated root page, owned by the primary seed user, used exclusively by
+  // `workspaces/shared-workspace-access.spec.ts` (THOTH-042, DECISION 4) to assert the
+  // read / read_write / read-only / non-member access matrix — kept separate from every other
+  // fixture so mutation attempts by other members never affect unrelated specs.
+  sharedAccess: {
+    page: {
+      id: 'e2e-page-shared-acc-0-0000-0000-000000000001',
+      name: 'E2E Shared Access Page',
     },
   },
 } as const;

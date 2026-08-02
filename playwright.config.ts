@@ -32,6 +32,28 @@ export default defineConfig({
       },
       dependencies: ['setup'],
     },
+    // Second/third seeded members of `SEED.workspace` (THOTH-042, DECISION 4) — `read_write`
+    // and `read`-only respectively. Scoped via `testMatch` to only the shared-workspace-access
+    // spec, which needs a live browser session for each grant level; every other spec
+    // continues to run solely against the primary `chromium` (owner) project.
+    {
+      name: 'chromium-second-member',
+      testMatch: /workspaces\/shared-workspace-access\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'tests/e2e/.auth/second-user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'chromium-readonly-member',
+      testMatch: /workspaces\/shared-workspace-access\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'tests/e2e/.auth/third-user.json',
+      },
+      dependencies: ['setup'],
+    },
   ],
   webServer: {
     command: 'pnpm dev',

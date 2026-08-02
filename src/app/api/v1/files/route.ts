@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     if (typeof pageId === 'string' && pageId.length > 0) {
       const page = await pageRetriever.retrievePage(pageId, session.user.id);
-      await assertGrantAllowsContainerForSession(session, page);
+      await assertGrantAllowsContainerForSession(session, page, { mutating: true });
       workspaceId = page.workspaceId;
       pageIdString = pageId;
     } else {

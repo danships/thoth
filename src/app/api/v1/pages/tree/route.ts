@@ -1,12 +1,12 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '@/lib/database';
-import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
+import { getContainerRepository, getDataViewRepository } from '@/lib/database';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
-import type { ContainerAccess } from '@/types/database';
+import type { Container } from '@/types/database';
 import type { GetPagesTreeQueryVariables, GetPagesTreeResponse, PagesTreeCursor, Page, DataView } from '@/types/api';
 import {
   getPagesTreeQueryVariablesSchema,
@@ -15,15 +15,14 @@ import {
   CHILD_PREVIEW_LIMIT,
 } from '@/types/api';
 
-// Over-fetch buffer used on top of `limit + 1` when querying `ContainerAccess` rows, to
-// absorb rows that share the exact same `lastAccessedAt` as the cursor position (dropped via
-// the containerId tie-break below) without under-fetching real results.
+// Over-fetch buffer used on top of `limit + 1` when querying `Container` rows, to absorb rows
+// that share the exact same `lastUpdated` as the cursor position (dropped via the `id`
+// tie-break below) without under-fetching real results.
 const SAFETY_MARGIN = 5;
 
-// Safety valve against runaway loops: `ContainerAccess` rows are per-page (root and nested),
-// so root pages can be interleaved with many nested-page rows in the global lastAccessedAt
-// order. This bounds how many over-fetch batches we're willing to walk through to collect a
-// page of root results.
+// Safety valve against runaway loops: root and nested pages are interleaved in the workspace's
+// global `lastUpdated` order, so this bounds how many over-fetch batches we're willing to walk
+// through to collect a page of root results.
 const MAX_BATCHES = 50;
 
 function encodeCursor(cursor: PagesTreeCursor): string {
@@ -47,67 +46,69 @@ function decodeCursor(raw: string): PagesTreeCursor {
 }
 
 /**
- * Collects the next page of root-level `ContainerAccess` rows, sorted by `lastAccessedAt`
- * desc (with `containerId` desc as a tie-break for deterministic ordering/pagination).
+ * Collects the next page of root-level `Container` (page) rows, sorted by `lastUpdated` desc
+ * (with `id` desc as a tie-break for deterministic ordering/pagination). Workspace-scoped
+ * `Container.lastUpdated` drives the regular root list (THOTH-042, DECISION 1) instead of the
+ * per-user `ContainerAccess.lastAccessedAt`, so a brand-new workspace member sees the full,
+ * populated root tree immediately.
  *
  * SuperSave does not support filtering `parentId` by `null` at the query level (the same
- * documented limitation `Container` queries work around), and root vs. nested `ContainerAccess`
- * rows can be arbitrarily interleaved in the global `lastAccessedAt` order. So rather than a
- * single over-fetch, this walks batches of `limit + 1 + SAFETY_MARGIN` rows (dropping rows at
- * or before the resuming cursor position in application code) until enough root rows have been
- * collected or the table is exhausted.
+ * documented limitation elsewhere in this file), and root vs. nested pages can be arbitrarily
+ * interleaved in the global `lastUpdated` order. So rather than a single over-fetch, this walks
+ * batches of `limit + 1 + SAFETY_MARGIN` rows (dropping rows at or before the resuming cursor
+ * position in application code) until enough root rows have been collected or the table is
+ * exhausted.
  */
-async function fetchRootContainerAccessPage(
-  userId: string,
+async function fetchRootContainerPage(
   workspaceId: string,
   limit: number,
   initialCursor: PagesTreeCursor | undefined
-): Promise<{ rows: ContainerAccess[]; hasMore: boolean }> {
-  const containerAccessRepository = await getContainerAccessRepository();
+): Promise<{ rows: Container[]; hasMore: boolean }> {
+  const containerRepository = await getContainerRepository();
 
-  const collected: ContainerAccess[] = [];
+  const collected: Container[] = [];
   let cursor = initialCursor;
   let batches = 0;
 
   while (collected.length < limit + 1 && batches < MAX_BATCHES) {
     batches += 1;
 
-    const batchQuery = addUserIdToQuery(containerAccessRepository.createQuery(), userId)
-      .eq('workspaceId', workspaceId)
-      .sort('lastAccessedAt', 'desc')
-      .sort('containerId', 'desc')
+    const batchQuery = addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId)
+      .eq('type', 'page')
+      .sort('lastUpdated', 'desc')
+      .sort('id', 'desc')
       .limit(limit + 1 + SAFETY_MARGIN);
 
     if (cursor) {
-      batchQuery.lte('lastAccessedAt', cursor.lastAccessedAt);
+      batchQuery.lte('lastUpdated', cursor.lastUpdated);
     }
 
-    const batch = await containerAccessRepository.getByQuery(batchQuery);
+    const batch = await containerRepository.getByQuery(batchQuery);
 
     if (batch.length === 0) {
       break;
     }
 
-    // Drop rows already returned in a previous batch: any row with a later lastAccessedAt
-    // than the cursor was already excluded by the `lte` filter; rows sharing the exact same
-    // lastAccessedAt as the cursor are disambiguated via the containerId tie-break.
+    // Drop rows already returned in a previous batch: any row with a later lastUpdated than
+    // the cursor was already excluded by the `lte` filter; rows sharing the exact same
+    // lastUpdated as the cursor are disambiguated via the id tie-break.
     const cursorSnapshot = cursor;
     const freshRows = cursorSnapshot
       ? batch.filter((row) => {
-          if (row.lastAccessedAt !== cursorSnapshot.lastAccessedAt) {
+          if (row.lastUpdated !== cursorSnapshot.lastUpdated) {
             return true;
           }
-          return row.containerId < cursorSnapshot.containerId;
+          return row.id < cursorSnapshot.containerId;
         })
       : batch;
 
-    collected.push(...freshRows.filter((row) => !row.parentId));
+    collected.push(...freshRows.filter((row) => !row.parentId && !row.deletedAt));
 
     const lastRowInBatch = batch.at(-1);
     if (!lastRowInBatch) {
       break;
     }
-    cursor = { lastAccessedAt: lastRowInBatch.lastAccessedAt, containerId: lastRowInBatch.containerId };
+    cursor = { lastUpdated: lastRowInBatch.lastUpdated, containerId: lastRowInBatch.id };
 
     // Fewer rows than requested means we've reached the end of the table.
     if (batch.length < limit + 1 + SAFETY_MARGIN) {
@@ -127,7 +128,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
     const containerRepository = await getContainerRepository();
     const limit = query?.limit ?? PAGES_TREE_DEFAULT_LIMIT;
 
-    let containers: Awaited<ReturnType<typeof containerRepository.getByQuery>>;
+    let containers: Container[];
     let pagination: GetPagesTreeResponse['pagination'];
 
     if (query?.parentId) {
@@ -142,9 +143,10 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       await assertWorkspaceAccess(session.user.id, parent.workspaceId);
 
       // this listing remains fully unpaginated, per the explicit out-of-scope decision for
-      // child listings in this ticket.
+      // child listings in this ticket. Content is scoped by workspace membership + grant, not
+      // creator (THOTH-042) — anchored on the parent's own (already-authorised) workspace.
       containers = await containerRepository.getByQuery(
-        addUserIdToQuery(containerRepository.createQuery(), session.user.id)
+        addWorkspaceIdToQuery(containerRepository.createQuery(), parent.workspaceId)
           .eq('type', 'page')
           .eq('parentId', query.parentId)
           .sort('lastUpdated', 'desc')
@@ -161,43 +163,28 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       }
       await assertWorkspaceAccess(session.user.id, workspaceId);
 
-      // Root list: cursor-paginated, driven off `ContainerAccess.lastAccessedAt` rather than
-      // `Container.lastUpdated`.
+      // Root list: cursor-paginated, driven off workspace-scoped `Container.lastUpdated`
+      // (THOTH-042, DECISION 1) rather than the per-user `ContainerAccess.lastAccessedAt` — so a
+      // brand-new workspace member sees the full, populated root tree immediately, not just
+      // pages they've personally opened. The `ContainerAccess` ordering machinery is retained,
+      // unused here, for THOTH-035's future "Recently accessed" menu.
       const cursor = query?.cursor ? decodeCursor(query.cursor) : undefined;
-      const { rows, hasMore } = await fetchRootContainerAccessPage(session.user.id, workspaceId, limit, cursor);
+      const { rows, hasMore } = await fetchRootContainerPage(workspaceId, limit, cursor);
 
-      const containerIds = rows.map((row) => row.containerId);
-      const containersById = new Map<string, Awaited<ReturnType<typeof containerRepository.getByQuery>>[number]>();
-      if (containerIds.length > 0) {
-        const fetchedContainers = await containerRepository.getByQuery(
-          addWorkspaceIdToQuery(addUserIdToQuery(containerRepository.createQuery(), session.user.id), workspaceId)
-            .eq('type', 'page')
-            .in('id', containerIds)
-        );
-        for (const container of fetchedContainers.filter((candidate) => !candidate.deletedAt)) {
-          containersById.set(container.id, container);
-        }
-      }
+      containers = rows;
 
-      // Preserve the ContainerAccess-driven (last-accessed) order; a page with no matching
-      // container is skipped (e.g. deleted since the access row was written).
-      containers = rows
-        .map((row) => containersById.get(row.containerId))
-        .filter((container): container is NonNullable<typeof container> => container !== undefined);
-
-      const lastRow = rows.at(-1);
+      const lastRow = containers.at(-1);
       pagination = {
         nextCursor:
-          hasMore && lastRow
-            ? encodeCursor({ lastAccessedAt: lastRow.lastAccessedAt, containerId: lastRow.containerId })
-            : null,
+          hasMore && lastRow ? encodeCursor({ lastUpdated: lastRow.lastUpdated, containerId: lastRow.id }) : null,
         hasMore,
       };
     }
 
-    // Filter out-of-scope containers for bearer-token (App-key) callers — a no-op for
-    // session-cookie callers. Applied after both branches above so a scoped key can never
-    // enumerate out-of-scope page titles via the tree endpoint (root list or child expansion).
+    // Filter out-of-scope containers — a no-op for `workspace`/`read_write` callers (every
+    // pre-THOTH-042 owner and App), and enforces real scope for scoped members/Apps alike.
+    // Applied after both branches above so a scoped caller can never enumerate out-of-scope
+    // page titles via the tree endpoint (root list or child expansion).
     containers = await filterContainersByGrantForSession(session, containers);
 
     // Separate containers that have views from those that don't
@@ -209,13 +196,13 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
     // Query for child pages only for containers without views. Fetched unbounded (no per-parent
     // DB limit, since SuperSave's `in` query can't express a per-group limit) and then capped to
     // CHILD_PREVIEW_LIMIT per parent in application code below, with overflow tracked so the UI
-    // can show a "more inside" indicator instead of paginating child listings.
+    // can show a "more inside" indicator instead of paginating child listings. Content is scoped
+    // by workspace membership + grant, not creator (THOTH-042); every container here was already
+    // resolved to a single, already-authorised `workspaceId` above (Pattern C).
     const databaseChildren =
       parentIds.length > 0
         ? await containerRepository.getByQuery(
-            addUserIdToQuery(containerRepository.createQuery(), session.user.id)
-              .in('parentId', parentIds)
-              .sort('lastUpdated', 'desc')
+            containerRepository.createQuery().in('parentId', parentIds).sort('lastUpdated', 'desc')
           )
         : [];
     const visibleChildren = databaseChildren.filter((child) => !child.deletedAt && child.type === 'page');
@@ -236,9 +223,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
 
     const viewsMap = new Map<string, Awaited<ReturnType<typeof dataViewRepository.getByQuery>>[number]>();
     if (allViewIds.length > 0) {
-      const views = await dataViewRepository.getByQuery(
-        addUserIdToQuery(dataViewRepository.createQuery(), session.user.id).in('id', allViewIds)
-      );
+      const views = await dataViewRepository.getByQuery(dataViewRepository.createQuery().in('id', allViewIds));
       for (const view of views.filter((candidate) => !candidate.deletedAt)) {
         viewsMap.set(view.id, view);
       }

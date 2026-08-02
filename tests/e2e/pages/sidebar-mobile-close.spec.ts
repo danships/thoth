@@ -10,6 +10,15 @@ test.describe('sidebar closes on mobile navigation', () => {
   test.describe('mobile', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
+    test.beforeEach(async ({ page }) => {
+      // Root listing is workspace-scoped ordering by `lastUpdated` (THOTH-042 DECISION 1), so
+      // other specs creating/updating root-level pages in the shared workspace can push these
+      // seeded pages outside the sidebar's initial (unpaginated) window. Bump them via a
+      // documented no-op append so they are deterministically visible without scrolling.
+      await page.request.post(`/api/v1/pages/${SEED.pages.root.id}/append`, { data: { content: '' } });
+      await page.request.post(`/api/v1/pages/${SEED.pages.dataSourceHost.id}/append`, { data: { content: '' } });
+    });
+
     test('closes the navbar after clicking a page link', async ({ page }) => {
       await page.goto(`/${SEED.workspace.slug}/pages`);
 

@@ -1,7 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getWorkspaceRepository } from '@/lib/database';
 import { registerContainerAccessForNewPage } from '@/lib/database/container-access-service';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -62,10 +62,7 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
       // so root pages are found by fetching all pages and filtering client-side (see the same
       // pattern in `src/app/api/v1/pages/tree/route.ts`).
       const pages = await containerRepository.getByQuery(
-        addUserIdToQuery(containerRepository.createQuery().eq('type', 'page'), session.user.id).eq(
-          'workspaceId',
-          workspace.id
-        )
+        addWorkspaceIdToQuery(containerRepository.createQuery().eq('type', 'page'), workspace.id)
       );
       const existingRootPage = pages.find((page) => page.type === 'page' && !page.parentId && !page.deletedAt);
 

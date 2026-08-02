@@ -1,6 +1,5 @@
 import { DataView } from '@/types/database';
 import { getDataViewRepository } from '..';
-import { addUserIdToQuery } from '../helpers';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 
@@ -8,9 +7,8 @@ class DataViewRetriever {
   private async retrieveDataViewInternal(id: string, userId: string): Promise<DataView> {
     const dataViewRepository = await getDataViewRepository();
 
-    const existingDataView = await dataViewRepository.getOneByQuery(
-      addUserIdToQuery(dataViewRepository.createQuery().eq('id', id), userId)
-    );
+    // Content is scoped by workspace membership + grant, not creator identity (THOTH-042).
+    const existingDataView = await dataViewRepository.getOneByQuery(dataViewRepository.createQuery().eq('id', id));
 
     if (!existingDataView) {
       throw new NotFoundError('Data view not found', true);

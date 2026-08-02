@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { withAuthPage } from '@/lib/auth/with-auth-page';
 import { getContainerRepository } from '@/lib/database';
-import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveWorkspaceForSlug } from '@/lib/database/resolve-workspace';
 import { PagesEmptyState } from '@/components/organisms/pages-empty-state';
 
@@ -22,11 +22,13 @@ async function PagesLandingPage({ params, session }: Properties & { session: { u
   // Note: SuperSave does not return results when filtering with `.eq('parentId', null)`,
   // so root pages are found by fetching all pages and filtering client-side (see the same
   // pattern in `src/app/api/v1/pages/tree/route.ts`).
+  // Content is scoped by workspace membership, not creator (THOTH-042) — `resolveWorkspaceForSlug`
+  // above already asserts the caller is a member of `workspace.id`.
   const pages = await containerRepository.getByQuery(
-    addWorkspaceIdToQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('type', 'page'), session.user.id),
-      workspace.id
-    ).sort('lastUpdated', 'desc')
+    addWorkspaceIdToQuery(containerRepository.createQuery().eq('type', 'page'), workspace.id).sort(
+      'lastUpdated',
+      'desc'
+    )
   );
   const rootPages = pages.filter((page) => page.type === 'page' && !page.parentId && !page.deletedAt);
 

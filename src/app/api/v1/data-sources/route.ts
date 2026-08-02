@@ -1,30 +1,52 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getWorkspaceRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
-import type { CreateDataSourceBody, CreateDataSourceResponse, GetDataSourcesResponse } from '@/types/api';
-import { createDataSourceBodySchema } from '@/types/api';
+import type {
+  CreateDataSourceBody,
+  CreateDataSourceResponse,
+  GetDataSourcesQuery,
+  GetDataSourcesResponse,
+} from '@/types/api';
+import { createDataSourceBodySchema, getDataSourcesQuerySchema } from '@/types/api';
 import { DataSourceContainer, DataSourceContainerCreate } from '@/types/database';
 import { randomUUID } from 'node:crypto';
 
-export const GET = apiRoute<GetDataSourcesResponse, {}, {}>({}, async (_, session) => {
-  const containerRepository = await getContainerRepository();
-  const dataSources = await containerRepository.getByQuery(
-    addUserIdToQuery(containerRepository.createQuery(), session.user.id).eq('type', 'data-source').sort('name')
-  );
+export const GET = apiRoute<GetDataSourcesResponse, GetDataSourcesQuery, {}>(
+  { expectedQuerySchema: getDataSourcesQuerySchema },
+  async ({ query }, session) => {
+    // Pattern L (list): no target id, so the workspace is resolved up front — preferring an
+    // explicit `workspaceId` (e.g. the workspace of the page the caller is currently viewing)
+    // and only falling back to the caller's default workspace for backwards compatibility —
+    // and membership is asserted before scoping the query — content is scoped by workspace
+    // membership + grant, not creator (THOTH-042).
+    const workspaceId = query.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
+    await assertWorkspaceAccess(session.user.id, workspaceId);
 
-  return dataSources
-    .filter((container): container is DataSourceContainer => container.type === 'data-source' && !container.deletedAt)
-    .map((dataSource) => ({
-      id: dataSource.id,
-      name: dataSource.name,
-      createdAt: dataSource.createdAt,
-      lastUpdated: dataSource.lastUpdated,
-      columns: dataSource.columns ?? [],
-    }));
-});
+    const containerRepository = await getContainerRepository();
+    const dataSources = await containerRepository.getByQuery(
+      addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId).eq('type', 'data-source').sort('name')
+    );
+
+    const scopedDataSources = await filterContainersByGrantForSession(
+      session,
+      dataSources.filter((container): container is DataSourceContainer => container.type === 'data-source')
+    );
+
+    return scopedDataSources
+      .filter((dataSource) => !dataSource.deletedAt)
+      .map((dataSource) => ({
+        id: dataSource.id,
+        name: dataSource.name,
+        createdAt: dataSource.createdAt,
+        lastUpdated: dataSource.lastUpdated,
+        columns: dataSource.columns ?? [],
+      }));
+  }
+);
 
 export const POST = apiRoute<CreateDataSourceResponse, {}, {}, CreateDataSourceBody>(
   {

@@ -9,6 +9,7 @@ import type {
   App,
   ApiKey,
   AppScopedContainer,
+  MemberScopedContainer,
   Webhook,
   WebhookDelivery,
   UploadedFile,
@@ -39,6 +40,7 @@ async function initializeDatabase() {
   await database.addEntity(entities.App);
   await database.addEntity(entities.ApiKey);
   await database.addEntity(entities.AppScopedContainer);
+  await database.addEntity(entities.MemberScopedContainer);
   await database.addEntity(entities.Webhook);
   await database.addEntity(entities.WebhookDelivery);
   await database.addEntity(entities.UploadedFile);
@@ -111,6 +113,11 @@ export async function getApiKeyRepository() {
 export async function getAppScopedContainerRepository() {
   const database = await getDatabase();
   return database.getRepository<AppScopedContainer>(entities.APP_SCOPED_CONTAINER_NAME);
+}
+
+export async function getMemberScopedContainerRepository() {
+  const database = await getDatabase();
+  return database.getRepository<MemberScopedContainer>(entities.MEMBER_SCOPED_CONTAINER_NAME);
 }
 
 export async function getWebhookRepository() {

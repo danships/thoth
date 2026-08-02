@@ -49,10 +49,13 @@ export const getPagesTreeQueryVariablesSchema = z.object({
 export type GetPagesTreeQueryVariables = z.infer<typeof getPagesTreeQueryVariablesSchema>;
 
 // Opaque cursor shape — encoded as a base64 JSON string. It is purely a sort-position
-// marker (lastAccessedAt + containerId tie-break), not a lookup key: it remains valid even
-// if the container it refers to has since been deleted.
+// marker (`lastUpdated` + `containerId` tie-break), not a lookup key: it remains valid even
+// if the container it refers to has since been deleted. Sourced from `Container.lastUpdated`
+// (workspace-scoped), not the per-user `ContainerAccess.lastAccessedAt` (THOTH-042, DECISION 1)
+// — the per-user ordering is retained on `ContainerAccess` for THOTH-035's future "Recently
+// accessed" menu, just no longer used to drive this regular root list.
 export const pagesTreeCursorSchema = z.object({
-  lastAccessedAt: z.string(),
+  lastUpdated: z.string(),
   containerId: z.string().min(1),
 });
 export type PagesTreeCursor = z.infer<typeof pagesTreeCursorSchema>;

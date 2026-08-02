@@ -1,7 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { cascadeSoftDeletePage } from '@/lib/database/soft-delete-service';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { pageColumnRetriever } from '@/lib/database/retrievers/page-column-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
@@ -37,10 +37,10 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
     const dataViewRepository = await getDataViewRepository();
     let linkedViews: GetPageDetailsResponse['views'] = [];
     if (page.views && page.views.length > 0) {
+      // Pattern C: anchored on the already-authorised page's own workspace, not creator
+      // (THOTH-042).
       const fetchedViews = await dataViewRepository.getByQuery(
-        addUserIdToQuery(dataViewRepository.createQuery(), session.user.id)
-          .in('id', page.views)
-          .eq('workspaceId', page.workspaceId)
+        addWorkspaceIdToQuery(dataViewRepository.createQuery(), page.workspaceId).in('id', page.views)
       );
       linkedViews = fetchedViews
         .filter((view) => !view.deletedAt)
@@ -54,18 +54,22 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
     }
 
     // Look up the per-user starred status for this page, same lookup pattern as
-    // `POST /pages/:id/access`. `false` if no ContainerAccess row exists yet.
+    // `POST /pages/:id/access`. `false` if no ContainerAccess row exists yet. Per-user state —
+    // stays scoped by userId (THOTH-042, Category B).
     const containerAccessRepository = await getContainerAccessRepository();
     const containerAccess = await containerAccessRepository.getOneByQuery(
       addUserIdToQuery(containerAccessRepository.createQuery().eq('containerId', page.id), session.user.id)
     );
 
     // Bounded existence check only — used purely to decide whether the "Sub Pages" tab is
-    // shown, so we never fetch (or return) the full child list here. Scoped by user id like
-    // every other read on this container.
+    // shown, so we never fetch (or return) the full child list here. Content is scoped by
+    // workspace membership + grant, not creator (THOTH-042).
     const containerRepository = await getContainerRepository();
     const childPage = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('parentId', page.id).eq('type', 'page'), session.user.id)
+      addWorkspaceIdToQuery(
+        containerRepository.createQuery().eq('parentId', page.id).eq('type', 'page'),
+        page.workspaceId
+      )
     );
 
     const returnValue: GetPageDetailsResponse = {
@@ -112,9 +116,10 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
 
-    // Verify the page exists and belongs to the user
+    // Verify the page exists and is accessible; content is scoped by workspace membership +
+    // grant, not creator (THOTH-042).
     const existingPage = await pageRetriever.retrievePage(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, existingPage);
+    await assertGrantAllowsContainerForSession(session, existingPage, { mutating: true });
 
     const filteredBody: Partial<typeof existingPage> = {};
     if (body.name !== undefined) {
@@ -153,7 +158,7 @@ export const DELETE = apiRoute<void, undefined, DeletePageParameters, {}>(
   },
   async ({ params }, session) => {
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, page);
+    await assertGrantAllowsContainerForSession(session, page, { mutating: true });
 
     const result = await cascadeSoftDeletePage(page, session.user.id);
 

@@ -8,6 +8,7 @@ import { dataViewSchema } from '../schemas/entities/data-view';
 import { appSchema } from '../schemas/entities/app';
 import { apiKeySchema, apiKeyPublicSchema } from '../schemas/entities/api-key';
 import { appScopedContainerSchema } from '../schemas/entities/app-scoped-container';
+import { memberScopedContainerSchema } from '../schemas/entities/member-scoped-container';
 import { webhookSchema } from '../schemas/entities/webhook';
 import { webhookDeliverySchema } from '../schemas/entities/webhook-delivery';
 import { uploadedFileSchema } from '../schemas/entities/uploaded-file';
@@ -106,6 +107,15 @@ export const appScopedContainerCreateSchema = appScopedContainerSchema.omit({ id
 export type AppScopedContainer = z.infer<typeof appScopedContainerSchema>;
 export type AppScopedContainerCreate = z.infer<typeof appScopedContainerCreateSchema>;
 /** End AppScopedContainer Entity Schema */
+
+/** MemberScopedContainer Entity Schema */
+export { memberScopedContainerSchema } from '../schemas/entities/member-scoped-container';
+
+export const memberScopedContainerCreateSchema = memberScopedContainerSchema.omit({ id: true });
+
+export type MemberScopedContainer = z.infer<typeof memberScopedContainerSchema>;
+export type MemberScopedContainerCreate = z.infer<typeof memberScopedContainerCreateSchema>;
+/** End MemberScopedContainer Entity Schema */
 
 /** Webhook Entity Schema */
 export { webhookSchema, webhookPublicSchema, webhookUrlSchema } from '../schemas/entities/webhook';

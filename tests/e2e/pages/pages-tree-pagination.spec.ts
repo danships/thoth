@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3';
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
@@ -11,6 +12,67 @@ import { SEED } from '../constants';
 // used here to keep the pane small relative to the seeded content and exercise a genuine
 // scroll-to-load-more interaction.
 test.use({ viewport: { width: 1280, height: 400 } });
+
+function withDatabase<T>(withOpenDatabase: (database: Database.Database) => T): T {
+  const databasePath = process.env['DB']!.replace('sqlite://', '');
+  const database = new Database(databasePath);
+  try {
+    return withOpenDatabase(database);
+  } finally {
+    database.close();
+  }
+}
+
+function setLastUpdated(containerId: string, lastUpdated: string) {
+  withDatabase((database) => {
+    database
+      .prepare(`UPDATE container SET contents = json_set(contents, '$.lastUpdated', ?) WHERE id = ?`)
+      .run(lastUpdated, containerId);
+  });
+}
+
+// Ages out every OTHER root-level page's `lastUpdated` in the shared workspace (including any
+// created by earlier specs, e.g. `create-page.spec.ts`), so this file's fixed root-list ordering
+// invariants hold regardless of what earlier specs have done there.
+function ageOutOtherRootPages(keepFreshIds: readonly string[]) {
+  withDatabase((database) => {
+    const placeholders = keepFreshIds.map(() => '?').join(', ');
+    database
+      .prepare(
+        `UPDATE container SET contents = json_set(contents, '$.lastUpdated', ?)
+         WHERE json_extract(contents, '$.workspaceId') = ?
+           AND json_extract(contents, '$.type') = 'page'
+           AND json_extract(contents, '$.parentId') IS NULL
+           AND id NOT IN (${placeholders})`
+      )
+      .run(new Date(Date.now() - 1_000_000).toISOString(), SEED.workspace.id, ...keepFreshIds);
+  });
+}
+
+// THOTH-042 (DECISION 1): the root list now sorts by workspace-scoped `Container.lastUpdated`
+// rather than per-user `ContainerAccess.lastAccessedAt`, so any root page created/updated by an
+// earlier spec in the shared workspace can push these seeded pages out of the expected ordering.
+// Re-establish a known-good baseline in `beforeAll` (mirroring the `ContainerAccess` freshening
+// pattern in `recent-tree.spec.ts`) so this spec is deterministic regardless of run order.
+test.describe.configure({ mode: 'serial' });
+
+test.beforeAll(() => {
+  const baseline = Date.now();
+  const keepFreshIds = [
+    SEED.pages.root.id,
+    SEED.pages.dataSourceHost.id,
+    SEED.pages.childOverflowHost.id,
+    ...SEED.pages.paginationSeed.map((paginationPage) => paginationPage.id),
+  ];
+  ageOutOtherRootPages(keepFreshIds);
+
+  setLastUpdated(SEED.pages.root.id, new Date(baseline + 5000).toISOString());
+  setLastUpdated(SEED.pages.dataSourceHost.id, new Date(baseline + 4000).toISOString());
+  setLastUpdated(SEED.pages.childOverflowHost.id, new Date(baseline + 3000).toISOString());
+  for (const [index, paginationPage] of SEED.pages.paginationSeed.entries()) {
+    setLastUpdated(paginationPage.id, new Date(baseline - index * 1000).toISOString());
+  }
+});
 
 async function scrollPaneToBottom(page: import('@playwright/test').Page) {
   await page.getByTestId('pages-tree-scroll-pane').evaluate((element) => {

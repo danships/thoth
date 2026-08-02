@@ -5,6 +5,7 @@ import { BETTER_AUTH_SQLITE_SQL, BETTER_AUTH_MYSQL_SQL } from './better-auth';
 import { backfillSoftDeleteFields } from './soft-delete-backfill';
 import { backfillWorkspaces } from './workspace-backfill';
 import { backfillWorkspaceStorageQuota } from './workspace-storage-quota-backfill';
+import { backfillMemberAccess } from './member-access-backfill';
 
 export const migrations: Migration[] = [
   {
@@ -53,6 +54,15 @@ export const migrations: Migration[] = [
     name: 'workspace-storage-quota-backfill',
     run: async (superSave: SuperSave) => {
       await backfillWorkspaceStorageQuota(superSave);
+    },
+  },
+  {
+    // Engine-agnostic backfill of `permission`/`scopeType` on pre-existing `workspace-member`
+    // rows for THOTH-042 ("Prepare codebase for multi-user access to workspace"). Must run
+    // after `workspace-multi-tenancy-backfill`, which creates the owner rows it backfills.
+    name: 'member-access-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillMemberAccess(superSave);
     },
   },
 ];
