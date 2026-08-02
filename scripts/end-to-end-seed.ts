@@ -651,7 +651,115 @@ async function seedAppData() {
     { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
   );
 
-  // ── Child-overflow test fixture ──────────────────────────────────────────────
+  // ── THOTH-037 filter/sort test fixture ──────────────────────────────────────
+  // A dedicated data source + view + multi-row set used exclusively by
+  // `tests/e2e/data-views/filter-sort.spec.ts`, so filter/sort assertions have several
+  // deterministic rows (including one with a missing `Score` value, for `isEmpty` coverage)
+  // without touching `SEED.dataSource`'s single-row fixture used by other specs.
+  const filterSortSeed = SEED.filterSort;
+
+  await upsertPage(
+    {
+      id: filterSortSeed.host.id,
+      name: filterSortSeed.host.name,
+      emoji: '🔎',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: null,
+      createdAt: now,
+      lastUpdated: now,
+      views: [filterSortSeed.dataView.id],
+    },
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
+
+  const existingFilterSortDs = await containerRepository.getOneByQuery(
+    containerRepository.createQuery().eq('id', filterSortSeed.dataSource.id)
+  );
+  await (existingFilterSortDs
+    ? containerRepository.update({
+        ...(existingFilterSortDs as DataSourceContainer),
+        name: filterSortSeed.dataSource.name,
+        columns: [...filterSortSeed.dataSource.columns] as Column[],
+        deletedAt: existingFilterSortDs.deletedAt ?? null,
+        deletedRootId: existingFilterSortDs.deletedRootId ?? null,
+        lastUpdated: now,
+      })
+    : containerRepository.create({
+        id: filterSortSeed.dataSource.id,
+        name: filterSortSeed.dataSource.name,
+        type: 'data-source',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: null,
+        columns: [...filterSortSeed.dataSource.columns] as Column[],
+        createdAt: now,
+        lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
+      } as unknown as DataSourceContainerCreate));
+
+  const existingFilterSortView = await dataViewRepository.getOneByQuery(
+    dataViewRepository.createQuery().eq('id', filterSortSeed.dataView.id)
+  );
+  await (existingFilterSortView
+    ? dataViewRepository.update({
+        ...existingFilterSortView,
+        name: filterSortSeed.dataView.name,
+        columns: filterSortSeed.dataSource.columns.map((c) => c.id),
+        // Deliberately seeded with no filters/sorts by default — every filter-sort spec sets
+        // its own config via `PATCH /views/:id` (or an inline `GET /pages` override) rather
+        // than relying on pre-seeded state, so each test is self-contained/order-independent.
+        filters: [],
+        sorts: [],
+        deletedAt: existingFilterSortView.deletedAt ?? null,
+        deletedRootId: existingFilterSortView.deletedRootId ?? null,
+        lastUpdated: now,
+      })
+    : dataViewRepository.create({
+        id: filterSortSeed.dataView.id,
+        name: filterSortSeed.dataView.name,
+        dataSourceId: filterSortSeed.dataSource.id,
+        userId: uid,
+        workspaceId: wsId,
+        columns: filterSortSeed.dataSource.columns.map((c) => c.id),
+        filters: [],
+        sorts: [],
+        createdAt: now,
+        lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
+      } as unknown as DataViewCreate));
+
+  for (const row of filterSortSeed.rows) {
+    await upsertPage(
+      {
+        id: row.id,
+        name: row.name,
+        emoji: null,
+        type: 'page',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: filterSortSeed.dataSource.id,
+        createdAt: now,
+        lastUpdated: now,
+        values: {
+          // Deliberately distinct from the page's own `name` (`${row.name} Item` rather than
+          // `row.name` verbatim) so e2e assertions on the page-title cell (`getByText(name,
+          // { exact: true })`) never collide with this dynamic column's own rendered value —
+          // both would otherwise show identical text and make `getByText` ambiguous.
+          [filterSortSeed.dataSource.columns[0].id]: { type: 'string', value: `${row.name} Item` },
+          ...(row.score === null
+            ? {}
+            : { [filterSortSeed.dataSource.columns[1].id]: { type: 'number', value: row.score } }),
+        },
+      },
+      { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+    );
+  }
+
+
   // A root page with more children (12) than CHILD_PREVIEW_LIMIT (10), used to verify the
   // sidebar shows a "more inside" indicator instead of listing/paginating all of them inline.
   await upsertPage(

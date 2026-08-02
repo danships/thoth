@@ -548,7 +548,7 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 50
+              "maximum": 200
             }
           },
           {
@@ -558,6 +558,40 @@
             "schema": {
               "default": false,
               "type": "boolean"
+            }
+          },
+          {
+            "name": "viewId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sorts",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ]
@@ -4900,6 +4934,92 @@
                         "dataSourceId": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "filters": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "operator": {
+                                "type": "string",
+                                "enum": [
+                                  "equals",
+                                  "notEquals",
+                                  "contains",
+                                  "notContains",
+                                  "gt",
+                                  "gte",
+                                  "lt",
+                                  "lte",
+                                  "isEmpty",
+                                  "isNotEmpty",
+                                  "hasAnyOf",
+                                  "hasAllOf"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "operator"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "sorts": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "direction": {
+                                "type": "string",
+                                "enum": [
+                                  "asc",
+                                  "desc"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "direction"
+                            ],
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "required": [
@@ -4907,7 +5027,9 @@
                         "name",
                         "lastUpdated",
                         "createdAt",
-                        "dataSourceId"
+                        "dataSourceId",
+                        "filters",
+                        "sorts"
                       ],
                       "additionalProperties": false
                     }
@@ -5047,6 +5169,92 @@
                         "dataSourceId": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "filters": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "operator": {
+                                "type": "string",
+                                "enum": [
+                                  "equals",
+                                  "notEquals",
+                                  "contains",
+                                  "notContains",
+                                  "gt",
+                                  "gte",
+                                  "lt",
+                                  "lte",
+                                  "isEmpty",
+                                  "isNotEmpty",
+                                  "hasAnyOf",
+                                  "hasAllOf"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "operator"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "sorts": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "direction": {
+                                "type": "string",
+                                "enum": [
+                                  "asc",
+                                  "desc"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "direction"
+                            ],
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "required": [
@@ -5054,7 +5262,9 @@
                         "name",
                         "lastUpdated",
                         "createdAt",
-                        "dataSourceId"
+                        "dataSourceId",
+                        "filters",
+                        "sorts"
                       ],
                       "additionalProperties": false
                     }
@@ -5161,6 +5371,92 @@
                         "dataSourceId": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "filters": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "operator": {
+                                "type": "string",
+                                "enum": [
+                                  "equals",
+                                  "notEquals",
+                                  "contains",
+                                  "notContains",
+                                  "gt",
+                                  "gte",
+                                  "lt",
+                                  "lte",
+                                  "isEmpty",
+                                  "isNotEmpty",
+                                  "hasAnyOf",
+                                  "hasAllOf"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "operator"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "sorts": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "direction": {
+                                "type": "string",
+                                "enum": [
+                                  "asc",
+                                  "desc"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "direction"
+                            ],
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "required": [
@@ -5168,7 +5464,9 @@
                         "name",
                         "lastUpdated",
                         "createdAt",
-                        "dataSourceId"
+                        "dataSourceId",
+                        "filters",
+                        "sorts"
                       ],
                       "additionalProperties": false
                     }
@@ -5253,6 +5551,90 @@
                   "dataSourceId": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "filters": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "columnId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operator": {
+                          "type": "string",
+                          "enum": [
+                            "equals",
+                            "notEquals",
+                            "contains",
+                            "notContains",
+                            "gt",
+                            "gte",
+                            "lt",
+                            "lte",
+                            "isEmpty",
+                            "isNotEmpty",
+                            "hasAnyOf",
+                            "hasAllOf"
+                          ]
+                        },
+                        "value": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "columnId",
+                        "operator"
+                      ]
+                    }
+                  },
+                  "sorts": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "columnId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "direction": {
+                          "type": "string",
+                          "enum": [
+                            "asc",
+                            "desc"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "columnId",
+                        "direction"
+                      ]
+                    }
                   }
                 }
               }
@@ -5388,6 +5770,92 @@
                         "dataSourceId": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "filters": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "operator": {
+                                "type": "string",
+                                "enum": [
+                                  "equals",
+                                  "notEquals",
+                                  "contains",
+                                  "notContains",
+                                  "gt",
+                                  "gte",
+                                  "lt",
+                                  "lte",
+                                  "isEmpty",
+                                  "isNotEmpty",
+                                  "hasAnyOf",
+                                  "hasAllOf"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "operator"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "sorts": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "direction": {
+                                "type": "string",
+                                "enum": [
+                                  "asc",
+                                  "desc"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "direction"
+                            ],
+                            "additionalProperties": false
+                          }
                         }
                       },
                       "required": [
@@ -5395,7 +5863,9 @@
                         "name",
                         "lastUpdated",
                         "createdAt",
-                        "dataSourceId"
+                        "dataSourceId",
+                        "filters",
+                        "sorts"
                       ],
                       "additionalProperties": false
                     }
@@ -12392,6 +12862,92 @@
           "dataSourceId": {
             "type": "string",
             "minLength": 1
+          },
+          "filters": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "columnId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "equals",
+                    "notEquals",
+                    "contains",
+                    "notContains",
+                    "gt",
+                    "gte",
+                    "lt",
+                    "lte",
+                    "isEmpty",
+                    "isNotEmpty",
+                    "hasAnyOf",
+                    "hasAllOf"
+                  ]
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "columnId",
+                "operator"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "sorts": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "columnId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                }
+              },
+              "required": [
+                "columnId",
+                "direction"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -12399,7 +12955,9 @@
           "name",
           "lastUpdated",
           "createdAt",
-          "dataSourceId"
+          "dataSourceId",
+          "filters",
+          "sorts"
         ],
         "additionalProperties": false
       },

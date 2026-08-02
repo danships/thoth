@@ -8,9 +8,10 @@ import type { DataView } from '@/types/api';
 
 type DataViewRenderProperties = {
   view: DataView;
+  onFilterSortChange?: () => void;
 };
 
-export function DataViewRender({ view }: DataViewRenderProperties) {
+export function DataViewRender({ view, onFilterSortChange }: DataViewRenderProperties) {
   const {
     pages,
     isLoading: pagesLoading,
@@ -18,7 +19,10 @@ export function DataViewRender({ view }: DataViewRenderProperties) {
     createPage,
     inProgress: createPageInProgress,
     mutate,
-  } = useDataViewPages(view.dataSourceId);
+    hasMore,
+    loadMore,
+    loadingMore,
+  } = useDataViewPages(view);
   const {
     data: dataSource,
     isLoading: isDataSourceLoading,
@@ -34,6 +38,7 @@ export function DataViewRender({ view }: DataViewRenderProperties) {
 
   return (
     <DataViewTable
+      view={view}
       dataSourceId={view.dataSourceId}
       columns={dataSource?.columns ?? []}
       pages={pages}
@@ -45,6 +50,10 @@ export function DataViewRender({ view }: DataViewRenderProperties) {
       createPageInProgress={createPageInProgress}
       mutatePages={mutate}
       mutateDataSource={mutateDataSource}
+      hasMore={hasMore}
+      onLoadMore={loadMore}
+      loadingMore={loadingMore}
+      onFilterSortChange={onFilterSortChange}
     />
   );
 }

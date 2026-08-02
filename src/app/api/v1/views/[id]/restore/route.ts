@@ -44,6 +44,8 @@ export const POST = apiRoute<RestoreViewResponse, undefined, RestoreViewParamete
       dataSourceId: restored.dataSourceId,
       createdAt: restored.createdAt,
       lastUpdated: restored.lastUpdated,
+      filters: restored.filters,
+      sorts: restored.sorts,
     };
   }
 );

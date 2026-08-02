@@ -13,16 +13,172 @@ import {
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import { dataViewRetriever } from '@/lib/database/retrievers/data-view-retriever';
+import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
+import { assertValidFilterSortRules, executePageQuery, type PageQueryCursor } from '@/lib/database/page-query-service';
 import type { PageContainer } from '@/types/database';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
-import { createPageBodySchema, getPagesQuerySchema, FAVORITES_MAX_LIMIT, RECENT_MAX_LIMIT } from '@/types/api';
+import {
+  createPageBodySchema,
+  getPagesQuerySchema,
+  FAVORITES_MAX_LIMIT,
+  RECENT_MAX_LIMIT,
+  PAGES_QUERY_DEFAULT_LIMIT,
+  pageQueryCursorSchema,
+} from '@/types/api';
+import { filterRuleSchema, sortRuleSchema } from '@/types/schemas/entities/data-view-query';
+
+function decodePageQueryCursor(raw: string): PageQueryCursor {
+  try {
+    const decoded = Buffer.from(raw, 'base64url').toString('utf8');
+    const parsed: unknown = JSON.parse(decoded);
+    const result = pageQueryCursorSchema.safeParse(parsed);
+    if (!result.success) {
+      throw new BadRequestError('Invalid cursor');
+    }
+    return result.data;
+  } catch (error) {
+    if (error instanceof BadRequestError) {
+      throw error;
+    }
+    throw new BadRequestError('Invalid cursor');
+  }
+}
+
+function encodePageQueryCursor(cursor: PageQueryCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodeInlineFilters(raw: string | undefined) {
+  if (!raw) {
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new BadRequestError('Invalid filters JSON');
+  }
+  const result = filterRuleSchema.array().safeParse(parsed);
+  if (!result.success) {
+    throw new BadRequestError('Invalid filters shape');
+  }
+  return result.data;
+}
+
+function decodeInlineSorts(raw: string | undefined) {
+  if (!raw) {
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new BadRequestError('Invalid sorts JSON');
+  }
+  const result = sortRuleSchema.array().safeParse(parsed);
+  if (!result.success) {
+    throw new BadRequestError('Invalid sorts shape');
+  }
+  return result.data;
+}
 
 export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
   {
     expectedQuerySchema: getPagesQuerySchema,
   },
-  async ({ query }, session) => {
+  async ({ query, setResponseHeader }, session) => {
     const containerRepository = await getContainerRepository();
+
+    if (query.viewId) {
+      // Content is scoped by workspace membership + grant, not creator (THOTH-042) —
+      // `dataViewRetriever`/`dataSourceRetriever` both assert workspace membership internally.
+      const dataView = await dataViewRetriever.retrieveDataView(query.viewId, session.user.id);
+      await assertGrantAllowsContainerForSession(session, dataView);
+      const dataSource = await dataSourceRetriever.retrieveDataSource(dataView.dataSourceId, session.user.id);
+
+      // Inline `filters`/`sorts` query params override the view's persisted config for this
+      // request only (THOTH-037) — validated the same way a `PATCH /views/:id` body is.
+      const inlineFilters = decodeInlineFilters(query.filters);
+      const inlineSorts = decodeInlineSorts(query.sorts);
+      const effectiveFilters = inlineFilters ?? dataView.filters ?? [];
+      const effectiveSorts = inlineSorts ?? dataView.sorts ?? [];
+      if (inlineFilters || inlineSorts) {
+        assertValidFilterSortRules(dataSource.columns, effectiveFilters, effectiveSorts);
+      }
+
+      // Behavior parity requirement: when there's nothing to filter/sort by, stay on the exact
+      // legacy in-memory path (same code as the `dataSourceId` branch below) rather than the
+      // raw-SQL path, so pre-existing views with no configured filter/sort see byte-for-byte
+      // identical behavior to before this feature existed.
+      if (effectiveFilters.length === 0 && effectiveSorts.length === 0) {
+        const pages = await containerRepository.getByQuery(
+          containerRepository.createQuery().eq('parentId', dataView.dataSourceId).eq('type', 'page')
+        );
+        const scopedPages = await filterContainersByGrantForSession(
+          session,
+          pages.filter((page): page is PageContainer => page.type === 'page' && !page.deletedAt)
+        );
+        return scopedPages.map((page) => {
+          const returnValue: GetPagesResponse[number] = {
+            page: {
+              id: page.id,
+              name: page.name,
+              emoji: page.emoji || null,
+              parentId: page.parentId || null,
+              createdAt: page.createdAt,
+              lastUpdated: page.lastUpdated,
+            },
+          };
+          if (query.includeValues) {
+            returnValue.values = page.values;
+          }
+          return returnValue;
+        });
+      }
+
+      const cursor = query.cursor ? decodePageQueryCursor(query.cursor) : undefined;
+      const limit = query.limit ?? PAGES_QUERY_DEFAULT_LIMIT;
+
+      const queryResult = await executePageQuery({
+        parentId: dataView.dataSourceId,
+        columns: dataSource.columns,
+        filters: effectiveFilters,
+        sorts: effectiveSorts,
+        ...(cursor ? { cursor } : {}),
+        limit,
+      });
+
+      // The raw-SQL path already scopes rows by `parentId` (a workspace-scoped, access-asserted
+      // data source) and excludes soft-deleted rows, but container-level/member-scoped grants
+      // (THOTH-042) still need to be applied on top, exactly like the in-memory path above.
+      const scopedPages = await filterContainersByGrantForSession(session, queryResult.pages);
+
+      setResponseHeader(
+        'X-Page-Query-Pagination',
+        JSON.stringify({
+          nextCursor: queryResult.nextCursor ? encodePageQueryCursor(queryResult.nextCursor) : null,
+          hasMore: queryResult.hasMore,
+        })
+      );
+
+      return scopedPages.map((page) => {
+        const returnValue: GetPagesResponse[number] = {
+          page: {
+            id: page.id,
+            name: page.name,
+            emoji: page.emoji || null,
+            parentId: page.parentId || null,
+            createdAt: page.createdAt,
+            lastUpdated: page.lastUpdated,
+          },
+        };
+        if (query.includeValues) {
+          returnValue.values = page.values;
+        }
+        return returnValue;
+      });
+    }
 
     if (query.favorited) {
       // Root-list parity: scope favorites to a single workspace (defaulting to the caller's

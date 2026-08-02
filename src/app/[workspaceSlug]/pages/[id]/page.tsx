@@ -341,7 +341,7 @@ export default function PageDetailsPage() {
 
               {pageDetails.views?.map((view) => (
                 <Tabs.Panel key={view.id} value={view.id} className={styles['tabsPanel'] ?? ''}>
-                  <DataViewRender view={view} />
+                  <DataViewRender view={view} onFilterSortChange={() => mutate()} />
                 </Tabs.Panel>
               ))}
             </Tabs>

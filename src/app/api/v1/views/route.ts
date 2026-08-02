@@ -49,6 +49,8 @@ export const GET = apiRoute<GetDataViewsResponse, GetDataViewsQuery, {}>(
       dataSourceId: dataView.dataSourceId,
       createdAt: dataView.createdAt,
       lastUpdated: dataView.lastUpdated,
+      filters: dataView.filters,
+      sorts: dataView.sorts,
     }));
   }
 );
@@ -100,6 +102,8 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
       lastUpdated: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       columns: [],
+      filters: [],
+      sorts: [],
       deletedAt: null,
       deletedRootId: null,
     };
@@ -119,6 +123,8 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
       dataSourceId: createdDataView.dataSourceId,
       createdAt: createdDataView.createdAt,
       lastUpdated: createdDataView.lastUpdated,
+      filters: createdDataView.filters,
+      sorts: createdDataView.sorts,
     } satisfies CreateDataViewResponse;
   }
 );

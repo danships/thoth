@@ -31,6 +31,12 @@ export function apiRoute<
       body: ExpectedBody;
       query: ExpectedQuery;
       params: ExpectedParameters;
+      // Additive escape hatch for routes that need to surface out-of-band metadata alongside a
+      // response body whose shape must stay byte-for-byte backward-compatible (e.g. `GET /pages`
+      // — see THOTH-037, where cursor-pagination metadata is only relevant to the new `viewId`
+      // path and every other caller of the endpoint still expects a plain array response).
+      // Ignored by every route that doesn't call it.
+      setResponseHeader: (name: string, value: string) => void;
     },
     session: ApiKeySession,
     request_: NextRequest
@@ -121,21 +127,25 @@ export function apiRoute<
       }
 
       // Call the handler
+      const responseHeaders: Record<string, string> = {};
       const result = await handler(
         {
           body: body as ExpectedBody,
           query: query as ExpectedQuery,
           params: resolvedParameters as ExpectedParameters,
+          setResponseHeader: (name, value) => {
+            responseHeaders[name] = value;
+          },
         },
         session,
         request
       );
 
       if (result === undefined) {
-        return new Response(null, { status: 204 });
+        return new Response(null, { status: 204, headers: responseHeaders });
       }
       // Return the result
-      return NextResponse.json({ data: result });
+      return NextResponse.json({ data: result }, { headers: responseHeaders });
     } catch (error) {
       const logger = await getLogger();
       logger.error('API route error:', error);

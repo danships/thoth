@@ -267,6 +267,8 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
               lastUpdated: view.lastUpdated,
               createdAt: view.createdAt,
               dataSourceId: view.dataSourceId,
+              filters: view.filters,
+              sorts: view.sorts,
             }));
         }
 

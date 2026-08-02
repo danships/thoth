@@ -13,6 +13,12 @@ export const FAVORITES_MAX_LIMIT = 50;
 // list of the most-recently-accessed pages, per THOTH-035.
 export const RECENT_MAX_LIMIT = 15;
 
+// Hard cap on the number of pages returned per page of a `viewId`-driven, filtered/sorted query
+// (THOTH-037) — the raw-SQL path is cursor-paginated, unlike the legacy in-memory `parentId`
+// path, so this only bounds a single page of results, not the total.
+export const PAGES_QUERY_MAX_LIMIT = 200;
+export const PAGES_QUERY_DEFAULT_LIMIT = 50;
+
 export const getPagesQuerySchema = z
   .object({
     parentId: z.string().min(1).optional(),
@@ -20,11 +26,25 @@ export const getPagesQuerySchema = z
     favorited: z.stringbool().optional(),
     recent: z.stringbool().optional(),
     workspaceId: z.string().min(1).optional(),
-    limit: z.coerce.number().int().min(1).max(FAVORITES_MAX_LIMIT).optional(),
+    limit: z.coerce.number().int().min(1).max(PAGES_QUERY_MAX_LIMIT).optional(),
     includeValues: z.coerce.boolean().optional().default(false),
+    // THOTH-037: when set, delegates to `pageQueryService` using the view's persisted (or
+    // inline-overridden) `filters`/`sorts` instead of the legacy in-memory `parentId` path.
+    viewId: z.string().min(1).optional(),
+    cursor: z.string().min(1).optional(),
+    // Inline overrides of a view's persisted filter/sort config, JSON-encoded (mirrors the
+    // `PATCH /views/:id` body shape). Only meaningful alongside `viewId`.
+    filters: z.string().optional(),
+    sorts: z.string().optional(),
   })
-  .refine((data) => data.parentId || data.dataSourceId || data.favorited || data.recent, {
-    message: 'Either parentId, dataSourceId, favorited, or recent must be provided',
+  .refine((data) => data.parentId || data.dataSourceId || data.favorited || data.recent || data.viewId, {
+    message: 'Either parentId, dataSourceId, favorited, recent, or viewId must be provided',
+  })
+  .refine((data) => !(data.viewId && (data.favorited || data.recent)), {
+    message: 'viewId cannot be combined with favorited or recent',
+  })
+  .refine((data) => !((data.filters || data.sorts) && !data.viewId), {
+    message: 'filters/sorts require viewId to be provided',
   });
 
 export type GetPagesQuery = z.infer<typeof getPagesQuerySchema>;
@@ -37,5 +57,23 @@ export const getPagesResponseSchema = z.array(
     lastAccessedAt: z.iso.datetime({ offset: true }).optional(),
   })
 );
+
+export const getPagesPaginationSchema = z.object({
+  nextCursor: z.string().nullable(),
+  hasMore: z.boolean(),
+});
+
+// `pagination` is only populated when the raw-SQL (`viewId`) path is used — the legacy
+// in-memory paths (`parentId`/`dataSourceId`/`favorited`/`recent`) stay unpaginated, so it's
+// omitted (`undefined`) for those, preserving byte-for-byte response shape for existing callers.
 export type GetPagesResponse = z.infer<typeof getPagesResponseSchema>;
 export type GetPagesResponseData = DataWrapper<GetPagesResponse>;
+
+// Opaque cursor shape for the `viewId`-driven raw-SQL path — encoded as a base64 JSON string,
+// mirroring the `pagesTreeCursorSchema` idiom in `get-pages-tree.ts`. Generic over the number of
+// configured sort keys (`values`), plus a trailing `containerId` tiebreak.
+export const pageQueryCursorSchema = z.object({
+  values: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  containerId: z.string().min(1),
+});
+export type PageQueryCursorShape = z.infer<typeof pageQueryCursorSchema>;

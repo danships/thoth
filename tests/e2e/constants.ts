@@ -234,4 +234,33 @@ export const SEED = {
       name: 'E2E Shared Access Page',
     },
   },
+  // A dedicated data source + view + row set for THOTH-037's filter/sort e2e coverage, kept
+  // fully separate from `SEED.dataSource`/`SEED.dataView` (which only seed a single row) so
+  // filter/sort assertions have multiple, deterministic rows to select amongst without any risk
+  // of interfering with other data-view specs that rely on the single-row fixture.
+  filterSort: {
+    host: {
+      id: 'e2e-page-fs-host-00-0000-0000-000000000001',
+      name: 'E2E Filter Sort Host',
+    },
+    dataSource: {
+      id: 'e2e-datasource-fs-0-0000-0000-000000000001',
+      name: 'E2E Filter Sort Data Source',
+      columns: [
+        { id: 'e2e-col-fs-name-000-0000-0000-000000000001', name: 'Label', type: 'string' as const },
+        { id: 'e2e-col-fs-score-00-0000-0000-000000000001', name: 'Score', type: 'number' as const },
+      ],
+    },
+    dataView: {
+      id: 'e2e-dataview-fs-000-0000-0000-000000000001',
+      name: 'E2E Filter Sort View',
+    },
+    // Row `d` deliberately has no `Score` value at all, to exercise `isEmpty`/`NULL` semantics.
+    rows: [
+      { id: 'e2e-page-fs-row-a-0-0000-0000-000000000001', name: 'Apple', score: 10 },
+      { id: 'e2e-page-fs-row-b-0-0000-0000-000000000001', name: 'Banana', score: 30 },
+      { id: 'e2e-page-fs-row-c-0-0000-0000-000000000001', name: 'cherry', score: 20 },
+      { id: 'e2e-page-fs-row-d-0-0000-0000-000000000001', name: 'Date', score: null },
+    ],
+  },
 } as const;

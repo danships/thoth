@@ -17,6 +17,8 @@ export const updateDataViewBodySchema = dataViewSchema
   .pick({
     name: true,
     dataSourceId: true,
+    filters: true,
+    sorts: true,
   })
   .partial();
 
