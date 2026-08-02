@@ -1,6 +1,9 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { withAuthPage } from '@/lib/auth/with-auth-page';
 import { getLandingWorkspaceForUser } from '@/lib/database/resolve-workspace';
+
+export const metadata: Metadata = { title: 'Pages' };
 
 // Legacy bare `/pages` URL from before multi-workspace support. Redirects into the user's
 // last-used/default workspace at `/[workspaceSlug]/pages`, which itself resolves the actual

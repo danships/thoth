@@ -24,6 +24,7 @@ import { useStorageUsage } from '@/lib/hooks/api/use-storage-usage';
 import { useWorkspaces } from '@/lib/hooks/api/use-workspaces';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { useDocumentTitle } from '@/lib/hooks/use-document-title';
 import { workspaceSlugSchema } from '@/types/schemas/entities/workspace';
 import type { UpdateWorkspaceBody, WorkspaceApi } from '@/types/api';
 
@@ -43,6 +44,7 @@ function formatBytes(bytes: number): string {
 
 export default function WorkspaceSettingsPage() {
   const workspace = useCurrentWorkspace();
+  useDocumentTitle('Settings');
   const router = useRouter();
   const { showSuccess, showError } = useNotification();
   const { patch, delete: remove, inProgress, error } = useCudApi();

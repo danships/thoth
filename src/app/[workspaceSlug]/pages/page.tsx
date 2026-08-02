@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { withAuthPage } from '@/lib/auth/with-auth-page';
 import { getContainerRepository } from '@/lib/database';
@@ -6,6 +7,8 @@ import { resolveWorkspaceForSlug } from '@/lib/database/resolve-workspace';
 import { PagesEmptyState } from '@/components/organisms/pages-empty-state';
 import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import type { ApiKeySession } from '@/lib/auth/session';
+
+export const metadata: Metadata = { title: 'Pages' };
 
 type Properties = {
   params: Promise<{ workspaceSlug: string }>;
