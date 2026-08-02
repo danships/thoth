@@ -88,7 +88,7 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
       if (!pageToLink || pageToLink.deletedAt || pageToLink.workspaceId !== workspace.id) {
         throw new NotFoundError('Page not found or access denied.');
       }
-      await assertGrantAllowsContainerForSession(session, pageToLink);
+      await assertGrantAllowsContainerForSession(session, pageToLink, { mutating: true });
     }
 
     const dataViewRepository = await getDataViewRepository();

@@ -201,8 +201,11 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
     // resolved to a single, already-authorised `workspaceId` above (Pattern C).
     const databaseChildren =
       parentIds.length > 0
-        ? await containerRepository.getByQuery(
-            containerRepository.createQuery().in('parentId', parentIds).sort('lastUpdated', 'desc')
+        ? await filterContainersByGrantForSession(
+            session,
+            await containerRepository.getByQuery(
+              containerRepository.createQuery().in('parentId', parentIds).sort('lastUpdated', 'desc')
+            )
           )
         : [];
     const visibleChildren = databaseChildren.filter((child) => !child.deletedAt && child.type === 'page');

@@ -4,12 +4,14 @@ import { getContainerRepository } from '@/lib/database';
 import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveWorkspaceForSlug } from '@/lib/database/resolve-workspace';
 import { PagesEmptyState } from '@/components/organisms/pages-empty-state';
+import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
+import type { ApiKeySession } from '@/lib/auth/session';
 
 type Properties = {
   params: Promise<{ workspaceSlug: string }>;
 };
 
-async function PagesLandingPage({ params, session }: Properties & { session: { user: { id: string } } }) {
+async function PagesLandingPage({ params, session }: Properties & { session: ApiKeySession }) {
   const { workspaceSlug } = await params;
   // Already validated/authorized by the parent `[workspaceSlug]/layout.tsx`; re-resolving here
   // (rather than trusting the URL segment as-is) keeps this page correct if hit directly, and
@@ -22,12 +24,17 @@ async function PagesLandingPage({ params, session }: Properties & { session: { u
   // Note: SuperSave does not return results when filtering with `.eq('parentId', null)`,
   // so root pages are found by fetching all pages and filtering client-side (see the same
   // pattern in `src/app/api/v1/pages/tree/route.ts`).
-  // Content is scoped by workspace membership, not creator (THOTH-042) — `resolveWorkspaceForSlug`
-  // above already asserts the caller is a member of `workspace.id`.
-  const pages = await containerRepository.getByQuery(
-    addWorkspaceIdToQuery(containerRepository.createQuery().eq('type', 'page'), workspace.id).sort(
-      'lastUpdated',
-      'desc'
+  // Content is scoped by workspace membership + grant, not creator (THOTH-042) —
+  // `resolveWorkspaceForSlug` above already asserts the caller is a member of `workspace.id`,
+  // and `filterContainersByGrantForSession` further restricts to pages the caller's grant allows,
+  // mirroring the pattern used by the pages API/tree routes.
+  const pages = await filterContainersByGrantForSession(
+    session,
+    await containerRepository.getByQuery(
+      addWorkspaceIdToQuery(containerRepository.createQuery().eq('type', 'page'), workspace.id).sort(
+        'lastUpdated',
+        'desc'
+      )
     )
   );
   const rootPages = pages.filter((page) => page.type === 'page' && !page.parentId && !page.deletedAt);

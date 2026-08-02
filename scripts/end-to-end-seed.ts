@@ -319,7 +319,7 @@ async function seedAppData() {
     } satisfies PageContainerCreate & { id: string };
     const existing = await containerRepository.getOneByQuery(containerRepository.createQuery().eq('id', data.id));
     await (existing
-      ? containerRepository.update({ ...existing, ...normalizedData, lastUpdated: now })
+      ? containerRepository.update({ ...existing, ...normalizedData })
       : containerRepository.create(normalizedData as unknown as PageContainerCreate));
 
     // Mirrors the app's own page-creation flow: every page gets a `ContainerAccess` row for

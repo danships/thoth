@@ -1,6 +1,5 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getPageRevisionRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -24,9 +23,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
     await assertGrantAllowsContainerForSession(session, page, { mutating: true });
 
     const repository = await getPageRevisionRepository();
-    const revision = await repository.getOneByQuery(
-      addUserIdToQuery(repository.createQuery().eq('id', params.revisionId), session.user.id)
-    );
+    const revision = await repository.getOneByQuery(repository.createQuery().eq('id', params.revisionId));
 
     if (!revision || revision.containerId !== params.id) {
       throw new NotFoundError('Revision not found', true);
@@ -34,9 +31,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
 
     if (revision.target === 'content') {
       const revisions = await repository.getByQuery(
-        addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
-          .eq('target', 'content')
-          .sort('sequence', 'asc')
+        repository.createQuery().eq('containerId', params.id).eq('target', 'content').sort('sequence', 'asc')
       );
       const restoredContent = reconstructAt(revisions, revision.sequence);
 
@@ -53,19 +48,14 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
       scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
 
       const contentRevisions = await repository.getByQuery(
-        addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
-          .eq('target', 'content')
-          .sort('sequence', 'desc')
-          .limit(1)
+        repository.createQuery().eq('containerId', params.id).eq('target', 'content').sort('sequence', 'desc').limit(1)
       );
 
       return { target: 'content', sequence: contentRevisions[0]?.sequence ?? revision.sequence };
     }
 
     const valuesRevisions = await repository.getByQuery(
-      addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
-        .eq('target', 'values')
-        .sort('sequence', 'asc')
+      repository.createQuery().eq('containerId', params.id).eq('target', 'values').sort('sequence', 'asc')
     );
     const reconstructedValues = reconstructValuesAt(page.values ?? {}, valuesRevisions, revision.sequence);
 
@@ -115,10 +105,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
     scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
 
     const newHeadValuesRevisions = await repository.getByQuery(
-      addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
-        .eq('target', 'values')
-        .sort('sequence', 'desc')
-        .limit(1)
+      repository.createQuery().eq('containerId', params.id).eq('target', 'values').sort('sequence', 'desc').limit(1)
     );
 
     return { target: 'values', sequence: newHeadValuesRevisions[0]?.sequence ?? revision.sequence };

@@ -4,6 +4,7 @@ import { registerContainerAccessForNewPage } from '@/lib/database/container-acce
 import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { assertGrantAllowsWrite, grantAllowsContainer, memberToAccessGrant } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateWelcomePageBody, CreateWelcomePageResponse } from '@/types/api';
 import { createWelcomePageBodySchema } from '@/types/api';
@@ -40,7 +41,12 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
     if (!workspaceId) {
       workspaceId = await resolveDefaultWorkspaceId(session.user.id);
     }
-    await assertWorkspaceAccess(session.user.id, workspaceId);
+    const member = await assertWorkspaceAccess(session.user.id, workspaceId);
+    // Resolve the caller's unified AccessGrant (THOTH-042) once up front, so both the
+    // idempotency lookup below (read scope) and the create path (write permission) are gated by
+    // it — a read-only-scoped member/App must not be able to create a welcome page, nor be
+    // handed back one it can't otherwise read.
+    const grant = session.appContext ? session.appContext.accessGrant : await memberToAccessGrant(member);
 
     return withLock(`${session.user.id}:${workspaceId}`, async () => {
       const workspaceRepository = await getWorkspaceRepository();
@@ -66,7 +72,11 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
       );
       const existingRootPage = pages.find((page) => page.type === 'page' && !page.parentId && !page.deletedAt);
 
-      if (existingRootPage && existingRootPage.type === 'page') {
+      if (
+        existingRootPage &&
+        existingRootPage.type === 'page' &&
+        (await grantAllowsContainer(grant, existingRootPage))
+      ) {
         return {
           id: existingRootPage.id,
           name: existingRootPage.name,
@@ -76,6 +86,11 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
           lastUpdated: existingRootPage.lastUpdated,
         };
       }
+
+      // Read-only-scoped members/Apps cannot create a new welcome page either — reachable both
+      // when there's no existing root page yet and when one exists but is outside the caller's
+      // scope (handled above).
+      assertGrantAllowsWrite(grant);
 
       const pageData: PageContainerCreate = {
         name: 'Welcome',

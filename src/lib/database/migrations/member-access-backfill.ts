@@ -3,8 +3,8 @@ import * as entities from '../entities';
 import type { WorkspaceMember, WorkspaceMemberCreate } from '@/types/database';
 
 // role -> permission/scopeType mapping for pre-existing `workspace-member` rows created before
-// THOTH-042. Every existing human member becomes `read_write`/`workspace` (full access), so
-// current behaviour is fully preserved — this is a pure backfill, not a capability change.
+// THOTH-042. Existing members receive workspace scope. Viewers receive `read`; all other roles
+// receive `read_write`. This preserves the existing capability model.
 function permissionForRole(role: string): 'read' | 'read_write' {
   return role === 'viewer' ? 'read' : 'read_write';
 }

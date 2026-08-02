@@ -4,7 +4,12 @@ import { registerContainerAccessForNewPage } from '@/lib/database/container-acce
 import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
-import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
+import {
+  assertGrantAllowsContainerForSession,
+  assertGrantAllowsWrite,
+  filterContainersByGrantForSession,
+  memberToAccessGrant,
+} from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -221,14 +226,23 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
         throw new NotFoundError('Parent page not found or access denied');
       }
 
+      // Content is scoped by workspace membership + grant, not creator (THOTH-042): membership
+      // is asserted here, and mutation (write) permission against the parent container itself
+      // is enforced below so a read-only-scoped member/App can't add children under a container
+      // they can't write to.
       await assertWorkspaceAccess(session.user.id, parentContainer.workspaceId);
+      await assertGrantAllowsContainerForSession(session, parentContainer, { mutating: true });
 
       workspaceId = parentContainer.workspaceId;
       parentId = body.parentId;
     } else {
-      // Root-level page: no existing entity to derive the workspace from.
+      // Root-level page: no existing entity to derive the workspace from — enforce write
+      // permission against the caller's own workspace-level grant instead (THOTH-042), so a
+      // read-only-scoped member/App can't create new root pages.
       workspaceId = body.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
-      await assertWorkspaceAccess(session.user.id, workspaceId);
+      const member = await assertWorkspaceAccess(session.user.id, workspaceId);
+      const grant = session.appContext ? session.appContext.accessGrant : await memberToAccessGrant(member);
+      assertGrantAllowsWrite(grant);
     }
 
     const workspaceRepository = await getWorkspaceRepository();
