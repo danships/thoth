@@ -47,17 +47,31 @@ await repository.delete(record.id);
 
 ## Building Queries
 
-Start from `repository.createQuery()` and chain filter methods. Always add the user scope via the helper from `@/lib/database/helpers` — never filter by `userId` manually:
+Start from `repository.createQuery()` and chain filter methods. **The scoping helper you use depends
+on the entity category (THOTH-042):**
+
+- **CONTENT** (`Container` pages/data-sources, `DataView`) — scope by **workspace**, never by
+  creator. Use `addWorkspaceIdToQuery`, then enforce access via `assertContentAccess` /
+  `filterContainersByGrantForSession` (see `.agents/skills/securing-routes/SKILL.md`).
+- **PER-USER STATE** (`ContainerAccess` — starred/last-accessed) — scope by `userId` via
+  `addUserIdToQuery`. This is the *only* legitimate remaining use of `addUserIdToQuery`.
 
 ```typescript
-import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
+import { addWorkspaceIdToQuery, addUserIdToQuery } from '@/lib/database/helpers';
 
-const query = addUserIdToQuery(repository.createQuery(), session.user.id)
+// CONTENT: scoped by workspace, not creator (THOTH-042)
+const query = addWorkspaceIdToQuery(repository.createQuery(), workspace.id)
   .eq('type', 'page')
   .in('id', ['id1', 'id2'])            // IN clause
   .sort('lastUpdated', 'desc')          // order by
   .limit(50);                           // row limit
+
+// PER-USER STATE: scoped by userId (Category B — e.g. ContainerAccess)
+const starred = addUserIdToQuery(containerAccessRepository.createQuery().eq('starred', true), session.user.id);
 ```
+
+`addUserIdToQuery` carries a JSDoc warning that it must never be used to gate content rows — see
+`src/lib/database/helpers.ts`.
 
 ## Entities
 
@@ -68,6 +82,7 @@ Entity definitions live in `src/lib/database/entities/`. The three main entities
 | `CONTAINER_NAME` | `Container` | Pages and data-source containers |
 | `WORKSPACE_NAME` | `Workspace` | User workspaces |
 | `DATA_VIEW_NAME` | `DataView` | Saved data views |
+| `MEMBER_SCOPED_CONTAINER_NAME` | `MemberScopedContainer` | Join table: a workspace member scoped to specific containers (mirrors `AppScopedContainer`) |
 
 Entity TypeScript types are in `src/types/database/`. Always import the type, not the entity class, for typing variables:
 
@@ -112,15 +127,27 @@ Database migrations live in `src/lib/database/migrations/`. Migrations run autom
 ## Common Patterns
 
 ```typescript
-// Check resource exists and belongs to user before mutation
+// CONTENT: fetch by id (no owner gate), then assert access on the row's own workspaceId
+// (THOTH-042 — see assertContentAccess in .agents/skills/securing-routes/SKILL.md)
 const existing = await containerRepository.getOneByQuery(
-  addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id)
+  containerRepository.createQuery().eq('id', params.id)
 );
 if (!existing) throw new NotFoundError('Resource not found');
+await assertContentAccess(session, existing, { mutating: true });
 
-// Get the user's workspace (needed when creating top-level resources)
+// Get the workspace by slug (needed when creating top-level resources)
 const workspace = await workspaceRepository.getOneByQuery(
-  addUserIdToQuery(workspaceRepository.createQuery(), session.user.id)
+  workspaceRepository.createQuery().eq('slug', workspaceSlug)
 );
 if (!workspace) throw new Error('Workspace not found');
 ```
+
+## Member Grants (`memberToAccessGrant`)
+
+A workspace member's capability is modelled with the **same shape** as an App's `AccessGrant`
+(`permission`: `'read' | 'read_write'`, `scopeType`: `'workspace' | 'containers' | 'containers_with_children'`),
+stored on the `workspace-member` row. `memberToAccessGrant(member)` (`src/lib/auth/access-grant.ts`)
+builds an `AccessGrant` from that row, reading the `member-scoped-container` join table
+(`getMemberScopedContainerRepository()`) when `scopeType` is not `'workspace'` — mirroring
+`appToAccessGrant`. This lets `assertGrantAllowsContainer` / `filterContainersByGrant` /
+`assertGrantAllowsWrite` apply identically to human members and Apps.

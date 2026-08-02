@@ -53,7 +53,10 @@ export type GetPagesTreeResponse = z.infer<typeof getPagesTreeResponseSchema>;
 
 ### 2. Route Implementation (`src/app/api/{route}/route.ts`)
 
-Use the `apiRoute` wrapper with typed parameters:
+Use the `apiRoute` wrapper with typed parameters. **Content** (pages, data-sources, DataViews)
+is scoped by workspace membership + grant via `assertContentAccess`/`addWorkspaceIdToQuery` —
+never by `userId` (creator identity is attribution only, see "Content vs. Per-User State
+Scoping" below):
 
 ```typescript
 export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}>(
@@ -61,8 +64,11 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
     expectedQuerySchema: getPagesTreeQueryVariablesSchema,
   },
   async ({ query }, session) => {
+    const workspaceId = await resolveWorkspaceIdForRequest(query, session.user.id);
+    await assertWorkspaceAccess(session.user.id, workspaceId);
+
     const containerRepository = await getContainerRepository();
-    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id).sort(
+    const databaseQuery = addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId).sort(
       'lastUpdated',
       'desc'
     );
@@ -71,8 +77,11 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       databaseQuery.eq('parentId', query.parentId);
     }
 
-    const containers = (await containerRepository.getByQuery(databaseQuery)).filter(
-      (container) => query?.parentId || !container.parentId
+    const containers = await filterContainersByGrantForSession(
+      session,
+      (await containerRepository.getByQuery(databaseQuery)).filter(
+        (container) => query?.parentId || !container.parentId
+      )
     );
 
     return {
@@ -117,6 +126,31 @@ src/app/api/
 - Use types instead of interfaces: `type MyType = { ... }` over `interface MyType { ... }`
 - All API endpoints should have typed request/response schemas
 - Use Zod for runtime validation
+
+## Content vs. Per-User State Scoping (THOTH-042)
+
+Thoth's authorization model draws a hard line between two kinds of rows:
+
+- **CONTENT** (`Container` pages/data-sources, `DataView`) — gated by **workspace membership +
+  grant**, never by creator identity. `userId` on a content row is attribution/provenance only.
+  The canonical chokepoint is `assertContentAccess(session, row, { mutating? })`
+  (`src/lib/api/server/workspace-access.ts`): it asserts the caller is a member of the row's own
+  `workspaceId` (via `assertWorkspaceAccess`, which throws `NotFoundError` — never 403 — for
+  non-members, hiding existence), resolves a single `AccessGrant` for the caller (a human member
+  via `memberToAccessGrant`, or an App via `session.appContext.accessGrant` — same shape, same
+  checks), and enforces read scope (`assertGrantAllowsContainer`) and, for mutations, write
+  permission (`assertGrantAllowsWrite`). List/tree routes use the sibling
+  `filterContainersByGrantForSession(session, rows)` instead. Build content queries with
+  `addWorkspaceIdToQuery(query, workspaceId)`, never `addUserIdToQuery`.
+
+- **PER-USER STATE** (`ContainerAccess` — starred/last-accessed) — stays scoped by `userId` via
+  `addUserIdToQuery(query, session.user.id)`. This is the *only* legitimate remaining use of
+  `addUserIdToQuery` for anything resembling a workspace resource.
+
+A member/App scoped to `workspace`/`read_write` (the default for every original owner) is
+unaffected — `assertGrantAllowsContainer` short-circuits and `assertGrantAllowsWrite` always
+passes. The extra enforcement only bites for members explicitly scoped to specific containers or
+granted `read`-only.
 
 ## File Structure
 
@@ -167,5 +201,5 @@ The following agent skills provide targeted guidance for specific tasks:
 | `pnpm-workflow`         | `.agents/skills/pnpm-workflow/SKILL.md`         | pnpm commands, available scripts, quality-gate workflow, and env-var setup                                                   |
 | `api-route-definition`  | `.agents/skills/api-route-definition/SKILL.md`  | Creating API routes with the `apiRoute` wrapper, file placement, HTTP exports, error handling, and the client helper pattern |
 | `zod-types-schemas`     | `.agents/skills/zod-types-schemas/SKILL.md`     | Defining Zod schemas and TypeScript types for API endpoints, naming conventions, and `DataWrapper` usage                     |
-| `securing-routes`       | `.agents/skills/securing-routes/SKILL.md`       | Session enforcement, per-user data scoping with `addUserIdToQuery`, resource ownership checks, and error types               |
+| `securing-routes`       | `.agents/skills/securing-routes/SKILL.md`       | Content access via `assertContentAccess` (membership + unified `AccessGrant`); per-user state (`ContainerAccess`) stays user-scoped              |
 | `database-repositories` | `.agents/skills/database-repositories/SKILL.md` | Using SuperSave repositories, query building, entity definitions, retrievers, and migration patterns                         |

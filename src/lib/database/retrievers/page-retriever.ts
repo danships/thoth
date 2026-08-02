@@ -1,6 +1,5 @@
 import { PageContainer } from '@/types/database';
 import { getContainerRepository } from '..';
-import { addUserIdToQuery } from '../helpers';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 
@@ -8,17 +7,19 @@ class PageRetriever {
   private async retrievePageInternal(id: string, userId: string): Promise<PageContainer> {
     const containerRepository = await getContainerRepository();
 
+    // Content is scoped by workspace membership + grant, not creator identity (THOTH-042).
     const existingPage = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', id), userId).eq('type', 'page')
+      containerRepository.createQuery().eq('id', id).eq('type', 'page')
     );
 
     if (!existingPage || existingPage.type !== 'page') {
       throw new NotFoundError('Page not found', true);
     }
 
-    // Anchor authorization to the entity's own `workspaceId`, verified against real
-    // membership — never trusted from the client. See `assertWorkspaceAccess` for why this is
-    // a discrete step rather than inlined into the query above.
+    // Safety invariant: membership is asserted on the row's OWN workspaceId (never trusted
+    // from the client), so a row from another workspace can never be returned even without a
+    // creator (`userId`) gate. See `assertWorkspaceAccess` for why this is a discrete step
+    // rather than inlined into the query above.
     await assertWorkspaceAccess(userId, existingPage.workspaceId);
 
     return existingPage;

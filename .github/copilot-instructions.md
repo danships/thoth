@@ -10,7 +10,7 @@ High level
 Key components and patterns
 
 - Auth: server-side session lookup is used in `src/app/layout.tsx` via `(await getAuth()).api.getSession`. Client-side auth lives in `src/lib/auth/provider.tsx` and `src/lib/auth/client.ts` (use `useAuth()` to access user/session on client).
-- Data layer: simple repository pattern under `src/lib/database` with helper `addUserIdToQuery` for per-user scoping. API route handlers typically call `getWorkspaceRepository()` and `getContainerRepository()`.
+- Data layer: simple repository pattern under `src/lib/database`. **Content** (pages, data-sources, DataViews) is scoped by workspace membership + grant via `assertContentAccess`/`addWorkspaceIdToQuery` — never by creator (`addUserIdToQuery` is reserved for **per-user state** like `ContainerAccess`, see THOTH-042 below). API route handlers typically call `getWorkspaceRepository()` and `getContainerRepository()`.
 - API routes: use `apiRoute` wrapper from `src/lib/api/route-wrapper` which enforces schema validation (Zod) and provides typed session. See `src/app/api/v1/pages/*.ts` for examples (GET, POST, tree endpoints).
 - Types & schemas: API shapes and validation live in `src/types/api` and `src/types/schemas`. Prefer reading those files for exact shapes when adding or changing endpoints.
 - Front-end store: Nanostores + a `createFetcherStore` helper (`src/lib/store/fetcher.ts`) are used for data fetching. Example stores: `$rootPagesTree` and `$currentPage` in `src/lib/store/query/`.
@@ -20,7 +20,7 @@ Creating a new API route
 - Files: add the route handler at `src/app/api/<your-route>/route.ts`. Next.js routes are file-system based; export functions named `GET`, `POST`, etc.
 - Types first: create Zod schemas and exported types under `src/types/api` (prefer `src/types/api/endpoints/`) and reuse them in the route via `expectedQuerySchema`/`expectedBodySchema`.
 - Use `apiRoute` wrapper: call `apiRoute<Resp, Query, Body>(options, handler)` so the session is typed and schemas are enforced.
-- Database access: obtain repositories with `getWorkspaceRepository()`/`getContainerRepository()` from `src/lib/database` and ALWAYS scope queries with `addUserIdToQuery(..., session.user.id)` to avoid leaking data.
+- Database access: obtain repositories with `getWorkspaceRepository()`/`getContainerRepository()` from `src/lib/database`. **Gate CONTENT with `assertContentAccess`** (membership via `assertWorkspaceAccess` + the unified `AccessGrant`, `src/lib/api/server/workspace-access.ts` + `src/lib/auth/access-grant.ts`) and scope its queries with `addWorkspaceIdToQuery(...)`; **keep PER-USER STATE** (`ContainerAccess`) scoped with `addUserIdToQuery(..., session.user.id)`. See THOTH-042 below for the full rule.
 - Client surface: after implementing the route, add a typed client helper in `src/lib/api/client.ts` (baseURL is `/api/v1`) so front-end code can call the endpoint consistently.
 - Validation & errors: rely on Zod for input validation; throw early (or return appropriate HTTP status from the handler) for auth/validation failures so errors surface in logs.
 - Quick checks: run `pnpm lint`, `pnpm lint:tsc` (TypeScript check) and `pnpm build` before opening a PR.
@@ -36,7 +36,7 @@ Conventions & gotchas
 
 - Routes only live under `src/app/api/*` (Next App Router route handlers). When adding an endpoint, update `src/lib/api/client.ts` for a typed client method.
 - Use types from `src/types/api` for API input/output. API route handlers validate inputs via Zod schemas exported alongside the types.
-- Database queries must be scoped by user using `addUserIdToQuery(...)` to avoid leaking data across users — most API routes rely on this pattern.
+- **Content vs. per-user state (THOTH-042):** CONTENT rows (`Container` pages/data-sources, `DataView`) are gated by **`assertContentAccess`** — workspace membership (`assertWorkspaceAccess`, which throws `NotFoundError`/404, never 403, for non-members) plus a unified `AccessGrant` (same shape for human members via `memberToAccessGrant` and Apps via `session.appContext.accessGrant`), enforced via `assertGrantAllowsContainer` (reads) and `assertGrantAllowsWrite` (mutations). Content queries use `addWorkspaceIdToQuery(...)`; list/tree routes finish with `filterContainersByGrantForSession(session, rows)`. `userId` on a content row is attribution only — **never** a gate. PER-USER STATE (`ContainerAccess` — starred/last-accessed) stays scoped with `addUserIdToQuery(...)`, the *only* remaining legitimate use of that helper.
 - The repo uses `better-auth` and an OIDC flow. Secrets are expected via env variables validated in `src/lib/environment.ts` (envalid). When running locally, provide env vars (e.g., `BETTER_AUTH_SECRET`, `OIDC_*`).
 - Prefers `type` aliases over `interface` (see `AGENTS.md`). Follow existing file style (strict TypeScript settings in package.json devDeps).
 

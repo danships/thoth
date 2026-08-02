@@ -1,7 +1,7 @@
 import type { Column } from '@/types/schemas/entities/container';
 import type { DataSourceContainer, PageContainer } from '@/types/database';
 import { getDataViewRepository } from '..';
-import { addUserIdToQuery } from '../helpers';
+import { addWorkspaceIdToQuery } from '../helpers';
 import { dataSourceRetriever } from './data-source-retriever';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 
@@ -25,8 +25,11 @@ class PageColumnRetriever {
     const columnById = new Map(dataSource.columns.map((column) => [column.id, column] as const));
 
     const dataViewRepository = await getDataViewRepository();
+    // Content is scoped by workspace membership + grant, not creator identity (THOTH-042).
+    // The data source is already authorised above; its own workspaceId is a safe, defensive
+    // same-workspace constraint (Pattern C — no second membership assertion needed here).
     const dataViews = await dataViewRepository.getByQuery(
-      addUserIdToQuery(dataViewRepository.createQuery(), userId)
+      addWorkspaceIdToQuery(dataViewRepository.createQuery(), dataSource.workspaceId)
         .eq('dataSourceId', dataSource.id)
         .sort('createdAt', 'asc') // oldest view first = most stable/predictable merge order
     );

@@ -1,7 +1,8 @@
-import { getAppScopedContainerRepository } from '@/lib/database';
+import { getAppScopedContainerRepository, getMemberScopedContainerRepository } from '@/lib/database';
 import { resolveContainerDescendants, resolvePageEmbeddedContainerIds } from '@/lib/database/app-service';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
-import type { App, AppPermission, AppScopeType } from '@/types/database';
+import type { App, AppPermission, AppScopeType, WorkspaceMember } from '@/types/database';
+import type { ApiKeySession } from './session';
 
 /**
  * The single, sole authorization chokepoint for App-key permission/scope enforcement in the
@@ -41,6 +42,35 @@ export async function appToAccessGrant(app: App): Promise<AccessGrant> {
     workspaceId: app.workspaceId,
     permission: app.permission,
     scopeType: app.scopeType,
+    scopedContainerIds: scopedRows.map((row) => row.containerId),
+  };
+}
+
+/**
+ * Builds the same `AccessGrant` shape from a workspace-member row, so human members and App
+ * keys flow through the identical scope/permission checks (`assertGrantAllowsContainer` /
+ * `filterContainersByGrant` / `assertGrantAllowsWrite`). Mirrors `appToAccessGrant`. Called by
+ * `assertContentAccess` — never call this ahead of time and cache it, since a user's grant
+ * differs per workspace and must be resolved from the member row for the *target* workspace.
+ */
+export async function memberToAccessGrant(member: WorkspaceMember): Promise<AccessGrant> {
+  if (member.scopeType === 'workspace') {
+    return {
+      workspaceId: member.workspaceId,
+      permission: member.permission,
+      scopeType: member.scopeType,
+    };
+  }
+
+  const memberScopedContainerRepository = await getMemberScopedContainerRepository();
+  const scopedRows = await memberScopedContainerRepository.getByQuery(
+    memberScopedContainerRepository.createQuery().eq('workspaceMemberId', member.id)
+  );
+
+  return {
+    workspaceId: member.workspaceId,
+    permission: member.permission,
+    scopeType: member.scopeType,
     scopedContainerIds: scopedRows.map((row) => row.containerId),
   };
 }
@@ -130,33 +160,46 @@ export async function filterContainersByGrant<T extends { id: string; workspaceI
 }
 
 /**
- * Session-aware convenience wrapper around `assertGrantAllowsContainer`: no-ops when the
- * caller authenticated via a session cookie (`session.appContext` undefined) so session-cookie
- * requests are byte-for-byte unaffected by this ticket's changes; only enforces the grant for
- * bearer-token (App-key) callers. Every container-scoped route handler should call this
- * immediately after its existing retriever call.
+ * Session-aware convenience wrapper around `assertGrantAllowsContainer`. Delegates to
+ * `assertContentAccess` (the canonical chokepoint in
+ * `src/lib/api/server/workspace-access.ts`), which resolves the caller's grant uniformly for
+ * App keys and human workspace members alike — so, unlike before THOTH-042, this now *does*
+ * enforce real scope/permission for session-cookie callers too, not just a no-op. Every
+ * container-scoped route handler should call this immediately after its existing retriever
+ * call, passing `{ mutating: true }` on mutating routes (PATCH/PUT/DELETE, and any POST that
+ * mutates existing content) so a read-only grant is rejected with `ForbiddenError` (403).
  */
 export async function assertGrantAllowsContainerForSession(
-  session: { appContext?: { accessGrant: AccessGrant } },
-  container: { id: string; workspaceId: string }
+  session: ApiKeySession,
+  container: { id: string; workspaceId: string },
+  options?: { mutating?: boolean }
 ): Promise<void> {
-  if (!session.appContext) {
-    return;
-  }
-  await assertGrantAllowsContainer(session.appContext.accessGrant, container);
+  // Local require avoids a static import cycle with `workspace-access.ts` (which itself imports
+  // from this file for the primitives `assertContentAccess` composes).
+  const { assertContentAccess } = await import('@/lib/api/server/workspace-access');
+  await assertContentAccess(session, container, options);
 }
 
 /**
- * Session-aware convenience wrapper around `filterContainersByGrant`: returns `containers`
- * unchanged for session-cookie callers, and filters them down to the App's scope for
- * bearer-token callers. Used by list/tree routes (e.g. `GET /pages/tree`, `GET /pages`).
+ * Session-aware convenience wrapper around `filterContainersByGrant`: used by list/tree routes
+ * (e.g. `GET /pages/tree`, `GET /pages`). Filters App-key callers by their App grant as before;
+ * for a session-cookie (human member) caller, resolves that member's `AccessGrant` (via the
+ * first container's `workspaceId` — every caller of this helper already scopes its list to a
+ * single workspace) and filters by it too, instead of no-op'ing.
  */
 export async function filterContainersByGrantForSession<T extends { id: string; workspaceId: string }>(
-  session: { appContext?: { accessGrant: AccessGrant } },
+  session: ApiKeySession,
   containers: T[]
 ): Promise<T[]> {
-  if (!session.appContext) {
+  if (session.appContext) {
+    return filterContainersByGrant(session.appContext.accessGrant, containers);
+  }
+  if (containers.length === 0) {
     return containers;
   }
-  return filterContainersByGrant(session.appContext.accessGrant, containers);
+
+  const { assertWorkspaceAccess } = await import('@/lib/api/server/workspace-access');
+  const member = await assertWorkspaceAccess(session.user.id, containers[0]!.workspaceId);
+  const grant = await memberToAccessGrant(member);
+  return filterContainersByGrant(grant, containers);
 }

@@ -11,12 +11,13 @@ test.describe('workspace menu', () => {
   });
 
   test('shows the current workspace name and links to its settings page', async ({ page }) => {
-    await page.goto(`/${SEED.workspace.slug}/pages`);
-
-    // `/[slug]/pages` redirects on to the landing page, which may then append a `?v=` view param
-    // via a client-side replace. Let that settle before interacting with the menu, otherwise the
-    // late replace can race with (and clobber) the settings navigation triggered below.
-    await page.waitForURL(/\/pages\/(?!create)[^/]+/);
+    // Navigate directly to a known page without any linked views, rather than the generic
+    // `/pages` redirect-to-most-recently-updated-page flow: since DECISION 1 (THOTH-042) made
+    // that landing page workspace-scoped (any root page, not just `SEED.pages.root`), it can
+    // land on a page with a view (e.g. `dataSourceHost`), whose client-side `?v=` replace can
+    // race with (and clobber) the settings navigation triggered below. `SEED.pages.root` has no
+    // views, so this sidesteps the race entirely.
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
     await page.waitForLoadState('networkidle');
 
     const menuTrigger = page.getByRole('button', { name: 'Workspace menu' });

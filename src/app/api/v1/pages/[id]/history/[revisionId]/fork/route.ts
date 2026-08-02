@@ -1,6 +1,5 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getPageRevisionRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { registerContainerAccessForNewPage } from '@/lib/database/container-access-service';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
@@ -44,12 +43,10 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
   async ({ params, body }, session) => {
     const containerRepository = await getContainerRepository();
     const sourcePage = await pageRetriever.retrievePage(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, sourcePage);
+    await assertGrantAllowsContainerForSession(session, sourcePage, { mutating: true });
 
     const repository = await getPageRevisionRepository();
-    const revision = await repository.getOneByQuery(
-      addUserIdToQuery(repository.createQuery().eq('id', params.revisionId), session.user.id)
-    );
+    const revision = await repository.getOneByQuery(repository.createQuery().eq('id', params.revisionId));
     if (!revision || revision.containerId !== params.id) {
       throw new NotFoundError('Revision not found', true);
     }
@@ -84,14 +81,10 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
     }
 
     const contentRevisions = await repository.getByQuery(
-      addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
-        .eq('target', 'content')
-        .sort('sequence', 'asc')
+      repository.createQuery().eq('containerId', params.id).eq('target', 'content').sort('sequence', 'asc')
     );
     const valuesRevisions = await repository.getByQuery(
-      addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
-        .eq('target', 'values')
-        .sort('sequence', 'asc')
+      repository.createQuery().eq('containerId', params.id).eq('target', 'values').sort('sequence', 'asc')
     );
 
     const contentTargetSeq =

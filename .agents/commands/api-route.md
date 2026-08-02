@@ -53,13 +53,19 @@ export type GetPagesTreeResponse = z.infer<typeof getPagesTreeResponseSchema>;
 Create the route handler the route-wrapper:
 
 ```typescript
+// content (pages, data-sources, DataViews) is scoped by workspace membership + grant, not
+// creator identity — see `assertContentAccess` / `filterContainersByGrantForSession`
+// (THOTH-042). `addUserIdToQuery` remains valid only for per-user state (e.g. `ContainerAccess`).
 export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}>(
   {
     expectedQuerySchema: getPagesTreeQueryVariablesSchema,
   },
   async ({ query }, session) => {
+    const workspaceId = query?.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
+    await assertWorkspaceAccess(session.user.id, workspaceId);
+
     const containerRepository = await getContainerRepository();
-    const databaseQuery = addUserIdToQuery(containerRepository.createQuery(), session.user.id).sort(
+    const databaseQuery = addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId).sort(
       'lastUpdated',
       'desc'
     );
@@ -73,18 +79,20 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
     const containers = (await containerRepository.getByQuery(databaseQuery)).filter(
       (container) => query?.parentId || !container.parentId
     );
+    const scopedContainers = await filterContainersByGrantForSession(session, containers);
 
-    const parentIds = containers.map((container) => container.id).filter(Boolean);
+    const parentIds = scopedContainers.map((container) => container.id).filter(Boolean);
 
     const databaseChildren =
       parentIds.length > 0
         ? await containerRepository.getByQuery(
-            addUserIdToQuery(containerRepository.createQuery(), session.user.id).in('parentId', parentIds)
+            addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId).in('parentId', parentIds)
           )
         : [];
+    const scopedChildren = await filterContainersByGrantForSession(session, databaseChildren);
 
     return {
-      branches: containers.map((container) => ({
+      branches: scopedContainers.map((container) => ({
         page: {
           id: container.id,
           name: container.name,
@@ -94,7 +102,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
           createdAt: container.createdAt,
           parentId: container.parentId || null,
         },
-        children: databaseChildren
+        children: scopedChildren
           .filter((child) => child.parentId === container.id)
           .map((child) => ({
             page: {

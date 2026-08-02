@@ -15,7 +15,7 @@ export const POST = apiRoute<RestorePageResponse, undefined, RestorePageParamete
   },
   async ({ params }, session) => {
     const page = await pageRetriever.retrievePageIncludingDeleted(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, page);
+    await assertGrantAllowsContainerForSession(session, page, { mutating: true });
 
     if (!page.deletedAt || page.deletedRootId !== page.id) {
       throw new NotFoundError('Page not found');

@@ -46,7 +46,7 @@ export const PATCH = apiRoute<UpdateDataViewResponse, undefined, UpdateDataViewP
 
     // Verify the data view exists and belongs to the user
     const existingDataView = await dataViewRetriever.retrieveDataView(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, existingDataView);
+    await assertGrantAllowsContainerForSession(session, existingDataView, { mutating: true });
 
     // If dataSourceId is being updated, verify the new data source exists and belongs to user
     if (body.dataSourceId && body.dataSourceId !== existingDataView.dataSourceId) {
@@ -78,7 +78,7 @@ export const DELETE = apiRoute<void, undefined, DeleteViewParameters, {}>(
   async ({ params }, session) => {
     const dataViewRepository = await getDataViewRepository();
     const dataView = await dataViewRetriever.retrieveDataView(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, dataView);
+    await assertGrantAllowsContainerForSession(session, dataView, { mutating: true });
 
     const now = new Date().toISOString();
     await dataViewRepository.update({

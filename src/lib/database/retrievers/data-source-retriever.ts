@@ -1,6 +1,5 @@
 import { DataSourceContainer } from '@/types/database';
 import { getContainerRepository } from '..';
-import { addUserIdToQuery } from '../helpers';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 
@@ -8,8 +7,9 @@ class DataSourceRetriever {
   private async retrieveDataSourceInternal(id: string, userId: string): Promise<DataSourceContainer> {
     const containerRepository = await getContainerRepository();
 
+    // Content is scoped by workspace membership + grant, not creator identity (THOTH-042).
     const existingDataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', id), userId).eq('type', 'data-source')
+      containerRepository.createQuery().eq('id', id).eq('type', 'data-source')
     );
 
     if (!existingDataSource || existingDataSource.type !== 'data-source') {

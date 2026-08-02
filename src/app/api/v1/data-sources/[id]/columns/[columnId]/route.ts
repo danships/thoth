@@ -1,7 +1,6 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
-import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -24,15 +23,10 @@ export const PATCH = apiRoute<
   },
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
-    const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
-    );
-
-    if (!dataSource || dataSource.type !== 'data-source') {
-      throw new NotFoundError('Data source not found', true);
-    }
-    await assertWorkspaceAccess(session.user.id, dataSource.workspaceId);
-    await assertGrantAllowsContainerForSession(session, dataSource);
+    // Pattern P: fetched by id via the retriever (workspace membership asserted on the row's
+    // own workspaceId), not gated by creator (THOTH-042).
+    const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, dataSource, { mutating: true });
 
     const columns = [...(dataSource.columns ?? [])];
     const foundColumn = columns.find((column) => column.id === params.columnId);
@@ -78,15 +72,10 @@ export const DELETE = apiRoute<void, undefined, UpdateDataSourceColumnParameters
   },
   async ({ params }, session) => {
     const containerRepository = await getContainerRepository();
-    const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', params.id), session.user.id).eq('type', 'data-source')
-    );
-
-    if (!dataSource || dataSource.type !== 'data-source') {
-      throw new NotFoundError('Data source not found', true);
-    }
-    await assertWorkspaceAccess(session.user.id, dataSource.workspaceId);
-    await assertGrantAllowsContainerForSession(session, dataSource);
+    // Pattern P: fetched by id via the retriever (workspace membership asserted on the row's
+    // own workspaceId), not gated by creator (THOTH-042).
+    const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
+    await assertGrantAllowsContainerForSession(session, dataSource, { mutating: true });
 
     const nextColumns = (dataSource.columns ?? []).filter((c) => c.id !== params.columnId);
     if (nextColumns.length === (dataSource.columns ?? []).length) {

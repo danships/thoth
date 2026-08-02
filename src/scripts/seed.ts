@@ -81,6 +81,8 @@ await workspaceMemberRepository.create({
   workspaceId: workspace.id,
   userId: PREVIEW_USER_ID,
   role: 'owner',
+  permission: 'read_write',
+  scopeType: 'workspace',
   createdAt: now,
 } satisfies WorkspaceMemberCreate);
 

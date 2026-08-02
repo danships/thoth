@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SEED } from './constants';
 
-const AUTH_FILE = path.join(import.meta.dirname, '.auth/user.json');
+const AUTH_DIR = path.join(import.meta.dirname, '.auth');
 
-setup('seed database and write auth storage state', async () => {
-  execSync('pnpm tsx --env-file=.env.test scripts/end-to-end-seed.ts', { stdio: 'inherit' });
-
-  const baseUrl = process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:3000';
+async function signInAndWriteStorageState(
+  baseUrl: string,
+  credentials: { email: string; password: string },
+  outputFile: string
+) {
   const parsedBaseUrl = new URL(baseUrl);
   const { hostname } = parsedBaseUrl;
   const isHttps = parsedBaseUrl.protocol === 'https:';
@@ -20,8 +21,8 @@ setup('seed database and write auth storage state', async () => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      email: SEED.user.email,
-      password: SEED.user.password,
+      email: credentials.email,
+      password: credentials.password,
     }),
   });
 
@@ -74,9 +75,9 @@ setup('seed database and write auth storage state', async () => {
     ];
   });
 
-  fs.mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
   fs.writeFileSync(
-    AUTH_FILE,
+    outputFile,
     JSON.stringify(
       {
         cookies,
@@ -86,4 +87,19 @@ setup('seed database and write auth storage state', async () => {
       2
     )
   );
+}
+
+setup('seed database and write auth storage state', async () => {
+  execSync('pnpm tsx --env-file=.env.test scripts/end-to-end-seed.ts', { stdio: 'inherit' });
+
+  const baseUrl = process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:3000';
+
+  // Primary seeded user (workspace owner) — used by the default `chromium` project.
+  await signInAndWriteStorageState(baseUrl, SEED.user, path.join(AUTH_DIR, 'user.json'));
+
+  // Second/third seeded members of `SEED.workspace` (THOTH-042, DECISION 4) — `read_write` and
+  // `read`-only respectively — used by the `chromium-second-member` /
+  // `chromium-readonly-member` projects to exercise the multi-user access matrix.
+  await signInAndWriteStorageState(baseUrl, SEED.secondUser, path.join(AUTH_DIR, 'second-user.json'));
+  await signInAndWriteStorageState(baseUrl, SEED.thirdUser, path.join(AUTH_DIR, 'third-user.json'));
 });

@@ -210,6 +210,11 @@ export async function syncAppWorkspaceMembership(app: App): Promise<void> {
       workspaceId: app.workspaceId,
       userId: ownerId,
       role: 'app',
+      // The synthetic `app` membership row exists only so App-attributed content passes the
+      // membership check; the App's real grant is always `session.appContext.accessGrant`,
+      // never this row's permission/scopeType (see `assertContentAccess`).
+      permission: 'read_write',
+      scopeType: 'workspace',
       createdAt: new Date().toISOString(),
     });
   } else if (!shouldExist && existing) {

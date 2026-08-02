@@ -74,6 +74,8 @@ async function createIsolatedUserWithoutPages() {
     workspaceId: workspace.id,
     userId,
     role: 'owner',
+    permission: 'read_write',
+    scopeType: 'workspace',
     createdAt: now,
   } satisfies WorkspaceMemberCreate);
 

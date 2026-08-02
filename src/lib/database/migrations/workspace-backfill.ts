@@ -49,6 +49,8 @@ export async function backfillWorkspaces(superSave: SuperSave): Promise<void> {
         workspaceId: workspace.id,
         userId: workspace.userId,
         role: 'owner',
+        permission: 'read_write',
+        scopeType: 'workspace',
         createdAt: workspace.createdAt ?? new Date().toISOString(),
       });
     }

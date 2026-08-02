@@ -15,7 +15,7 @@ export const POST = apiRoute<RestoreDataSourceResponse, undefined, RestoreDataSo
   },
   async ({ params }, session) => {
     const dataSource = await dataSourceRetriever.retrieveDataSourceIncludingDeleted(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, dataSource);
+    await assertGrantAllowsContainerForSession(session, dataSource, { mutating: true });
 
     if (!dataSource.deletedAt || dataSource.deletedRootId !== dataSource.id) {
       throw new NotFoundError('Data source not found');

@@ -101,6 +101,6 @@ export const api = {
 2. Define Zod schemas and TS types in `src/types/api/endpoints/<endpoint-name>.ts`
 3. Export types from `src/types/api/index.ts`
 4. Use `apiRoute` wrapper with the correct schema options
-5. Scope all DB queries with `addUserIdToQuery` (see `securing-routes` skill)
+5. Scope DB queries per entity category: CONTENT via `addWorkspaceIdToQuery` + `assertContentAccess`/`filterContainersByGrantForSession`; PER-USER STATE via `addUserIdToQuery` (see `securing-routes` skill, THOTH-042)
 6. Add a typed helper to `src/lib/api/client.ts`
 7. Run `pnpm lint` and `pnpm build`

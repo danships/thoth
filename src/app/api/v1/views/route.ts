@@ -1,8 +1,10 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository, getWorkspaceRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
+import { assertGrantAllowsContainerForSession, filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateDataViewBody, CreateDataViewResponse, GetDataViewsResponse, GetDataViewsQuery } from '@/types/api';
 import { createDataViewBodySchema, getDataViewsQuerySchema } from '@/types/api';
@@ -14,24 +16,40 @@ export const GET = apiRoute<GetDataViewsResponse, GetDataViewsQuery, {}>(
   },
   async ({ query }, session) => {
     const dataViewRepository = await getDataViewRepository();
-    let databaseQuery = addUserIdToQuery(dataViewRepository.createQuery(), session.user.id).sort('createdAt', 'desc');
 
-    // Optional filtering by data source ID
+    // Pattern L (list): a `workspaceId` is required to scope the query. When `dataSourceId` is
+    // given, derive the workspace from it (already access-checked by the retriever); otherwise
+    // fall back to an explicit `workspaceId` or the caller's default workspace, matching the
+    // GET/POST pattern used elsewhere (THOTH-042).
+    let workspaceId: string;
+    if (query?.dataSourceId) {
+      const dataSource = await dataSourceRetriever.retrieveDataSource(query.dataSourceId, session.user.id);
+      await assertGrantAllowsContainerForSession(session, dataSource);
+      workspaceId = dataSource.workspaceId;
+    } else {
+      workspaceId = query?.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
+      await assertWorkspaceAccess(session.user.id, workspaceId);
+    }
+
+    let databaseQuery = addWorkspaceIdToQuery(dataViewRepository.createQuery(), workspaceId).sort('createdAt', 'desc');
+
     if (query?.dataSourceId) {
       databaseQuery = databaseQuery.eq('dataSourceId', query.dataSourceId);
     }
 
     const dataViews = await dataViewRepository.getByQuery(databaseQuery);
+    const scopedDataViews = await filterContainersByGrantForSession(
+      session,
+      dataViews.filter((dataView) => !dataView.deletedAt)
+    );
 
-    return dataViews
-      .filter((dataView) => !dataView.deletedAt)
-      .map((dataView) => ({
-        id: dataView.id,
-        name: dataView.name,
-        dataSourceId: dataView.dataSourceId,
-        createdAt: dataView.createdAt,
-        lastUpdated: dataView.lastUpdated,
-      }));
+    return scopedDataViews.map((dataView) => ({
+      id: dataView.id,
+      name: dataView.name,
+      dataSourceId: dataView.dataSourceId,
+      createdAt: dataView.createdAt,
+      lastUpdated: dataView.lastUpdated,
+    }));
   }
 );
 
@@ -40,17 +58,9 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
     expectedBodySchema: createDataViewBodySchema,
   },
   async ({ body }, session) => {
-    const containerRepository = await getContainerRepository();
-    const dataSource = await containerRepository.getOneByQuery(
-      addUserIdToQuery(containerRepository.createQuery().eq('id', body.dataSourceId), session.user.id).eq(
-        'type',
-        'data-source'
-      )
-    );
-
-    if (!dataSource || dataSource.deletedAt) {
-      throw new NotFoundError('Data source not found or access denied.');
-    }
+    // Content is scoped by workspace membership + grant, not creator (THOTH-042).
+    const dataSource = await dataSourceRetriever.retrieveDataSource(body.dataSourceId, session.user.id);
+    await assertGrantAllowsContainerForSession(session, dataSource);
 
     const workspaceId =
       body.workspaceId ?? dataSource.workspaceId ?? (await resolveDefaultWorkspaceId(session.user.id));
@@ -67,15 +77,18 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
       throw new NotFoundError('Workspace not found');
     }
 
+    const containerRepository = await getContainerRepository();
     let pageToLink: Container | undefined | null;
     if (body.pageId) {
+      // Pattern C: derived from the already-authorised data source's own workspace.
       pageToLink = await containerRepository.getOneByQuery(
-        addUserIdToQuery(containerRepository.createQuery().eq('id', body.pageId), session.user.id).eq('type', 'page')
+        addWorkspaceIdToQuery(containerRepository.createQuery().eq('id', body.pageId), workspace.id).eq('type', 'page')
       );
 
       if (!pageToLink || pageToLink.deletedAt || pageToLink.workspaceId !== workspace.id) {
         throw new NotFoundError('Page not found or access denied.');
       }
+      await assertGrantAllowsContainerForSession(session, pageToLink, { mutating: true });
     }
 
     const dataViewRepository = await getDataViewRepository();

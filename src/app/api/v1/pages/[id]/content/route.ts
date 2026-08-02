@@ -36,7 +36,7 @@ export const POST = apiRoute(
     const containerRepository = await getContainerRepository();
 
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, page);
+    await assertGrantAllowsContainerForSession(session, page, { mutating: true });
 
     // Record the revision against the *pre-update* content, before the container row itself is
     // overwritten below. Skipped entirely when the content hasn't actually changed, so a no-op

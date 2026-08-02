@@ -2,7 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { getLogger } from '@/lib/logger';
 import type {
   DeleteDataSourceParameters,
@@ -49,9 +49,9 @@ export const PATCH = apiRoute<UpdateDataSourceResponse, undefined, UpdateDataSou
 
     const containerRepository = await getContainerRepository();
 
-    // Verify the data source exists and belongs to the user
+    // Content is scoped by workspace membership + grant, not creator (THOTH-042).
     const existingDataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, existingDataSource);
+    await assertGrantAllowsContainerForSession(session, existingDataSource, { mutating: true });
 
     // Update the data source with provided fields
     const filteredBody = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
@@ -80,18 +80,17 @@ export const DELETE = apiRoute<void, undefined, DeleteDataSourceParameters, {}>(
     const containerRepository = await getContainerRepository();
     const dataViewRepository = await getDataViewRepository();
     const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, dataSource);
+    await assertGrantAllowsContainerForSession(session, dataSource, { mutating: true });
 
     const now = new Date().toISOString();
 
     // Update all active linked views first, and only mark the data source itself deleted once
     // every view update has succeeded — if a view update throws partway through, the data
     // source stays live rather than being left in an inconsistent, partially-cascaded state.
+    // Pattern C: anchored on the already-authorised data source's own workspace, not creator
+    // (THOTH-042).
     const linkedViews = await dataViewRepository.getByQuery(
-      addUserIdToQuery(dataViewRepository.createQuery().eq('dataSourceId', dataSource.id), session.user.id).eq(
-        'workspaceId',
-        dataSource.workspaceId
-      )
+      addWorkspaceIdToQuery(dataViewRepository.createQuery().eq('dataSourceId', dataSource.id), dataSource.workspaceId)
     );
 
     let deletedViewCount = 0;

@@ -7,6 +7,7 @@ export { WorkspaceSlugRedirect, NAME as WORKSPACE_SLUG_REDIRECT_NAME } from './w
 export { App, NAME as APP_NAME } from './app';
 export { ApiKey, NAME as API_KEY_NAME } from './api-key';
 export { AppScopedContainer, NAME as APP_SCOPED_CONTAINER_NAME } from './app-scoped-container';
+export { MemberScopedContainer, NAME as MEMBER_SCOPED_CONTAINER_NAME } from './member-scoped-container';
 export { Webhook, NAME as WEBHOOK_NAME } from './webhook';
 export { WebhookDelivery, NAME as WEBHOOK_DELIVERY_NAME } from './webhook-delivery';
 export { UploadedFile, NAME as UPLOADED_FILE_NAME } from './uploaded-file';

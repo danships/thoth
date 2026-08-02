@@ -15,7 +15,7 @@ export const POST = apiRoute<RestoreViewResponse, undefined, RestoreViewParamete
   },
   async ({ params }, session) => {
     const dataView = await dataViewRetriever.retrieveDataViewIncludingDeleted(params.id, session.user.id);
-    await assertGrantAllowsContainerForSession(session, dataView);
+    await assertGrantAllowsContainerForSession(session, dataView, { mutating: true });
 
     if (!dataView.deletedAt || dataView.deletedRootId !== dataView.id) {
       throw new NotFoundError('Data view not found');

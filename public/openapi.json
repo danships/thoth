@@ -4843,6 +4843,15 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         ]
       },
@@ -6646,6 +6655,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Not authorized",
             "content": {
@@ -6666,7 +6685,18 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
       },
       "post": {
         "operationId": "createDataSource",

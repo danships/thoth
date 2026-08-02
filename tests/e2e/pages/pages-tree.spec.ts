@@ -23,12 +23,21 @@ test('sidebar shows Trash button', async ({ page }) => {
 });
 
 test('seeded root page appears in sidebar', async ({ page }) => {
+  // Root listing is workspace-scoped ordering by `lastUpdated` (THOTH-042 DECISION 1); bump it
+  // deterministically so it's guaranteed visible in the sidebar's initial window regardless of
+  // what other specs have done in the shared workspace.
+  await page.request.post(`/api/v1/pages/${SEED.pages.root.id}/append`, { data: { content: '' } });
   await page.goto(`/${SEED.workspace.slug}/pages`);
   // Root also appears in the Recent section (per THOTH-035), so scope to the Pages tree.
   await expect(page.getByTestId('pages-tree-scroll-pane').getByText(SEED.pages.root.name)).toBeVisible();
 });
 
 test('seeded data source host page appears in sidebar', async ({ page }) => {
+  // Root listing is workspace-scoped ordering by `lastUpdated` (THOTH-042 DECISION 1), so other
+  // specs creating/updating root-level pages in the shared workspace can push this seeded page
+  // outside the sidebar's initial (unpaginated) window. Bump it via a documented no-op append so
+  // it is deterministically the most-recently-updated root page for this assertion.
+  await page.request.post(`/api/v1/pages/${SEED.pages.dataSourceHost.id}/append`, { data: { content: '' } });
   await page.goto(`/${SEED.workspace.slug}/pages`);
   // Also appears in the Recent section (per THOTH-035), so scope to the Pages tree.
   await expect(page.getByTestId('pages-tree-scroll-pane').getByText(SEED.pages.dataSourceHost.name)).toBeVisible();

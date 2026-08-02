@@ -32,7 +32,7 @@ export async function mutatePageContent(
   const containerRepository = await getContainerRepository();
 
   const page = await pageRetriever.retrievePage(id, session.user.id);
-  await assertGrantAllowsContainerForSession(session, page);
+  await assertGrantAllowsContainerForSession(session, page, { mutating: true });
 
   const existing = 'content' in page ? (page.content ?? '') : '';
 
