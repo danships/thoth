@@ -47,4 +47,4 @@ db.sqlite-*
 /playwright-report/
 /test-results/
 /tests/e2e/.auth/
-e2e-test.db
+e2e-test.db.tmp/
