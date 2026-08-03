@@ -10,6 +10,10 @@ import type { OperationRegistry } from './types';
  * - `POST /files` and `GET /files/{id}/content` (`src/app/api/v1/files/route.ts`,
  *   `src/app/api/v1/files/[id]/content/route.ts`): manual handlers (multipart request body /
  *   binary streaming response), not wrapped by `apiRoute`, so not part of the generated schema.
+ * - `GET /pages/{id}/markdown` (`src/app/api/v1/pages/[id]/markdown/route.ts`, THOTH-048): manual
+ *   handler returning the raw Markdown body as `text/markdown` (not JSON), so not wrapped by
+ *   `apiRoute` and not part of the generated schema. It's the internal rewrite target for the
+ *   `.md`-suffixed page detail URL, not a documented API surface of its own.
  *
  * `/config` is registered as `/config` even though `GET_AUTH_CONFIG_ENDPOINT` is `/v1/config`,
  * because the generated document is served with `/api/v1` as its server base URL.
