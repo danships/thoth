@@ -1,34 +1,39 @@
-import assert from 'node:assert/strict';
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { COALESCE_WINDOW_MS } from './constants';
 import { nextCoalesceWindowEnd, shouldCoalesce } from './coalesce';
 
-const now = new Date('2024-01-01T12:00:00.000Z');
+describe('coalesce', () => {
+  let now = new Date(0);
 
-// True within window + same author
-{
-  const head = { author: 'user-1', coalesceWindowEnd: new Date(now.getTime() + 60_000).toISOString() };
-  assert.equal(shouldCoalesce(head, 'user-1', now), true);
-}
+  beforeAll(() => {
+    now = new Date('2024-01-01T12:00:00.000Z');
+  });
 
-// False on different author
-{
-  const head = { author: 'user-1', coalesceWindowEnd: new Date(now.getTime() + 60_000).toISOString() };
-  assert.equal(shouldCoalesce(head, 'user-2', now), false);
-}
+  afterAll(() => {
+    now = new Date(0);
+  });
 
-// False after window expiry
-{
-  const head = { author: 'user-1', coalesceWindowEnd: new Date(now.getTime() - 1).toISOString() };
-  assert.equal(shouldCoalesce(head, 'user-1', now), false);
-}
+  test('returns true within the window for the same author', () => {
+    const head = { author: 'user-1', coalesceWindowEnd: new Date(now.getTime() + 60_000).toISOString() };
+    expect(shouldCoalesce(head, 'user-1', now)).toBe(true);
+  });
 
-// False when no head
-assert.equal(shouldCoalesce(null, 'user-1', now), false);
+  test('returns false for a different author', () => {
+    const head = { author: 'user-1', coalesceWindowEnd: new Date(now.getTime() + 60_000).toISOString() };
+    expect(shouldCoalesce(head, 'user-2', now)).toBe(false);
+  });
 
-// nextCoalesceWindowEnd extends exactly COALESCE_WINDOW_MS from `now`
-{
-  const windowEnd = nextCoalesceWindowEnd(now);
-  assert.equal(new Date(windowEnd).getTime() - now.getTime(), COALESCE_WINDOW_MS);
-}
+  test('returns false after window expiry', () => {
+    const head = { author: 'user-1', coalesceWindowEnd: new Date(now.getTime() - 1).toISOString() };
+    expect(shouldCoalesce(head, 'user-1', now)).toBe(false);
+  });
 
-console.log('✅  coalesce tests passed');
+  test('returns false when there is no head', () => {
+    expect(shouldCoalesce(null, 'user-1', now)).toBe(false);
+  });
+
+  test('extends the next coalesce window exactly COALESCE_WINDOW_MS from now', () => {
+    const windowEnd = nextCoalesceWindowEnd(now);
+    expect(new Date(windowEnd).getTime() - now.getTime()).toBe(COALESCE_WINDOW_MS);
+  });
+});

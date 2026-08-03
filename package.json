@@ -11,8 +11,8 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "concurrently \"pnpm:lint:*\"",
-    "lint:eslint": "NODE_OPTIONS=--max-old-space-size=4096 eslint src tests scripts playwright.config.ts",
-    "lint:openapi": "tsx scripts/generate-openapi.ts --check && tsx src/lib/openapi/build.test.ts",
+    "lint:eslint": "NODE_OPTIONS=--max-old-space-size=4096 eslint src tests scripts playwright.config.ts vitest.unit.config.ts vitest.integration.config.ts",
+    "lint:openapi": "tsx scripts/generate-openapi.ts --check && vitest run --config vitest.unit.config.ts src/lib/openapi/build.test.ts",
     "lint:prettier": "prettier --check --log-level=warn src",
     "format": "prettier --write src && eslint --fix src",
     "lint:tsc": "tsc --noEmit",
@@ -22,7 +22,10 @@
     "workspaces:purge": "tsx scripts/purge-deleted-workspaces.ts",
     "pages:purge": "tsx scripts/purge-deleted-pages.ts",
     "files:purge": "tsx scripts/purge-deleted-files.ts",
-    "test:unit": "tsx scripts/run-unit-tests.ts",
+    "test": "vitest run --config vitest.unit.config.ts && vitest run --config vitest.integration.config.ts",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:unit:watch": "vitest --config vitest.unit.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
@@ -80,7 +83,8 @@
     "prettier": "^3.9.4",
     "rimraf": "^6.1.3",
     "tsx": "^4.19.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   },
   "packageManager": "pnpm@11.18.0"
 }

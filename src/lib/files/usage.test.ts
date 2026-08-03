@@ -1,26 +1,35 @@
-import assert from 'node:assert/strict';
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { extractFileIdsFromContent } from './usage';
 
-// Single reference
-assert.deepEqual(extractFileIdsFromContent('Here is a file: [download](/api/v1/files/abc-123/content)'), ['abc-123']);
+describe('extractFileIdsFromContent', () => {
+  beforeAll(() => undefined);
+  afterAll(() => undefined);
 
-// Multiple distinct references preserve first-seen order
-assert.deepEqual(
-  extractFileIdsFromContent(
-    '![img](/api/v1/files/img-1/content)\n\n[file](/api/v1/files/file-2/content)\n\n[again](/api/v1/files/img-1/content)'
-  ),
-  ['img-1', 'file-2']
-);
+  test('extracts a single reference', () => {
+    expect(extractFileIdsFromContent('Here is a file: [download](/api/v1/files/abc-123/content)')).toEqual(['abc-123']);
+  });
 
-// No matches
-assert.deepEqual(extractFileIdsFromContent('Just plain text, no files here.'), []);
+  test('preserves first-seen order across multiple distinct references', () => {
+    expect(
+      extractFileIdsFromContent(`![img](/api/v1/files/img-1/content)
 
-// Ignores unrelated URLs — a full external URL that happens to embed our exact path shape
-// (id + `/content` suffix) must not be mistaken for a locally-served file link, since the
-// character preceding `/api` here is part of the external hostname, not a link boundary.
-assert.deepEqual(extractFileIdsFromContent('[link](https://example.com/api/v1/files/some-id/content) not-a-match'), []);
+[file](/api/v1/files/file-2/content)
 
-// Empty content
-assert.deepEqual(extractFileIdsFromContent(''), []);
+[again](/api/v1/files/img-1/content)`)
+    ).toEqual(['img-1', 'file-2']);
+  });
 
-console.log('✅  extractFileIdsFromContent tests passed');
+  test('returns an empty list when there are no matches', () => {
+    expect(extractFileIdsFromContent('Just plain text, no files here.')).toEqual([]);
+  });
+
+  test('ignores unrelated external URLs that embed a matching path shape', () => {
+    expect(extractFileIdsFromContent('[link](https://example.com/api/v1/files/some-id/content) not-a-match')).toEqual(
+      []
+    );
+  });
+
+  test('returns an empty list for empty content', () => {
+    expect(extractFileIdsFromContent('')).toEqual([]);
+  });
+});
