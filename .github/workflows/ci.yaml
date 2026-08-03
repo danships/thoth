@@ -43,6 +43,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run unit tests
+        run: pnpm test:unit
+
       - name: Run lint
         run: pnpm lint
 
@@ -62,6 +65,44 @@ jobs:
       - name: Run build
         run: pnpm build
 
+  integration:
+    runs-on: ubuntu-latest
+    needs: ci
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      NODE_ENV: test
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || 'integration-test-secret-not-for-production' }}
+      LOG_LEVEL: error
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run integration tests
+        run: pnpm test:integration
+
   e2e:
     runs-on: ubuntu-latest
     needs: ci
@@ -69,6 +110,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: 1
       NODE_ENV: test
       DB: sqlite:///tmp/thoth-e2e.db
+      STORAGE_LOCAL_FOLDER: /tmp/thoth-e2e-uploads
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || 'e2e-test-secret-not-for-production' }}
       SUPERSAVE_SKIP_SYNC: false
       LOG_LEVEL: error

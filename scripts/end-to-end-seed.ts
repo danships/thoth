@@ -25,7 +25,7 @@ import type {
   WorkspaceMemberCreate,
   DataViewCreate,
 } from '../src/types/database/index.js';
-import type { Column } from '../src/types/schemas/entities/container.js';
+import type { Column, PageValue } from '../src/types/schemas/entities/container.js';
 
 const DB_PATH = process.env['DB']!.replace('sqlite://', '');
 
@@ -737,10 +737,10 @@ async function seedAppData() {
 
   for (const row of filterSortSeed.rows) {
     const cols = filterSortSeed.dataSource.columns;
-    const values: Record<string, { type: string; value: unknown }> = {};
-
-    // Label (string column) — uses `${row.name} Item` to avoid collision with page name
-    values[cols[0].id] = { type: 'string', value: `${row.name} Item` };
+    const values: Record<string, PageValue> = {
+      // Label (string column) — uses `${row.name} Item` to avoid collision with page name
+      [cols[0].id]: { type: 'string', value: `${row.name} Item` },
+    };
 
     // Score (number column)
     if (row.score !== null) {

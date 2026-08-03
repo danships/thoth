@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from 'vitest';
-import { getBaseUrl, getOwnerClient, getData, SEED, createAnonymousClient } from '../../support/fixtures';
+import { getBaseUrl, getOwnerClient, SEED, createAnonymousClient } from '../../support/fixtures';
 import type { ApiClient } from '../../support/fixtures';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -36,18 +36,18 @@ async function queryView(
   } = {}
 ): Promise<PaginatedResponse> {
   const includeValues = options.includeValues ?? true;
-  const params: Record<string, string> = {
+  const parameters: Record<string, string> = {
     viewId: VIEW_ID,
     // z.coerce.boolean() coerces any non-empty string (including "false") to true;
     // only send the parameter when its value is truthy, and omit it to get the default (false).
     ...(includeValues ? { includeValues: 'true' } : {}),
   };
-  if (options.filters) params['filters'] = JSON.stringify(options.filters);
-  if (options.sorts) params['sorts'] = JSON.stringify(options.sorts);
-  if (options.cursor) params['cursor'] = options.cursor;
-  if (options.limit) params['limit'] = String(options.limit);
+  if (options.filters) parameters['filters'] = JSON.stringify(options.filters);
+  if (options.sorts) parameters['sorts'] = JSON.stringify(options.sorts);
+  if (options.cursor) parameters['cursor'] = options.cursor;
+  if (options.limit) parameters['limit'] = String(options.limit);
 
-  const response = await client.get('/api/v1/pages', { params });
+  const response = await client.get('/api/v1/pages', { params: parameters });
   expect(response.status, `GET /pages returned ${response.status}`).toBe(200);
   return response.json<PaginatedResponse>();
 }
@@ -515,7 +515,7 @@ describe('Data View filter/sort API', () => {
       // Then chronological: 2025-01-01 (E), 2025-03-01 (B), 2025-06-15 (A,C,G), 2025-12-31 (F)
       expect(ids[2]).toBe(E); // Jan 1
       expect(ids[3]).toBe(B); // Mar 1
-      expect(ids[ids.length - 1]).toBe(F); // Dec 31
+      expect(ids.at(-1)).toBe(F); // Dec 31
     });
 
     test('multi-sort with mixed directions', async () => {

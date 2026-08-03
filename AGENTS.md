@@ -173,21 +173,26 @@ src/
 
 ## Testing & Quality
 
-Before completing tasks, run available lint and typecheck commands:
+Before completing tasks, run the relevant quality gates for the scope you changed:
 
-- Check package.json for scripts like `npm run lint`, `npm run typecheck`, `npm run test`
-- Fix any issues found
+- `pnpm test:unit` — fast Vitest unit tests for isolated logic in `src/**/*.test.ts`
+- `pnpm test:integration` — Vitest API integration tests against a real HTTP server in `tests/integration/api/**/*.test.ts`
+- `pnpm test` — combined unit + integration suite
+- `pnpm test:e2e` — Playwright browser tests for user-facing flows
+- `pnpm lint` — ESLint + Prettier + TypeScript + OpenAPI drift checks
+- `pnpm lint:tsc` — TypeScript-only check when you need to focus on compile errors first
 - Only commit changes when explicitly requested by the user
 - Never add custom patches (e.g. via `pnpm patch`/`patches/*.patch`) to work around a broken
   ESLint rule or dependency incompatibility. Instead, disable the offending rule (or fix the
   root cause via config, e.g. explicit `settings`) in `eslint.config.mjs`.
 
-## E2E Tests (Playwright)
+## Playwright E2E Tests
 
-Every feature — new or modified — **must** ship with Playwright E2E tests.
+Use Playwright for browser/UI interaction coverage. Prefer unit tests for isolated logic and
+`tests/integration/api/` for API-only behavior that does not require a browser.
 
 - Tests live in `tests/e2e/` grouped by domain (auth, pages, data-sources, data-views, page-values).
-- Use seeded data from `tests/e2e/constants.ts` (`SEED.*`) — never hardcode IDs.
+- Shared seeded data lives in `tests/fixtures/seed.ts` and is re-exported by `tests/e2e/constants.ts` (`SEED.*`).
 - Run: `pnpm test:e2e` (local) · `pnpm test:e2e:ui` (interactive) · `pnpm test:e2e:report` (report).
 - See `.agents/commands/e2e-test.md` for full conventions, auth setup, and selector guidance.
 

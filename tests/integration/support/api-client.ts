@@ -26,14 +26,6 @@ function parseCookieJar(response: Response): CookieJar {
   return jar;
 }
 
-function mergeCookieJars(existing: CookieJar, incoming: CookieJar): CookieJar {
-  const merged = new Map(existing);
-  for (const [name, value] of incoming) {
-    merged.set(name, value);
-  }
-  return merged;
-}
-
 function cookieHeader(jar: CookieJar): string {
   return [...jar.entries()].map(([name, value]) => `${name}=${value}`).join('; ');
 }
@@ -86,10 +78,10 @@ function wrapResponse(response: Response): ApiResponse {
   };
 }
 
-function buildUrl(baseUrl: string, path: string, params?: Record<string, string>): string {
+function buildUrl(baseUrl: string, path: string, parameters?: Record<string, string>): string {
   const url = new URL(path, baseUrl);
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
+  if (parameters) {
+    for (const [key, value] of Object.entries(parameters)) {
       url.searchParams.set(key, value);
     }
   }
@@ -155,14 +147,23 @@ function createClientInternal(baseUrl: string, jar: CookieJar, bearerToken: stri
     options?: RequestOptions
   ): Promise<ApiResponse> => {
     const url = buildUrl(baseUrl, path, options?.params);
-    const headers: Record<string, string> = {
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(options?.headers ?? {}),
-    };
+    const headers: Record<string, string> = options?.headers ? { ...options.headers } : {};
+
+    if (body === undefined) {
+      const response = await doFetch(url, {
+        method,
+        headers,
+      });
+      return wrapResponse(response);
+    }
+
     const response = await doFetch(url, {
       method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+      body: JSON.stringify(body),
     });
     return wrapResponse(response);
   };

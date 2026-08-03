@@ -2,12 +2,12 @@
 //
 // Vitest global-setup for the API integration suite.
 // Spawns a Next.js dev server backed by a fresh, seeded SQLite database.
-import type { GlobalSetupContext } from 'vitest/node';
-import { spawn, execSync } from 'node:child_process';
+import type { TestProject } from 'vitest/node';
+import { spawn, execSync, type ChildProcessByStdio } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
+import type { Readable } from 'node:stream';
 
 /** Find a free port on the loopback interface. */
 function getFreePort(): Promise<number> {
@@ -45,21 +45,21 @@ async function waitForServer(url: string, timeoutMs: number, serverOutput: strin
   );
 }
 
-export default async function globalSetup({ provide }: GlobalSetupContext) {
+export default async function globalSetup({ provide }: Pick<TestProject, 'provide'>) {
   const projectRoot = path.resolve(import.meta.dirname, '../..');
 
   // Create a task-scoped temporary directory for the database and uploads
-  const tempDir = await mkdtemp(path.join(tmpdir(), 'thoth-integration-'));
-  const dbPath = path.join(tempDir, 'integration.db');
-  const uploadsPath = path.join(tempDir, 'uploads');
+  const temporaryDirectory = await mkdtemp(path.join(projectRoot, '.thoth-integration-'));
+  const databasePath = path.join(temporaryDirectory, 'integration.db');
+  const uploadsPath = path.join(temporaryDirectory, 'uploads');
 
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
 
-  const env: Record<string, string> = {
-    ...process.env as Record<string, string>,
+  const environment: NodeJS.ProcessEnv = {
+    ...process.env,
     NODE_ENV: 'test',
-    DB: `sqlite://${dbPath}`,
+    DB: `sqlite://${databasePath}`,
     BETTER_AUTH_SECRET: 'integration-test-secret-not-for-production',
     SUPERSAVE_SKIP_SYNC: 'false',
     LOG_LEVEL: 'error',
@@ -75,10 +75,10 @@ export default async function globalSetup({ provide }: GlobalSetupContext) {
     ['exec', 'next', 'dev', '--turbopack', '--hostname', '127.0.0.1', '--port', String(port)],
     {
       cwd: projectRoot,
-      env,
+      env: environment,
       stdio: ['ignore', 'pipe', 'pipe'],
     }
-  );
+  ) as ChildProcessByStdio<null, Readable, Readable>;
 
   serverProcess.stdout.on('data', (data: Buffer) => {
     serverOutput.push(data.toString());
@@ -90,7 +90,7 @@ export default async function globalSetup({ provide }: GlobalSetupContext) {
   // Detect early exit
   let serverExited = false;
   let exitCode: number | null = null;
-  serverProcess.on('exit', (code) => {
+  serverProcess.on('exit', (code: number | null) => {
     serverExited = true;
     exitCode = code;
   });
@@ -111,7 +111,7 @@ export default async function globalSetup({ provide }: GlobalSetupContext) {
   // Run the seed script against the integration database
   execSync(`pnpm tsx scripts/end-to-end-seed.ts`, {
     cwd: projectRoot,
-    env,
+    env: environment,
     stdio: 'pipe',
     timeout: 60_000,
   });
@@ -119,7 +119,7 @@ export default async function globalSetup({ provide }: GlobalSetupContext) {
   // Provide the base URL to test files via the globalSetup provide mechanism
   // Tests read this via `process.env.INTEGRATION_BASE_URL`
   provide('baseUrl', baseUrl);
-  provide('tempDir', tempDir);
+  provide('tempDir', temporaryDirectory);
 
   // Write env so workers pick it up
   process.env['INTEGRATION_BASE_URL'] = baseUrl;
@@ -144,7 +144,7 @@ export default async function globalSetup({ provide }: GlobalSetupContext) {
     }
 
     try {
-      await rm(tempDir, { recursive: true, force: true });
+      await rm(temporaryDirectory, { recursive: true, force: true });
     } catch {
       // Best effort cleanup
     }

@@ -1,4 +1,3 @@
-import { Blob } from 'node:buffer';
 import { describe, expect, test } from 'vitest';
 import { getBaseUrl, getOwnerClient, SEED } from '../../support/fixtures';
 
@@ -9,7 +8,8 @@ async function getOwner() {
 async function uploadFile(filename: string, mimeType: string, contents: Buffer | Uint8Array): Promise<Response> {
   const client = await getOwner();
   const form = new FormData();
-  form.set('file', new Blob([contents], { type: mimeType }), filename);
+  const fileBlob = new globalThis.Blob([new Uint8Array(contents)], { type: mimeType });
+  form.set('file', fileBlob, filename);
   return client.fetch('/api/v1/files', {
     method: 'POST',
     body: form,
