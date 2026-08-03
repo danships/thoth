@@ -54,12 +54,28 @@ jobs:
         run: |
           IMAGE=$(echo "${{ env.IMAGE_BASE }}:24h" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
-          docker buildx build \
+
+          # ttl.sh is a free, best-effort registry and occasionally returns
+          # transient 502/timeout errors on push. Retry the whole build+push
+          # a few times before giving up so flaky registry responses don't
+          # fail the whole workflow.
+          max_attempts=3
+          attempt=1
+          until docker buildx build \
             --platform linux/amd64 \
             --push \
             --tag "${IMAGE}" \
             --file Dockerfile.preview \
             .
+          do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::docker buildx build/push failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            echo "::warning::docker buildx build/push failed (attempt ${attempt}/${max_attempts}), retrying in 15s..."
+            attempt=$((attempt + 1))
+            sleep 15
+          done
 
       - name: Deploy preview on VM
         if: steps.check-secrets.outputs.configured == 'true'
