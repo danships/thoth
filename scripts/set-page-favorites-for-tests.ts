@@ -11,7 +11,7 @@
 // Usage: pnpm tsx --env-file=.env.test scripts/set-page-favorites-for-tests.ts <true|false> <pageId...>
 import 'dotenv/config';
 import { getContainerAccessRepository } from '../src/lib/database/index.js';
-import { SEED } from '../tests/e2e/constants.js';
+import { SEED } from '../tests/fixtures/seed.js';
 
 const [starredFlag, ...pageIds] = process.argv.slice(2);
 

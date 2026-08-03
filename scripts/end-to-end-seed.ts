@@ -13,7 +13,7 @@ import {
   getWorkspaceRepository,
 } from '../src/lib/database/index.js';
 import { getStorageAdapter } from '../src/lib/storage/index.js';
-import { SEED } from '../tests/e2e/constants.js';
+import { SEED } from '../tests/fixtures/seed.js';
 import type {
   ContainerAccessCreate,
   DataSourceContainer,
