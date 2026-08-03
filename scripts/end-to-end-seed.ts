@@ -94,15 +94,7 @@ async function seedAuthTables() {
       `INSERT OR REPLACE INTO account (id, accountId, providerId, userId, createdAt, updatedAt, password)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(
-      'e2e-account-00000001',
-      SEED.secondUser.id,
-      'credential',
-      SEED.secondUser.id,
-      now,
-      now,
-      secondPasswordHash
-    );
+    .run('e2e-account-00000001', SEED.secondUser.id, 'credential', SEED.secondUser.id, now, now, secondPasswordHash);
 
   database
     .prepare(
@@ -473,6 +465,45 @@ async function seedAppData() {
     { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
   );
 
+  // THOTH-053: dedicated rows for inline-Markdown rendering assertions, kept separate from
+  // `SEED.dataSourcePage` (whose "Notes" cell is mutated by the inline-edit spec) so Markdown
+  // presentation assertions never race with a test that overwrites the shared row's raw text.
+  await upsertPage(
+    {
+      id: SEED.dataSource.markdownRow.id,
+      name: SEED.dataSource.markdownRow.name,
+      emoji: null,
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: SEED.dataSource.id,
+      createdAt: now,
+      lastUpdated: now,
+      values: {
+        [SEED.dataSource.columns[0].id]: { type: 'string', value: SEED.dataSource.markdown.raw },
+      },
+    },
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
+
+  await upsertPage(
+    {
+      id: SEED.dataSource.longMarkdownRow.id,
+      name: SEED.dataSource.longMarkdownRow.name,
+      emoji: null,
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: SEED.dataSource.id,
+      createdAt: now,
+      lastUpdated: now,
+      values: {
+        [SEED.dataSource.columns[0].id]: { type: 'string', value: SEED.dataSource.longMarkdown.raw },
+      },
+    },
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
+
   const existingView = await dataViewRepository.getOneByQuery(
     dataViewRepository.createQuery().eq('id', SEED.dataView.id)
   );
@@ -644,7 +675,7 @@ async function seedAppData() {
       createdAt: now,
       lastUpdated: now,
       values: {
-        [fieldsSeed.dataSource.columns[0].id]: { type: 'string', value: 'Initial alpha' },
+        [fieldsSeed.dataSource.columns[0].id]: { type: 'string', value: fieldsSeed.page.alphaValue },
         [fieldsSeed.dataSource.columns[1].id]: { type: 'boolean', value: false },
       },
     },
@@ -783,7 +814,6 @@ async function seedAppData() {
       { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
     );
   }
-
 
   // A root page with more children (12) than CHILD_PREVIEW_LIMIT (10), used to verify the
   // sidebar shows a "more inside" indicator instead of listing/paginating all of them inline.

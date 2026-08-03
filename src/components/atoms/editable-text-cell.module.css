@@ -1,0 +1,15 @@
+.markdownTarget {
+  min-width: 120px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--mantine-radius-sm);
+}
+
+.markdownTarget:hover {
+  background-color: var(--mantine-color-gray-0);
+}
+
+.markdownTarget:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 1px;
+}

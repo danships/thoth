@@ -1,0 +1,44 @@
+.root {
+  /* Force the entire rendered result onto a single visual line: no wrapping, clipped and
+     ellipsised at the cell boundary rather than growing the row/table/document. */
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  min-width: 1px;
+}
+
+/* Every wrapper/permitted inline child must stay inline (and inherit the no-wrap/ellipsis
+   behaviour) so an unwrapped block element (e.g. a former heading/paragraph) can never introduce
+   a line break or push the cell onto multiple lines. */
+.root :global(p),
+.root :global(strong),
+.root :global(em),
+.root :global(del),
+.root :global(code),
+.root :global(a) {
+  display: inline;
+  white-space: inherit;
+}
+
+.root :global(code) {
+  padding: 0 4px;
+  border-radius: var(--mantine-radius-sm);
+  background-color: var(--mantine-color-gray-1);
+  font-size: 0.9em;
+}
+
+.root :global(a) {
+  color: var(--mantine-color-blue-6);
+}
+
+.root :global(a:focus-visible) {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 1px;
+}
+
+.empty {
+  color: var(--mantine-color-gray-5);
+}
