@@ -4,8 +4,8 @@ import { useEffect } from 'react';
 
 /**
  * Sets `document.title` for client components, which (unlike server components/layouts) can't
- * export a static `metadata` object for Next.js to pick up. Always suffixed with " :: thoth"
- * (THOTH-046) to match the `%s :: thoth` template applied to server-rendered `metadata.title`
+ * export a static `metadata` object for Next.js to pick up. Always suffixed with " :: Thoth"
+ * (THOTH-046) to match the `%s :: Thoth` template applied to server-rendered `metadata.title`
  * values in the root layout (`src/app/layout.tsx`).
  *
  * Pass `undefined` while the real title isn't known yet (e.g. still loading) to leave the
@@ -16,6 +16,6 @@ export function useDocumentTitle(title: string | undefined): void {
     if (!title) {
       return;
     }
-    document.title = `${title} :: thoth`;
+    document.title = `${title} :: Thoth`;
   }, [title]);
 }

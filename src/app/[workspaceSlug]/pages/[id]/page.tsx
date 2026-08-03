@@ -75,11 +75,12 @@ export default function PageDetailsPage() {
 
   // The selected view (if any) is appended to the page name in the document title (THOTH-046)
   // — "Contents" and "Sub Pages" are the two built-in tabs, everything else is a named
-  // `DataView`. Falls back to just the page name while `pageDetails` (and thus the view list)
-  // hasn't loaded yet.
+  // `DataView`. Falls back to a stable "Page" title while `pageDetails` (and thus the view
+  // list) hasn't loaded yet, or failed to load, so a stale title from a previous page never
+  // lingers.
   const selectedViewLabel = getSelectedViewLabel(selectedView, pageDetails?.views);
   useDocumentTitle(
-    pageDetails?.page.name ? [pageDetails.page.name, selectedViewLabel].filter(Boolean).join(' - ') : undefined
+    pageDetails?.page.name ? [pageDetails.page.name, selectedViewLabel].filter(Boolean).join(' - ') : 'Page'
   );
 
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);

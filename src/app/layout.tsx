@@ -3,7 +3,7 @@ import { PropsWithChildren } from 'react';
 import RootClientLayout from './layout-client';
 import './globals.css';
 
-// Every rendered page needs a `<title>` ending in " :: thoth" (THOTH-046). Server-component
+// Every rendered page needs a `<title>` ending in " :: Thoth" (THOTH-046). Server-component
 // pages/layouts can override `title` directly (Next.js applies the `template` below to any
 // string they set); client-component pages can't export `metadata`, so they set
 // `document.title` themselves instead (see `useDocumentTitle`), formatted the same way. This
@@ -11,8 +11,8 @@ import './globals.css';
 // anything (e.g. `/`) or briefly before a client page's own effect runs.
 export const metadata: Metadata = {
   title: {
-    default: 'thoth',
-    template: '%s :: thoth',
+    default: 'Thoth',
+    template: '%s :: Thoth',
   },
 };
 
