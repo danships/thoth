@@ -16,6 +16,11 @@ export type OpenApiOperation = {
   body?: z.ZodType;
   response?: z.ZodType;
   responseWrapper?: ResponseWrapperMode;
+  // Additional properties merged as siblings of `data` in the generated response schema (e.g.
+  // `{ data: [...], pagination: {...} }`) — used for endpoints whose out-of-band metadata
+  // (THOTH-037 cursor pagination) lives at the response's root rather than nested inside `data`.
+  // Always optional in the generated schema, since the metadata is only populated conditionally.
+  responseMeta?: Record<string, z.ZodType>;
   successStatus?: 200 | 201 | 204;
   errorStatuses?: number[];
 };

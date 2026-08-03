@@ -87,7 +87,7 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
   {
     expectedQuerySchema: getPagesQuerySchema,
   },
-  async ({ query, setResponseHeader }, session) => {
+  async ({ query, setResponseMeta }, session) => {
     const containerRepository = await getContainerRepository();
 
     if (query.viewId) {
@@ -154,13 +154,16 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       // (THOTH-042) still need to be applied on top, exactly like the in-memory path above.
       const scopedPages = await filterContainersByGrantForSession(session, queryResult.pages);
 
-      setResponseHeader(
-        'X-Page-Query-Pagination',
-        JSON.stringify({
+      // Cursor-pagination metadata for the `viewId`-driven path is returned as a `pagination`
+      // field at the root of the response body, as a sibling of `data` (THOTH-037) — every
+      // other caller of this endpoint (favorited/recent/parentId/dataSourceId) simply never
+      // triggers `setResponseMeta`, so it keeps its existing plain-array-under-`data` shape.
+      setResponseMeta({
+        pagination: {
           nextCursor: queryResult.nextCursor ? encodePageQueryCursor(queryResult.nextCursor) : null,
           hasMore: queryResult.hasMore,
-        })
-      );
+        },
+      });
 
       return scopedPages.map((page) => {
         const returnValue: GetPagesResponse[number] = {

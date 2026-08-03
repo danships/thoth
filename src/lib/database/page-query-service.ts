@@ -134,6 +134,26 @@ function extractRawExpression(engine: Engine): string {
   return engine === 'sqlite' ? 'json_extract(contents, ?)' : 'JSON_EXTRACT(contents, ?)';
 }
 
+// `better-sqlite3` refuses to bind raw JS booleans (it only accepts numbers, strings, bigints,
+// buffers, and null) — see https://github.com/WiseLibs/better-sqlite3/issues/258. SQLite itself
+// has no boolean storage class and represents JSON `true`/`false` as the integers 1/0 once
+// extracted via `json_extract`, so normalizing here matches the stored representation and keeps
+// MySQL (which accepts JS booleans as bind params) unaffected.
+function normalizeFilterValue(engine: Engine, value: FilterRule['value']): FilterRule['value'] {
+  if (engine === 'sqlite' && typeof value === 'boolean') {
+    return value ? 1 : 0;
+  }
+  return value;
+}
+
+// Escapes `%`/`_`/`\` in a `contains`/`notContains` filter value so it's treated as a literal
+// substring rather than a LIKE wildcard pattern (e.g. searching for `50%` should not match every
+// value starting with `50`).
+function likePattern(value: unknown): string {
+  const escaped = String(value).replaceAll(/[\\%_]/g, (character) => `\\${character}`);
+  return `%${escaped}%`;
+}
+
 type SqlFragment = { sql: string; params: unknown[] };
 
 function buildFilterFragment(engine: Engine, column: Column, filter: FilterRule): SqlFragment {
@@ -143,6 +163,7 @@ function buildFilterFragment(engine: Engine, column: Column, filter: FilterRule)
   // case-insensitive comparisons stay consistent with the rest of the codebase (THOTH-037 Edge
   // Cases). MySQL/MariaDB's default collation is already case-insensitive, no override needed.
   const collate = isString && engine === 'sqlite' ? ' COLLATE NOCASE' : '';
+  const value = normalizeFilterValue(engine, filter.value);
 
   switch (filter.operator) {
     case 'isEmpty': {
@@ -172,37 +193,37 @@ function buildFilterFragment(engine: Engine, column: Column, filter: FilterRule)
       };
     }
     case 'equals': {
-      return { sql: `${extractExpression(engine)}${collate} = ?`, params: [path, filter.value] };
+      return { sql: `${extractExpression(engine)}${collate} = ?`, params: [path, value] };
     }
     case 'notEquals': {
       return {
         sql: `(${extractExpression(engine)} IS NULL OR ${extractExpression(engine)}${collate} != ?)`,
-        params: [path, path, filter.value],
+        params: [path, path, value],
       };
     }
     case 'contains': {
       return {
-        sql: `${extractExpression(engine)}${collate} LIKE ?`,
-        params: [path, `%${String(filter.value)}%`],
+        sql: String.raw`${extractExpression(engine)}${collate} LIKE ? ESCAPE '\'`,
+        params: [path, likePattern(value)],
       };
     }
     case 'notContains': {
       return {
-        sql: `(${extractExpression(engine)} IS NULL OR ${extractExpression(engine)}${collate} NOT LIKE ?)`,
-        params: [path, path, `%${String(filter.value)}%`],
+        sql: String.raw`(${extractExpression(engine)} IS NULL OR ${extractExpression(engine)}${collate} NOT LIKE ? ESCAPE '\')`,
+        params: [path, path, likePattern(value)],
       };
     }
     case 'gt': {
-      return { sql: `${extractExpression(engine)} > ?`, params: [path, filter.value] };
+      return { sql: `${extractExpression(engine)} > ?`, params: [path, value] };
     }
     case 'gte': {
-      return { sql: `${extractExpression(engine)} >= ?`, params: [path, filter.value] };
+      return { sql: `${extractExpression(engine)} >= ?`, params: [path, value] };
     }
     case 'lt': {
-      return { sql: `${extractExpression(engine)} < ?`, params: [path, filter.value] };
+      return { sql: `${extractExpression(engine)} < ?`, params: [path, value] };
     }
     case 'lte': {
-      return { sql: `${extractExpression(engine)} <= ?`, params: [path, filter.value] };
+      return { sql: `${extractExpression(engine)} <= ?`, params: [path, value] };
     }
     case 'hasAnyOf': {
       const ids = Array.isArray(filter.value) ? filter.value : [];
@@ -327,10 +348,50 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
   // expansion that works correctly regardless of how many keys there are or whether their
   // directions are mixed:
   //   OR over i: (AND_{j<i} kj = cj) AND (k_i OP_i c_i)     where OP_i is `>` for asc, `<` for desc
+  //
+  // Data-view columns are frequently empty (NULL after `json_extract`), and both SQLite and
+  // MySQL order NULL as the smallest possible value regardless of `ASC`/`DESC` (NULL first for
+  // ASC, NULL last for DESC — i.e. NULL always sorts as "-infinity"). A plain `kj = cj`/`ki OP ci`
+  // comparison against a NULL operand evaluates to NULL/unknown in SQL and is dropped from the
+  // WHERE clause, silently skipping rows or emitting an unusable cursor. `nullSafeEquals`/
+  // `nullSafeAfter` below encode the same "NULL is the minimum" semantics explicitly instead.
   if (options.cursor) {
     // The trailing `id asc` tiebreak's cursor value is always `containerId`; every other key's
     // value comes from `options.cursor.values` in the same order the sort expressions were built.
+    // A cursor produced for a different filter/sort configuration (e.g. the view's sorts changed
+    // between pages, or `dropStaleRules` dropped a rule) would misalign values with keys — reject
+    // it outright rather than silently querying with the wrong bindings.
+    if (options.cursor.values.length !== sortExpressions.length - 1) {
+      throw new BadRequestError('Cursor does not match the current sort configuration');
+    }
     const cursorValues: unknown[] = [...options.cursor.values, options.cursor.containerId];
+
+    // Null-safe equality: `IS` (SQLite) / `<=>` (MySQL) both compare NULL to NULL as true and
+    // never evaluate to NULL/unknown, unlike `=`.
+    const nullSafeEquals = (sql: string, parameter: unknown): SqlFragment => ({
+      sql: engine === 'mysql' ? `${sql} <=> ?` : `${sql} IS ?`,
+      params: [parameter],
+    });
+
+    // Null-safe "comes after the cursor in this key's sort order", treating NULL as the minimum
+    // value for both ASC and DESC (matching each engine's default NULL ordering).
+    const nullSafeAfter = (sql: string, direction: 'asc' | 'desc', cursorValue: unknown): SqlFragment => {
+      if (direction === 'asc') {
+        // Cursor value is the minimum possible (NULL): anything non-null comes after it.
+        // Otherwise, plain `>` already excludes NULL rows correctly (NULL < any real value).
+        return cursorValue === null
+          ? { sql: `${sql} IS NOT NULL`, params: [] }
+          : { sql: `${sql} > ?`, params: [cursorValue] };
+      }
+      // direction === 'desc'
+      if (cursorValue === null) {
+        // Cursor is already at the minimum; nothing can sort after it in descending order.
+        return { sql: '1 = 0', params: [] };
+      }
+      // NULL rows are smaller than any real value, so they still come after a non-null cursor
+      // in descending order — `<` alone would otherwise silently exclude them.
+      return { sql: `(${sql} IS NULL OR ${sql} < ?)`, params: [cursorValue] };
+    };
 
     const orClauses: string[] = [];
     const orParameters: unknown[] = [];
@@ -342,16 +403,17 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
         if (!priorExpr) {
           continue;
         }
-        equalityParts.push(`${priorExpr.sql} = ?`);
-        equalityParameters.push(...priorExpr.params, cursorValues[index_]);
+        const equality = nullSafeEquals(priorExpr.sql, cursorValues[index_]);
+        equalityParts.push(equality.sql);
+        equalityParameters.push(...priorExpr.params, ...equality.params);
       }
       const currentExpr = sortExpressions[index];
       if (!currentExpr) {
         continue;
       }
-      const op = currentExpr.direction === 'asc' ? '>' : '<';
-      const comparisonPart = `${currentExpr.sql} ${op} ?`;
-      const comparisonParameters = [...currentExpr.params, cursorValues[index]];
+      const comparison = nullSafeAfter(currentExpr.sql, currentExpr.direction, cursorValues[index]);
+      const comparisonPart = comparison.sql;
+      const comparisonParameters = [...currentExpr.params, ...comparison.params];
 
       const parts = [...equalityParts, comparisonPart];
       orClauses.push(`(${parts.join(' AND ')})`);

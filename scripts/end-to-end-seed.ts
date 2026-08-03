@@ -668,7 +668,10 @@ async function seedAppData() {
       workspaceId: wsId,
       parentId: null,
       createdAt: now,
-      lastUpdated: now,
+      // Root page: `lastUpdated` drives the sidebar root list's sort order. Kept well before
+      // every `paginationSeed` entry (same rationale as `favoriteToggle` below) so this fixture
+      // never ties with — and never enters — the root list's first pagination window.
+      lastUpdated: new Date(Date.parse(now) - 1_000_000).toISOString(),
       views: [filterSortSeed.dataView.id],
     },
     { lastAccessedAt: OLD_ACCESS_TIMESTAMP }

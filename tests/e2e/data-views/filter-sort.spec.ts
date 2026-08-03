@@ -3,7 +3,7 @@ import { SEED } from '../constants';
 import type { Page, Locator } from '@playwright/test';
 
 // THOTH-037: filtering/sorting configuration on a Data View. Uses the dedicated
-// `SEED.filterSort` fixture (a data source with `Name`/`Score` columns and 4 rows, one of
+// `SEED.filterSort` fixture (a data source with `Label`/`Score` columns and 4 rows, one of
 // which — "Date" — deliberately has no `Score` value) so assertions are self-contained and
 // don't interfere with `SEED.dataSource`'s single-row fixture used by other specs.
 

@@ -207,6 +207,18 @@ function buildResponses(
       componentSchemas,
       `${operation.operationId}Response`
     );
+    const metaProperties = operation.responseMeta
+      ? Object.fromEntries(
+          Object.entries(operation.responseMeta).map(([key, schema]) => [
+            key,
+            normalizeSchema(
+              z.toJSONSchema(schema, schemaOptions('output')),
+              componentSchemas,
+              `${operation.operationId}${key.charAt(0).toUpperCase()}${key.slice(1)}`
+            ),
+          ])
+        )
+      : undefined;
     responses[successStatus] = {
       description: successDescription(Number(successStatus), operation.method),
       content: {
@@ -219,6 +231,7 @@ function buildResponses(
                   required: ['data'],
                   properties: {
                     data: responseSchema,
+                    ...metaProperties,
                   },
                 },
         },

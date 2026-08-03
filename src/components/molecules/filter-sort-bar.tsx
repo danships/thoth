@@ -51,12 +51,22 @@ function defaultOperatorFor(column: Column | undefined): FilterOperator {
   return (column ? OPERATORS_BY_COLUMN_TYPE[column.type][0] : 'equals') as FilterOperator;
 }
 
-function defaultValueForOperator(operator: FilterOperator): FilterRule['value'] {
+// Derives a default `value` typed to match the column, so a freshly-added/changed filter rule
+// is immediately valid rather than sending an empty string to a `boolean`/`number` column (which
+// the query layer would compare/bind as the wrong type — e.g. `better-sqlite3` rejecting a raw
+// JS boolean, or `''` never numerically comparing as expected).
+function defaultValueForOperator(operator: FilterOperator, columnType?: Column['type']): FilterRule['value'] {
   if (VALUELESS_OPERATORS.has(operator)) {
     return null;
   }
   if (MULTI_VALUE_OPERATORS.has(operator)) {
     return [];
+  }
+  if (columnType === 'boolean') {
+    return false;
+  }
+  if (columnType === 'number') {
+    return 0;
   }
   return '';
 }
@@ -83,7 +93,8 @@ function FilterValueInput({
         onChange={onChange}
         placeholder="Select options"
         size="xs"
-        w={200}
+        miw={160}
+        style={{ flex: '1 1 160px' }}
       />
     );
   }
@@ -94,7 +105,8 @@ function FilterValueInput({
         value={typeof rule.value === 'number' ? rule.value : ''}
         onChange={(value) => onChange(typeof value === 'number' ? value : '')}
         size="xs"
-        w={140}
+        miw={110}
+        style={{ flex: '1 1 110px' }}
       />
     );
   }
@@ -119,7 +131,8 @@ function FilterValueInput({
         onChange={(value) => onChange(value ?? '')}
         placeholder="Select an option"
         size="xs"
-        w={160}
+        miw={130}
+        style={{ flex: '1 1 130px' }}
       />
     );
   }
@@ -130,7 +143,8 @@ function FilterValueInput({
       onChange={(event) => onChange(event.currentTarget.value)}
       placeholder="Value"
       size="xs"
-      w={160}
+      miw={130}
+      style={{ flex: '1 1 130px' }}
     />
   );
 }
@@ -146,6 +160,23 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
 
+  // Keep both drafts in sync with the persisted `filters`/`sorts` props whenever they change
+  // (e.g. right after the *other* popover's `onApply` round-trips through the parent's
+  // revalidation) — using React's "adjust state during render" pattern rather than a
+  // `useEffect`, mirroring `useDataViewPages`'s `previousBaseKey` trick, to avoid an extra
+  // cascading-render commit. Without this, `applyFilters`/`applySorts` could submit a stale
+  // sibling draft and silently revert the other's just-applied change (see THOTH-037 review).
+  const [previousFilters, setPreviousFilters] = useState(filters);
+  if (filters !== previousFilters) {
+    setPreviousFilters(filters);
+    setFilterDraft(filters);
+  }
+  const [previousSorts, setPreviousSorts] = useState(sorts);
+  if (sorts !== previousSorts) {
+    setPreviousSorts(sorts);
+    setSortDraft(sorts);
+  }
+
   const columnsById = useMemo(() => new Map(columns.map((column) => [column.id, column])), [columns]);
 
   const handleAddFilter = () => {
@@ -154,7 +185,10 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
       return;
     }
     const operator = defaultOperatorFor(firstColumn);
-    setFilterDraft([...filterDraft, { columnId: firstColumn.id, operator, value: defaultValueForOperator(operator) }]);
+    setFilterDraft([
+      ...filterDraft,
+      { columnId: firstColumn.id, operator, value: defaultValueForOperator(operator, firstColumn.type) },
+    ]);
   };
 
   const handleAddSort = () => {
@@ -184,20 +218,21 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
   const handleColumnChange = (index: number, columnId: string) => {
     const column = columnsById.get(columnId);
     const operator = defaultOperatorFor(column);
-    updateFilter(index, { columnId, operator, value: defaultValueForOperator(operator) });
+    updateFilter(index, { columnId, operator, value: defaultValueForOperator(operator, column?.type) });
   };
 
   const handleOperatorChange = (index: number, operator: FilterOperator) => {
-    updateFilter(index, { operator, value: defaultValueForOperator(operator) });
+    const column = columnsById.get(filterDraft[index]?.columnId ?? '');
+    updateFilter(index, { operator, value: defaultValueForOperator(operator, column?.type) });
   };
 
   const applyFilters = () => {
-    onApply(filterDraft, sorts);
+    onApply(filterDraft, sortDraft);
     setFilterPopoverOpen(false);
   };
 
   const applySorts = () => {
-    onApply(filters, sortDraft);
+    onApply(filterDraft, sortDraft);
     setSortPopoverOpen(false);
   };
 
@@ -225,20 +260,21 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
             Filter{filters.length > 0 ? ` (${filters.length})` : ''}
           </Button>
         </Popover.Target>
-        <Popover.Dropdown>
-          <Stack gap="xs" miw={320}>
+        <Popover.Dropdown style={{ maxWidth: 'calc(100vw - 2rem)' }}>
+          <Stack gap="xs" miw={0} w={320} maw="100%">
             {filterDraft.map((rule, index) => {
               const column = columnsById.get(rule.columnId);
               const operators = column ? (OPERATORS_BY_COLUMN_TYPE[column.type] as FilterOperator[]) : [];
               return (
-                <Group key={index} gap="xs" wrap="nowrap" data-testid="filter-rule-row">
+                <Group key={index} gap="xs" wrap="wrap" data-testid="filter-rule-row">
                   <Select
                     comboboxProps={{ transitionProps: { duration: 0 }, withinPortal: false }}
                     data={columns.map((col) => ({ value: col.id, label: col.name }))}
                     value={rule.columnId}
                     onChange={(value) => value && handleColumnChange(index, value)}
                     size="xs"
-                    w={130}
+                    miw={110}
+                    style={{ flex: '1 1 110px' }}
                   />
                   <Select
                     comboboxProps={{ transitionProps: { duration: 0 }, withinPortal: false }}
@@ -246,7 +282,8 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
                     value={rule.operator}
                     onChange={(value) => value && handleOperatorChange(index, value as FilterOperator)}
                     size="xs"
-                    w={120}
+                    miw={100}
+                    style={{ flex: '1 1 100px' }}
                   />
                   <FilterValueInput column={column} rule={rule} onChange={(value) => updateFilter(index, { value })} />
                   <ActionIcon
@@ -300,17 +337,18 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
             Sort{sorts.length > 0 ? ` (${sorts.length})` : ''}
           </Button>
         </Popover.Target>
-        <Popover.Dropdown>
-          <Stack gap="xs" miw={280}>
+        <Popover.Dropdown style={{ maxWidth: 'calc(100vw - 2rem)' }}>
+          <Stack gap="xs" miw={0} w={280} maw="100%">
             {sortDraft.map((rule, index) => (
-              <Group key={index} gap="xs" wrap="nowrap" data-testid="sort-rule-row">
+              <Group key={index} gap="xs" wrap="wrap" data-testid="sort-rule-row">
                 <Select
                   comboboxProps={{ transitionProps: { duration: 0 }, withinPortal: false }}
                   data={columns.map((col) => ({ value: col.id, label: col.name }))}
                   value={rule.columnId}
                   onChange={(value) => value && updateSort(index, { columnId: value })}
                   size="xs"
-                  w={150}
+                  miw={130}
+                  style={{ flex: '1 1 130px' }}
                 />
                 <Select
                   comboboxProps={{ transitionProps: { duration: 0 }, withinPortal: false }}
@@ -321,7 +359,8 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
                   value={rule.direction}
                   onChange={(value) => value && updateSort(index, { direction: value as SortDirection })}
                   size="xs"
-                  w={120}
+                  miw={110}
+                  style={{ flex: '1 1 110px' }}
                 />
                 <ActionIcon variant="subtle" color="red" onClick={() => removeSort(index)} aria-label="Remove sort">
                   <IconX size={14} />

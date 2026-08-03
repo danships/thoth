@@ -58,11 +58,18 @@ export const PATCH = apiRoute<UpdateDataViewResponse, undefined, UpdateDataViewP
 
     // Validate `filters`/`sorts` against the (possibly newly-set) data source's own columns
     // before persisting — an invalid columnId/operator/value combination must 400, not be
-    // silently accepted (THOTH-037).
-    if (body.filters !== undefined || body.sorts !== undefined) {
+    // silently accepted (THOTH-037). Must run whenever `dataSourceId` changes too (not just
+    // `filters`/`sorts`), since existing rules may no longer be valid against the new data
+    // source's columns; the effective rule set is the body's value when provided, falling back
+    // to the existing view's persisted value otherwise.
+    if (body.dataSourceId !== undefined || body.filters !== undefined || body.sorts !== undefined) {
       const dataSourceId = body.dataSourceId ?? existingDataView.dataSourceId;
       const dataSource = await dataSourceRetriever.retrieveDataSource(dataSourceId, session.user.id);
-      assertValidFilterSortRules(dataSource.columns, body.filters ?? [], body.sorts ?? []);
+      assertValidFilterSortRules(
+        dataSource.columns,
+        body.filters ?? existingDataView.filters ?? [],
+        body.sorts ?? existingDataView.sorts ?? []
+      );
     }
 
     const filteredBody = Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));

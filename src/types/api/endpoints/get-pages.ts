@@ -62,12 +62,15 @@ export const getPagesPaginationSchema = z.object({
   nextCursor: z.string().nullable(),
   hasMore: z.boolean(),
 });
+export type GetPagesPagination = z.infer<typeof getPagesPaginationSchema>;
 
-// `pagination` is only populated when the raw-SQL (`viewId`) path is used — the legacy
-// in-memory paths (`parentId`/`dataSourceId`/`favorited`/`recent`) stay unpaginated, so it's
-// omitted (`undefined`) for those, preserving byte-for-byte response shape for existing callers.
+// `pagination` is returned as a root-level field alongside `data` (i.e. `{ data: [...],
+// pagination: {...} }`), not nested inside `data` — it's only populated when the raw-SQL
+// (`viewId`) path is used; the legacy in-memory paths (`parentId`/`dataSourceId`/`favorited`/
+// `recent`) stay unpaginated, so it's omitted (`undefined`) for those, preserving byte-for-byte
+// `data` shape for existing callers.
 export type GetPagesResponse = z.infer<typeof getPagesResponseSchema>;
-export type GetPagesResponseData = DataWrapper<GetPagesResponse>;
+export type GetPagesResponseData = DataWrapper<GetPagesResponse> & { pagination?: GetPagesPagination };
 
 // Opaque cursor shape for the `viewId`-driven raw-SQL path — encoded as a base64 JSON string,
 // mirroring the `pagesTreeCursorSchema` idiom in `get-pages-tree.ts`. Generic over the number of

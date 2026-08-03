@@ -102,7 +102,7 @@ export function DataViewTable({
       mutatePages();
       onFilterSortChange?.();
     } catch (updateError) {
-      handleColumnError(updateError);
+      showError(updateError instanceof Error ? updateError.message : 'Failed to save filters and sorts');
     }
   };
 

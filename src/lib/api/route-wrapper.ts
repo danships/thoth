@@ -37,6 +37,11 @@ export function apiRoute<
       // path and every other caller of the endpoint still expects a plain array response).
       // Ignored by every route that doesn't call it.
       setResponseHeader: (name: string, value: string) => void;
+      // Merges arbitrary fields into the top-level JSON response body, as siblings of `data`
+      // (e.g. `{ data: [...], pagination: {...} }`) — used instead of a custom response header
+      // so pagination metadata is part of the regular JSON payload rather than hidden in an
+      // out-of-band header (THOTH-037).
+      setResponseMeta: (fields: Record<string, unknown>) => void;
     },
     session: ApiKeySession,
     request_: NextRequest
@@ -128,6 +133,7 @@ export function apiRoute<
 
       // Call the handler
       const responseHeaders: Record<string, string> = {};
+      const responseMeta: Record<string, unknown> = {};
       const result = await handler(
         {
           body: body as ExpectedBody,
@@ -135,6 +141,9 @@ export function apiRoute<
           params: resolvedParameters as ExpectedParameters,
           setResponseHeader: (name, value) => {
             responseHeaders[name] = value;
+          },
+          setResponseMeta: (fields) => {
+            Object.assign(responseMeta, fields);
           },
         },
         session,
@@ -145,7 +154,7 @@ export function apiRoute<
         return new Response(null, { status: 204, headers: responseHeaders });
       }
       // Return the result
-      return NextResponse.json({ data: result }, { headers: responseHeaders });
+      return NextResponse.json({ data: result, ...responseMeta }, { headers: responseHeaders });
     } catch (error) {
       const logger = await getLogger();
       logger.error('API route error:', error);

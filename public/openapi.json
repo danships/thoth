@@ -460,6 +460,29 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "nextCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "hasMore": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "nextCursor",
+                        "hasMore"
+                      ],
+                      "additionalProperties": false
                     }
                   }
                 }
