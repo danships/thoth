@@ -160,22 +160,26 @@ describe('workspaces API', () => {
 
     const activeWorkspacesResponse = await client.get('/api/v1/workspaces');
     const activeWorkspaces = await getData<{ id: string }[]>(activeWorkspacesResponse);
-    for (const workspace of activeWorkspaces) {
-      if (workspace.id === SEED.workspace.id) {
-        continue;
+    try {
+      for (const workspace of activeWorkspaces) {
+        if (workspace.id === SEED.workspace.id) {
+          continue;
+        }
+        await client.delete(`/api/v1/workspaces/${workspace.id}`);
       }
-      await client.delete(`/api/v1/workspaces/${workspace.id}`);
+
+      const remainingResponse = await client.get('/api/v1/workspaces');
+      const remaining = await getData<{ id: string }[]>(remainingResponse);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]!.id).toBe(SEED.workspace.id);
+
+      const lastDeleteResponse = await client.delete(`/api/v1/workspaces/${SEED.workspace.id}`);
+      expect(lastDeleteResponse.status).toBe(400);
+    } finally {
+      // SEED.secondWorkspace is shared across the sequential integration suite, so it must be
+      // restored even if an assertion above throws, or later workspace tests will fail.
+      const restoreSecondResponse = await client.post(`/api/v1/workspaces/${SEED.secondWorkspace.id}/restore`);
+      expect(restoreSecondResponse.ok).toBe(true);
     }
-
-    const remainingResponse = await client.get('/api/v1/workspaces');
-    const remaining = await getData<{ id: string }[]>(remainingResponse);
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]!.id).toBe(SEED.workspace.id);
-
-    const lastDeleteResponse = await client.delete(`/api/v1/workspaces/${SEED.workspace.id}`);
-    expect(lastDeleteResponse.status).toBe(400);
-
-    const restoreSecondResponse = await client.post(`/api/v1/workspaces/${SEED.secondWorkspace.id}/restore`);
-    expect(restoreSecondResponse.ok).toBe(true);
   });
 });

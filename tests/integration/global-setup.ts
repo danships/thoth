@@ -95,10 +95,18 @@ export default async function globalSetup({ provide }: Pick<TestProject, 'provid
     exitCode = code;
   });
 
+  // Kills the server and removes the temporary directory; used to avoid leaking a process
+  // holding the port/database file if setup fails partway through.
+  const cleanupOnFailure = async () => {
+    serverProcess.kill('SIGKILL');
+    await rm(temporaryDirectory, { recursive: true, force: true }).catch(() => undefined);
+  };
+
   // Wait for the server to be ready (poll the auth config endpoint)
   try {
     await waitForServer(`${baseUrl}/api/auth/ok`, 90_000, serverOutput);
   } catch (error) {
+    await cleanupOnFailure();
     if (serverExited) {
       throw new Error(
         `Server exited with code ${exitCode} before becoming ready.\n` +
@@ -109,12 +117,17 @@ export default async function globalSetup({ provide }: Pick<TestProject, 'provid
   }
 
   // Run the seed script against the integration database
-  execSync(`pnpm tsx scripts/end-to-end-seed.ts`, {
-    cwd: projectRoot,
-    env: environment,
-    stdio: 'pipe',
-    timeout: 60_000,
-  });
+  try {
+    execSync(`pnpm tsx scripts/end-to-end-seed.ts`, {
+      cwd: projectRoot,
+      env: environment,
+      stdio: 'pipe',
+      timeout: 60_000,
+    });
+  } catch (error) {
+    await cleanupOnFailure();
+    throw error;
+  }
 
   // Provide the base URL to test files via the globalSetup provide mechanism
   // Tests read this via `process.env.INTEGRATION_BASE_URL`

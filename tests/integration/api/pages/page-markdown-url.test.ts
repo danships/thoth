@@ -52,8 +52,10 @@ describe('.md page detail URL', () => {
       scopeType: 'workspace',
       attributionMode: 'creator',
     });
+    expect(appResponse.ok, await appResponse.text()).toBe(true);
     const app = await getData<{ id: string }>(appResponse);
     const keyResponse = await client.post(`/api/v1/apps/${app.id}/keys`, {});
+    expect(keyResponse.ok, await keyResponse.text()).toBe(true);
     const key = await getData<{ secret: string }>(keyResponse);
 
     const bearerClient = createBearerClient(getBaseUrl(), key.secret);
@@ -76,8 +78,10 @@ describe('.md page detail URL', () => {
       attributionMode: 'creator',
       containerIds: [SEED.pages.favoriteToggle.id],
     });
+    expect(appResponse.ok, await appResponse.text()).toBe(true);
     const app = await getData<{ id: string }>(appResponse);
     const keyResponse = await client.post(`/api/v1/apps/${app.id}/keys`, {});
+    expect(keyResponse.ok, await keyResponse.text()).toBe(true);
     const key = await getData<{ secret: string }>(keyResponse);
 
     const bearerClient = createBearerClient(getBaseUrl(), key.secret);

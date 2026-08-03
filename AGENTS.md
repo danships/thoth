@@ -181,6 +181,7 @@ Before completing tasks, run the relevant quality gates for the scope you change
 - `pnpm test:e2e` — Playwright browser tests for user-facing flows
 - `pnpm lint` — ESLint + Prettier + TypeScript + OpenAPI drift checks
 - `pnpm lint:tsc` — TypeScript-only check when you need to focus on compile errors first
+- `pnpm build` — required before opening a pull request
 - Only commit changes when explicitly requested by the user
 - Never add custom patches (e.g. via `pnpm patch`/`patches/*.patch`) to work around a broken
   ESLint rule or dependency incompatibility. Instead, disable the offending rule (or fix the
