@@ -6,7 +6,6 @@ import { backfillSoftDeleteFields } from './soft-delete-backfill';
 import { backfillWorkspaces } from './workspace-backfill';
 import { backfillWorkspaceStorageQuota } from './workspace-storage-quota-backfill';
 import { backfillMemberAccess } from './member-access-backfill';
-import { backfillDataViewFiltersSorts } from './data-view-filters-sorts-backfill';
 
 export const migrations: Migration[] = [
   {
@@ -64,14 +63,6 @@ export const migrations: Migration[] = [
     name: 'member-access-backfill',
     run: async (superSave: SuperSave) => {
       await backfillMemberAccess(superSave);
-    },
-  },
-  {
-    // Additive, engine-agnostic backfill of the new `filters`/`sorts` arrays on pre-existing
-    // `DataView` rows for THOTH-037 ("Add sorting and filtering configuration to a view").
-    name: 'data-view-filters-sorts-backfill',
-    run: async (superSave: SuperSave) => {
-      await backfillDataViewFiltersSorts(superSave);
     },
   },
 ];

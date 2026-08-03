@@ -11,9 +11,8 @@ export const dataViewSchema = z
     dataSourceId: z.string().min(1),
     columns: z.array(z.string().min(1)),
     // Persisted filter/sort configuration (THOTH-037) — additive, defaulted for backward
-    // compatibility with rows created before this feature existed (see the
-    // `data-view-filters-sorts-backfill` migration, which rewrites existing rows with explicit
-    // `[]` values so raw-SQL introspection doesn't have to special-case `undefined`).
+    // compatibility with rows created before this feature existed. No backfill migration is
+    // needed: the `.default([])` below already fills these in on every read.
     filters: z.array(filterRuleSchema).default([]),
     sorts: z.array(sortRuleSchema).default([]),
     deletedAt: z.string().nullable(),
