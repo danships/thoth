@@ -1,19 +1,6 @@
 'use client';
 
-import {
-  Alert,
-  ActionIcon,
-  Box,
-  Button,
-  Container,
-  Group,
-  Loader,
-  Modal,
-  Stack,
-  Tabs,
-  Text,
-  Title,
-} from '@mantine/core';
+import { Alert, Box, Button, Container, Group, Loader, Modal, Stack, Tabs, Text, Title } from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDisclosure } from '@mantine/hooks';
@@ -39,7 +26,6 @@ import { PageDetailMenu } from '@/components/organisms/page-detail-menu';
 import { PageHistoryDrawer } from '@/components/organisms/page-history-drawer';
 import { PageDetailEditor, type PageDetailEditorHandle } from '@/components/organisms/page-detail-editor';
 import { PageSubpagesList } from '@/components/organisms/page-subpages-list';
-import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import { GET_PAGES_ENDPOINT, SUBPAGES_TAB_VALUE } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
@@ -281,24 +267,14 @@ export default function PageDetailsPage() {
             >
               {pageDetails?.page.name ?? <Loader />}
             </Title>
-            <ActionIcon
-              variant="subtle"
-              size="lg"
-              disabled={isTogglingFavorite}
-              onClick={handleToggleFavorite}
-              aria-label={pageDetails.starred ? 'Unstar page' : 'Star page'}
-            >
-              {pageDetails.starred ? (
-                <IconStarFilled size={20} color="var(--mantine-color-yellow-6)" />
-              ) : (
-                <IconStar size={20} />
-              )}
-            </ActionIcon>
           </Group>
           <Group justify="flex-end">
             <PageDetailMenu
               pageId={pageId}
               hasContent={Boolean(pageDetails.content)}
+              starred={pageDetails.starred}
+              isTogglingFavorite={isTogglingFavorite}
+              onToggleFavorite={handleToggleFavorite}
               onImportMarkdown={handleImportMarkdown}
               onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
               onMoveToTrash={handleMoveToTrash}

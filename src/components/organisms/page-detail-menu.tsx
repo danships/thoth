@@ -10,6 +10,8 @@ import {
   IconHistory,
   IconLink,
   IconPlugConnected,
+  IconStar,
+  IconStarFilled,
   IconTrash,
   IconUnlink,
 } from '@tabler/icons-react';
@@ -26,6 +28,9 @@ const MAX_IMPORT_CONTENT_LENGTH = 1_000_000;
 type PageDetailMenuProperties = {
   pageId: string;
   hasContent: boolean;
+  starred: boolean;
+  isTogglingFavorite?: boolean;
+  onToggleFavorite: () => void | Promise<void>;
   onImportMarkdown: (markdown: string) => Promise<void>;
   onAddChildPage: () => void;
   onMoveToTrash?: () => Promise<void>;
@@ -55,6 +60,9 @@ function connectedBadgeLabel(app: ConnectedPageApp): string {
 export function PageDetailMenu({
   pageId,
   hasContent,
+  starred,
+  isTogglingFavorite,
+  onToggleFavorite,
   onImportMarkdown,
   onAddChildPage,
   onMoveToTrash,
@@ -192,6 +200,17 @@ export function PageDetailMenu({
               View History
             </Menu.Item>
           )}
+
+          <Menu.Item
+            leftSection={
+              starred ? <IconStarFilled size={14} color="var(--mantine-color-yellow-6)" /> : <IconStar size={14} />
+            }
+            disabled={isTogglingFavorite ?? false}
+            onClick={() => void onToggleFavorite()}
+            data-testid="page-favorite-toggle-button"
+          >
+            {starred ? 'Unstar Page' : 'Star Page'}
+          </Menu.Item>
 
           <Menu.Item leftSection={<IconFilePlus size={14} />} onClick={onAddChildPage}>
             Add Child Page
