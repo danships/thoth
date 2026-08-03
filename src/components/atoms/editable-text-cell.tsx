@@ -171,6 +171,7 @@ function MarkdownTextCell({ value, onBlur, disabled = false, columnName }: Markd
   const commit = (text: string) => {
     setEditing(false);
     setDraft(text);
+    setLastSyncedValue(text);
     if (text !== value) {
       onBlur(text);
     }
@@ -179,6 +180,7 @@ function MarkdownTextCell({ value, onBlur, disabled = false, columnName }: Markd
   const cancel = () => {
     setEditing(false);
     setDraft(value);
+    setLastSyncedValue(value);
   };
 
   const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {

@@ -15,7 +15,12 @@ type MarkdownContentProperties = {
 // text rather than disappearing or producing a multi-line/oversized cell.
 const ALLOWED_ELEMENTS = ['p', 'strong', 'em', 'del', 'code', 'a', 'text'];
 
-function MarkdownLink({ href, children, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { children?: ReactNode }) {
+function MarkdownLink({
+  href,
+  children,
+  node: _node,
+  ...rest
+}: AnchorHTMLAttributes<HTMLAnchorElement> & { children?: ReactNode; node?: unknown }) {
   return (
     <a
       {...rest}
