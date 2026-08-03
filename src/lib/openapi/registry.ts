@@ -35,6 +35,9 @@ export const operations = [
     auth: 'sessionOrApiKey',
     query: api.getPagesQuerySchema,
     response: api.getPagesResponseSchema,
+    // Only populated for the `viewId`-driven, cursor-paginated path (THOTH-037); every other
+    // query shape (favorited/recent/parentId/dataSourceId) omits it.
+    responseMeta: { pagination: api.getPagesPaginationSchema },
   },
   {
     path: '/pages',

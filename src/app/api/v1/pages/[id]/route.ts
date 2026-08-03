@@ -50,6 +50,8 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
           dataSourceId: view.dataSourceId,
           createdAt: view.createdAt,
           lastUpdated: view.lastUpdated,
+          filters: view.filters,
+          sorts: view.sorts,
         }));
     }
 

@@ -9,15 +9,18 @@ import { DataTableRow } from '@/components/molecules/data-table-row';
 import { DataTableColumnHeader } from '@/components/molecules/data-table-column-header';
 import { ColumnFormModal } from '@/components/molecules/column-form-modal';
 import { NewPageRow } from '@/components/molecules/new-page-row';
+import { FilterSortBar } from '@/components/molecules/filter-sort-bar';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { useDataViewColumns } from '@/lib/hooks/api/use-data-view-columns';
 import { usePageValueUpdate } from '@/lib/hooks/api/use-page-value-update';
 import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
+import { useUpdateDataView } from '@/lib/hooks/api/use-update-data-view';
 import { useCreateSingleSelectOption } from '@/lib/hooks/api/use-create-single-select-option';
 import { getRandomSelectColor } from '@/lib/data-source/select-colors';
 import type { Column } from '@/types/schemas/entities/container';
 import type { SelectColor } from '@/types/schemas/entities/container';
-import type { CreateDataSourceColumnBody, GetPagesResponse, UpdateDataSourceColumnBody } from '@/types/api';
+import type { FilterRule, SortRule } from '@/types/schemas/entities/data-view-query';
+import type { CreateDataSourceColumnBody, DataView, GetPagesResponse, UpdateDataSourceColumnBody } from '@/types/api';
 
 // Each data column needs at least this much room for its editable control (select/multi-select
 // targets, date pickers, etc.) to render without being squeezed. With `tableLayout: 'fixed'`, the
@@ -30,6 +33,7 @@ const DATA_COLUMN_MIN_WIDTH = 140;
 const DEFAULT_TABLE_MIN_WIDTH = 520;
 
 type DataViewTableProperties = {
+  view: DataView;
   dataSourceId: string;
   columns: Column[];
   pages: GetPagesResponse | undefined;
@@ -44,9 +48,14 @@ type DataViewTableProperties = {
     options?: { revalidate: boolean }
   ) => void;
   mutateDataSource: () => void;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  loadingMore: boolean;
+  onFilterSortChange?: (() => void) | undefined;
 };
 
 export function DataViewTable({
+  view,
   dataSourceId,
   columns,
   pages,
@@ -58,6 +67,10 @@ export function DataViewTable({
   createPageInProgress,
   mutatePages,
   mutateDataSource,
+  hasMore,
+  onLoadMore,
+  loadingMore,
+  onFilterSortChange,
 }: DataViewTableProperties) {
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [editingColumn, setEditingColumn] = useState<Column | null>(null);
@@ -74,6 +87,24 @@ export function DataViewTable({
   const { updatePage, inProgress: pageUpdateInProgress } = useUpdatePage({ mutatePages });
   const { createOption } = useCreateSingleSelectOption(dataSourceId);
   const { showError } = useNotification();
+  const { updateDataView, inProgress: viewUpdateInProgress } = useUpdateDataView(view.id);
+
+  const handleFilterSortApply = async (filters: FilterRule[], sorts: SortRule[]) => {
+    try {
+      await updateDataView({ filters, sorts });
+      // The new filters/sorts only take effect once the underlying `pages` query re-runs. Since
+      // `useDataViewPages` derives its query key from `view.filters`/`view.sorts`, and `view` is
+      // owned by the parent page's `usePageDetails` SWR cache (not this component), the parent
+      // is responsible for revalidating `pageDetails` after a successful update (see
+      // `onFilterSortChange` threaded down from `data-view-render.tsx`). `mutatePages()` here
+      // additionally forces the *current* pages query to revalidate immediately for snappier
+      // feedback while that propagates.
+      mutatePages();
+      onFilterSortChange?.();
+    } catch (updateError) {
+      showError(updateError instanceof Error ? updateError.message : 'Failed to save filters and sorts');
+    }
+  };
 
   const handleColumnSubmit = async (values: {
     name: string;
@@ -204,7 +235,14 @@ export function DataViewTable({
 
   return (
     <>
-      <Group justify="flex-end" mt="md" mb="md">
+      <Group justify="space-between" mt="md" mb="md" wrap="wrap">
+        <FilterSortBar
+          columns={columns}
+          filters={view.filters ?? []}
+          sorts={view.sorts ?? []}
+          onApply={(filters, sorts) => void handleFilterSortApply(filters, sorts)}
+          inProgress={viewUpdateInProgress}
+        />
         <Button size="xs" variant="default" onClick={handleAddColumn} leftSection={<IconPlus />}>
           Add Column
         </Button>
@@ -248,6 +286,13 @@ export function DataViewTable({
           </Table.Tbody>
         </Table>
       </Table.ScrollContainer>
+      {hasMore && (
+        <Group justify="center" mt="md">
+          <Button size="xs" variant="default" onClick={onLoadMore} loading={loadingMore} data-testid="load-more-pages">
+            Load more
+          </Button>
+        </Group>
+      )}
       <ColumnFormModal
         opened={showColumnModal}
         onClose={handleCloseModal}
