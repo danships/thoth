@@ -1,6 +1,20 @@
+import type { Metadata } from 'next';
 import { PropsWithChildren } from 'react';
 import RootClientLayout from './layout-client';
 import './globals.css';
+
+// Every rendered page needs a `<title>` ending in " :: Thoth" (THOTH-046). Server-component
+// pages/layouts can override `title` directly (Next.js applies the `template` below to any
+// string they set); client-component pages can't export `metadata`, so they set
+// `document.title` themselves instead (see `useDocumentTitle`), formatted the same way. This
+// `default` is only ever seen for the handful of routes that always redirect before rendering
+// anything (e.g. `/`) or briefly before a client page's own effect runs.
+export const metadata: Metadata = {
+  title: {
+    default: 'Thoth',
+    template: '%s :: Thoth',
+  },
+};
 
 // Authenticated, workspace-scoped chrome (the `AppShell` header/navbar from
 // `@/components/layout`) now lives in `src/app/[workspaceSlug]/layout.tsx`, since the sidebar's

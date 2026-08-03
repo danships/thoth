@@ -1,6 +1,9 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { withAuthPage } from '@/lib/auth/with-auth-page';
 import { getLandingWorkspaceForUser } from '@/lib/database/resolve-workspace';
+
+export const metadata: Metadata = { title: 'Create page' };
 
 // Legacy bare `/pages/create` URL from before multi-workspace support.
 async function LegacyCreatePagePage({ session }: { session: { user: { id: string } } }) {

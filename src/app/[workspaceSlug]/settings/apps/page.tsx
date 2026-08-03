@@ -9,10 +9,12 @@ import { useApps } from '@/lib/hooks/api/use-apps';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { useDocumentTitle } from '@/lib/hooks/use-document-title';
 import type { AppResponse } from '@/types/api';
 
 export default function AppsSettingsPage() {
   const workspace = useCurrentWorkspace();
+  useDocumentTitle('Apps');
   const { data, isLoading, mutate } = useApps(workspace.id);
   const { delete: remove } = useCudApi();
   const { showSuccess, showError } = useNotification();

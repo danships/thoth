@@ -43,7 +43,21 @@ import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import { GET_PAGES_ENDPOINT, SUBPAGES_TAB_VALUE } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
+import { useDocumentTitle } from '@/lib/hooks/use-document-title';
 import styles from './page.module.css';
+
+// Labels the currently selected tab for the document title (THOTH-046): the two built-in tabs
+// ("Contents", the default, and "Sub Pages") get a fixed label, anything else is a named
+// `DataView` id looked up in the page's view list.
+function getSelectedViewLabel(selectedView: string, views: GetDataViewsResponse | undefined): string | undefined {
+  if (selectedView === 'contents') {
+    return 'Contents';
+  }
+  if (selectedView === SUBPAGES_TAB_VALUE) {
+    return 'Sub Pages';
+  }
+  return views?.find((view) => view.id === selectedView)?.name;
+}
 
 export default function PageDetailsPage() {
   const parameters = useParams();
@@ -58,6 +72,16 @@ export default function PageDetailsPage() {
   const { data: breadcrumbs, isLoading: isLoadingBreadcrumbs } = usePageBreadcrumbs(pageId);
 
   const hasSubpages = pageDetails?.hasChildren ?? false;
+
+  // The selected view (if any) is appended to the page name in the document title (THOTH-046)
+  // — "Contents" and "Sub Pages" are the two built-in tabs, everything else is a named
+  // `DataView`. Falls back to a stable "Page" title while `pageDetails` (and thus the view
+  // list) hasn't loaded yet, or failed to load, so a stale title from a previous page never
+  // lingers.
+  const selectedViewLabel = getSelectedViewLabel(selectedView, pageDetails?.views);
+  useDocumentTitle(
+    pageDetails?.page.name ? [pageDetails.page.name, selectedViewLabel].filter(Boolean).join(' - ') : 'Page'
+  );
 
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);
   const [historyDrawerOpened, { open: openHistoryDrawer, close: closeHistoryDrawer }] = useDisclosure(false);

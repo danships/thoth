@@ -1,6 +1,9 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { withAuthPage } from '@/lib/auth/with-auth-page';
 import { getWorkspaceSlugForContainer } from '@/lib/database/resolve-workspace';
+
+export const metadata: Metadata = { title: 'Create page' };
 
 type LegacyCreateSubpageProperties = {
   params: Promise<{ id: string }>;

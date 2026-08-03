@@ -28,6 +28,7 @@ import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { getAppScopeLabel } from '@/lib/format/app-scope-label';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { useDocumentTitle } from '@/lib/hooks/use-document-title';
 import { ApiKeyCreatedModal } from '@/components/organisms/api-key-created-modal';
 import { WebhookSecretModal } from '@/components/organisms/webhook-secret-modal';
 import { WebhookDeliveriesTable } from '@/components/organisms/webhook-deliveries-table';
@@ -52,6 +53,7 @@ export default function AppDetailPage() {
   const { slug: workspaceSlug } = useCurrentWorkspace();
 
   const { data: app, isLoading, mutate } = useApp(appId);
+  useDocumentTitle(app ? `${app.label} :: Apps` : 'Apps');
   const { data: webhooksData, isLoading: isLoadingWebhooks, mutate: mutateWebhooks } = useAppWebhooks(appId);
   const { post, patch, delete: remove } = useCudApi();
   const { showError, showSuccess } = useNotification();
