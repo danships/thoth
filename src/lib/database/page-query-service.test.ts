@@ -287,6 +287,82 @@ describe('page-query-service', () => {
     expect(new Set(seen).size).toBe(5);
   });
 
+  test('walks desc cursor pagination without duplicates or skips', async () => {
+    const parentId = 'desc-cursor-data-source';
+    const values = ['Echo', 'Bravo', 'Delta', 'Charlie', 'Alfa'];
+    for (const value of values) {
+      const page = await createTestPage({ title: { type: 'string', value } });
+      await containerRepository.update({ ...page, parentId });
+    }
+
+    const seen: string[] = [];
+    let cursor: Awaited<ReturnType<typeof executePageQuery>>['nextCursor'] = undefined as unknown as null;
+    let iterations = 0;
+    do {
+      const result = await executePageQuery({
+        parentId,
+        columns,
+        filters: [],
+        sorts: [{ columnId: 'title', direction: 'desc' }],
+        limit: 2,
+        ...(cursor ? { cursor } : {}),
+      });
+      for (const page of result.pages) {
+        seen.push(page.values?.['title']?.value as string);
+      }
+      cursor = result.nextCursor;
+      iterations += 1;
+    } while (cursor && iterations < 10);
+
+    expect(seen).toEqual(['Echo', 'Delta', 'Charlie', 'Bravo', 'Alfa']);
+    expect(new Set(seen).size).toBe(5);
+  });
+
+  test('walks multi-sort cursor pagination (boolean asc + number desc)', async () => {
+    const parentId = 'multi-sort-cursor-ds';
+    const rows = [
+      { title: 'T1', active: true, age: 10 },
+      { title: 'T2', active: false, age: 30 },
+      { title: 'T3', active: true, age: 20 },
+      { title: 'T4', active: false, age: 5 },
+    ];
+    for (const row of rows) {
+      const page = await createTestPage({
+        title: { type: 'string', value: row.title },
+        active: { type: 'boolean', value: row.active },
+        age: { type: 'number', value: row.age },
+      });
+      await containerRepository.update({ ...page, parentId });
+    }
+
+    const seen: string[] = [];
+    let cursor: Awaited<ReturnType<typeof executePageQuery>>['nextCursor'] = undefined as unknown as null;
+    let iterations = 0;
+    do {
+      const result = await executePageQuery({
+        parentId,
+        columns,
+        filters: [],
+        sorts: [
+          { columnId: 'active', direction: 'asc' },
+          { columnId: 'age', direction: 'desc' },
+        ],
+        limit: 2,
+        ...(cursor ? { cursor } : {}),
+      });
+      for (const page of result.pages) {
+        seen.push(page.values?.['title']?.value as string);
+      }
+      cursor = result.nextCursor;
+      iterations += 1;
+    } while (cursor && iterations < 10);
+
+    // active asc: false (0) before true (1)
+    // Within false: age desc: T2(30), T4(5)
+    // Within true: age desc: T3(20), T1(10)
+    expect(seen).toEqual(['T2', 'T4', 'T3', 'T1']);
+  });
+
   test('silently drops stale deleted or renamed rules instead of erroring', async () => {
     const result = await executePageQuery({
       parentId: dataSourceId,
