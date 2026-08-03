@@ -1,46 +1,64 @@
-import assert from 'node:assert/strict';
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import { LocalStorageAdapter } from './local-adapter';
 
-const root = await mkdtemp(nodePath.join(tmpdir(), 'thoth-storage-adapter-test-'));
-const adapter = new LocalStorageAdapter(root);
+describe('LocalStorageAdapter', () => {
+  let root: string;
+  let adapter: LocalStorageAdapter;
 
-assert.equal(adapter.type, 'local');
+  beforeAll(async () => {
+    root = await mkdtemp(nodePath.join(tmpdir(), 'thoth-storage-adapter-test-'));
+    adapter = new LocalStorageAdapter(root);
+  });
 
-// save + read round-trip
-const key = 'workspace-1/file-1';
-const payload = Buffer.from('hello uploaded world');
-await adapter.save(key, payload);
+  afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
 
-assert.equal(await adapter.exists(key), true);
+  test('reports type as local', () => {
+    expect(adapter.type).toBe('local');
+  });
 
-const stream = await adapter.read(key);
-const chunks: Uint8Array[] = [];
-for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) {
-  chunks.push(chunk);
-}
-assert.equal(Buffer.concat(chunks).toString('utf8'), payload.toString('utf8'));
+  test('save + read round-trip', async () => {
+    const key = 'workspace-1/file-1';
+    const payload = Buffer.from('hello uploaded world');
+    await adapter.save(key, payload);
 
-// nested directories are created as needed
-const onDisk = await readFile(nodePath.join(root, key));
-assert.equal(onDisk.toString('utf8'), payload.toString('utf8'));
+    expect(await adapter.exists(key)).toBe(true);
 
-// delete
-await adapter.delete(key);
-assert.equal(await adapter.exists(key), false);
+    const stream = await adapter.read(key);
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk);
+    }
+    expect(Buffer.concat(chunks).toString('utf8')).toBe(payload.toString('utf8'));
 
-// deleting a non-existent key is a no-op, not an error
-await adapter.delete(key);
+    // nested directories are created as needed
+    const onDisk = await readFile(nodePath.join(root, key));
+    expect(onDisk.toString('utf8')).toBe(payload.toString('utf8'));
+  });
 
-// exists() is false for a key that was never written
-assert.equal(await adapter.exists('never-written'), false);
+  test('delete removes the key', async () => {
+    const key = 'workspace-1/file-1';
+    const payload = Buffer.from('hello uploaded world');
+    await adapter.save(key, payload);
+    await adapter.delete(key);
+    expect(await adapter.exists(key)).toBe(false);
+  });
 
-// path traversal is rejected
-await assert.rejects(() => adapter.save('../escape', payload), /Invalid storage key/);
-await assert.rejects(() => adapter.read('../../etc/passwd'), /Invalid storage key/);
+  test('deleting a non-existent key is a no-op', async () => {
+    await adapter.delete('workspace-1/file-1');
+  });
 
-await rm(root, { recursive: true, force: true });
+  test('exists() is false for a key that was never written', async () => {
+    expect(await adapter.exists('never-written')).toBe(false);
+  });
 
-console.log('✅  LocalStorageAdapter tests passed');
+  test('path traversal is rejected', async () => {
+    const payload = Buffer.from('test');
+    await expect(() => adapter.save('../escape', payload)).rejects.toThrow(/Invalid storage key/);
+    await expect(() => adapter.read('../../etc/passwd')).rejects.toThrow(/Invalid storage key/);
+  });
+});

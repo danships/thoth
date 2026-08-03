@@ -13,7 +13,7 @@ import {
   getWorkspaceRepository,
 } from '../src/lib/database/index.js';
 import { getStorageAdapter } from '../src/lib/storage/index.js';
-import { SEED } from '../tests/e2e/constants.js';
+import { SEED } from '../tests/fixtures/seed.js';
 import type {
   ContainerAccessCreate,
   DataSourceContainer,
@@ -25,7 +25,7 @@ import type {
   WorkspaceMemberCreate,
   DataViewCreate,
 } from '../src/types/database/index.js';
-import type { Column } from '../src/types/schemas/entities/container.js';
+import type { Column, PageValue } from '../src/types/schemas/entities/container.js';
 
 const DB_PATH = process.env['DB']!.replace('sqlite://', '');
 
@@ -736,6 +736,37 @@ async function seedAppData() {
       } as unknown as DataViewCreate));
 
   for (const row of filterSortSeed.rows) {
+    const cols = filterSortSeed.dataSource.columns;
+    const values: Record<string, PageValue> = {
+      // Label (string column) — uses `${row.name} Item` to avoid collision with page name
+      [cols[0].id]: { type: 'string', value: `${row.name} Item` },
+    };
+
+    // Score (number column)
+    if (row.score !== null) {
+      values[cols[1].id] = { type: 'number', value: row.score };
+    }
+
+    // Active (boolean column)
+    if (row.active !== null) {
+      values[cols[2].id] = { type: 'boolean', value: row.active };
+    }
+
+    // Due (date column)
+    if (row.due !== null) {
+      values[cols[3].id] = { type: 'date', value: row.due };
+    }
+
+    // Priority (single-select column)
+    if (row.priority !== null) {
+      values[cols[4].id] = { type: 'single-select', value: row.priority };
+    }
+
+    // Tags (multi-select column) — null = missing key, [] = explicit empty
+    if (row.tags !== null) {
+      values[cols[5].id] = { type: 'multi-select', value: [...row.tags] };
+    }
+
     await upsertPage(
       {
         id: row.id,
@@ -747,16 +778,7 @@ async function seedAppData() {
         parentId: filterSortSeed.dataSource.id,
         createdAt: now,
         lastUpdated: now,
-        values: {
-          // Deliberately distinct from the page's own `name` (`${row.name} Item` rather than
-          // `row.name` verbatim) so e2e assertions on the page-title cell (`getByText(name,
-          // { exact: true })`) never collide with this dynamic column's own rendered value —
-          // both would otherwise show identical text and make `getByText` ambiguous.
-          [filterSortSeed.dataSource.columns[0].id]: { type: 'string', value: `${row.name} Item` },
-          ...(row.score === null
-            ? {}
-            : { [filterSortSeed.dataSource.columns[1].id]: { type: 'number', value: row.score } }),
-        },
+        values,
       },
       { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
     );

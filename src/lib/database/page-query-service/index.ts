@@ -67,7 +67,12 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
       direction: sort.direction,
       valueOf: (page) => {
         const raw = page.values?.[sort.columnId]?.value ?? null;
-        return Array.isArray(raw) ? null : raw;
+        if (Array.isArray(raw)) return null;
+        // SQLite's json_extract returns 1/0 for JSON booleans, and better-sqlite3 cannot bind
+        // JS booleans — convert to the numeric equivalent so cursor params match the DB
+        // representation and are bindable.
+        if (typeof raw === 'boolean') return raw ? 1 : 0;
+        return raw;
       },
     });
   }
@@ -106,21 +111,26 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
     const cursorValues: unknown[] = [...options.cursor.values, options.cursor.containerId];
 
     // Null-safe equality: `IS` (SQLite) / `<=>` (MySQL) both compare NULL to NULL as true and
-    // never evaluate to NULL/unknown, unlike `=`.
-    const nullSafeEquals = (sql: string, parameter: unknown): SqlFragment => ({
-      sql: `${sql} ${adapter.nullSafeEqualsOperator()} ?`,
-      params: [parameter],
+    // never evaluate to NULL/unknown, unlike `=`.  Accepts the full expression (sql + params) so
+    // the returned fragment is fully parameterised and callers never need to manually prepend
+    // expression-level params.
+    const nullSafeEquals = (expr: SqlFragment, parameter: unknown): SqlFragment => ({
+      sql: `${expr.sql} ${adapter.nullSafeEqualsOperator()} ?`,
+      params: [...expr.params, parameter],
     });
 
     // Null-safe "comes after the cursor in this key's sort order", treating NULL as the minimum
-    // value for both ASC and DESC (matching each engine's default NULL ordering).
-    const nullSafeAfter = (sql: string, direction: 'asc' | 'desc', cursorValue: unknown): SqlFragment => {
+    // value for both ASC and DESC (matching each engine's default NULL ordering).  Like
+    // `nullSafeEquals`, accepts the full expression so every `?` placeholder contributed by
+    // `expr.sql` is accounted for — in particular the DESC non-null branch embeds `expr.sql`
+    // twice (`IS NULL OR < ?`), so `expr.params` must appear twice.
+    const nullSafeAfter = (expr: SqlFragment, direction: 'asc' | 'desc', cursorValue: unknown): SqlFragment => {
       if (direction === 'asc') {
         // Cursor value is the minimum possible (NULL): anything non-null comes after it.
         // Otherwise, plain `>` already excludes NULL rows correctly (NULL < any real value).
         return cursorValue === null
-          ? { sql: `${sql} IS NOT NULL`, params: [] }
-          : { sql: `${sql} > ?`, params: [cursorValue] };
+          ? { sql: `${expr.sql} IS NOT NULL`, params: [...expr.params] }
+          : { sql: `${expr.sql} > ?`, params: [...expr.params, cursorValue] };
       }
       // direction === 'desc'
       if (cursorValue === null) {
@@ -128,8 +138,9 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
         return { sql: '1 = 0', params: [] };
       }
       // NULL rows are smaller than any real value, so they still come after a non-null cursor
-      // in descending order — `<` alone would otherwise silently exclude them.
-      return { sql: `(${sql} IS NULL OR ${sql} < ?)`, params: [cursorValue] };
+      // in descending order — `<` alone would otherwise silently exclude them.  `expr.sql`
+      // appears twice, so its params are duplicated accordingly.
+      return { sql: `(${expr.sql} IS NULL OR ${expr.sql} < ?)`, params: [...expr.params, ...expr.params, cursorValue] };
     };
 
     const orClauses: string[] = [];
@@ -142,21 +153,20 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
         if (!priorExpr) {
           continue;
         }
-        const equality = nullSafeEquals(priorExpr.sql, cursorValues[index_]);
+        const equality = nullSafeEquals(priorExpr, cursorValues[index_]);
         equalityParts.push(equality.sql);
-        equalityParameters.push(...priorExpr.params, ...equality.params);
+        equalityParameters.push(...equality.params);
       }
       const currentExpr = sortExpressions[index];
       if (!currentExpr) {
         continue;
       }
-      const comparison = nullSafeAfter(currentExpr.sql, currentExpr.direction, cursorValues[index]);
+      const comparison = nullSafeAfter(currentExpr, currentExpr.direction, cursorValues[index]);
       const comparisonPart = comparison.sql;
-      const comparisonParameters = [...currentExpr.params, ...comparison.params];
 
       const parts = [...equalityParts, comparisonPart];
       orClauses.push(`(${parts.join(' AND ')})`);
-      orParameters.push(...equalityParameters, ...comparisonParameters);
+      orParameters.push(...equalityParameters, ...comparison.params);
     }
 
     whereClauses.push(`(${orClauses.join(' OR ')})`);

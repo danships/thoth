@@ -1,162 +1,165 @@
-import assert from 'node:assert/strict';
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 
-// Point the app's real supersave database at a fresh temp sqlite file *before* anything imports
-// `@/lib/environment` or `@/lib/database` (both lazily read `process.env` only on first call,
-// see `getEnvironment()`), so this suite runs against an isolated, disposable database rather
-// than mocking the repository layer.
-const temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-page-revision-test-'));
-const databaseFile = nodePath.join(temporaryDirectory, 'test.db');
-const mutableEnvironment = process.env as Record<string, string | undefined>;
-mutableEnvironment['NODE_ENV'] = 'test';
-mutableEnvironment['DB'] = `sqlite://${databaseFile}`;
-mutableEnvironment['BETTER_AUTH_SECRET'] = 'test-secret-not-for-production-use';
-mutableEnvironment['LOG_LEVEL'] = 'error';
-mutableEnvironment['SUPERSAVE_SKIP_SYNC'] = 'false';
-
-const { getContainerRepository } = await import('@/lib/database');
-const { recordContentRevision, recordValuesRevision, getContentRevisions, getValuesRevisions, buildContentFields } =
-  await import('./revision-service');
-const { reconstructAt } = await import('./reconstruct');
-const { SNAPSHOT_INTERVAL, MAX_PATCH_BYTES } = await import('./constants');
-
 import type { PageContainer } from '@/types/database';
 
-const containerRepository = await getContainerRepository();
+const stringValue = (value: string) => ({ type: 'string' as const, value });
 
-async function createTestPage(initialContent: string): Promise<PageContainer> {
-  const pageData = {
-    name: 'Test page',
-    type: 'page' as const,
-    parentId: null,
-    workspaceId: 'workspace-1',
-    userId: 'user-1',
-    emoji: null,
-    content: initialContent,
-    values: {},
-    lastUpdated: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    deletedAt: null,
-    deletedRootId: null,
-  };
-  const created = await containerRepository.create(pageData);
-  return created as PageContainer;
-}
+describe('revision-service', () => {
+  let temporaryDirectory = '';
+  let containerRepository: Awaited<ReturnType<(typeof import('@/lib/database'))['getContainerRepository']>>;
+  let recordContentRevision: (typeof import('./revision-service'))['recordContentRevision'];
+  let recordValuesRevision: (typeof import('./revision-service'))['recordValuesRevision'];
+  let getContentRevisions: (typeof import('./revision-service'))['getContentRevisions'];
+  let getValuesRevisions: (typeof import('./revision-service'))['getValuesRevisions'];
+  let buildContentFields: (typeof import('./revision-service'))['buildContentFields'];
+  let reconstructAt: (typeof import('./reconstruct'))['reconstructAt'];
+  let SNAPSHOT_INTERVAL: (typeof import('./constants'))['SNAPSHOT_INTERVAL'];
+  let MAX_PATCH_BYTES: (typeof import('./constants'))['MAX_PATCH_BYTES'];
 
-function toContentLike(revisions: Awaited<ReturnType<typeof getContentRevisions>>) {
-  return revisions.map((revision) => ({
-    sequence: revision.sequence,
-    kind: revision.kind,
-    content: revision.content,
-    patch: revision.patch,
-  }));
-}
+  beforeAll(async () => {
+    temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-page-revision-test-'));
+    const databaseFile = nodePath.join(temporaryDirectory, 'test.db');
+    const mutableEnvironment = process.env as Record<string, string | undefined>;
+    mutableEnvironment['NODE_ENV'] = 'test';
+    mutableEnvironment['DB'] = `sqlite://${databaseFile}`;
+    mutableEnvironment['BETTER_AUTH_SECRET'] = 'test-secret-not-for-production-use';
+    mutableEnvironment['LOG_LEVEL'] = 'error';
+    mutableEnvironment['SUPERSAVE_SKIP_SYNC'] = 'false';
 
-// --- First-save lazy baseline: seq 1 snapshot of prior content, seq 2 new content ---
-{
-  const page = await createTestPage('initial content');
-  await recordContentRevision({ page, newContent: 'first edit', author: 'user-1' });
+    const databaseModule = await import('@/lib/database');
+    const revisionServiceModule = await import('./revision-service');
+    const reconstructModule = await import('./reconstruct');
+    const constantsModule = await import('./constants');
 
-  const revisions = await getContentRevisions(page.id, 'user-1');
-  assert.equal(revisions.length, 2);
-  assert.equal(revisions[0]!.sequence, 1);
-  assert.equal(revisions[0]!.kind, 'snapshot');
-  assert.equal(revisions[0]!.content, 'initial content');
-  assert.equal(revisions[1]!.sequence, 2);
-  assert.equal(reconstructAt(toContentLike(revisions), 2), 'first edit');
-
-  // --- Coalesce updates head in place within window (same author, still-open window) ---
-  await recordContentRevision({ page, newContent: 'first edit, refined', author: 'user-1' });
-  const afterCoalesce = await getContentRevisions(page.id, 'user-1');
-  assert.equal(afterCoalesce.length, 2, 'same-author save within the coalesce window should not append');
-  assert.equal(reconstructAt(toContentLike(afterCoalesce), 2), 'first edit, refined');
-
-  // --- A different author always appends, never coalesces ---
-  await recordContentRevision({ page, newContent: 'second edit by someone else', author: 'user-2' });
-  const afterAppend = await getContentRevisions(page.id, 'user-1');
-  assert.equal(afterAppend.length, 3);
-  assert.equal(afterAppend[2]!.sequence, 3);
-  assert.equal(afterAppend[2]!.previousSequence, 2);
-  assert.equal(reconstructAt(toContentLike(afterAppend), 3), 'second edit by someone else');
-}
-
-// --- Interval snapshot every SNAPSHOT_INTERVAL revisions ---
-{
-  const page = await createTestPage('');
-  // Alternate authors on every save so every call appends (never coalesces), reaching exactly
-  // `SNAPSHOT_INTERVAL` appended+lazy-baseline revisions.
-  let sequenceCount = 0;
-  let authorToggle = 0;
-  while (sequenceCount < SNAPSHOT_INTERVAL) {
-    authorToggle += 1;
-    await recordContentRevision({
-      page,
-      newContent: `content v${authorToggle}`,
-      author: `user-${authorToggle}`,
-    });
-    const currentRevisions = await getContentRevisions(page.id, 'user-1');
-    sequenceCount = currentRevisions.length;
-  }
-
-  const revisions = await getContentRevisions(page.id, 'user-1');
-  const atInterval = revisions.find((revision) => revision.sequence === SNAPSHOT_INTERVAL);
-  assert.ok(atInterval, `expected a revision at sequence ${SNAPSHOT_INTERVAL}`);
-  assert.equal(atInterval!.kind, 'snapshot', 'every SNAPSHOT_INTERVAL-th revision should be a full snapshot');
-}
-
-// --- Oversized-patch downgrade to snapshot ---
-{
-  // Two large, entirely unrelated strings produce a patch whose escaped (`encodeURI`-based)
-  // text representation exceeds MAX_PATCH_BYTES, so it must be stored as a snapshot instead.
-  const base = 'a'.repeat(900_000);
-  const totallyDifferent = Array.from({ length: 900_000 }, (_, index) =>
-    String.fromCodePoint(19_968 + (index % 500))
-  ).join('');
-  const fields = buildContentFields(base, totallyDifferent, false);
-  assert.equal(fields.kind, 'snapshot');
-  assert.equal(fields.content, totallyDifferent);
-  assert.equal(fields.patch, '');
-
-  // Sanity: a forced snapshot always downgrades regardless of size.
-  const forced = buildContentFields('a', 'b', true);
-  assert.equal(forced.kind, 'snapshot');
-
-  // Sanity: MAX_PATCH_BYTES is a real, positive bound.
-  assert.ok(MAX_PATCH_BYTES > 0);
-}
-
-// --- recordValuesRevision writes correct valuesBefore and independent per-target sequence ---
-{
-  const page = await createTestPage('some content');
-  await recordContentRevision({ page, newContent: 'edited content', author: 'user-1' });
-
-  const stringValue = (value: string) => ({ type: 'string' as const, value });
-
-  await recordValuesRevision({ page, changed: { title: stringValue('first title') }, author: 'user-1' });
-  const pageWithFirstValue = { ...page, values: { title: stringValue('first title') } };
-  await recordValuesRevision({
-    page: pageWithFirstValue,
-    changed: { title: stringValue('second title') },
-    author: 'user-1',
+    containerRepository = await databaseModule.getContainerRepository();
+    recordContentRevision = revisionServiceModule.recordContentRevision;
+    recordValuesRevision = revisionServiceModule.recordValuesRevision;
+    getContentRevisions = revisionServiceModule.getContentRevisions;
+    getValuesRevisions = revisionServiceModule.getValuesRevisions;
+    buildContentFields = revisionServiceModule.buildContentFields;
+    reconstructAt = reconstructModule.reconstructAt;
+    SNAPSHOT_INTERVAL = constantsModule.SNAPSHOT_INTERVAL;
+    MAX_PATCH_BYTES = constantsModule.MAX_PATCH_BYTES;
   });
 
-  const valuesRevisions = await getValuesRevisions(page.id, 'user-1');
-  assert.equal(valuesRevisions.length, 2);
-  assert.equal(valuesRevisions[0]!.sequence, 1);
-  assert.equal(valuesRevisions[0]!.previousSequence, null);
-  assert.deepEqual(JSON.parse(valuesRevisions[0]!.valuesBefore), { title: null });
-  assert.equal(valuesRevisions[1]!.sequence, 2);
-  assert.equal(valuesRevisions[1]!.previousSequence, 1);
-  assert.deepEqual(JSON.parse(valuesRevisions[1]!.valuesBefore), { title: stringValue('first title') });
+  afterAll(async () => {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  });
 
-  // The values stream's sequence numbering is independent of (does not interleave with) the
-  // content stream's, which by now is already at sequence 2 for this page.
-  const contentRevisions = await getContentRevisions(page.id, 'user-1');
-  assert.equal(contentRevisions.length, 2);
-}
+  async function createTestPage(initialContent: string): Promise<PageContainer> {
+    const pageData = {
+      name: 'Test page',
+      type: 'page' as const,
+      parentId: null,
+      workspaceId: 'workspace-1',
+      userId: 'user-1',
+      emoji: null,
+      content: initialContent,
+      values: {},
+      lastUpdated: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      deletedAt: null,
+      deletedRootId: null,
+    };
+    const created = await containerRepository.create(pageData);
+    return created as PageContainer;
+  }
 
-await rm(temporaryDirectory, { recursive: true, force: true });
+  function toContentLike(revisions: Awaited<ReturnType<typeof getContentRevisions>>) {
+    return revisions.map((revision) => ({
+      sequence: revision.sequence,
+      kind: revision.kind,
+      content: revision.content,
+      patch: revision.patch,
+    }));
+  }
 
-console.log('✅  revision-service tests passed');
+  test('writes a lazy baseline on first save, then coalesces same-author edits and appends different authors', async () => {
+    const page = await createTestPage('initial content');
+    await recordContentRevision({ page, newContent: 'first edit', author: 'user-1' });
+
+    const revisions = await getContentRevisions(page.id, 'user-1');
+    expect(revisions.length).toBe(2);
+    expect(revisions[0]!.sequence).toBe(1);
+    expect(revisions[0]!.kind).toBe('snapshot');
+    expect(revisions[0]!.content).toBe('initial content');
+    expect(revisions[1]!.sequence).toBe(2);
+    expect(reconstructAt(toContentLike(revisions), 2)).toBe('first edit');
+
+    await recordContentRevision({ page, newContent: 'first edit, refined', author: 'user-1' });
+    const afterCoalesce = await getContentRevisions(page.id, 'user-1');
+    expect(afterCoalesce.length).toBe(2);
+    expect(reconstructAt(toContentLike(afterCoalesce), 2)).toBe('first edit, refined');
+
+    await recordContentRevision({ page, newContent: 'second edit by someone else', author: 'user-2' });
+    const afterAppend = await getContentRevisions(page.id, 'user-1');
+    expect(afterAppend.length).toBe(3);
+    expect(afterAppend[2]!.sequence).toBe(3);
+    expect(afterAppend[2]!.previousSequence).toBe(2);
+    expect(reconstructAt(toContentLike(afterAppend), 3)).toBe('second edit by someone else');
+  });
+
+  test('stores a full snapshot every SNAPSHOT_INTERVAL revisions', async () => {
+    const page = await createTestPage('');
+    let sequenceCount = 0;
+    let authorToggle = 0;
+    while (sequenceCount < SNAPSHOT_INTERVAL) {
+      authorToggle += 1;
+      await recordContentRevision({
+        page,
+        newContent: `content v${authorToggle}`,
+        author: `user-${authorToggle}`,
+      });
+      const currentRevisions = await getContentRevisions(page.id, 'user-1');
+      sequenceCount = currentRevisions.length;
+    }
+
+    const revisions = await getContentRevisions(page.id, 'user-1');
+    const atInterval = revisions.find((revision) => revision.sequence === SNAPSHOT_INTERVAL);
+    expect(atInterval).toBeTruthy();
+    expect(atInterval!.kind).toBe('snapshot');
+  });
+
+  test('downgrades oversized patches to snapshots and honors forced snapshots', () => {
+    const base = 'a'.repeat(900_000);
+    const totallyDifferent = Array.from({ length: 900_000 }, (_, index) =>
+      String.fromCodePoint(19_968 + (index % 500))
+    ).join('');
+    const fields = buildContentFields(base, totallyDifferent, false);
+    expect(fields.kind).toBe('snapshot');
+    expect(fields.content).toBe(totallyDifferent);
+    expect(fields.patch).toBe('');
+
+    const forced = buildContentFields('a', 'b', true);
+    expect(forced.kind).toBe('snapshot');
+    expect(MAX_PATCH_BYTES > 0).toBeTruthy();
+  });
+
+  test('writes correct valuesBefore entries with an independent values sequence', async () => {
+    const page = await createTestPage('some content');
+    await recordContentRevision({ page, newContent: 'edited content', author: 'user-1' });
+
+    await recordValuesRevision({ page, changed: { title: stringValue('first title') }, author: 'user-1' });
+    const pageWithFirstValue = { ...page, values: { title: stringValue('first title') } };
+    await recordValuesRevision({
+      page: pageWithFirstValue,
+      changed: { title: stringValue('second title') },
+      author: 'user-1',
+    });
+
+    const valuesRevisions = await getValuesRevisions(page.id, 'user-1');
+    expect(valuesRevisions.length).toBe(2);
+    expect(valuesRevisions[0]!.sequence).toBe(1);
+    expect(valuesRevisions[0]!.previousSequence).toBeNull();
+    expect(JSON.parse(valuesRevisions[0]!.valuesBefore)).toEqual({ title: null });
+    expect(valuesRevisions[1]!.sequence).toBe(2);
+    expect(valuesRevisions[1]!.previousSequence).toBe(1);
+    expect(JSON.parse(valuesRevisions[1]!.valuesBefore)).toEqual({ title: stringValue('first title') });
+
+    const contentRevisions = await getContentRevisions(page.id, 'user-1');
+    expect(contentRevisions.length).toBe(2);
+  });
+});

@@ -62,6 +62,9 @@ Run these from the repository root:
 | Start | `pnpm start` | Run the production build |
 | Lint (all) | `pnpm lint` | Run ESLint + Prettier + TypeScript checks concurrently |
 | Format | `pnpm format` | Auto-fix Prettier and ESLint issues in `src/` |
+| Unit tests | `pnpm test:unit` | Run Vitest unit tests |
+| Integration tests | `pnpm test:integration` | Run API integration tests against a live server |
+| All fast tests | `pnpm test` | Run unit + integration tests |
 | E2E tests | `pnpm test:e2e` | Run Playwright end-to-end tests |
 | E2E tests (UI) | `pnpm test:e2e:ui` | Run Playwright tests in interactive UI mode |
 | E2E report | `pnpm test:e2e:report` | Show the last Playwright HTML report |
@@ -69,7 +72,13 @@ Run these from the repository root:
 
 ### Testing
 
-Every new or modified feature should ship with Playwright end-to-end tests under `tests/e2e/`. See `.agents/commands/e2e-test.md` for conventions on seeding, authentication, and selectors.
+Thoth uses three test suites with clear boundaries:
+
+- Unit tests (`src/**/*.test.ts`, Vitest) — fast, isolated checks with no server required.
+- API integration tests (`tests/integration/api/**/*.test.ts`, Vitest) — real HTTP against a spawned Next.js dev server backed by a seeded SQLite database.
+- E2E tests (`tests/e2e/**/*.spec.ts`, Playwright) — browser-based UI interaction tests.
+
+Shared seeded data constants live in `tests/fixtures/seed.ts` and are re-exported from `tests/e2e/constants.ts` for Playwright. See `.agents/commands/e2e-test.md` for E2E conventions.
 
 ### Contributing
 

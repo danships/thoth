@@ -111,29 +111,5 @@ test.describe('page history', () => {
     });
   });
 
-  test('records a revision on values save', async ({ request }) => {
-    const noteColumn = SEED.dataSource.columns[0];
-    const pageResponse = await request.post('/api/v1/pages', {
-      data: {
-        name: 'E2E History Values Page',
-        emoji: null,
-        parentId: SEED.dataSource.id,
-        workspaceId: SEED.workspace.id,
-      },
-    });
-    expect(pageResponse.ok()).toBeTruthy();
-    const pageEntity = await getData<PageApi>(pageResponse);
 
-    const valuesResponse = await request.patch(`/api/v1/pages/${pageEntity.id}/values`, {
-      data: { [noteColumn.id]: { type: 'string', value: 'Done' } },
-    });
-    expect(valuesResponse.ok()).toBeTruthy();
-
-    const historyResponse = await request.get(`/api/v1/pages/${pageEntity.id}/history?target=values`);
-    expect(historyResponse.ok()).toBeTruthy();
-    const history = await getData<{ revisions: Array<{ target: string; changedColumns?: string[] }> }>(historyResponse);
-    expect(history.revisions.length).toBe(1);
-    expect(history.revisions[0]?.target).toBe('values');
-    expect(history.revisions[0]?.changedColumns).toContain(noteColumn.id);
-  });
 });

@@ -190,41 +190,4 @@ test.describe('recent sidebar section and GET /pages?recent filter', () => {
     await expect(page.getByRole('button', { name: 'Collapse recent' })).toBeVisible();
     await expect(page.getByTestId('recent-tree')).toBeVisible();
   });
-
-  test('GET /pages?recent=true satisfies the "one selector required" validation on its own', async ({ page }) => {
-    const response = await page.request.get('/api/v1/pages?recent=true');
-    expect(response.ok()).toBe(true);
-  });
-
-  test('GET /pages still requires at least one selector', async ({ page }) => {
-    const response = await page.request.get('/api/v1/pages');
-    expect(response.status()).toBe(400);
-  });
-
-  test('GET /pages?recent=true is capped at RECENT_MAX_LIMIT even with a higher limit', async ({ page }) => {
-    const response = await page.request.get(`/api/v1/pages?recent=true&workspaceId=${SEED.workspace.id}&limit=50`);
-    expect(response.ok()).toBe(true);
-    const body = await response.json();
-    expect(Array.isArray(body.data)).toBe(true);
-    expect(body.data).toHaveLength(15);
-  });
-
-  test('GET /pages?recent=true returns entries sorted by lastAccessedAt desc, each with a lastAccessedAt field', async ({
-    page,
-  }) => {
-    const response = await page.request.get(`/api/v1/pages?recent=true&workspaceId=${SEED.workspace.id}`);
-    expect(response.ok()).toBe(true);
-    const body = await response.json();
-    const entries = body.data as { page: { id: string }; lastAccessedAt?: string }[];
-
-    expect(entries.length).toBeGreaterThan(0);
-    for (const entry of entries) {
-      expect(entry.lastAccessedAt).toBeTruthy();
-    }
-
-    const timestamps = entries.map((entry) => Date.parse(entry.lastAccessedAt!));
-    for (let index = 1; index < timestamps.length; index++) {
-      expect(timestamps[index]).toBeLessThanOrEqual(timestamps[index - 1]!);
-    }
-  });
 });

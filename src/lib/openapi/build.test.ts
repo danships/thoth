@@ -1,40 +1,52 @@
-import assert from 'node:assert/strict';
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { validate } from '@readme/openapi-parser';
 import { buildOpenApiDocument } from './build';
 
-const document = buildOpenApiDocument();
+describe('buildOpenApiDocument', () => {
+  let document: ReturnType<typeof buildOpenApiDocument> | null = null;
 
-assert.equal(document.openapi, '3.1.0');
+  beforeAll(() => {
+    document = buildOpenApiDocument();
+  });
 
-const seenOperationIds = new Set<string>();
-for (const [path, pathItem] of Object.entries(document.paths)) {
-  for (const [method, operation] of Object.entries(pathItem)) {
-    assert.ok(operation.operationId, `${method.toUpperCase()} ${path} is missing an operationId`);
-    assert.ok(!seenOperationIds.has(operation.operationId), `Duplicate operationId: ${operation.operationId}`);
-    seenOperationIds.add(operation.operationId);
+  afterAll(() => {
+    document = null;
+  });
 
-    if (path.startsWith('/apps')) {
-      assert.deepEqual(
-        operation.security,
-        [{ sessionCookie: [] }],
-        `${method.toUpperCase()} ${path} must be session-only`
-      );
+  test('builds an OpenAPI 3.1.0 document', () => {
+    expect(document!.openapi).toBe('3.1.0');
+  });
+
+  test('assigns unique operation ids and keeps app routes session-only', () => {
+    const seenOperationIds = new Set<string>();
+    for (const [path, pathItem] of Object.entries(document!.paths)) {
+      for (const [method, operation] of Object.entries(pathItem)) {
+        expect(operation.operationId, `${method.toUpperCase()} ${path} is missing an operationId`).toBeTruthy();
+        expect(seenOperationIds.has(operation.operationId), `Duplicate operationId: ${operation.operationId}`).toBe(
+          false
+        );
+        seenOperationIds.add(operation.operationId);
+
+        if (path.startsWith('/apps')) {
+          expect(operation.security).toEqual([{ sessionCookie: [] }]);
+        }
+      }
     }
-  }
-}
+  });
 
-const pagesTreeLimit = document.paths['/pages/tree']?.['get']?.parameters?.find(
-  (parameter) => parameter.in === 'query' && parameter.name === 'limit'
-);
-assert.ok(pagesTreeLimit, 'GET /pages/tree should expose the limit query parameter');
-assert.equal(typeof pagesTreeLimit.schema, 'object');
-assert.ok(
-  Object.prototype.hasOwnProperty.call(pagesTreeLimit.schema, 'type') || '$ref' in pagesTreeLimit.schema,
-  'GET /pages/tree limit parameter should have a JSON schema'
-);
+  test('exposes the pages tree limit query parameter with a schema', () => {
+    const pagesTreeLimit = document!.paths['/pages/tree']?.['get']?.parameters?.find(
+      (parameter) => parameter.in === 'query' && parameter.name === 'limit'
+    );
+    expect(pagesTreeLimit).toBeTruthy();
+    expect(typeof pagesTreeLimit!.schema).toBe('object');
+    expect(
+      Object.prototype.hasOwnProperty.call(pagesTreeLimit!.schema, 'type') || '$ref' in pagesTreeLimit!.schema
+    ).toBeTruthy();
+  });
 
-const validationResult = await validate(document);
-assert.ok(
-  validationResult.valid,
-  `OpenAPI document is invalid: ${JSON.stringify(validationResult.valid ? [] : validationResult.errors, null, 2)}`
-);
+  test('validates the generated OpenAPI document', async () => {
+    const validationResult = await validate(document!);
+    expect(validationResult.valid).toBeTruthy();
+  });
+});
