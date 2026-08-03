@@ -49,50 +49,54 @@ test.describe('page favorite toggle', () => {
     restoreLastAccessedAt(SEED.pages.favoriteToggle.id, originalLastAccessedAt);
   });
 
-  test('starring a page from the detail header flips the icon to filled and persists across reload', async ({
-    page,
-  }) => {
+  test('starring a page from the detail menu flips the icon/label and persists across reload', async ({ page }) => {
     await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.favoriteToggle.id}`);
 
-    const starButton = page.getByRole('button', { name: 'Star page' });
-    await expect(starButton).toBeVisible();
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    const starMenuItem = page.getByRole('menuitem', { name: 'Star Page' });
+    await expect(starMenuItem).toBeVisible();
 
     const [response] = await Promise.all([
       page.waitForResponse(
         (response) => response.url().includes(`/pages/${SEED.pages.favoriteToggle.id}/favorite`) && response.ok()
       ),
-      starButton.click(),
+      starMenuItem.click(),
     ]);
     expect(response.ok()).toBe(true);
 
-    await expect(page.getByRole('button', { name: 'Unstar page' })).toBeVisible();
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Unstar Page' })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Unstar page' })).toBeVisible();
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Unstar Page' })).toBeVisible();
   });
 
-  test('unstarring a page reverts the icon back to the outline state', async ({ page }) => {
+  test('unstarring a page reverts the menu item back to the outline state', async ({ page }) => {
     await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.favoriteToggle.id}`);
 
-    const starButton = page.getByRole('button', { name: 'Star page' });
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    const starMenuItem = page.getByRole('menuitem', { name: 'Star Page' });
     await Promise.all([
       page.waitForResponse(
         (response) => response.url().includes(`/pages/${SEED.pages.favoriteToggle.id}/favorite`) && response.ok()
       ),
-      starButton.click(),
+      starMenuItem.click(),
     ]);
 
-    const unstarButton = page.getByRole('button', { name: 'Unstar page' });
-    await expect(unstarButton).toBeVisible();
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    const unstarMenuItem = page.getByRole('menuitem', { name: 'Unstar Page' });
+    await expect(unstarMenuItem).toBeVisible();
 
     await Promise.all([
       page.waitForResponse(
         (response) => response.url().includes(`/pages/${SEED.pages.favoriteToggle.id}/favorite`) && response.ok()
       ),
-      unstarButton.click(),
+      unstarMenuItem.click(),
     ]);
 
-    await expect(page.getByRole('button', { name: 'Star page' })).toBeVisible();
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Star Page' })).toBeVisible();
   });
 
   test('the sidebar Favorites section shows and hides the page as it is starred/unstarred', async ({ page }) => {
@@ -101,12 +105,13 @@ test.describe('page favorite toggle', () => {
     // No Favorites section yet — nothing starred.
     await expect(page.getByRole('heading', { name: 'Favorites' })).toHaveCount(0);
 
-    const starButton = page.getByRole('button', { name: 'Star page' });
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    const starMenuItem = page.getByRole('menuitem', { name: 'Star Page' });
     await Promise.all([
       page.waitForResponse(
         (response) => response.url().includes(`/pages/${SEED.pages.favoriteToggle.id}/favorite`) && response.ok()
       ),
-      starButton.click(),
+      starMenuItem.click(),
     ]);
 
     await expect(page.getByRole('heading', { name: 'Favorites' })).toBeVisible();
@@ -114,12 +119,13 @@ test.describe('page favorite toggle', () => {
       page.getByTestId('favorites-tree').getByRole('link', { name: new RegExp(SEED.pages.favoriteToggle.name) })
     ).toBeVisible();
 
-    const unstarButton = page.getByRole('button', { name: 'Unstar page' });
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    const unstarMenuItem = page.getByRole('menuitem', { name: 'Unstar Page' });
     await Promise.all([
       page.waitForResponse(
         (response) => response.url().includes(`/pages/${SEED.pages.favoriteToggle.id}/favorite`) && response.ok()
       ),
-      unstarButton.click(),
+      unstarMenuItem.click(),
     ]);
 
     await expect(page.getByRole('heading', { name: 'Favorites' })).toHaveCount(0);
@@ -128,12 +134,13 @@ test.describe('page favorite toggle', () => {
   test('the Favorites section collapses and expands via its chevron toggle', async ({ page }) => {
     await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.favoriteToggle.id}`);
 
-    const starButton = page.getByRole('button', { name: 'Star page' });
+    await page.getByRole('button', { name: 'Page menu' }).click();
+    const starMenuItem = page.getByRole('menuitem', { name: 'Star Page' });
     await Promise.all([
       page.waitForResponse(
         (response) => response.url().includes(`/pages/${SEED.pages.favoriteToggle.id}/favorite`) && response.ok()
       ),
-      starButton.click(),
+      starMenuItem.click(),
     ]);
 
     const favoriteLink = page.getByTestId('favorites-tree').getByRole('link', {
