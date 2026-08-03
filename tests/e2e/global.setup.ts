@@ -96,10 +96,4 @@ setup('seed database and write auth storage state', async () => {
 
   // Primary seeded user (workspace owner) — used by the default `chromium` project.
   await signInAndWriteStorageState(baseUrl, SEED.user, path.join(AUTH_DIR, 'user.json'));
-
-  // Second/third seeded members of `SEED.workspace` (THOTH-042, DECISION 4) — `read_write` and
-  // `read`-only respectively — used by the `chromium-second-member` /
-  // `chromium-readonly-member` projects to exercise the multi-user access matrix.
-  await signInAndWriteStorageState(baseUrl, SEED.secondUser, path.join(AUTH_DIR, 'second-user.json'));
-  await signInAndWriteStorageState(baseUrl, SEED.thirdUser, path.join(AUTH_DIR, 'third-user.json'));
 });

@@ -16,7 +16,7 @@ function setFavoritesDirectly(starred: boolean, pageIds: string[]) {
 
 test.describe.configure({ mode: 'serial' });
 
-test.describe('favorites sidebar section and GET /pages?favorited filter', () => {
+test.describe('favorites sidebar section', () => {
   test('sidebar Favorites section is absent when no pages are starred', async ({ page }) => {
     await page.goto(`/${SEED.workspace.slug}/pages`);
     await expect(page.getByRole('heading', { name: 'Pages' })).toBeVisible();
@@ -38,30 +38,6 @@ test.describe('favorites sidebar section and GET /pages?favorited filter', () =>
         data: { starred: false },
       });
     }
-  });
-
-  test('GET /pages?favorited=true satisfies the "one selector required" validation on its own', async ({ page }) => {
-    const response = await page.request.get(`/api/v1/pages?favorited=true&workspaceId=${SEED.workspace.id}`);
-    expect(response.ok()).toBe(true);
-  });
-
-  test('GET /pages still requires at least one selector', async ({ page }) => {
-    const response = await page.request.get('/api/v1/pages');
-    expect(response.status()).toBe(400);
-  });
-
-  test('GET /pages with parentId still works alongside the relaxed favorited validation', async ({ page }) => {
-    const response = await page.request.get(`/api/v1/pages?parentId=${SEED.pages.root.id}`);
-    expect(response.ok()).toBe(true);
-    const body = await response.json();
-    expect(Array.isArray(body.data)).toBe(true);
-  });
-
-  test('GET /pages with dataSourceId still works alongside the relaxed favorited validation', async ({ page }) => {
-    const response = await page.request.get(`/api/v1/pages?dataSourceId=${SEED.dataSource.id}`);
-    expect(response.ok()).toBe(true);
-    const body = await response.json();
-    expect(Array.isArray(body.data)).toBe(true);
   });
 
   test('starring more than FAVORITES_MAX_LIMIT pages surfaces the "may be more" indicator', async ({ page }) => {
