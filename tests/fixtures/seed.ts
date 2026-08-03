@@ -163,6 +163,31 @@ export const SEED = {
         ],
       },
     ],
+    // THOTH-053: named inline-Markdown expectations, seeded onto a page kept separate from
+    // `dataSourcePage` (which specs mutate via inline edit) so Markdown-rendering assertions never
+    // race with — or get clobbered by — tests that overwrite the "Notes" cell's raw text.
+    markdown: {
+      raw: 'This is **bold**, *emphasis*, ~~strike~~, `code`, and a [link](https://example.com/thoth).',
+      boldText: 'bold',
+      emphasisText: 'emphasis',
+      strikeText: 'strike',
+      codeText: 'code',
+      linkText: 'link',
+      linkHref: 'https://example.com/thoth',
+    },
+    markdownRow: {
+      id: 'e2e-page-dsrow-md-0-0000-0000-000000000001',
+      name: 'E2E Markdown Row',
+    },
+    // A very long single-line Markdown value (with inline code) used to verify the rendered cell
+    // stays on one line and ellipsises rather than growing the row/table/document width.
+    longMarkdown: {
+      raw: `Lorem ipsum dolor sit amet **consectetur adipiscing** elit, \`sed do eiusmod tempor\` incididunt ut labore et dolore magna aliqua ${'ultra-long-word-'.repeat(10)}end.`,
+    },
+    longMarkdownRow: {
+      id: 'e2e-page-dsrow-long-0-0000-0000-000000000001',
+      name: 'E2E Long Markdown Row',
+    },
   },
   dataView: {
     id: 'e2e-dataview-0000-0000-0000-000000000001',
@@ -209,6 +234,9 @@ export const SEED = {
     page: {
       id: 'e2e-page-fields-row-0-0000-000000000001',
       name: 'E2E Fields Row',
+      // Deliberately Markdown-looking raw text (THOTH-053 regression fixture): the Fields tab
+      // must keep showing this literally, punctuation and all, never rendered as bold.
+      alphaValue: '**Initial** alpha',
     },
   },
   // A pre-seeded `uploaded-file` + `file-usage` row (with a matching byte file written into the

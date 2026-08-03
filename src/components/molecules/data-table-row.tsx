@@ -45,6 +45,7 @@ export function DataTableRow({
               onChange={(value) => onCellUpdate(col.id, value)}
               disabled={disabled}
               onCreateOption={onCreateOption}
+              renderStringAsMarkdown
             />
           </Table.Td>
         );

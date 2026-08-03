@@ -12,6 +12,14 @@ type EditableColumnValueProperties = {
   onChange: (value: PageValue) => void;
   disabled?: boolean;
   onCreateOption?: ((columnId: string, label: string) => Promise<SingleSelectOption>) | undefined;
+  /**
+   * Whether string-column values render as inline Markdown at rest (see `MarkdownContent`) rather
+   * than plain text. This is a presentation-context concern, not a column setting: `DataTableRow`
+   * enables it for Data View cells, while `PageFieldsEditor` deliberately leaves it `false` so the
+   * row page's Fields tab stays immediately editable raw text. Editing always operates on the raw
+   * source string regardless of this flag.
+   */
+  renderStringAsMarkdown?: boolean;
 };
 
 /**
@@ -25,6 +33,7 @@ export function EditableColumnValue({
   onChange,
   disabled = false,
   onCreateOption,
+  renderStringAsMarkdown = false,
 }: EditableColumnValueProperties) {
   if (column.type === 'date') {
     return (
@@ -102,6 +111,8 @@ export function EditableColumnValue({
       }}
       disabled={disabled}
       type={column.type}
+      renderMarkdown={column.type === 'string' && renderStringAsMarkdown}
+      columnName={column.name}
     />
   );
 }

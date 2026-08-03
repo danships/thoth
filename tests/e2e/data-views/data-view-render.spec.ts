@@ -13,6 +13,25 @@ test('seeded data row appears in the data view table', async ({ page }) => {
   await expect(page.getByText(SEED.dataSourcePage.name)).toBeVisible();
 });
 
+test('inline Markdown in a text cell does not break the row/column structure', async ({ page }) => {
+  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
+  await page.getByRole('tab', { name: SEED.dataView.name }).click();
+  await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 });
+
+  const row = page.getByRole('row').filter({ hasText: SEED.dataSource.markdownRow.name });
+  await expect(row).toBeVisible();
+
+  // Compare against the live header cell count (rather than a hardcoded `columns.length + 1`)
+  // so this assertion stays robust if another spec run earlier in the suite added a column to
+  // this shared data source: the Markdown row must still have exactly one cell per column, and
+  // its rendered Markdown content sits inside that single "Notes" cell rather than spilling into
+  // neighbouring cells or adding extra rows.
+  const headerCellCount = await page.getByRole('row').first().getByRole('columnheader').count();
+  await expect(row.getByRole('cell')).toHaveCount(headerCellCount);
+  const notesCell = row.getByRole('cell').nth(1);
+  await expect(notesCell.locator('strong', { hasText: SEED.dataSource.markdown.boldText })).toBeVisible();
+});
+
 test('can create a new page from the "New page name" row using the Add page button', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();

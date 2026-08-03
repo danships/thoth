@@ -20,9 +20,15 @@ test('Page fields section renders columns in the DataView order and edits persis
   expect(alphaBox).not.toBeNull();
   expect(betaBox!.y).toBeLessThan(alphaBox!.y);
 
-  // Edit the "Alpha" text field.
+  // THOTH-053 regression: the Fields tab is a plain-text editing surface — even though the
+  // seeded "Alpha" value looks like Markdown, it must show up literally (asterisks and all),
+  // never rendered bold, and must not adopt the Data View's click-to-edit interaction.
   const alphaRow = page.getByText('Alpha', { exact: true }).locator('..');
   const alphaValue = alphaRow.locator('[contenteditable="true"]');
+  await expect(alphaValue).toHaveText(SEED.fieldsTab.page.alphaValue);
+  await expect(alphaRow.locator('strong')).toHaveCount(0);
+
+  // Edit the "Alpha" text field.
   await alphaValue.click();
   await alphaValue.press('ControlOrMeta+A');
   await alphaValue.pressSequentially('Updated alpha');
