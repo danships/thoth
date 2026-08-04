@@ -1,9 +1,10 @@
 import { getAdapter } from './adapter';
-import { buildFilterFragment, buildSortExpression } from './query-builder';
+import { buildFilterFragment, buildNameSortExpression, buildSortExpression } from './query-builder';
 import { dropStaleRules } from './validation';
 import type { ExecutePageQueryOptions, ExecutePageQueryResult, SqlFragment } from './types';
 import type { PageContainer } from '@/types/database';
 import { BadRequestError } from '../../errors/bad-request-error';
+import { NAME_SORT_COLUMN_ID } from '@/types/schemas/entities/data-view-query';
 
 export { assertValidFilterSortRules } from './validation';
 export type { PageQueryCursor, ExecutePageQueryOptions, ExecutePageQueryResult } from './types';
@@ -12,7 +13,11 @@ export type { PageQueryCursor, ExecutePageQueryOptions, ExecutePageQueryResult }
 // rationale) so client components can import them without pulling in this file's server-only DB
 // driver imports. Re-exported here for backward compatibility with existing importers (e.g.
 // `page-query-service.test.ts`).
-export { OPERATORS_BY_COLUMN_TYPE, VALUELESS_OPERATORS } from '@/types/schemas/entities/data-view-query';
+export {
+  NAME_SORT_COLUMN_ID,
+  OPERATORS_BY_COLUMN_TYPE,
+  VALUELESS_OPERATORS,
+} from '@/types/schemas/entities/data-view-query';
 
 /**
  * Executes a raw-SQL, cursor-paginated query for pages under `parentId`, applying `filters`
@@ -57,6 +62,17 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
     valueOf: (page: PageContainer) => string | number | boolean | null;
   }[] = [];
   for (const sort of sorts) {
+    // `name` sorts on the page's own attribute rather than a dynamic Data Source column
+    // (THOTH-065) — handled separately since it has no entry in `columnsById`.
+    if (sort.columnId === NAME_SORT_COLUMN_ID) {
+      const expression = buildNameSortExpression(adapter);
+      sortExpressions.push({
+        ...expression,
+        direction: sort.direction,
+        valueOf: (page) => page.name,
+      });
+      continue;
+    }
     const column = columnsById.get(sort.columnId);
     if (!column) {
       continue;

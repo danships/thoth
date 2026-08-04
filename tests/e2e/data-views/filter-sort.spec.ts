@@ -129,6 +129,29 @@ test.describe('Data View filter/sort configuration', () => {
     await expect(nameCells.nth(2)).toContainText('Apple');
   });
 
+  test('sorting by Name orders rows alphabetically, case-insensitively (THOTH-065)', async ({ page }) => {
+    await openFilterSortView(page);
+
+    await page.getByTestId('filter-sort-bar-sort-button').click();
+    await page.getByRole('button', { name: 'Add sort' }).click();
+
+    const sortRow = page.getByTestId('sort-rule-row').first();
+    // Column defaults to "Name" (listed first, always sortable — THOTH-065); direction defaults
+    // to "Ascending".
+    await expect(comboboxes(sortRow).nth(0)).toHaveValue('Name');
+
+    await page.getByTestId('apply-sorts').click();
+
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 });
+    const nameCells = page.getByRole('row').filter({ hasText: /Apple|Banana|cherry|Date/ });
+    await expect(nameCells).toHaveCount(4, { timeout: 10_000 });
+    // Ascending, case-insensitive: Apple, Banana, cherry, Date.
+    await expect(nameCells.nth(0)).toContainText('Apple');
+    await expect(nameCells.nth(1)).toContainText('Banana');
+    await expect(nameCells.nth(2)).toContainText('cherry');
+    await expect(nameCells.nth(3)).toContainText('Date');
+  });
+
   test('filter/sort config persists across a page reload', async ({ page }) => {
     await openFilterSortView(page);
 

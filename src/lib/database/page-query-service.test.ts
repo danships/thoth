@@ -252,6 +252,38 @@ describe('page-query-service', () => {
     expect(descResult.pages.map((page) => page.values?.['title']?.value)).toEqual(['zeta', 'Middle', 'Alpha']);
   });
 
+  test('sorts ascending and descending by the built-in name attribute case-insensitively (THOTH-065)', async () => {
+    const parentId = 'name-sort-data-source';
+    const zeta = await createTestPage();
+    await containerRepository.update({ ...zeta, name: 'zeta', parentId });
+    const alpha = await createTestPage();
+    await containerRepository.update({ ...alpha, name: 'Alpha', parentId });
+    const middle = await createTestPage();
+    await containerRepository.update({ ...middle, name: 'Middle', parentId });
+
+    const ascResult = await executePageQuery({
+      parentId,
+      columns,
+      filters: [],
+      sorts: [{ columnId: 'name', direction: 'asc' }],
+      limit: 50,
+    });
+    expect(ascResult.pages.map((page) => page.name)).toEqual(['Alpha', 'Middle', 'zeta']);
+
+    const descResult = await executePageQuery({
+      parentId,
+      columns,
+      filters: [],
+      sorts: [{ columnId: 'name', direction: 'desc' }],
+      limit: 50,
+    });
+    expect(descResult.pages.map((page) => page.name)).toEqual(['zeta', 'Middle', 'Alpha']);
+  });
+
+  test('accepts the "name" sentinel sort columnId even when it is not a data source column', () => {
+    expect(() => assertValidFilterSortRules(columns, [], [{ columnId: 'name', direction: 'asc' }])).not.toThrow();
+  });
+
   test('walks cursor pagination without duplicates or skips', async () => {
     const parentId = 'cursor-data-source';
     const values = new Set(['Echo', 'Bravo', 'Delta', 'Charlie', 'Alfa']);

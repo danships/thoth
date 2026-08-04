@@ -84,3 +84,13 @@ export function buildSortExpression(adapter: PageQueryEngineAdapter, column: Col
   const collate = column.type === 'string' ? adapter.stringCollation() : '';
   return { sql: `${adapter.extractExpression()}${collate}`, params: [path] };
 }
+
+/** Builds the ORDER-BY expression for sorting by a page's own `name` (THOTH-065), a fixed
+ * `Container` attribute rather than a dynamic Data Source column. Unlike `buildSortExpression`,
+ * this reads a real generated/indexed `name` column on the `container` table directly (see the
+ * `Container` entity's `filterSortFields`) rather than `json_extract`-ing into `contents` —
+ * mirroring how `parentId`/`type`/etc. are already referenced as plain columns elsewhere in this
+ * query. Always string-collated the same way an ordinary `string` column's sort is. */
+export function buildNameSortExpression(adapter: PageQueryEngineAdapter): SqlFragment {
+  return { sql: `name${adapter.stringCollation()}`, params: [] };
+}
