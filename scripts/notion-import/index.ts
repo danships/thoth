@@ -695,6 +695,7 @@ export async function runImport(
 
   state.lastRun.finishedAt = new Date().toISOString();
 
-  const exitCode = state.lastRun.state === 'completed' ? 0 : state.lastRun.state === 'partially_completed' ? 1 : 2;
+  const exitCode =
+    state.lastRun.state === 'completed' ? 0 : (state.lastRun.state === 'partially_completed' ? 1 : 2);
   return { exitCode, state };
 }
