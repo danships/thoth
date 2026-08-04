@@ -91,10 +91,18 @@ prevents two concurrent runs against the same state file.
 
 ## What migrates (and what doesn't)
 
-See the THOTH-049 spec / PR description for the full feature-gap analysis (the THOTH-049 spec
-is an internal planning document and is not publicly available). In short: pages,
-databases (as data sources with rows), and most block types migrate; `relation`/`rollup`
-properties, table of contents/breadcrumb blocks, comments, and page history do not.
+**Databases / properties**
+
+- **Migrated**: `title`, `number` (format lost), `checkbox`, `select`/`status` → `single-select`, `multi_select`, `date` (ranges collapse to start), `unique_id`; `rich_text`/`url`/`email`/`phone` → `string` columns with **inline Markdown preserved** (bold/italic/strike/code/links via THOTH-053), stored as raw `{ type:'string', value }`.
+- **Degraded (accepted for v1)**: `people` → comma-joined names; `files & media` → inline-Markdown links to the file URLs; `formula` → snapshot of the computed value only.
+- **NOT migrated**: `relation`, `rollup` (no equivalent type — skipped, reported per column); `created_by`/`last_edited_by`/system time columns (Thoth tracks its own); linked/multi-source databases (skipped at fetch); Notion database views/filters/sorts/groupings → only a single default table view exists per data-source.
+- Select **option colours** map to the nearest Thoth `selectColor` palette entry, default `gray`.
+
+**Page content / blocks**
+
+- **Migrated**: paragraph, headings, quote, divider, code, equation, lists, to-do, tables, image/file/pdf/video/audio (uploaded via `POST /files` + Markdown/HTML-comment tokens per `src/lib/files/markdown-blocks.ts`), page/child-page mentions + `link_to_page` (rewritten to internal Thoth links after all pages exist), emoji page icon, page cover image.
+- **Degraded**: callout → blockquote, toggle → heading + content (collapsibility lost), external video/embed/bookmark/link_preview → link, synced_block → inlined once, column_list/column → flattened.
+- **NOT migrated**: table_of_contents, breadcrumb, unknown blocks (dropped + counted), comments, page history/versions, user/date @-mentions, permissions/sharing, custom (non-emoji) page icons.
 
 ## Development
 
