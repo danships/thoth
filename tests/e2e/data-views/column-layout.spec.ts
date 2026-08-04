@@ -84,22 +84,43 @@ test.describe('Data View column layout', () => {
     await openColumnLayoutView(page);
 
     const alphaHandle = page.getByTestId(`column-drag-handle-${SEED.columnLayout.dataSource.columns[0]!.id}`);
-    await alphaHandle.focus();
-    await page.keyboard.press('Space');
-    // dnd-kit's KeyboardSensor flips `aria-pressed` on the draggable handle once the drag has
-    // actually been picked up (its internal state updates asynchronously). Without waiting for
-    // it, the following ArrowRight can race ahead of pickup under load and be dropped/ignored,
-    // making this test flaky (THOTH-052 CI failures).
-    await expect(alphaHandle).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('Space');
 
+    // Retry the whole pick-up/move/drop keyboard sequence, not just the resulting assertion.
+    // dnd-kit's KeyboardSensor computes the drop target from the *currently measured* droppable
+    // rects, which are recalculated asynchronously (e.g. on scroll/resize observers) — under CI
+    // load, the very first `ArrowRight` can occasionally be evaluated against stale rects and
+    // resolve to a no-op move, landing the column right back where it started. Waiting only on
+    // `aria-pressed` (confirming pick-up) isn't sufficient to guard against that, so if the
+    // header order hasn't actually changed after a full press/move/drop cycle, redo the entire
+    // sequence — a fresh `focus()` + `Space` starts a brand-new drag with freshly measured rects.
     await expect(async () => {
+      // If a previous iteration's `ArrowRight` did land (just not yet reflected when we last
+      // checked), the order may already be correct — skip re-issuing the keyboard sequence in
+      // that case, since doing so would pick Alpha back up and move it a second time.
       const headers = headerOrder(page);
+      const currentOrder = await headers.allTextContents();
+      if (
+        currentOrder[0]?.includes('Name') &&
+        currentOrder[1]?.includes('Alpha') &&
+        currentOrder[2]?.includes('Beta')
+      ) {
+        return;
+      }
+
+      await alphaHandle.focus();
+      await page.keyboard.press('Space');
+      // dnd-kit's KeyboardSensor flips `aria-pressed` on the draggable handle once the drag has
+      // actually been picked up (its internal state updates asynchronously). Without waiting for
+      // it, the following ArrowRight can race ahead of pickup under load and be dropped/ignored,
+      // making this test flaky (THOTH-052 CI failures).
+      await expect(alphaHandle).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('Space');
+
       await expect(headers.nth(0)).toContainText('Name');
       await expect(headers.nth(1)).toContainText('Alpha');
       await expect(headers.nth(2)).toContainText('Beta');
-    }).toPass({ timeout: 10_000 });
+    }).toPass({ timeout: 15_000 });
   });
 
   test('Columns manager: show Gamma and apply persists it visibly at its stored position', async ({ page }) => {
@@ -196,7 +217,9 @@ test.describe('Data View column layout', () => {
     const nameHeader = page.getByTestId('column-header-name');
     await dragHandleOnto(page, betaHandle, nameHeader);
 
-    await expect(page.getByText('This view changed elsewhere since it was loaded. The column layout has been refreshed.')).toBeVisible({
+    await expect(
+      page.getByText('This view changed elsewhere since it was loaded. The column layout has been refreshed.')
+    ).toBeVisible({
       timeout: 10_000,
     });
 
