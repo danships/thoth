@@ -84,6 +84,11 @@ test.describe('Data View column layout', () => {
     const alphaHandle = page.getByTestId(`column-drag-handle-${SEED.columnLayout.dataSource.columns[0]!.id}`);
     await alphaHandle.focus();
     await page.keyboard.press('Space');
+    // dnd-kit's KeyboardSensor flips `aria-pressed` on the draggable handle once the drag has
+    // actually been picked up (its internal state updates asynchronously). Without waiting for
+    // it, the following ArrowRight can race ahead of pickup under load and be dropped/ignored,
+    // making this test flaky (THOTH-052 CI failures).
+    await expect(alphaHandle).toHaveAttribute('aria-pressed', 'true');
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Space');
 
