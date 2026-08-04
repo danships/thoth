@@ -38,8 +38,11 @@ export const GET = apiRoute<GetDataViewResponse, undefined, GetDataViewParameter
       lastUpdated: dataView.lastUpdated,
       filters: dataView.filters,
       sorts: dataView.sorts,
-      columns: dataView.columns,
-      columnLayout: dataView.columnLayout,
+      // Rows persisted before THOTH-052 have neither field on the underlying document —
+      // normalize to their schema defaults rather than letting `undefined` slip through and
+      // omit a required `columnLayout` key from the serialized response.
+      columns: dataView.columns ?? [],
+      columnLayout: dataView.columnLayout ?? null,
     };
   }
 );
@@ -100,14 +103,18 @@ export const PATCH = apiRoute<UpdateDataViewResponse, undefined, UpdateDataViewP
       if (dataSourceChanging && body.columnLayout === undefined) {
         layoutFields = { columnLayout: null, columns: [] };
       } else if (body.columnLayout === null) {
-        // Explicit reset back to the default (legacy) resolution — no ids to validate.
-        layoutFields = { columnLayout: null, columns: existingDataView.columns };
+        // Explicit reset back to the default (legacy) resolution — no ids to validate. A
+        // concurrent data-source change still invalidates the legacy `columns` ids, so reset
+        // them for the same reason as the other branches.
+        layoutFields = { columnLayout: null, columns: dataSourceChanging ? [] : existingDataView.columns };
       } else if (body.columnLayout !== undefined) {
         const effectiveDataSourceId = body.dataSourceId ?? existingDataView.dataSourceId;
         const dataSource = await dataSourceRetriever.retrieveDataSource(effectiveDataSourceId, session.user.id);
         const canonicalLayout = validateColumnLayoutForWrite(dataSource.columns, body.columnLayout);
         // Ordinary layout saves leave the legacy `columns` array (page-field ordering) unchanged.
-        layoutFields = { columnLayout: canonicalLayout, columns: existingDataView.columns };
+        // A concurrent data-source change invalidates those ids, so reset them for the same
+        // reason the branch above does.
+        layoutFields = { columnLayout: canonicalLayout, columns: dataSourceChanging ? [] : existingDataView.columns };
       }
 
       const filteredBody = Object.fromEntries(
@@ -147,8 +154,11 @@ export const PATCH = apiRoute<UpdateDataViewResponse, undefined, UpdateDataViewP
       dataSourceId: updatedDataView.dataSourceId,
       filters: updatedDataView.filters,
       sorts: updatedDataView.sorts,
-      columns: updatedDataView.columns,
-      columnLayout: updatedDataView.columnLayout,
+      // Rows persisted before THOTH-052 have neither field on the underlying document —
+      // normalize to their schema defaults rather than letting `undefined` slip through and
+      // omit a required `columnLayout` key from the serialized response.
+      columns: updatedDataView.columns ?? [],
+      columnLayout: updatedDataView.columnLayout ?? null,
     } satisfies UpdateDataViewResponse;
   }
 );

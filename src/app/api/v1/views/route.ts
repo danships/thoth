@@ -51,8 +51,11 @@ export const GET = apiRoute<GetDataViewsResponse, GetDataViewsQuery, {}>(
       lastUpdated: dataView.lastUpdated,
       filters: dataView.filters,
       sorts: dataView.sorts,
-      columns: dataView.columns,
-      columnLayout: dataView.columnLayout,
+      // Rows persisted before THOTH-052 have neither field on the underlying document —
+      // normalize to their schema defaults rather than letting `undefined` slip through and
+      // omit a required `columnLayout` key from the serialized response.
+      columns: dataView.columns ?? [],
+      columnLayout: dataView.columnLayout ?? null,
     }));
   }
 );
