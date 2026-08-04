@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+scripts/notion-import/node_modules
 /.pnp
 .pnp.*
 .yarn/*
