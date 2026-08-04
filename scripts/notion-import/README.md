@@ -18,7 +18,8 @@ fingerprints, and the run report) in a local JSON **state file**.
 This script is isolated from the main Thoth pnpm project — install its dependencies separately:
 
 ```bash
-cd scripts/notion-import
+git clone https://github.com/danships/thoth
+cd thoth/scripts/notion-import
 npm install   # or: pnpm install --ignore-workspace
 ```
 
@@ -90,7 +91,8 @@ prevents two concurrent runs against the same state file.
 
 ## What migrates (and what doesn't)
 
-See the THOTH-049 spec / PR description for the full feature-gap analysis. In short: pages,
+See the THOTH-049 spec / PR description for the full feature-gap analysis (the THOTH-049 spec
+is an internal planning document and is not publicly available). In short: pages,
 databases (as data sources with rows), and most block types migrate; `relation`/`rollup`
 properties, table of contents/breadcrumb blocks, comments, and page history do not.
 
