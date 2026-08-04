@@ -5332,6 +5332,68 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "columns": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "columnLayout": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "name"
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "data"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -5341,7 +5403,9 @@
                         "createdAt",
                         "dataSourceId",
                         "filters",
-                        "sorts"
+                        "sorts",
+                        "columns",
+                        "columnLayout"
                       ],
                       "additionalProperties": false
                     }
@@ -5567,6 +5631,68 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "columns": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "columnLayout": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "name"
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "data"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -5576,7 +5702,9 @@
                         "createdAt",
                         "dataSourceId",
                         "filters",
-                        "sorts"
+                        "sorts",
+                        "columns",
+                        "columnLayout"
                       ],
                       "additionalProperties": false
                     }
@@ -5769,6 +5897,68 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "columns": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "columnLayout": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "name"
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "data"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -5778,7 +5968,9 @@
                         "createdAt",
                         "dataSourceId",
                         "filters",
-                        "sorts"
+                        "sorts",
+                        "columns",
+                        "columnLayout"
                       ],
                       "additionalProperties": false
                     }
@@ -5819,6 +6011,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -5947,6 +6149,61 @@
                         "direction"
                       ]
                     }
+                  },
+                  "columnLayout": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "name"
+                                },
+                                "visible": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "visible"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "data"
+                                },
+                                "columnId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "visible": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "columnId",
+                                "visible"
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "expectedLastUpdated": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               }
@@ -6168,6 +6425,68 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "columns": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "columnLayout": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "name"
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "data"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -6177,7 +6496,9 @@
                         "createdAt",
                         "dataSourceId",
                         "filters",
-                        "sorts"
+                        "sorts",
+                        "columns",
+                        "columnLayout"
                       ],
                       "additionalProperties": false
                     }
@@ -13260,6 +13581,68 @@
               ],
               "additionalProperties": false
             }
+          },
+          "columns": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "columnLayout": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "name"
+                        },
+                        "visible": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "visible"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "data"
+                        },
+                        "columnId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "visible": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "columnId",
+                        "visible"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -13269,7 +13652,9 @@
           "createdAt",
           "dataSourceId",
           "filters",
-          "sorts"
+          "sorts",
+          "columns",
+          "columnLayout"
         ],
         "additionalProperties": false
       },

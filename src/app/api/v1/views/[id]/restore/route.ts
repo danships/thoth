@@ -46,6 +46,8 @@ export const POST = apiRoute<RestoreViewResponse, undefined, RestoreViewParamete
       lastUpdated: restored.lastUpdated,
       filters: restored.filters,
       sorts: restored.sorts,
+      columns: restored.columns,
+      columnLayout: restored.columnLayout,
     };
   }
 );

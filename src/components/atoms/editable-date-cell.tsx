@@ -34,7 +34,16 @@ export function EditableDateCell({
       value={inputValue}
       onChange={handleChange}
       disabled={disabled}
-      style={{ minWidth: 120, border: 'none', background: 'transparent', outline: 'none', cursor: 'text' }}
+      style={{
+        minWidth: 120,
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        border: 'none',
+        background: 'transparent',
+        outline: 'none',
+        cursor: 'text',
+      }}
     />
   );
 }

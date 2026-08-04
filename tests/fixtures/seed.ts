@@ -392,4 +392,41 @@ export const SEED = {
       },
     ],
   },
+  // A dedicated data source + view + rows for THOTH-052's column layout e2e coverage (drag
+  // reorder, the Columns manager, hidden-column filter/sort availability), kept fully separate
+  // from `SEED.dataSource`/`SEED.filterSort` so layout mutations (persisted via header drag or
+  // the manager) never race with or clobber those specs' fixtures. Persisted `columnLayout`
+  // places Name between "Alpha" and "Beta", with "Gamma" hidden — exercising a moved Name and a
+  // hidden column that must still be selectable in the filter/sort bar.
+  columnLayout: {
+    host: {
+      id: 'e2e-page-cl-host-00-0000-0000-000000000001',
+      name: 'E2E Column Layout Host',
+    },
+    dataSource: {
+      id: 'e2e-datasource-cl-0-0000-0000-000000000001',
+      name: 'E2E Column Layout Data Source',
+      columns: [
+        { id: 'e2e-col-cl-alpha-0-0000-0000-000000000001', name: 'Alpha', type: 'string' as const },
+        { id: 'e2e-col-cl-beta-00-0000-0000-000000000001', name: 'Beta', type: 'string' as const },
+        { id: 'e2e-col-cl-gamma-0-0000-0000-000000000001', name: 'Gamma', type: 'string' as const },
+      ],
+    },
+    dataView: {
+      id: 'e2e-dataview-cl-000-0000-0000-000000000001',
+      name: 'E2E Column Layout View',
+    },
+    rows: [
+      { id: 'e2e-page-cl-row-a-0-0000-0000-000000000001', name: 'CL Row A', alpha: 'A1', beta: 'B1', gamma: 'G1' },
+      { id: 'e2e-page-cl-row-b-0-0000-0000-000000000001', name: 'CL Row B', alpha: 'A2', beta: 'B2', gamma: 'G2' },
+      { id: 'e2e-page-cl-row-c-0-0000-0000-000000000001', name: 'CL Row C', alpha: 'A3', beta: 'B3', gamma: 'G3' },
+    ],
+    // Alpha, Name, Beta visible (in that order); Gamma hidden. See module doc comment above.
+    layout: [
+      { kind: 'data' as const, columnId: 'e2e-col-cl-alpha-0-0000-0000-000000000001', visible: true },
+      { kind: 'name' as const, visible: true },
+      { kind: 'data' as const, columnId: 'e2e-col-cl-beta-00-0000-0000-000000000001', visible: true },
+      { kind: 'data' as const, columnId: 'e2e-col-cl-gamma-0-0000-0000-000000000001', visible: false },
+    ],
+  },
 } as const;

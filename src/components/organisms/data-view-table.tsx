@@ -1,12 +1,15 @@
 'use client';
 
 /* eslint-disable unicorn/no-nested-ternary */
-import { Alert, Button, Group, Loader, Stack, Table } from '@mantine/core';
+import { Alert, Button, Group, Loader, Modal, Stack, Table, TextInput } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconPlus } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { useDisclosure } from '@mantine/hooks';
+import { IconColumns, IconPlus } from '@tabler/icons-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
 import {
   DndContext,
+  type CollisionDetection,
   type DragEndEvent,
   KeyboardSensor,
   PointerSensor,
@@ -14,12 +17,19 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { DataTableRow } from '@/components/molecules/data-table-row';
-import { DataTableColumnHeader } from '@/components/molecules/data-table-column-header';
+import { SortableDataViewColumnHeader } from '@/components/molecules/sortable-data-view-column-header';
+import { ColumnHeaderActions } from '@/components/atoms/column-header-actions';
 import { ColumnFormModal } from '@/components/molecules/column-form-modal';
 import { NewPageRow } from '@/components/molecules/new-page-row';
 import { FilterSortBar } from '@/components/molecules/filter-sort-bar';
+import { DataViewColumnManager } from '@/components/molecules/data-view-column-manager';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { useDataViewColumns } from '@/lib/hooks/api/use-data-view-columns';
 import { usePageValueUpdate } from '@/lib/hooks/api/use-page-value-update';
@@ -30,8 +40,15 @@ import { useCreateSingleSelectOption } from '@/lib/hooks/api/use-create-single-s
 import { getRandomSelectColor } from '@/lib/data-source/select-colors';
 import { swrFetcher } from '@/lib/swr/fetcher';
 import { markDragEnded } from '@/lib/dnd/suppress-click-after-drag';
+import {
+  resolveDataViewColumnLayout,
+  toViewColumnLayoutItems,
+  type ResolvedColumnLayout,
+  type ResolvedColumnLayoutItem,
+} from '@/lib/data-view/column-layout';
 import type { Column } from '@/types/schemas/entities/container';
 import type { SelectColor } from '@/types/schemas/entities/container';
+import type { ViewColumnLayoutItem } from '@/types/schemas/entities/data-view';
 import type { FilterRule, SortRule } from '@/types/schemas/entities/data-view-query';
 import {
   GET_PAGES_ENDPOINT,
@@ -57,6 +74,9 @@ const DEFAULT_TABLE_MIN_WIDTH = 520;
 // controls below their min-width and causing them to overlap/intercept clicks meant for a
 // neighbouring cell.
 const DRAG_COLUMN_WIDTH = 32;
+// Width reserved for the THOTH-052 fixed "Open page" action gutter — always rendered, never
+// part of `columnLayout`, so it must always be folded into `tableMinWidth` too.
+const ACTION_GUTTER_WIDTH = 90;
 
 // Pure helper: given the currently-known page order, compute the array with `activeId` moved
 // next to `overId`, plus the moved page's new neighbour IDs (used as reorder anchors). Returns
@@ -85,10 +105,38 @@ function computeReorder(sourcePages: GetPagesResponse | undefined, activeId: str
   return { reordered, beforeId, afterId };
 }
 
+function layoutItemId(item: ResolvedColumnLayoutItem): string {
+  return item.kind === 'name' ? 'name' : item.column.id;
+}
+
+// Moves `activeId` next to `overId` within the *complete* layout (including hidden items),
+// preserving every hidden item's relative order (THOTH-052) — used for both header drags and
+// the Column Manager's Apply. Returns `null` when the move is a no-op or either id can't be
+// found (e.g. a column deleted mid-drag).
+function moveWithinLayout(
+  fullLayout: ResolvedColumnLayoutItem[],
+  activeId: string,
+  overId: string
+): ResolvedColumnLayoutItem[] | null {
+  const oldIndex = fullLayout.findIndex((item) => layoutItemId(item) === activeId);
+  const newIndex = fullLayout.findIndex((item) => layoutItemId(item) === overId);
+  if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
+    return null;
+  }
+  const reordered = [...fullLayout];
+  const [moved] = reordered.splice(oldIndex, 1);
+  if (!moved) {
+    return null;
+  }
+  reordered.splice(newIndex, 0, moved);
+  return reordered;
+}
+
 type DataViewTableProperties = {
   view: DataView;
   dataSourceId: string;
-  columns: Column[];
+  dataSourceColumns: Column[];
+  layout: ResolvedColumnLayout;
   pages: GetPagesResponse | undefined;
   isLoading: boolean;
   error: string | null;
@@ -104,13 +152,14 @@ type DataViewTableProperties = {
   hasMore: boolean;
   onLoadMore: () => void;
   loadingMore: boolean;
-  onFilterSortChange?: (() => void) | undefined;
+  onViewChange?: (() => void) | undefined;
 };
 
 export function DataViewTable({
   view,
   dataSourceId,
-  columns,
+  dataSourceColumns,
+  layout,
   pages,
   isLoading,
   error,
@@ -123,10 +172,32 @@ export function DataViewTable({
   hasMore,
   onLoadMore,
   loadingMore,
-  onFilterSortChange,
+  onViewChange,
 }: DataViewTableProperties) {
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [editingColumn, setEditingColumn] = useState<Column | null>(null);
+  const [showColumnManager, setShowColumnManager] = useState(false);
+  const [addPageModalOpened, { open: openAddPageModal, close: closeAddPageModal }] = useDisclosure(false);
+  const [addPageModalName, setAddPageModalName] = useState('');
+  // Optimistic override for the *rendered* layout while a header-drag or Column Manager Apply
+  // save is in flight (or has just completed), reverted on failure. Cleared whenever the
+  // parent's authoritative `view` advances (see the effect below), so a stale optimistic order
+  // is never stuck rendered forever if the parent's revalidation lands with something different.
+  const [pendingLayout, setPendingLayout] = useState<ResolvedColumnLayout | null>(null);
+  const [columnLayoutSaving, setColumnLayoutSaving] = useState(false);
+
+  // Once the parent's authoritative `view` (and therefore its resolved `layout`) advances past
+  // the snapshot this component optimistically applied, drop the local override — otherwise a
+  // stale optimistic order could linger forever if the parent's revalidated data ever differs
+  // from what was optimistically rendered (e.g. another tab's concurrent edit).
+  const lastSeenUpdatedReference = useRef(view.lastUpdated);
+  useEffect(() => {
+    if (lastSeenUpdatedReference.current !== view.lastUpdated) {
+      lastSeenUpdatedReference.current = view.lastUpdated;
+      setPendingLayout(null);
+    }
+  }, [view.lastUpdated]);
+
   const {
     createColumn,
     updateColumn,
@@ -155,10 +226,31 @@ export function DataViewTable({
   // `handleDragEnd`'s `onConfirm`).
   const legacyPagesKey = `${GET_PAGES_ENDPOINT}?dataSourceId=${dataSourceId}&includeValues=true`;
 
+  const effectiveLayout = pendingLayout ?? layout;
+  const visibleDataCount = effectiveLayout.visible.filter((item) => item.kind === 'data').length;
+  const nameVisible = effectiveLayout.visible.some((item) => item.kind === 'name');
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // A single `DndContext` hosts two independent `SortableContext` regions (header columns and
+  // page rows, THOTH-052/THOTH-036) — but dnd-kit's collision detection considers *every*
+  // registered droppable in the `DndContext`, not just the active drag's own `SortableContext`.
+  // Without filtering, dragging a header can resolve `over` to a row (or vice versa), silently
+  // routing the drop to the wrong region. Restrict candidates to the same group as `active`.
+  const columnDragIds = useMemo(
+    () => new Set(effectiveLayout.all.map((item) => layoutItemId(item))),
+    [effectiveLayout]
+  );
+  const restrictedCollisionDetection: CollisionDetection = (arguments_) => {
+    const activeIsColumn = columnDragIds.has(String(arguments_.active.id));
+    const filteredContainers = arguments_.droppableContainers.filter((container) =>
+      activeIsColumn ? columnDragIds.has(String(container.id)) : !columnDragIds.has(String(container.id))
+    );
+    return closestCenter({ ...arguments_, droppableContainers: filteredContainers });
+  };
 
   const applyReorder = (activeId: string, overId: string) => {
     const previousPages = pages;
@@ -177,6 +269,41 @@ export function DataViewTable({
     });
   };
 
+  const persistColumnLayout = async (reorderedFull: ResolvedColumnLayoutItem[]) => {
+    const previous = effectiveLayout;
+    const reorderedVisible = reorderedFull.filter((item) => item.visible);
+    setPendingLayout({ all: reorderedFull, visible: reorderedVisible });
+    setColumnLayoutSaving(true);
+    try {
+      const result = await updateDataView({
+        columnLayout: toViewColumnLayoutItems(reorderedFull),
+        expectedLastUpdated: view.lastUpdated,
+      });
+      if (!result) {
+        throw new Error('Failed to save column layout');
+      }
+      onViewChange?.();
+    } catch (saveError) {
+      setPendingLayout(previous);
+      if (axios.isAxiosError(saveError) && saveError.response?.status === 409) {
+        showError('This view changed elsewhere since it was loaded. The column layout has been refreshed.');
+        onViewChange?.();
+      } else {
+        showError(saveError instanceof Error ? saveError.message : 'Failed to save column layout');
+      }
+    } finally {
+      setColumnLayoutSaving(false);
+    }
+  };
+
+  const handleColumnManagerApply = async (canonicalItems: ViewColumnLayoutItem[]) => {
+    // Resolve immediately against the live Data Source so the applied layout renders with real
+    // column metadata without waiting for the parent's revalidation to complete first.
+    const resolved = resolveDataViewColumnLayout(dataSourceColumns, view.columns ?? [], canonicalItems);
+    await persistColumnLayout(resolved.all);
+    setShowColumnManager(false);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     markDragEnded();
     const { active, over } = event;
@@ -185,6 +312,19 @@ export function DataViewTable({
     }
     const activeId = String(active.id);
     const overId = String(over.id);
+
+    // A single `DndContext`/`onDragEnd` handles both the header (column) and row (page) sortable
+    // regions (THOTH-052) — routed here by checking whether the dragged id belongs to the
+    // current column layout, since page ids and layout ids (`'name'` or a Data Source `Column`
+    // id) never collide.
+    const isColumnDrag = effectiveLayout.all.some((item) => layoutItemId(item) === activeId);
+    if (isColumnDrag) {
+      const reordered = moveWithinLayout(effectiveLayout.all, activeId, overId);
+      if (reordered) {
+        void persistColumnLayout(reordered);
+      }
+      return;
+    }
 
     if (!hasCustomSort) {
       applyReorder(activeId, overId);
@@ -199,7 +339,7 @@ export function DataViewTable({
       onConfirm: async () => {
         try {
           await updateDataView({ sorts: [] });
-          onFilterSortChange?.();
+          onViewChange?.();
 
           // Clearing `view.sorts` flips `useDataViewPages` from the cursor-paginated `viewId`
           // query (active while a custom sort/filter exists) to the legacy `dataSourceId` fetch
@@ -240,11 +380,11 @@ export function DataViewTable({
       // `useDataViewPages` derives its query key from `view.filters`/`view.sorts`, and `view` is
       // owned by the parent page's `usePageDetails` SWR cache (not this component), the parent
       // is responsible for revalidating `pageDetails` after a successful update (see
-      // `onFilterSortChange` threaded down from `data-view-render.tsx`). `mutatePages()` here
+      // `onViewChange` threaded down from `data-view-render.tsx`). `mutatePages()` here
       // additionally forces the *current* pages query to revalidate immediately for snappier
       // feedback while that propagates.
       mutatePages();
-      onFilterSortChange?.();
+      onViewChange?.();
     } catch (updateError) {
       showError(updateError instanceof Error ? updateError.message : 'Failed to save filters and sorts');
     }
@@ -348,19 +488,32 @@ export function DataViewTable({
     setEditingColumn(null);
   };
 
+  const handleAddPageModalSubmit = async () => {
+    const name = addPageModalName.trim();
+    if (!name) {
+      return;
+    }
+    await onPageCreate(name);
+    setAddPageModalName('');
+    closeAddPageModal();
+  };
+
   const inProgress = useMemo(() => {
     return createPageInProgress || columnOperationInProgress || valueUpdateInProgress || pageUpdateInProgress;
   }, [createPageInProgress, columnOperationInProgress, valueUpdateInProgress, pageUpdateInProgress]);
 
-  // Scaling the scroll container's minWidth with the column count keeps every column at least as
-  // wide as its editable control, falling back to horizontal scrolling instead of squeezing
-  // columns (see the constants above for rationale).
+  // Scaling the scroll container's minWidth with the visible column count keeps every column at
+  // least as wide as its editable control, falling back to horizontal scrolling instead of
+  // squeezing columns (see the constants above for rationale). The fixed action gutter is always
+  // rendered, so it's always folded in too.
   const tableMinWidth = useMemo(() => {
     const dragColumnWidth = pages && pages.length > 0 ? DRAG_COLUMN_WIDTH : 0;
-    return columns.length > 0
-      ? dragColumnWidth + NAME_COLUMN_MIN_WIDTH + columns.length * DATA_COLUMN_MIN_WIDTH
-      : DEFAULT_TABLE_MIN_WIDTH;
-  }, [columns.length, pages]);
+    if (visibleDataCount === 0 && !nameVisible) {
+      return DEFAULT_TABLE_MIN_WIDTH;
+    }
+    const nameWidth = nameVisible ? NAME_COLUMN_MIN_WIDTH : 0;
+    return dragColumnWidth + nameWidth + visibleDataCount * DATA_COLUMN_MIN_WIDTH + ACTION_GUTTER_WIDTH;
+  }, [visibleDataCount, nameVisible, pages]);
 
   if (isLoading) {
     return (
@@ -382,32 +535,70 @@ export function DataViewTable({
     <>
       <Group justify="space-between" mt="md" mb="md" wrap="wrap">
         <FilterSortBar
-          columns={columns}
+          columns={dataSourceColumns}
           filters={view.filters ?? []}
           sorts={view.sorts ?? []}
           onApply={(filters, sorts) => void handleFilterSortApply(filters, sorts)}
           inProgress={viewUpdateInProgress}
         />
-        <Button size="xs" variant="default" onClick={handleAddColumn} leftSection={<IconPlus />}>
-          Add Column
-        </Button>
+        <Group gap="xs">
+          {!nameVisible && (
+            <Button size="xs" variant="default" onClick={openAddPageModal} leftSection={<IconPlus />}>
+              Add page
+            </Button>
+          )}
+          <Button
+            size="xs"
+            variant="default"
+            onClick={() => setShowColumnManager(true)}
+            leftSection={<IconColumns size={16} />}
+            data-testid="open-column-manager"
+          >
+            Columns
+          </Button>
+          <Button size="xs" variant="default" onClick={handleAddColumn} leftSection={<IconPlus />}>
+            Add Column
+          </Button>
+        </Group>
       </Group>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={restrictedCollisionDetection} onDragEnd={handleDragEnd}>
         <Table.ScrollContainer minWidth={tableMinWidth} mt="lg" type="native" data-testid="data-table-scroll-container">
-          <Table striped highlightOnHover w="100%" style={columns.length > 0 ? { tableLayout: 'fixed' } : undefined}>
+          <Table striped highlightOnHover w="100%" style={visibleDataCount > 0 ? { tableLayout: 'fixed' } : undefined}>
             <Table.Thead>
-              <Table.Tr>
-                {pages && pages.length > 0 && <Table.Th style={{ width: DRAG_COLUMN_WIDTH }} />}
-                <Table.Th style={columns.length > 0 ? { width: '30%', maxWidth: 260 } : undefined}>Name</Table.Th>
-                {columns.map((col) => (
-                  <DataTableColumnHeader
-                    key={col.id}
-                    column={col}
-                    onEdit={() => handleEditColumn(col)}
-                    onDelete={() => handleDeleteColumn(col)}
-                  />
-                ))}
-              </Table.Tr>
+              <SortableContext
+                items={effectiveLayout.visible.map((item) => layoutItemId(item))}
+                strategy={horizontalListSortingStrategy}
+              >
+                <Table.Tr>
+                  {pages && pages.length > 0 && <Table.Th style={{ width: DRAG_COLUMN_WIDTH }} />}
+                  {effectiveLayout.visible.map((item) =>
+                    item.kind === 'name' ? (
+                      <SortableDataViewColumnHeader
+                        key="name"
+                        id="name"
+                        label="Name"
+                        style={visibleDataCount > 0 ? { width: '30%', maxWidth: 260 } : undefined}
+                        disabled={columnLayoutSaving}
+                      />
+                    ) : (
+                      <SortableDataViewColumnHeader
+                        key={item.column.id}
+                        id={item.column.id}
+                        label={item.column.name}
+                        disabled={columnLayoutSaving}
+                        actions={
+                          <ColumnHeaderActions
+                            label={item.column.name}
+                            onEdit={() => handleEditColumn(item.column)}
+                            onDelete={() => handleDeleteColumn(item.column)}
+                          />
+                        }
+                      />
+                    )
+                  )}
+                  <Table.Th style={{ width: ACTION_GUTTER_WIDTH }} />
+                </Table.Tr>
+              </SortableContext>
             </Table.Thead>
             <SortableContext items={pages?.map(({ page }) => page.id) ?? []} strategy={verticalListSortingStrategy}>
               <Table.Tbody>
@@ -416,7 +607,7 @@ export function DataViewTable({
                     key={page.id}
                     page={page}
                     values={values}
-                    columns={columns}
+                    visibleLayout={effectiveLayout.visible}
                     onCellUpdate={(columnId, value) => updateValue(page.id, columnId, value)}
                     onPageNameUpdate={(pageId, name) => updatePage(pageId, { name })}
                     disabled={inProgress}
@@ -430,7 +621,7 @@ export function DataViewTable({
                   onKeyDown={handleNewPageKeyDown}
                   onSubmit={() => void onPageCreate(newPageName)}
                   disabled={inProgress}
-                  columnCount={columns.length}
+                  visibleLayout={effectiveLayout.visible}
                   hasDragColumn={Boolean(pages && pages.length > 0)}
                 />
               </Table.Tbody>
@@ -454,6 +645,49 @@ export function DataViewTable({
         inProgress={columnOperationInProgress}
         onError={handleColumnError}
       />
+      <DataViewColumnManager
+        opened={showColumnManager}
+        onClose={() => setShowColumnManager(false)}
+        onApply={handleColumnManagerApply}
+        layout={effectiveLayout}
+        dataSourceColumns={dataSourceColumns}
+        inProgress={columnLayoutSaving}
+      />
+      <Modal
+        opened={addPageModalOpened}
+        onClose={closeAddPageModal}
+        title="Add page"
+        centered
+        closeButtonProps={{ 'aria-label': 'Close' }}
+      >
+        <Stack gap="sm">
+          <TextInput
+            placeholder="Page name"
+            value={addPageModalName}
+            onChange={(event) => setAddPageModalName(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                void handleAddPageModalSubmit();
+              }
+            }}
+            data-testid="add-page-modal-name"
+            autoFocus
+          />
+          <Group justify="flex-end">
+            <Button variant="default" onClick={closeAddPageModal}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleAddPageModalSubmit()}
+              disabled={addPageModalName.trim().length === 0}
+              loading={createPageInProgress}
+              data-testid="add-page-modal-submit"
+            >
+              Add page
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

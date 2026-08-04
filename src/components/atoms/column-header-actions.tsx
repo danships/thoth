@@ -2,15 +2,16 @@ import { ActionIcon, Menu } from '@mantine/core';
 import { IconDots, IconEdit, IconTrash } from '@tabler/icons-react';
 
 type ColumnHeaderActionsProperties = {
+  label: string;
   onEdit: () => void;
   onDelete: () => void;
 };
 
-export function ColumnHeaderActions({ onEdit, onDelete }: ColumnHeaderActionsProperties) {
+export function ColumnHeaderActions({ label, onEdit, onDelete }: ColumnHeaderActionsProperties) {
   return (
     <Menu shadow="md" width={200}>
       <Menu.Target>
-        <ActionIcon variant="subtle" size="sm">
+        <ActionIcon variant="subtle" size="sm" aria-label={`${label} column actions`}>
           <IconDots size={16} />
         </ActionIcon>
       </Menu.Target>

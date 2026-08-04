@@ -816,6 +816,108 @@ async function seedAppData() {
     );
   }
 
+  // Data source + view + rows for THOTH-052's column layout e2e coverage — see the doc comment
+  // on `SEED.columnLayout` for why it's kept separate from every other data-view fixture.
+  const columnLayoutSeed = SEED.columnLayout;
+
+  await upsertPage(
+    {
+      id: columnLayoutSeed.host.id,
+      name: columnLayoutSeed.host.name,
+      emoji: '🧱',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: null,
+      createdAt: now,
+      lastUpdated: new Date(Date.parse(now) - 1_000_000).toISOString(),
+      views: [columnLayoutSeed.dataView.id],
+    },
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
+
+  const existingColumnLayoutDs = await containerRepository.getOneByQuery(
+    containerRepository.createQuery().eq('id', columnLayoutSeed.dataSource.id)
+  );
+  await (existingColumnLayoutDs
+    ? containerRepository.update({
+        ...(existingColumnLayoutDs as DataSourceContainer),
+        name: columnLayoutSeed.dataSource.name,
+        columns: [...columnLayoutSeed.dataSource.columns] as Column[],
+        deletedAt: existingColumnLayoutDs.deletedAt ?? null,
+        deletedRootId: existingColumnLayoutDs.deletedRootId ?? null,
+        lastUpdated: now,
+      })
+    : containerRepository.create({
+        id: columnLayoutSeed.dataSource.id,
+        name: columnLayoutSeed.dataSource.name,
+        type: 'data-source',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: null,
+        columns: [...columnLayoutSeed.dataSource.columns] as Column[],
+        createdAt: now,
+        lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
+      } as unknown as DataSourceContainerCreate));
+
+  const existingColumnLayoutView = await dataViewRepository.getOneByQuery(
+    dataViewRepository.createQuery().eq('id', columnLayoutSeed.dataView.id)
+  );
+  await (existingColumnLayoutView
+    ? dataViewRepository.update({
+        ...existingColumnLayoutView,
+        name: columnLayoutSeed.dataView.name,
+        columns: columnLayoutSeed.dataSource.columns.map((c) => c.id),
+        columnLayout: [...columnLayoutSeed.layout],
+        filters: [],
+        sorts: [],
+        deletedAt: existingColumnLayoutView.deletedAt ?? null,
+        deletedRootId: existingColumnLayoutView.deletedRootId ?? null,
+        lastUpdated: now,
+      })
+    : dataViewRepository.create({
+        id: columnLayoutSeed.dataView.id,
+        name: columnLayoutSeed.dataView.name,
+        dataSourceId: columnLayoutSeed.dataSource.id,
+        userId: uid,
+        workspaceId: wsId,
+        columns: columnLayoutSeed.dataSource.columns.map((c) => c.id),
+        columnLayout: [...columnLayoutSeed.layout],
+        filters: [],
+        sorts: [],
+        createdAt: now,
+        lastUpdated: now,
+        deletedAt: null,
+        deletedRootId: null,
+      } as unknown as DataViewCreate));
+
+  for (const row of columnLayoutSeed.rows) {
+    const cols = columnLayoutSeed.dataSource.columns;
+    const values: Record<string, PageValue> = {
+      [cols[0]!.id]: { type: 'string', value: row.alpha },
+      [cols[1]!.id]: { type: 'string', value: row.beta },
+      [cols[2]!.id]: { type: 'string', value: row.gamma },
+    };
+
+    await upsertPage(
+      {
+        id: row.id,
+        name: row.name,
+        emoji: null,
+        type: 'page',
+        userId: uid,
+        workspaceId: wsId,
+        parentId: columnLayoutSeed.dataSource.id,
+        createdAt: now,
+        lastUpdated: now,
+        values,
+      },
+      { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+    );
+  }
+
   // A root page with more children (12) than CHILD_PREVIEW_LIMIT (10), used to verify the
   // sidebar shows a "more inside" indicator instead of listing/paginating all of them inline.
   await upsertPage(
