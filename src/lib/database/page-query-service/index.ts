@@ -77,11 +77,14 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
     });
   }
   if (sortExpressions.length === 0) {
+    // Manual order (THOTH-036) is the default for parented listings (this raw-SQL path is only
+    // ever used for a `dataView`'s rows, i.e. always parented) — falls back to `sortOrder asc`
+    // instead of `createdAt asc`.
     sortExpressions.push({
-      sql: 'createdAt',
+      sql: 'sortOrder',
       params: [],
       direction: 'asc',
-      valueOf: (page) => page.createdAt,
+      valueOf: (page) => page.sortOrder ?? null,
     });
   }
   sortExpressions.push({ sql: 'id', params: [], direction: 'asc', valueOf: (page) => page.id });

@@ -29,6 +29,32 @@ function encodeCursor(cursor: PagesTreeCursor): string {
   return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
 }
 
+// Manual-order comparator for parented listings (child expansion/preview) — see THOTH-036.
+// Treats a missing/null `sortOrder` as sorting last, so a stray legacy row (e.g. one created
+// before the backfill migration ran) falls to the end instead of jumping to the top. Applied
+// defensively in application code on top of the DB-level `sort('sortOrder', 'asc')` above, since
+// SuperSave's native NULL ordering across engines isn't guaranteed to match this "nulls last"
+// convention.
+function sortByManualOrder<T extends { sortOrder?: string | null | undefined }>(items: T[]): T[] {
+  return items.toSorted((a, b) => {
+    const aKey = a.sortOrder ?? null;
+    const bKey = b.sortOrder ?? null;
+    if (aKey === null && bKey === null) {
+      return 0;
+    }
+    if (aKey === null) {
+      return 1;
+    }
+    if (bKey === null) {
+      return -1;
+    }
+    if (aKey < bKey) {
+      return -1;
+    }
+    return aKey > bKey ? 1 : 0;
+  });
+}
+
 function decodeCursor(raw: string): PagesTreeCursor {
   let parsed: unknown;
   try {
@@ -145,13 +171,15 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       // this listing remains fully unpaginated, per the explicit out-of-scope decision for
       // child listings in this ticket. Content is scoped by workspace membership + grant, not
       // creator (THOTH-042) — anchored on the parent's own (already-authorised) workspace.
+      // Manual order (THOTH-036) is the default for child listings — `sortOrder asc` (root list
+      // ordering is unchanged and stays out of scope, see `fetchRootContainerPage` below).
       containers = await containerRepository.getByQuery(
         addWorkspaceIdToQuery(containerRepository.createQuery(), parent.workspaceId)
           .eq('type', 'page')
           .eq('parentId', query.parentId)
-          .sort('lastUpdated', 'desc')
+          .sort('sortOrder', 'asc')
       );
-      containers = containers.filter((container) => !container.deletedAt);
+      containers = sortByManualOrder(containers.filter((container) => !container.deletedAt));
       pagination = { nextCursor: null, hasMore: false };
     } else {
       // Root list: no existing entity to derive the workspace from, so `workspaceId` is
@@ -204,11 +232,13 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
         ? await filterContainersByGrantForSession(
             session,
             await containerRepository.getByQuery(
-              containerRepository.createQuery().in('parentId', parentIds).sort('lastUpdated', 'desc')
+              containerRepository.createQuery().in('parentId', parentIds).sort('sortOrder', 'asc')
             )
           )
         : [];
-    const visibleChildren = databaseChildren.filter((child) => !child.deletedAt && child.type === 'page');
+    const visibleChildren = sortByManualOrder(
+      databaseChildren.filter((child) => !child.deletedAt && child.type === 'page')
+    );
 
     const childCountByParent = new Map<string, number>();
     for (const child of visibleChildren) {
@@ -249,6 +279,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
               lastUpdated: child.lastUpdated,
               createdAt: child.createdAt,
               parentId: child.parentId || null,
+              sortOrder: child.sortOrder ?? null,
             },
           }));
 
@@ -280,6 +311,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
             lastUpdated: container.lastUpdated,
             createdAt: container.createdAt,
             parentId: container.parentId || null,
+            sortOrder: container.sortOrder ?? null,
           },
           children,
           ...(hasMoreChildren && { hasMoreChildren }),

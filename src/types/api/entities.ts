@@ -20,6 +20,7 @@ export const pageSchema = pageContainerSchema
     emoji: true,
     cover: true,
     parentId: true,
+    sortOrder: true,
   })
   .meta({ id: 'Page' });
 export type Page = z.infer<typeof pageSchema>;

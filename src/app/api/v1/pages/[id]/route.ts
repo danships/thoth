@@ -83,6 +83,7 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
         lastUpdated: page.lastUpdated,
         createdAt: page.createdAt,
         parentId: page.parentId || null,
+        sortOrder: page.sortOrder ?? null,
       },
       starred: containerAccess?.starred ?? false,
       hasChildren: Boolean(childPage),
@@ -150,6 +151,7 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
       lastUpdated: updatedPage.lastUpdated,
       createdAt: updatedPage.createdAt,
       parentId: updatedPage.parentId || null,
+      sortOrder: updatedPage.sortOrder ?? null,
     } satisfies UpdatePageResponse;
   }
 );

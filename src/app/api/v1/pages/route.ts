@@ -10,6 +10,8 @@ import {
   filterContainersByGrantForSession,
   memberToAccessGrant,
 } from '@/lib/auth/access-grant';
+import { getMaxSiblingSortOrder } from '@/lib/database/sort-order-service';
+import { generateKeyBetween } from 'fractional-indexing';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -47,6 +49,29 @@ function decodePageQueryCursor(raw: string): PageQueryCursor {
 
 function encodePageQueryCursor(cursor: PageQueryCursor): string {
   return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+// Manual-order comparator for parented listings (child pages, data-source rows) — see
+// THOTH-036. Treats a missing/null `sortOrder` as sorting last, so a stray legacy row (e.g. one
+// created before the backfill migration ran) falls to the end instead of jumping to the top.
+function sortByManualOrder<T extends { sortOrder?: string | null | undefined }>(items: T[]): T[] {
+  return items.toSorted((a, b) => {
+    const aKey = a.sortOrder ?? null;
+    const bKey = b.sortOrder ?? null;
+    if (aKey === null && bKey === null) {
+      return 0;
+    }
+    if (aKey === null) {
+      return 1;
+    }
+    if (bKey === null) {
+      return -1;
+    }
+    if (aKey < bKey) {
+      return -1;
+    }
+    return aKey > bKey ? 1 : 0;
+  });
 }
 
 function decodeInlineFilters(raw: string | undefined) {
@@ -119,13 +144,14 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
           session,
           pages.filter((page): page is PageContainer => page.type === 'page' && !page.deletedAt)
         );
-        return scopedPages.map((page) => {
+        return sortByManualOrder(scopedPages).map((page) => {
           const returnValue: GetPagesResponse[number] = {
             page: {
               id: page.id,
               name: page.name,
               emoji: page.emoji || null,
               parentId: page.parentId || null,
+              sortOrder: page.sortOrder ?? null,
               createdAt: page.createdAt,
               lastUpdated: page.lastUpdated,
             },
@@ -172,6 +198,7 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
             name: page.name,
             emoji: page.emoji || null,
             parentId: page.parentId || null,
+            sortOrder: page.sortOrder ?? null,
             createdAt: page.createdAt,
             lastUpdated: page.lastUpdated,
           },
@@ -334,13 +361,14 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
       pages.filter((page): page is PageContainer => page.type === 'page' && !page.deletedAt)
     );
 
-    return scopedPages.map((page) => {
+    return sortByManualOrder(scopedPages).map((page) => {
       const returnValue: GetPagesResponse[number] = {
         page: {
           id: page.id,
           name: page.name,
           emoji: page.emoji || null,
           parentId: page.parentId || null,
+          sortOrder: page.sortOrder ?? null,
           createdAt: page.createdAt,
           lastUpdated: page.lastUpdated,
         },
@@ -410,6 +438,15 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       throw new NotFoundError('Workspace not found');
     }
 
+    // Only parented pages (child pages, data-source rows) are manually ordered (THOTH-036) —
+    // root pages (`parentId === null`) keep `sortOrder: null`. New parented pages always land
+    // at the end of their sibling group.
+    let sortOrder: string | null = null;
+    if (parentId) {
+      const maxSiblingSortOrder = await getMaxSiblingSortOrder(workspaceId, parentId);
+      sortOrder = generateKeyBetween(maxSiblingSortOrder, null);
+    }
+
     // Create the page container with the provided data
     const pageData = {
       name: body.name,
@@ -422,6 +459,7 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       createdAt: new Date().toISOString(),
       deletedAt: null,
       deletedRootId: null,
+      sortOrder,
     };
 
     const createdPage = await containerRepository.create(pageData);
@@ -437,7 +475,9 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       id: createdPage.id,
       name: createdPage.name,
       emoji: 'emoji' in createdPage ? createdPage.emoji : null,
+      cover: 'cover' in createdPage ? (createdPage.cover ?? null) : null,
       parentId: createdPage.parentId || null,
+      sortOrder: createdPage.sortOrder ?? null,
       createdAt: createdPage.createdAt,
       lastUpdated: createdPage.lastUpdated,
     };

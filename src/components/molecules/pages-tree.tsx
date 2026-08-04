@@ -83,6 +83,19 @@ export function PagesTree({ branches }: PagesTreeProperties) {
     );
   }
 
+  // Manual reordering (THOTH-036) — only child pages within an expanded root branch are
+  // sortable, never the root branches themselves (permanently out of scope). `parentId` here is
+  // always the immediate root branch's page id (deeper nesting isn't shown in the sidebar).
+  const handleReorderChildren = async (
+    parentId: string,
+    movedId: string,
+    beforeId: string | null,
+    afterId: string | null
+  ) => {
+    await api.pages.reorder(movedId, { beforeId, afterId });
+    await revalidateWorkspacePageData(workspaceId, parentId);
+  };
+
   return (
     <Box>
       {branches.map((branch) => {
@@ -94,6 +107,7 @@ export function PagesTree({ branches }: PagesTreeProperties) {
             views: branch.views.map((view) => ({ id: view.id, name: view.name })),
           }),
           onDelete: handleDelete,
+          onReorderChildren: handleReorderChildren,
         };
         return <TreeNode key={branch.page.id} {...treeNodeProperties} />;
       })}

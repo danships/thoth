@@ -29,7 +29,7 @@ test('long inline Markdown stays on one line and ellipsises inside its cell', as
   const row = page
     .getByRole('row')
     .filter({ hasText: SEED.dataSource.longMarkdownRow.name });
-  const cell = row.getByRole('cell').nth(1);
+  const cell = row.getByRole('cell').nth(2);
   await expect(cell).toBeVisible();
 
   const overflowsCleanly = await cell.evaluate((element) => {

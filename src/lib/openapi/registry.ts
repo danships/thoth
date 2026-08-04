@@ -202,6 +202,18 @@ export const operations = [
     successStatus: 200,
   },
   {
+    path: '/pages/{id}/reorder',
+    method: 'post',
+    operationId: 'reorderPage',
+    summary: 'Reorder a page within its sibling group',
+    tags: ['Pages'],
+    auth: 'sessionOrApiKey',
+    params: api.reorderPageParametersSchema,
+    body: api.reorderPageBodySchema,
+    response: api.reorderPageResponseSchema,
+    errorStatuses: [400, 404],
+  },
+  {
     path: '/pages/{id}/breadcrumbs',
     method: 'get',
     operationId: 'getPageBreadcrumbs',

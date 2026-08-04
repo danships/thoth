@@ -18,7 +18,7 @@ test('seeded multi-select cell value renders multiple badges', async ({ page }) 
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const tagsCell = row.getByRole('cell').nth(5);
+  const tagsCell = row.getByRole('cell').nth(6);
 
   await expect(tagsCell.getByText(tagsColumn.options[0].label)).toBeVisible();
   await expect(tagsCell.getByText(tagsColumn.options[2].label)).toBeVisible();
@@ -29,7 +29,7 @@ test('can select an additional option for a multi-select cell', async ({ page })
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const tagsCell = row.getByRole('cell').nth(5);
+  const tagsCell = row.getByRole('cell').nth(6);
 
   await tagsCell.getByTestId('multi-select-cell-target').click();
   await page.getByRole('option', { name: tagsColumn.options[1].label }).click();
@@ -53,7 +53,7 @@ test('can deselect an option from a multi-select cell', async ({ page }) => {
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const tagsCell = row.getByRole('cell').nth(5);
+  const tagsCell = row.getByRole('cell').nth(6);
 
   // Select "Backend" first so this test is self-contained and doesn't depend on state left
   // behind by the "can select an additional option" test (which would break on a retry after a
@@ -84,7 +84,7 @@ test('can create a new option from the multi-select cell dropdown and re-searchi
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const tagsCell = row.getByRole('cell').nth(5);
+  const tagsCell = row.getByRole('cell').nth(6);
 
   await tagsCell.getByTestId('multi-select-cell-target').click();
   const searchInput = page.locator('input[placeholder="Search or create option"][data-expanded="true"]');

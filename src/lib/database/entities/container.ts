@@ -16,5 +16,6 @@ export const Container: EntityDefinition = {
     type: 'string',
     deletedAt: 'string',
     deletedRootId: 'string',
+    sortOrder: 'string',
   },
 };

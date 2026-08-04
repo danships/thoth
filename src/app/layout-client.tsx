@@ -4,8 +4,9 @@ import '@mantine/notifications/styles.css';
 import { MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
 import { Notifications } from '@mantine/notifications';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthProvider } from '@/lib/auth/provider';
+import { installClickSuppression } from '@/lib/dnd/suppress-click-after-drag';
 import { theme } from '@/lib/theme';
 
 export default function RootClientLayout({
@@ -21,6 +22,8 @@ export default function RootClientLayout({
     }
     return 'auto';
   });
+
+  useEffect(() => installClickSuppression(), []);
 
   return (
     <html lang="en">
