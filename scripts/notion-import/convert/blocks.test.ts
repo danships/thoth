@@ -27,6 +27,16 @@ describe('blocksToMarkdown', () => {
     expect(blocksToMarkdown([block('1', 'heading_3', { rich_text: rt('A') })]).markdown).toBe('### A');
   });
 
+  it('retains Markdown for descendants nested under a (toggleable) heading', () => {
+    const heading = block(
+      '1',
+      'heading_1',
+      { rich_text: rt('Title') },
+      { children: [block('1a', 'paragraph', { rich_text: rt('nested content') })] }
+    );
+    expect(blocksToMarkdown([heading]).markdown).toBe('# Title\nnested content');
+  });
+
   it('converts a quote', () => {
     expect(blocksToMarkdown([block('1', 'quote', { rich_text: rt('quoted') })]).markdown).toBe('> quoted');
   });
@@ -38,6 +48,11 @@ describe('blocksToMarkdown', () => {
   it('converts a code block preserving the language and raw (unescaped) text', () => {
     const result = blocksToMarkdown([block('1', 'code', { rich_text: rt('const a = 1;'), language: 'javascript' })]);
     expect(result.markdown).toBe('```javascript\nconst a = 1;\n```');
+  });
+
+  it('widens the code fence delimiter so it is never closed early by backticks in the content', () => {
+    const result = blocksToMarkdown([block('1', 'code', { rich_text: rt('```nested fence```'), language: '' })]);
+    expect(result.markdown).toBe('````\n```nested fence```\n````');
   });
 
   it('converts an equation to a $$ block', () => {
@@ -56,6 +71,16 @@ describe('blocksToMarkdown', () => {
     expect(blocksToMarkdown([block('1', 'to_do', { rich_text: rt('task'), checked: false })]).markdown).toBe(
       '- [ ] task'
     );
+  });
+
+  it('indents a to_do block child the same way as a nested bulleted list item', () => {
+    const todo = block(
+      '1',
+      'to_do',
+      { rich_text: rt('parent task'), checked: false },
+      { children: [block('1a', 'paragraph', { rich_text: rt('child note') })] }
+    );
+    expect(blocksToMarkdown([todo]).markdown).toBe('- [ ] parent task\n  child note');
   });
 
   it('degrades a callout to a blockquote', () => {
@@ -104,6 +129,30 @@ describe('blocksToMarkdown', () => {
       block('1', 'file', {}, { upload: null, originalUrl: 'https://notion.so/original.pdf' }),
     ]);
     expect(result.markdown).toBe('[file](https://notion.so/original.pdf)');
+  });
+
+  it('appends the caption after an uploaded image', () => {
+    const result = blocksToMarkdown([
+      block(
+        '1',
+        'image',
+        { caption: rt('a scenic photo') },
+        { upload: { id: 'file-1', url: 'https://cdn.example.com/f1.png', filename: 'f1.png' } }
+      ),
+    ]);
+    expect(result.markdown).toBe('![f1.png](https://cdn.example.com/f1.png)\na scenic photo');
+  });
+
+  it('appends the caption after a fallback link when a file upload failed', () => {
+    const result = blocksToMarkdown([
+      block(
+        '1',
+        'file',
+        { caption: rt('a fallback caption') },
+        { upload: null, originalUrl: 'https://notion.so/original.pdf' }
+      ),
+    ]);
+    expect(result.markdown).toBe('[file](https://notion.so/original.pdf)\na fallback caption');
   });
 
   it('converts bookmark/embed/link_preview to a plain link', () => {

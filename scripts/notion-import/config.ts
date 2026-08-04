@@ -60,12 +60,22 @@ function requireFromEnvironment(environment: EnvironmentLike, name: string): str
   return value.trim();
 }
 
+const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const FALSE_VALUES = new Set(['0', 'false', 'no', 'off']);
+
 function readBooleanFromEnvironment(environment: EnvironmentLike, name: string, defaultValue: boolean): boolean {
   const value = environment[name];
   if (value === undefined || value.trim().length === 0) {
     return defaultValue;
   }
-  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+  const normalized = value.trim().toLowerCase();
+  if (TRUE_VALUES.has(normalized)) {
+    return true;
+  }
+  if (FALSE_VALUES.has(normalized)) {
+    return false;
+  }
+  throw new ConfigError(`Invalid ${name}: ${value}. Expected one of ${[...TRUE_VALUES, ...FALSE_VALUES].join(', ')}.`);
 }
 
 function readListFromEnvironment(environment: EnvironmentLike, name: string): string[] | null {

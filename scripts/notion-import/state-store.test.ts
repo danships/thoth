@@ -45,6 +45,34 @@ describe('loadStateFile', () => {
     await writeFile(filePath, JSON.stringify({ foo: 'bar' }), 'utf8');
     await expect(loadStateFile(filePath)).rejects.toThrow(StateFileCorruptError);
   });
+
+  it('refuses to run when the version is unsupported', async () => {
+    const directory = await makeTemporaryDirectory();
+    const filePath = path.join(directory, 'bad-version.json');
+    const state = createInitialStateFile({ notionWorkspaceId: null, thothWorkspaceId: 'tw', targetParentId: null });
+    await writeFile(filePath, JSON.stringify({ ...state, version: 2 }), 'utf8');
+    await expect(loadStateFile(filePath)).rejects.toThrow(StateFileCorruptError);
+  });
+
+  it('refuses to run when a mapping entry is malformed', async () => {
+    const directory = await makeTemporaryDirectory();
+    const filePath = path.join(directory, 'bad-mapping.json');
+    const state = createInitialStateFile({ notionWorkspaceId: null, thothWorkspaceId: 'tw', targetParentId: null });
+    await writeFile(
+      filePath,
+      JSON.stringify({ ...state, mappings: { 'notion-1': { notionType: 'not-a-real-type' } } }),
+      'utf8'
+    );
+    await expect(loadStateFile(filePath)).rejects.toThrow(StateFileCorruptError);
+  });
+
+  it('refuses to run when lastRun is malformed', async () => {
+    const directory = await makeTemporaryDirectory();
+    const filePath = path.join(directory, 'bad-last-run.json');
+    const state = createInitialStateFile({ notionWorkspaceId: null, thothWorkspaceId: 'tw', targetParentId: null });
+    await writeFile(filePath, JSON.stringify({ ...state, lastRun: null }), 'utf8');
+    await expect(loadStateFile(filePath)).rejects.toThrow(StateFileCorruptError);
+  });
 });
 
 describe('saveStateFile', () => {

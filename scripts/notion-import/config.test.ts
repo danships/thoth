@@ -40,7 +40,12 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...REQUIRED_ENV, DRY_RUN: 'true' }).dryRun).toBe(true);
     expect(loadConfig({ ...REQUIRED_ENV, DRY_RUN: '1' }).dryRun).toBe(true);
     expect(loadConfig({ ...REQUIRED_ENV, DRY_RUN: 'false' }).dryRun).toBe(false);
+    expect(loadConfig({ ...REQUIRED_ENV, DRY_RUN: '0' }).dryRun).toBe(false);
     expect(loadConfig({ ...REQUIRED_ENV }).dryRun).toBe(false);
+  });
+
+  it('rejects an unrecognized DRY_RUN value instead of silently defaulting to false', () => {
+    expect(() => loadConfig({ ...REQUIRED_ENV, DRY_RUN: 'maybe' })).toThrow(ConfigError);
   });
 
   it('parses NOTION_ROOT_IDS as a comma-separated list', () => {

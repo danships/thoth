@@ -3,7 +3,13 @@
 // which attaches `children` and `upload` onto each node before calling `blocksToMarkdown`. This
 // keeps the mapping logic itself trivially unit-testable.
 
-import { richTextToMarkdown, richTextToPlainText, isSafeUrl, type NotionRichText } from './rich-text';
+import {
+  richTextToMarkdown,
+  richTextToPlainText,
+  markdownLink,
+  backtickDelimiter,
+  type NotionRichText,
+} from './rich-text';
 
 export type UploadedFile = { id: string; url: string; filename: string };
 
@@ -30,18 +36,21 @@ export type BlockConversionResult = {
 const HTML_COMMENT_FILE_TOKEN_TYPES = new Set(['file', 'video', 'audio']);
 
 function fileBlockMarkdown(node: NotionBlockNode, kind: 'image' | 'file' | 'video' | 'audio'): string {
+  const caption = richTextToMarkdown(node.payload['caption'] as NotionRichText[] | undefined);
+  const withCaption = (markdown: string): string => (markdown && caption ? `${markdown}\n${caption}` : markdown);
+
   if (node.upload) {
     if (kind === 'image') {
-      return `![${node.upload.filename}](${node.upload.url})`;
+      return withCaption(`![${node.upload.filename}](${node.upload.url})`);
     }
     if (HTML_COMMENT_FILE_TOKEN_TYPES.has(kind)) {
       const payload = encodeURIComponent(JSON.stringify({ id: node.upload.id, name: node.upload.filename }));
-      return `<!--thoth-file-block:${kind}:${payload}-->`;
+      return withCaption(`<!--thoth-file-block:${kind}:${payload}-->`);
     }
   }
   // Degraded fallback: a plain Markdown link to the original Notion-hosted URL.
-  if (node.originalUrl && isSafeUrl(node.originalUrl)) {
-    return `[${node.upload?.filename ?? kind}](${node.originalUrl})`;
+  if (node.originalUrl) {
+    return withCaption(markdownLink(node.upload?.filename ?? kind, node.originalUrl));
   }
   return '';
 }
@@ -73,13 +82,13 @@ function convertBlock(node: NotionBlockNode, unsupported: string[]): string {
       return richTextToMarkdown(richText('rich_text')) + childrenMarkdown(node, unsupported);
     }
     case 'heading_1': {
-      return `# ${richTextToMarkdown(richText('rich_text'))}`;
+      return `# ${richTextToMarkdown(richText('rich_text'))}` + childrenMarkdown(node, unsupported);
     }
     case 'heading_2': {
-      return `## ${richTextToMarkdown(richText('rich_text'))}`;
+      return `## ${richTextToMarkdown(richText('rich_text'))}` + childrenMarkdown(node, unsupported);
     }
     case 'heading_3': {
-      return `### ${richTextToMarkdown(richText('rich_text'))}`;
+      return `### ${richTextToMarkdown(richText('rich_text'))}` + childrenMarkdown(node, unsupported);
     }
     case 'quote': {
       return `> ${richTextToMarkdown(richText('rich_text'))}` + childrenMarkdown(node, unsupported);
@@ -94,7 +103,8 @@ function convertBlock(node: NotionBlockNode, unsupported: string[]): string {
     case 'code': {
       const language = typeof node.payload['language'] === 'string' ? node.payload['language'] : '';
       const code = richTextToPlainText(richText('rich_text'));
-      return `\`\`\`${language}\n${code}\n\`\`\``;
+      const fence = backtickDelimiter(code, 3);
+      return `${fence}${language}\n${code}\n${fence}`;
     }
     case 'equation': {
       return `$$${(node.payload['expression'] as string | undefined) ?? ''}$$`;
@@ -108,7 +118,8 @@ function convertBlock(node: NotionBlockNode, unsupported: string[]): string {
     case 'to_do': {
       const checked = Boolean(node.payload['checked']);
       return (
-        `- [${checked ? 'x' : ' '}] ${richTextToMarkdown(richText('rich_text'))}` + childrenMarkdown(node, unsupported)
+        `- [${checked ? 'x' : ' '}] ${richTextToMarkdown(richText('rich_text'))}` +
+        indent(childrenMarkdown(node, unsupported))
       );
     }
     case 'toggle': {
@@ -156,7 +167,7 @@ function convertBlock(node: NotionBlockNode, unsupported: string[]): string {
     case 'embed':
     case 'link_preview': {
       const url = node.payload['url'] as string | undefined;
-      return url && isSafeUrl(url) ? `[${url}](${url})` : '';
+      return url ? markdownLink(url, url) : '';
     }
     case 'child_page': {
       // Rewritten to a real Thoth link in the orchestrator's link-resolution pass.

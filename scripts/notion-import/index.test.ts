@@ -267,6 +267,11 @@ describe('runImport (page lifecycle)', () => {
 
     expect(thoth.calls).toEqual([]);
     expect(result.state.mappings['p1']).toBeUndefined();
+    // The dry-run preview must still reflect what *would* have been created, not just "no writes
+    // happened" — otherwise DRY_RUN is useless as a preview.
+    const previewEntry = result.state.lastRun.report.find((entry) => entry.notionId === 'p1');
+    expect(previewEntry?.outcome).toBe('created');
+    expect(previewEntry?.title).toBe('My Page');
   });
 
   it('exits 2 and marks the run failed when Thoth connection validation fails', async () => {
@@ -334,6 +339,65 @@ describe('runImport (database lifecycle)', () => {
     const rowMapping = result.state.mappings['row1']!;
     const values = thoth.pageValues.get(rowMapping.thothContainerId!)!;
     const statusColumnId = databaseMapping.columnMappings!['Status']!.thothColumnId;
+    expect(values[statusColumnId]).toEqual({
+      type: 'single-select',
+      value: databaseMapping.columnMappings!['Status']!.optionIdsByLabel!['Open'],
+    });
+  });
+
+  it('reuses the persisted column mappings on a second run and applies the mapped row update', async () => {
+    const config = loadConfig(BASE_ENV);
+    const notion = new FakeNotionClient();
+    const thoth = new FakeThothClient();
+    notion.databases.set('db1', notionDatabase('db1', 'Tasks', '2026-01-01T00:00:00.000Z'));
+    notion.rootIds = ['db1'];
+    notion.rows.set('db1', [
+      {
+        id: 'row1',
+        object: 'page',
+        last_edited_time: '2026-01-01T00:00:00.000Z',
+        properties: {
+          Name: { type: 'title', title: [{ plain_text: 'Task 1' }] },
+          Status: { type: 'select', select: { name: 'Open' } },
+        },
+        parent: { type: 'data_source' },
+      },
+    ]);
+
+    const first = await runImport(config, notion, thoth, null);
+    thoth.calls = [];
+
+    // Advance both the database's and the row's last_edited_time so the second run has to
+    // re-sync the database (picking up its persisted column mappings, not re-creating them) and
+    // re-check the row (picking up the new Status value).
+    notion.databases.set('db1', notionDatabase('db1', 'Tasks', '2026-02-01T00:00:00.000Z'));
+    notion.rows.set('db1', [
+      {
+        id: 'row1',
+        object: 'page',
+        last_edited_time: '2026-02-01T00:00:00.000Z',
+        properties: {
+          Name: { type: 'title', title: [{ plain_text: 'Task 1' }] },
+          Status: { type: 'select', select: { name: 'Open' } },
+        },
+        parent: { type: 'data_source' },
+      },
+    ]);
+
+    const second = await runImport(config, notion, thoth, first.state);
+
+    expect(second.exitCode).toBe(0);
+    // The data source's columns must not be re-created on an update — only the row is touched.
+    expect(thoth.calls).not.toContain('createDataSource');
+    expect(thoth.calls).not.toContain('addDataSourceColumn');
+    expect(thoth.calls).toContain('updatePageValues');
+
+    const databaseMapping = second.state.mappings['db1']!;
+    const rowMapping = second.state.mappings['row1']!;
+    const statusColumnId = databaseMapping.columnMappings!['Status']!.thothColumnId;
+    const values = thoth.pageValues.get(rowMapping.thothContainerId!)!;
+    // The update must carry the mapped single-select Status value through — not an empty object,
+    // which would indicate the persisted column mappings were lost/ignored on this path.
     expect(values[statusColumnId]).toEqual({
       type: 'single-select',
       value: databaseMapping.columnMappings!['Status']!.optionIdsByLabel!['Open'],

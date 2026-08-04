@@ -44,6 +44,26 @@ describe('decideInitialAction', () => {
     expect(decision).toEqual({ action: 'needs_thoth_read' });
   });
 
+  it('treats an unparseable Notion timestamp as changed rather than silently skipping', () => {
+    const mapping = buildMapping({ notionLastEditedTime: '2026-01-01T00:00:00.000Z' });
+    const decision = decideInitialAction({
+      mapping,
+      notionLastEditedTime: 'not-a-date',
+      notionArchived: false,
+    });
+    expect(decision).toEqual({ action: 'needs_thoth_read' });
+  });
+
+  it('treats an unparseable stored timestamp as changed rather than silently skipping', () => {
+    const mapping = buildMapping({ notionLastEditedTime: 'not-a-date' });
+    const decision = decideInitialAction({
+      mapping,
+      notionLastEditedTime: '2026-01-01T00:00:00.000Z',
+      notionArchived: false,
+    });
+    expect(decision).toEqual({ action: 'needs_thoth_read' });
+  });
+
   it('marks archived/deleted Notion objects as kept, never triggering a delete', () => {
     const mapping = buildMapping();
     const decision = decideInitialAction({
@@ -54,15 +74,16 @@ describe('decideInitialAction', () => {
     expect(decision).toEqual({ action: 'skip_archived', detail: 'archived in Notion — kept in Thoth' });
   });
 
-  it('treats a never-before-seen archived object as still needing no create (also skip_archived)', () => {
+  it('creates for a never-before-seen object even if Notion reports it as archived (!mapping is checked first)', () => {
     const decision = decideInitialAction({
       mapping: undefined,
       notionLastEditedTime: '2026-02-01T00:00:00.000Z',
-      notionArchived: false,
+      notionArchived: true,
     });
-    // Sanity: an object with no mapping and not archived is always a create, regardless of
-    // archived flag ordering in the checks below.
-    expect(decision.action).toBe('create');
+    // The `!mapping` check runs before the `notionArchived` check, so an object we've never seen
+    // before is always a `create` — there's nothing in Thoth to keep/skip yet, regardless of its
+    // current archived state in Notion.
+    expect(decision).toEqual({ action: 'create' });
   });
 });
 

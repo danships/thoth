@@ -10,6 +10,7 @@ import { decideInitialAction, decideAfterThothRead } from './sync';
 import type { Config } from './config';
 import { createInitialStateFile, createEmptyStats, type StateFile, type ReportEntry, type SyncOutcome } from './types';
 import type { PrimitiveColumnInput, ThothPageValue } from './thoth-client';
+import { redactSecrets } from './redact';
 
 export type NotionBlockLike = {
   id: string;
@@ -114,6 +115,10 @@ function pushReport(context: ImportContext, entry: ReportEntry) {
   }
 }
 
+// Applied to the Notion-hosted media fetch below so a stalled/unresponsive host fails fast
+// instead of hanging the whole BFS walk indefinitely.
+const MEDIA_FETCH_TIMEOUT_MS = 30_000;
+
 // Recursively builds the block tree for a Notion page/block, uploading file-like blocks to
 // Thoth as it goes (skipped entirely in dry-run mode — no writes of any kind happen then).
 async function buildBlockTree(
@@ -148,7 +153,10 @@ async function buildBlockTree(
       node.originalUrl = url;
       if (url && !context.config.dryRun) {
         try {
-          const response = await fetch(url);
+          const response = await fetch(url, { signal: AbortSignal.timeout(MEDIA_FETCH_TIMEOUT_MS) });
+          if (!response.ok) {
+            throw new Error(`fetch failed with status ${response.status}`);
+          }
           const buffer = Buffer.from(await response.arrayBuffer());
           const filename = url.split('/').pop()?.split('?', 1)[0] || `${block.type}-${block.id}`;
           node.upload = await context.thoth.uploadFile({
@@ -158,8 +166,15 @@ async function buildBlockTree(
             pageId: thothPageId ?? undefined,
             workspaceId: context.config.thothWorkspaceId,
           });
-        } catch {
+        } catch (error) {
           node.upload = null;
+          // Report why the fallback (a plain link to the original Notion URL) is being used —
+          // an operator watching the run should be able to tell a timeout/404/upload error from
+          // "everything's fine", rather than silently downgrading a media block.
+          console.warn(
+            `[notion-import] Failed to fetch/upload media for block ${block.id} (${block.type}) from ${url}: ` +
+              `${error instanceof Error ? error.message : String(error)} — falling back to a link to the original Notion URL.`
+          );
         }
       }
     }
@@ -237,11 +252,16 @@ async function processPage(
     }
   }
 
-  const blockNodes = context.config.dryRun ? [] : await buildBlockTree(context, notionPage.id, thothPageId, discovered);
-  if (context.config.dryRun) {
-    // Still need to discover children for a dry-run preview, without uploading files/writing.
-    await buildBlockTree(context, notionPage.id, null, discovered);
-  }
+  // In dry-run mode, still discover children (and record them for BFS) for an accurate preview,
+  // but never upload files or write to Thoth — `buildBlockTree` itself no-ops those under
+  // `config.dryRun`. The previously-discarded result is now kept so the preview's `markdown`/
+  // `unsupportedTypes` reflect the full tree instead of always being empty.
+  const blockNodes = await buildBlockTree(
+    context,
+    notionPage.id,
+    context.config.dryRun ? null : thothPageId,
+    discovered
+  );
   const { markdown, unsupportedTypes } = blocksToMarkdown(blockNodes);
 
   if (!context.config.dryRun && thothPageId) {
@@ -353,6 +373,15 @@ async function processDatabase(
     }
   } else if (existingMapping?.columnMappings) {
     Object.assign(columnMappings, existingMapping.columnMappings);
+  } else {
+    // The existing mapping doesn't carry the column mappings needed to convert row values (state
+    // file corruption, or a mapping created by an older/incompatible version of this script).
+    // Never fall through with an empty `columnMappings` here — that would silently convert every
+    // row property to "unsupported" and, worse, overwrite existing Thoth row values with `{}`.
+    // Fail this database's update loudly instead so it's reported/retried, not silently lost.
+    throw new Error(
+      `Inconsistent state: expected persisted column mappings for existing database ${notionDatabase.id}`
+    );
   }
 
   if (!context.config.dryRun) {
@@ -424,6 +453,7 @@ async function processDatabaseRow(
   for (const [propertyName, propertyValue] of Object.entries(row.properties)) {
     const columnMapping = columnMappings[propertyName];
     if (!columnMapping) {
+      unsupportedColumns.push(`${propertyName}: no matching Thoth column`);
       continue;
     }
     const converted = convertPropertyValue(propertyValue as Record<string, unknown>, columnMapping);
@@ -437,13 +467,15 @@ async function processDatabaseRow(
   let rowPageId = existingMapping?.thothContainerId ?? null;
 
   if (initial.action === 'create') {
-    const created = await context.thoth.createPage({ name: title, parentId: dataSourceId });
-    rowPageId = created.id;
+    if (!context.config.dryRun) {
+      const created = await context.thoth.createPage({ name: title, parentId: dataSourceId });
+      rowPageId = created.id;
+    }
   } else {
     if (!existingMapping || !rowPageId) {
       throw new Error(`Inconsistent state: expected a mapping for existing row ${row.id}`);
     }
-    const currentValues = await context.thoth.getPageValues(rowPageId);
+    const currentValues = context.config.dryRun ? {} : await context.thoth.getPageValues(rowPageId);
     const currentHash = hashJson(currentValues);
     const decision = decideAfterThothRead(existingMapping, currentHash);
     if (decision.action === 'conflict') {
@@ -459,18 +491,23 @@ async function processDatabaseRow(
     }
   }
 
-  if (rowPageId) {
+  // Defense in depth: `processDatabase` already skips calling this function entirely in
+  // dry-run mode, but guard the actual Thoth writes/state mutation here too, so this function
+  // can never mutate anything on its own regardless of how/when it's called.
+  if (!context.config.dryRun && rowPageId) {
     await context.thoth.updatePageValues(rowPageId, values);
   }
 
-  context.state.mappings[row.id] = {
-    notionType: 'database_row',
-    thothContainerId: rowPageId,
-    thothColumnId: null,
-    notionLastEditedTime: row.last_edited_time,
-    importedContentHash: hashJson(values),
-    deletedInNotion: false,
-  };
+  if (!context.config.dryRun) {
+    context.state.mappings[row.id] = {
+      notionType: 'database_row',
+      thothContainerId: rowPageId,
+      thothColumnId: null,
+      notionLastEditedTime: row.last_edited_time,
+      importedContentHash: hashJson(values),
+      deletedInNotion: false,
+    };
+  }
 
   pushReport(context, {
     notionId: row.id,
@@ -500,7 +537,16 @@ async function resolveLinks(context: ImportContext, writtenPageIds: Set<string>)
     }
     const resolved = content.replaceAll(/\{\{notion-page-link:([^}]+)\}\}/g, (_match, linkedNotionId: string) => {
       const linkedMapping = context.state.mappings[linkedNotionId];
-      return linkedMapping?.thothContainerId ? `[${linkedNotionId}](/pages/${linkedMapping.thothContainerId})` : '';
+      // Prefer the linked page's actual title (from this run's report, which every visited page
+      // is added to) over the raw Notion id, which isn't meaningful to a reader.
+      const linkedTitle = context.state.lastRun.report.find((entry) => entry.notionId === linkedNotionId)?.title;
+      if (linkedMapping?.thothContainerId) {
+        return `[${linkedTitle ?? linkedNotionId}](/pages/${linkedMapping.thothContainerId})`;
+      }
+      // Never silently drop a link the source content pointed to — returning '' would make
+      // referenced content vanish without a trace. Keep it visible (even if not clickable) so a
+      // reader/operator can tell something was linked here but couldn't be resolved.
+      return `[${linkedTitle ?? `Unresolved Notion page (${linkedNotionId})`}]`;
     });
     if (resolved !== content) {
       await context.thoth.setPageContent(mapping.thothContainerId, resolved);
@@ -526,6 +572,13 @@ export async function runImport(
     });
 
   const mode = config.importMode === 'auto' ? (existingState ? 'sync' : 'initial') : config.importMode;
+
+  if (mode === 'initial') {
+    // IMPORT_MODE=initial forces a full import regardless of any mappings recorded by a
+    // previous run — this is the explicit "start over" escape hatch, so any previously-seen
+    // objects must be treated as brand new rather than skipped/updated via stale mappings.
+    state.mappings = {};
+  }
 
   state.lastRun = {
     startedAt: new Date().toISOString(),
@@ -556,7 +609,12 @@ export async function runImport(
       );
       state.mappings = {};
     }
-    if (!existingState) {
+    if (!state.connection.notionWorkspaceId) {
+      // Backfill whenever the workspace id isn't already recorded — not just on a brand-new
+      // state file. A state file can legitimately have `notionWorkspaceId: null` (freshly
+      // created but not yet run to completion, or created before this field existed) and should
+      // still get it recorded. Never overwrite an already-recorded id (the mismatch guard above
+      // handles that case explicitly).
       state.connection.notionWorkspaceId = notionWorkspaceId;
     }
 
@@ -583,11 +641,14 @@ export async function runImport(
         continue;
       }
 
-      const thothParentId =
-        parentThothIdByNotionId.get(id) ??
-        (parentNotionId
-          ? (context.state.mappings[parentNotionId]?.thothContainerId ?? null)
-          : config.thothTargetParentId);
+      let thothParentId: string | null;
+      if (parentThothIdByNotionId.has(id)) {
+        thothParentId = parentThothIdByNotionId.get(id) ?? null;
+      } else if (parentNotionId) {
+        thothParentId = context.state.mappings[parentNotionId]?.thothContainerId ?? null;
+      } else {
+        thothParentId = config.thothTargetParentId;
+      }
 
       const discovered: { id: string; parentNotionId: string }[] = [];
 
@@ -613,7 +674,7 @@ export async function runImport(
               : titleOf(object.properties),
           outcome: 'failed',
           thothContainerId: null,
-          detail: error instanceof Error ? error.message : String(error),
+          detail: redactSecrets(error instanceof Error ? error.message : String(error)),
         });
       }
 
@@ -629,11 +690,11 @@ export async function runImport(
     state.lastRun.state = stats.failed > 0 || stats.skippedConflict > 0 ? 'partially_completed' : 'completed';
   } catch (error) {
     state.lastRun.state = 'failed';
-    state.lastRun.error = error instanceof Error ? error.message : String(error);
+    state.lastRun.error = redactSecrets(error instanceof Error ? error.message : String(error));
   }
 
   state.lastRun.finishedAt = new Date().toISOString();
 
-  const exitCode = state.lastRun.state === 'completed' ? 0 : (state.lastRun.state === 'partially_completed' ? 1 : 2);
+  const exitCode = state.lastRun.state === 'completed' ? 0 : state.lastRun.state === 'partially_completed' ? 1 : 2;
   return { exitCode, state };
 }

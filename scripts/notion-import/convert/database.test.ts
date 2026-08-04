@@ -162,12 +162,20 @@ describe('convertPropertyValue', () => {
     expect(result).toEqual({ type: 'string', value: 'Alice, Bob' });
   });
 
-  it('degrades files to inline-Markdown links', () => {
+  it('degrades files to inline-Markdown links, escaping the label', () => {
     const result = convertPropertyValue(
       { files: [{ name: 'doc.pdf', file: { url: 'https://example.com/doc.pdf' } }] },
       { thothColumnId: 'c1', type: 'string' }
     );
-    expect(result).toEqual({ type: 'string', value: '[doc.pdf](https://example.com/doc.pdf)' });
+    expect(result).toEqual({ type: 'string', value: String.raw`[doc\.pdf](https://example.com/doc.pdf)` });
+  });
+
+  it('falls back to plain escaped text for a file with an unsafe/invalid URL', () => {
+    const result = convertPropertyValue(
+      { files: [{ name: 'evil.pdf', file: { url: 'javascript:alert(1)' } }] },
+      { thothColumnId: 'c1', type: 'string' }
+    );
+    expect(result).toEqual({ type: 'string', value: String.raw`evil\.pdf` });
   });
 
   it('snapshots a formula result', () => {

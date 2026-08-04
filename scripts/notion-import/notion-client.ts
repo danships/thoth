@@ -11,8 +11,20 @@
 // (if any) single data source it maps to; multi-source databases are skipped there (see
 // feature-gap analysis — linked/multi-source databases are not migrated).
 
-import { Client, isFullPage, isFullDataSource, isFullBlock } from '@notionhq/client';
+import { Client, isFullPage, isFullDataSource, isFullBlock, APIResponseError, APIErrorCode } from '@notionhq/client';
 import type { NotionPageLike, NotionDatabaseLike, NotionBlockLike } from './index';
+
+// Only these API error codes indicate "wrong object type/id for this endpoint" — i.e. exactly
+// the case `retrieve()`'s try-pages-then-data-source-then-database fallback chain is designed to
+// swallow. Anything else (auth, rate-limit, network, 5xx, validation of a real malformed
+// request) must propagate so a real failure is never silently mistaken for "not this kind of
+// object" and reported as a missing/skipped item.
+function isExpectedRetrieveFallbackError(error: unknown): boolean {
+  return (
+    APIResponseError.isAPIResponseError(error) &&
+    (error.code === APIErrorCode.ObjectNotFound || error.code === APIErrorCode.ValidationError)
+  );
+}
 
 export class NotionClient {
   private readonly client: Client;
@@ -67,7 +79,10 @@ export class NotionClient {
       if (isFullPage(page)) {
         return toPageLike(page);
       }
-    } catch {
+    } catch (error) {
+      if (!isExpectedRetrieveFallbackError(error)) {
+        throw error;
+      }
       // fall through — might be a data source or (legacy) database id instead
     }
     try {
@@ -75,7 +90,10 @@ export class NotionClient {
       if (isFullDataSource(dataSource)) {
         return toDatabaseLike(dataSource);
       }
-    } catch {
+    } catch (error) {
+      if (!isExpectedRetrieveFallbackError(error)) {
+        throw error;
+      }
       // fall through — might be a legacy multi-source database id
     }
     try {
@@ -91,7 +109,10 @@ export class NotionClient {
         );
       }
       return null;
-    } catch {
+    } catch (error) {
+      if (!isExpectedRetrieveFallbackError(error)) {
+        throw error;
+      }
       return null;
     }
   }

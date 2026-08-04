@@ -31,7 +31,15 @@ export function decideInitialAction(input: SyncDecisionInput): SyncDecision | { 
     return { action: 'skip_archived', detail: 'archived in Notion — kept in Thoth' };
   }
 
-  const notionChanged = new Date(notionLastEditedTime).getTime() > new Date(mapping.notionLastEditedTime).getTime();
+  const notionEditedAt = new Date(notionLastEditedTime).getTime();
+  const previouslyImportedEditedAt = new Date(mapping.notionLastEditedTime).getTime();
+  // Treat either side as "changed" if it doesn't parse as a valid date — silently comparing
+  // `NaN > NaN` (`false`) would otherwise make an unparseable timestamp always look unchanged
+  // and skip re-processing an object that may genuinely need it.
+  const notionChanged =
+    Number.isNaN(notionEditedAt) || Number.isNaN(previouslyImportedEditedAt)
+      ? true
+      : notionEditedAt > previouslyImportedEditedAt;
   if (!notionChanged) {
     return { action: 'skip_unchanged' };
   }
@@ -47,7 +55,7 @@ export function decideAfterThothRead(mapping: Mapping, currentThothHash: string)
   if (currentThothHash !== mapping.importedContentHash) {
     return {
       action: 'conflict',
-      detail: `edited in Thoth since the last import on ${mapping.notionLastEditedTime} — skipped`,
+      detail: `edited in Thoth since the last import (Notion was last edited at ${mapping.notionLastEditedTime}) — skipped`,
     };
   }
   return { action: 'update' };

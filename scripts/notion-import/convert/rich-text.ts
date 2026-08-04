@@ -26,8 +26,36 @@ export function isSafeUrl(url: string): boolean {
   }
 }
 
-function escapeMarkdown(text: string): string {
+export function escapeMarkdown(text: string): string {
   return text.replaceAll(/([\\`*_{}[\]()#+.!|])/g, String.raw`\$1`);
+}
+
+// Returns a backtick delimiter strictly longer than the longest run of backticks already present
+// in `text`, so wrapping the text in it (as inline code or as a fenced code block) can never be
+// prematurely terminated by a backtick run the text itself contains. `minLength` lets callers
+// enforce e.g. the 3-backtick minimum for fenced code blocks.
+export function backtickDelimiter(text: string, minLength = 1): string {
+  const runs = text.match(/`+/g) ?? [];
+  let longestRun = 0;
+  for (const run of runs) {
+    longestRun = Math.max(longestRun, run.length);
+  }
+  return '`'.repeat(Math.max(longestRun + 1, minLength));
+}
+
+// Serializes a single safe Markdown link `[text](url)`. Returns plain (escaped) text if the URL
+// scheme isn't allow-listed. URLs containing whitespace or parentheses — which would otherwise
+// prematurely close the `(...)` destination — are wrapped in `<...>` per CommonMark's "pointy
+// bracket" link destination syntax; the same helper is reused by every place in this script that
+// serializes a Notion URL as a Markdown link (rich text, media captions/fallbacks,
+// bookmarks/embeds, and database file values), so link/URL escaping only has one implementation.
+export function markdownLink(text: string, href: string): string {
+  if (!isSafeUrl(href)) {
+    return text;
+  }
+  const needsAngleBrackets = /[\s()]/.test(href);
+  const destination = needsAngleBrackets ? `<${href.replaceAll('<', '%3C').replaceAll('>', '%3E')}>` : href;
+  return `[${text}](${destination})`;
 }
 
 function applyAnnotations(text: string, annotations: NotionRichText['annotations']): string {
@@ -36,7 +64,8 @@ function applyAnnotations(text: string, annotations: NotionRichText['annotations
   }
   let result = text;
   if (annotations.code) {
-    result = `\`${result}\``;
+    const delimiter = backtickDelimiter(result);
+    result = `${delimiter}${result}${delimiter}`;
   }
   if (annotations.bold) {
     result = `**${result}**`;
@@ -58,11 +87,8 @@ export function richTextToMarkdown(richText: NotionRichText[] | undefined | null
   return richText
     .map((segment) => {
       const plain = segment.annotations?.code ? segment.plain_text : escapeMarkdown(segment.plain_text);
-      let formatted = applyAnnotations(plain, segment.annotations);
-      if (segment.href && isSafeUrl(segment.href)) {
-        formatted = `[${formatted}](${segment.href})`;
-      }
-      return formatted;
+      const formatted = applyAnnotations(plain, segment.annotations);
+      return segment.href ? markdownLink(formatted, segment.href) : formatted;
     })
     .join('');
 }

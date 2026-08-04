@@ -10,6 +10,7 @@ import { loadStateFile, saveStateFile, acquireLock, StateFileCorruptError } from
 import { NotionClient } from './notion-client';
 import { ThothClient } from './thoth-client';
 import { runImport, type NotionClientLike } from './index';
+import { redactSecrets } from './redact';
 
 function printSummary(result: Awaited<ReturnType<typeof runImport>>) {
   const { state } = result;
@@ -67,7 +68,13 @@ async function main() {
     printSummary(result);
     process.exitCode = result.exitCode;
   } finally {
-    await releaseLock();
+    // `releaseLock` is optional (never set if `acquireLock` itself failed above) and its own
+    // rejection must never mask an otherwise-successful run's exit code — log it and move on.
+    await releaseLock?.().catch((error: unknown) => {
+      console.error(
+        `[notion-import] Failed to release the state-file lock: ${redactSecrets(error instanceof Error ? error.message : String(error))}`
+      );
+    });
   }
 }
 
@@ -75,7 +82,7 @@ try {
   await main();
 } catch (error) {
   // Redact potential secrets from an unexpected top-level failure before logging.
-  const message = error instanceof Error ? error.message : String(error);
+  const message = redactSecrets(error instanceof Error ? error.message : String(error));
   console.error(`[notion-import] Fatal error: ${message}`);
   process.exitCode = 2;
 }

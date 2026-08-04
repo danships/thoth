@@ -36,10 +36,10 @@ describe('ThothClient', () => {
   it('retries on 429 honouring Retry-After, then succeeds', async () => {
     fetchMock
       .mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '0' } }))
-      .mockResolvedValueOnce(jsonResponse({ data: { id: 'ds-1', columns: [] } }));
+      .mockResolvedValueOnce(jsonResponse({ data: { values: {} } }));
 
-    const result = await client().createDataSource({ name: 'DB' });
-    expect(result).toEqual({ id: 'ds-1', columns: [] });
+    const result = await client().getPageValues('page-1');
+    expect(result).toEqual({});
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -47,6 +47,12 @@ describe('ThothClient', () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 503 }));
     await expect(client().validateConnection()).rejects.toThrow(ThothApiError);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry non-idempotent resource-creation calls on 429/5xx', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 429, headers: { 'Retry-After': '0' } }));
+    await expect(client().createDataSource({ name: 'DB' })).rejects.toThrow(ThothApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('throws ThothApiError immediately on a non-retryable 4xx status', async () => {

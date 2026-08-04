@@ -3,7 +3,7 @@
 // API constraint: `POST /data-sources` only accepts primitive (string/number/boolean) columns;
 // date/select/multi-select columns must be added afterwards via `POST /data-sources/:id/columns`.
 
-import { richTextToMarkdown, richTextToPlainText } from './rich-text';
+import { richTextToMarkdown, richTextToPlainText, markdownLink, escapeMarkdown } from './rich-text';
 import type { ExtendedColumnInput, PrimitiveColumnInput, SelectColor, ThothPageValue } from '../thoth-client';
 
 export type NotionPropertyDefinition = {
@@ -189,9 +189,15 @@ function extractStringValue(notionValue: Record<string, unknown>): string {
       .join(', ');
   }
   if (Array.isArray(notionValue['files'])) {
-    // Degraded: inline-Markdown links to the file URLs.
+    // Degraded: inline-Markdown links to the file URLs. `markdownLink` validates the URL scheme
+    // and falls back to plain (escaped) text when it isn't an allow-listed http(s)/mailto link,
+    // and escapes any Markdown-special characters in the file name.
     return (notionValue['files'] as { name: string; file?: { url: string }; external?: { url: string } }[])
-      .map((file) => `[${file.name}](${file.file?.url ?? file.external?.url ?? ''})`)
+      .map((file) => {
+        const url = file.file?.url ?? file.external?.url ?? '';
+        const label = escapeMarkdown(file.name);
+        return url ? markdownLink(label, url) : label;
+      })
       .join(', ');
   }
   if (notionValue['formula'] && typeof notionValue['formula'] === 'object') {

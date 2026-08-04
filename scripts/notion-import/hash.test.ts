@@ -13,6 +13,10 @@ describe('normalizeMarkdown', () => {
   it('collapses trailing blank lines to a single trailing newline', () => {
     expect(normalizeMarkdown('content\n\n\n\n')).toBe('content');
   });
+
+  it('preserves leading whitespace/indentation on the first line', () => {
+    expect(normalizeMarkdown('  indented content\nmore\n\n')).toBe('  indented content\nmore');
+  });
 });
 
 describe('hashMarkdown', () => {

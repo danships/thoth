@@ -54,6 +54,11 @@ const DEFAULT_RETRY: RetryOptions = {
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
+// Shared timeout applied to every outgoing request (both the JSON `request()` path and the
+// multipart `uploadFile()` path) so a stalled/unresponsive Thoth host fails fast instead of
+// hanging the whole import run indefinitely.
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export class ThothClient {
   constructor(
     private readonly baseUrl: string,
@@ -61,7 +66,16 @@ export class ThothClient {
     private readonly retryOptions: RetryOptions = DEFAULT_RETRY
   ) {}
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  // `retryableOnFailure` must be `false` for non-idempotent resource-creation calls (creating a
+  // page/data-source/column). Retrying those on a 429/5xx is unsafe: the first attempt may have
+  // actually succeeded server-side (e.g. the response was lost), and re-sending would create a
+  // duplicate resource with no reconciliation step to detect/merge it. Idempotent calls (reads,
+  // full-replace writes like `setPageContent`/`updatePageValues`) keep retrying as before.
+  private async request<T>(
+    path: string,
+    init: RequestInit = {},
+    { retryableOnFailure = true }: { retryableOnFailure?: boolean } = {}
+  ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     let attempt = 0;
     // Redact the key from any thrown error to keep secrets out of logs, per THOTH-049 security
@@ -70,6 +84,7 @@ export class ThothClient {
       attempt += 1;
       const response = await fetch(url, {
         ...init,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           ...(init.body ? { 'Content-Type': 'application/json' } : {}),
@@ -78,9 +93,9 @@ export class ThothClient {
       });
 
       if (response.status === 429 || response.status >= 500) {
-        if (attempt >= this.retryOptions.maxAttempts) {
+        if (!retryableOnFailure || attempt >= this.retryOptions.maxAttempts) {
           throw new ThothApiError(
-            `Thoth API ${path} failed with status ${response.status} after ${attempt} attempts`,
+            `Thoth API ${path} failed with status ${response.status} after ${attempt} attempt${attempt === 1 ? '' : 's'}`,
             response.status
           );
         }
@@ -124,7 +139,11 @@ export class ThothClient {
     parentId?: string | null | undefined;
     workspaceId?: string | undefined;
   }) {
-    return this.request<{ id: string; name: string }>('/pages', { method: 'POST', body: JSON.stringify(input) });
+    return this.request<{ id: string; name: string }>(
+      '/pages',
+      { method: 'POST', body: JSON.stringify(input) },
+      { retryableOnFailure: false }
+    );
   }
 
   async getPageContent(pageId: string): Promise<string> {
@@ -152,17 +171,25 @@ export class ThothClient {
     columns?: PrimitiveColumnInput[] | undefined;
     workspaceId?: string | undefined;
   }) {
-    return this.request<{ id: string; columns: ThothColumn[] }>('/data-sources', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
+    return this.request<{ id: string; columns: ThothColumn[] }>(
+      '/data-sources',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      { retryableOnFailure: false }
+    );
   }
 
   async addDataSourceColumn(dataSourceId: string, input: ExtendedColumnInput): Promise<ThothColumn> {
-    return this.request<ThothColumn>(`/data-sources/${dataSourceId}/columns`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
+    return this.request<ThothColumn>(
+      `/data-sources/${dataSourceId}/columns`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      { retryableOnFailure: false }
+    );
   }
 
   async uploadFile(input: {
@@ -183,6 +210,7 @@ export class ThothClient {
     const url = `${this.baseUrl}/files`;
     const response = await fetch(url, {
       method: 'POST',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: { Authorization: `Bearer ${this.apiKey}` },
       body: formData,
     });

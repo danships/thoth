@@ -37,6 +37,19 @@ describe('richTextToMarkdown', () => {
       'Hello **world**'
     );
   });
+
+  it('widens the inline code delimiter so it is never closed early by backticks in the content', () => {
+    expect(richTextToMarkdown([{ plain_text: 'a`b', annotations: { code: true } }])).toBe('``a`b``');
+    expect(richTextToMarkdown([{ plain_text: 'has ``double`` backticks', annotations: { code: true } }])).toBe(
+      '```has ``double`` backticks```'
+    );
+  });
+
+  it('wraps a link URL containing spaces/parentheses in angle brackets', () => {
+    expect(richTextToMarkdown([{ plain_text: 'click', href: 'https://example.com/a (b)' }])).toBe(
+      '[click](<https://example.com/a (b)>)'
+    );
+  });
 });
 
 describe('richTextToPlainText', () => {

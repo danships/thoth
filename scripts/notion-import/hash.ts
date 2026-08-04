@@ -16,8 +16,7 @@ export function normalizeMarkdown(markdown: string): string {
     .split('\n')
     .map((line) => line.replace(/[ \t]+$/, ''))
     .join('\n')
-    .replace(/\n+$/, '\n')
-    .trim();
+    .replace(/\n+$/, '');
 }
 
 // Recursively sorts object keys so structurally-identical values hash identically regardless of
