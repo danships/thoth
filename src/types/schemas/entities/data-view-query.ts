@@ -43,6 +43,14 @@ export const sortRuleSchema = z.object({
 });
 export type SortRule = z.infer<typeof sortRuleSchema>;
 
+// Sentinel `columnId` for sorting on a page's `name` (THOTH-065) — `name` is a fixed attribute of
+// the `Container` itself, not a dynamic Data Source column, so it never appears in a data
+// source's `columns` array. Reuses the same `'name'` sentinel already established for the
+// built-in Name header's drag-and-drop id (THOTH-052, see `layoutItemId` in `data-view-table.tsx`)
+// since a real column id can never literally be `'name'` (column ids are always `randomUUID()`).
+// Filtering on name is out of scope for THOTH-065 — only sorting.
+export const NAME_SORT_COLUMN_ID = 'name';
+
 // Every operator valid for a given column `type`. Enforced both by `page-query-service.ts`
 // (silently-skip semantics for stale filter/sort rules, per THOTH-037's Edge Cases) and by the
 // API route handlers (which instead throw `BadRequestError` for the *same* invalid combinations

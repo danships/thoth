@@ -14,7 +14,7 @@ import {
   TextInput,
 } from '@mantine/core';
 import { IconArrowsSort, IconFilter, IconPlus, IconX } from '@tabler/icons-react';
-import { OPERATORS_BY_COLUMN_TYPE } from '@/types/schemas/entities/data-view-query';
+import { NAME_SORT_COLUMN_ID, OPERATORS_BY_COLUMN_TYPE } from '@/types/schemas/entities/data-view-query';
 import type { Column } from '@/types/schemas/entities/container';
 import type { FilterOperator, FilterRule, SortDirection, SortRule } from '@/types/schemas/entities/data-view-query';
 
@@ -179,6 +179,16 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
 
   const columnsById = useMemo(() => new Map(columns.map((column) => [column.id, column])), [columns]);
 
+  // A page's `name` is a fixed `Container` attribute, not a Data Source column (THOTH-065) — it
+  // never appears in `columns`, but is always sortable (unlike filtering, which stays scoped to
+  // real columns). Modeled as a pseudo `Column` matching `stringColumnSchema`'s shape so it slots
+  // into the same sort `Select` as real columns; listed first since it's the one column every
+  // view always has.
+  const sortableColumns = useMemo<Column[]>(
+    () => [{ id: NAME_SORT_COLUMN_ID, name: 'Name', type: 'string' }, ...columns],
+    [columns]
+  );
+
   const handleAddFilter = () => {
     const firstColumn = columns[0];
     if (!firstColumn) {
@@ -192,7 +202,7 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
   };
 
   const handleAddSort = () => {
-    const firstColumn = columns[0];
+    const firstColumn = sortableColumns[0];
     if (!firstColumn) {
       return;
     }
@@ -343,7 +353,7 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
               <Group key={index} gap="xs" wrap="wrap" data-testid="sort-rule-row">
                 <Select
                   comboboxProps={{ transitionProps: { duration: 0 }, withinPortal: false }}
-                  data={columns.map((col) => ({ value: col.id, label: col.name }))}
+                  data={sortableColumns.map((col) => ({ value: col.id, label: col.name }))}
                   value={rule.columnId}
                   onChange={(value) => value && updateSort(index, { columnId: value })}
                   size="xs"
@@ -373,7 +383,7 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
                 variant="subtle"
                 leftSection={<IconPlus size={14} />}
                 onClick={handleAddSort}
-                disabled={columns.length === 0}
+                disabled={sortableColumns.length === 0}
               >
                 Add sort
               </Button>

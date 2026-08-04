@@ -1,6 +1,7 @@
 import { BadRequestError } from '../../errors/bad-request-error';
 import type { Column } from '@/types/schemas/entities/container';
 import {
+  NAME_SORT_COLUMN_ID,
   OPERATORS_BY_COLUMN_TYPE,
   VALUELESS_OPERATORS,
   type FilterRule,
@@ -33,7 +34,9 @@ export function assertValidFilterSortRules(columns: Column[], filters: FilterRul
   }
 
   for (const sort of sorts) {
-    if (!columnsById.has(sort.columnId)) {
+    // `NAME_SORT_COLUMN_ID` sorts on the page's own `name` attribute (THOTH-065), not a Data
+    // Source column, so it's always valid regardless of `columns`.
+    if (sort.columnId !== NAME_SORT_COLUMN_ID && !columnsById.has(sort.columnId)) {
       throw new BadRequestError(`Unknown columnId in sort: ${sort.columnId}`);
     }
   }
@@ -66,7 +69,7 @@ export function dropStaleRules(
   const validSorts: SortRule[] = [];
   const droppedSorts: SortRule[] = [];
   for (const sort of sorts) {
-    if (columnsById.has(sort.columnId)) {
+    if (sort.columnId === NAME_SORT_COLUMN_ID || columnsById.has(sort.columnId)) {
       validSorts.push(sort);
     } else {
       droppedSorts.push(sort);
