@@ -52,6 +52,8 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
           lastUpdated: view.lastUpdated,
           filters: view.filters,
           sorts: view.sorts,
+          columns: view.columns,
+          columnLayout: view.columnLayout,
         }));
     }
 

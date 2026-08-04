@@ -51,6 +51,8 @@ export const GET = apiRoute<GetDataViewsResponse, GetDataViewsQuery, {}>(
       lastUpdated: dataView.lastUpdated,
       filters: dataView.filters,
       sorts: dataView.sorts,
+      columns: dataView.columns,
+      columnLayout: dataView.columnLayout,
     }));
   }
 );
@@ -104,6 +106,9 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
       columns: [],
       filters: [],
       sorts: [],
+      // No layout to resolve yet — `resolveDataViewColumnLayout` treats `null` as Name first,
+      // followed by all current Data Source columns, all visible (THOTH-052).
+      columnLayout: null,
       deletedAt: null,
       deletedRootId: null,
     };
@@ -125,6 +130,8 @@ export const POST = apiRoute<CreateDataViewResponse, {}, {}, CreateDataViewBody>
       lastUpdated: createdDataView.lastUpdated,
       filters: createdDataView.filters,
       sorts: createdDataView.sorts,
+      columns: createdDataView.columns,
+      columnLayout: createdDataView.columnLayout,
     } satisfies CreateDataViewResponse;
   }
 );

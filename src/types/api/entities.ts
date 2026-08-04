@@ -44,6 +44,8 @@ export const dataViewSchema = dataViewSchemaEntity
     dataSourceId: true,
     filters: true,
     sorts: true,
+    columns: true,
+    columnLayout: true,
   })
   .meta({ id: 'DataView' });
 export type DataView = z.infer<typeof dataViewSchema>;

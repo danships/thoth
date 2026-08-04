@@ -3,15 +3,20 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconGripVertical } from '@tabler/icons-react';
 import { EditablePageNameCell } from '@/components/atoms/editable-page-name-cell';
+import { PageRowActionsCell } from '@/components/atoms/page-row-actions-cell';
 import { EditableColumnValue } from '@/components/molecules/editable-column-value';
-import type { Column, SingleSelectOption } from '@/types/schemas/entities/container';
+import type { ResolvedColumnLayoutItem } from '@/lib/data-view/column-layout';
+import type { SingleSelectOption } from '@/types/schemas/entities/container';
 import type { Page } from '@/types/api';
 import type { PageValue } from '@/types/schemas/entities/container';
 
 type DataTableRowProperties = {
   page: Page;
   values: Record<string, PageValue> | undefined;
-  columns: Column[];
+  // The currently *visible* layout, in resolved render order (THOTH-052) — Name may appear at
+  // any position (or not at all); data columns render via a single ordered descriptor map
+  // instead of always following Name.
+  visibleLayout: ResolvedColumnLayoutItem[];
   onCellUpdate: (columnId: string, value: PageValue) => void;
   onPageNameUpdate: (pageId: string, name: string) => void;
   disabled?: boolean;
@@ -25,7 +30,7 @@ type DataTableRowProperties = {
 export function DataTableRow({
   page,
   values,
-  columns,
+  visibleLayout,
   onCellUpdate,
   onPageNameUpdate,
   disabled = false,
@@ -57,30 +62,37 @@ export function DataTableRow({
           </ActionIcon>
         </Table.Td>
       )}
-      <Table.Td>
-        <EditablePageNameCell
-          value={page.name}
-          emoji={page.emoji}
-          pageId={page.id}
-          onBlur={(name) => onPageNameUpdate(page.id, name)}
-          disabled={disabled}
-        />
-      </Table.Td>
-      {columns.map((col) => {
-        const current = values?.[col.id];
-        return (
-          <Table.Td key={col.id}>
+      {visibleLayout.map((item) =>
+        item.kind === 'name' ? (
+          <Table.Td key="name">
+            <EditablePageNameCell
+              value={page.name}
+              emoji={page.emoji}
+              onBlur={(name) => onPageNameUpdate(page.id, name)}
+              disabled={disabled}
+            />
+          </Table.Td>
+        ) : (
+          // `overflow: hidden` guards against native editable controls (e.g. the date input's
+          // `min-width`) rendering wider than a narrow `table-layout: fixed` column and visually
+          // bleeding into — and intercepting clicks meant for — the next cell.
+          <Table.Td key={item.column.id} style={{ overflow: 'hidden' }}>
             <EditableColumnValue
-              column={col}
-              value={current}
-              onChange={(value) => onCellUpdate(col.id, value)}
+              column={item.column}
+              value={values?.[item.column.id]}
+              onChange={(value) => onCellUpdate(item.column.id, value)}
               disabled={disabled}
               onCreateOption={onCreateOption}
               renderStringAsMarkdown
             />
           </Table.Td>
-        );
-      })}
+        )
+      )}
+      {/* Fixed action gutter (THOTH-052) — never part of `columnLayout`; keeps row navigation
+          available even when Name is reordered away from the start or hidden entirely. */}
+      <Table.Td style={{ width: 90 }}>
+        <PageRowActionsCell pageId={page.id} pageName={page.name} />
+      </Table.Td>
     </Table.Tr>
   );
 }

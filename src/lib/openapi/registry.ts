@@ -379,6 +379,7 @@ export const operations = [
     body: api.updateDataViewBodySchema,
     response: api.updateDataViewResponseSchema,
     successStatus: 200,
+    errorStatuses: [400, 409],
   },
   {
     path: '/views/{id}',

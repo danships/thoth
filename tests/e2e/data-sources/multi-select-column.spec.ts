@@ -128,7 +128,7 @@ test('can create a multi-select column with options via the Add Column modal', a
   await page.reload();
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const labelsCell = row.getByRole('cell').last();
+  const labelsCell = row.getByRole('cell').nth(-2);
   await labelsCell.getByTestId('multi-select-cell-target').click();
   await expect(page.getByRole('option', { name: 'Bug' })).toBeVisible();
   await expect(page.getByRole('option', { name: 'Feature' })).toBeVisible();
@@ -155,7 +155,7 @@ test('can create a multi-select column with zero options and add options inline 
   await expect(page.getByRole('columnheader', { name: 'Empty Tags' })).toBeVisible();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const emptyTagsCell = row.getByRole('cell').last();
+  const emptyTagsCell = row.getByRole('cell').nth(-2);
 
   await emptyTagsCell.getByTestId('multi-select-cell-target').click();
   // Multiple multi-select cells stay mounted in the DOM even when their dropdown is closed —

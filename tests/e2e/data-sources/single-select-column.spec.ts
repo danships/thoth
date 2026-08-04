@@ -30,7 +30,7 @@ test('renaming an option via Edit Column updates previously-set cells without ch
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const columnHeader = page.getByRole('columnheader', { name: priorityColumn.name });
-  await columnHeader.getByRole('button').click();
+  await columnHeader.getByRole('button', { name: `${priorityColumn.name} column actions` }).click();
   await page.getByRole('menuitem', { name: 'Edit' }).click();
 
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -129,7 +129,7 @@ test('can create a single-select column with zero options and add options inline
   await expect(page.getByRole('columnheader', { name: 'Empty Status' })).toBeVisible();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const selectCell = row.getByRole('cell').last();
+  const selectCell = row.getByRole('cell').nth(-2);
 
   await selectCell.getByTestId('single-select-cell-target').click();
   // Multiple single-select cells stay mounted in the DOM even when their dropdown is closed —

@@ -275,6 +275,8 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
               dataSourceId: view.dataSourceId,
               filters: view.filters,
               sorts: view.sorts,
+              columns: view.columns,
+              columnLayout: view.columnLayout,
             }));
         }
 
