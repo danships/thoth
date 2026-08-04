@@ -70,6 +70,12 @@ Run these from the repository root:
 | E2E report | `pnpm test:e2e:report` | Show the last Playwright HTML report |
 | Seed database | `pnpm db:seed` | Seed the database with sample data |
 
+### Standalone scripts
+
+- [Notion → Thoth import script](scripts/notion-import/README.md) — a standalone CLI that syncs
+  content from a Notion workspace into a Thoth workspace over the public `/api/v1/*` API. See its
+  own README for setup, configuration, and usage.
+
 ### Testing
 
 Thoth uses three test suites with clear boundaries:

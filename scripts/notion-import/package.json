@@ -1,0 +1,27 @@
+{
+  "name": "notion-import",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone Notion → Thoth import script (THOTH-049). Not part of the Thoth application/workspace — has its own dependencies, TypeScript config, and test runner.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint:tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@notionhq/client": "^5.23.3",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@tsconfig/strictest": "^2.0.8",
+    "@types/node": "^26.1.0",
+    "tsx": "^4.19.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}
