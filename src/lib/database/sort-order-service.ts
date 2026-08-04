@@ -4,11 +4,48 @@ import { addWorkspaceIdToQuery } from './helpers';
 import type { Container } from '@/types/database';
 
 /**
+ * Manual-order comparator for parented listings (child pages, data-source rows, sibling-group
+ * rebalancing) — see THOTH-036. Treats a missing/null `sortOrder` as sorting last, so a stray
+ * legacy row (e.g. one created before the backfill migration ran) falls to the end instead of
+ * jumping to the top. Falls back to `id asc` as a final tiebreak when two rows share the same
+ * `sortOrder` (or both are `null`), so the order is stable/deterministic instead of depending on
+ * incidental fetch order — every caller (listing endpoints and `rebalanceSiblingGroup`) shares
+ * this single implementation so they can never drift from one another.
+ */
+function compareIds(idA: string, idB: string): number {
+  if (idA < idB) {
+    return -1;
+  }
+  return idA > idB ? 1 : 0;
+}
+
+export function sortByManualOrder<T extends { id: string; sortOrder?: string | null | undefined }>(items: T[]): T[] {
+  return items.toSorted((a, b) => {
+    const aKey = a.sortOrder ?? null;
+    const bKey = b.sortOrder ?? null;
+    if (aKey === null && bKey === null) {
+      return compareIds(a.id, b.id);
+    }
+    if (aKey === null) {
+      return 1;
+    }
+    if (bKey === null) {
+      return -1;
+    }
+    if (aKey < bKey) {
+      return -1;
+    }
+    if (aKey > bKey) {
+      return 1;
+    }
+    return compareIds(a.id, b.id);
+  });
+}
+
+/**
  * Returns the lexicographically-largest `sortOrder` key currently in use within a sibling
- * group (`workspaceId` + `parentId`), or `null` if the group is empty. Used to mint an
- * end-of-list key for newly created pages (`generateKeyBetween(max, null)`), and as the shared
- * "max sibling key" helper reused by both `POST /pages` and the reorder rebalance path
- * (THOTH-036).
+ * group (`workspaceId` + `parentId`), or `null` if the group is empty. Used as the shared
+ * "max sibling key" helper reused by the reorder rebalance path (THOTH-036).
  */
 export async function getMaxSiblingSortOrder(workspaceId: string, parentId: string): Promise<string | null> {
   const containerRepository = await getContainerRepository();
@@ -20,6 +57,27 @@ export async function getMaxSiblingSortOrder(workspaceId: string, parentId: stri
   );
 
   return lastSibling?.sortOrder ?? null;
+}
+
+/**
+ * Returns the `sortOrder` of the sibling that currently sorts first (per `sortByManualOrder`)
+ * within a sibling group (`workspaceId` + `parentId`), or `null` if the group is empty. Used to
+ * mint a start-of-list key for newly created pages (`generateKeyBetween(null, min)`) — new
+ * pages are added to the top of their sibling group, not the bottom.
+ *
+ * Computed in application code (fetch + `sortByManualOrder`) rather than a DB-level
+ * `sort('sortOrder', 'asc')`, because SuperSave's SQLite adapter sorts text columns with
+ * `COLLATE NOCASE` — case-insensitive — which disagrees with `fractional-indexing`'s
+ * case-sensitive byte ordering (e.g. `NOCASE` would rank `'a0'` before `'Zz'`, even though
+ * `'Zz' < 'a0'` byte-wise, which is the order the keys were actually generated in).
+ */
+export async function getMinSiblingSortOrder(workspaceId: string, parentId: string): Promise<string | null> {
+  const containerRepository = await getContainerRepository();
+  const siblings = await containerRepository.getByQuery(
+    addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId).eq('parentId', parentId)
+  );
+  const ordered = sortByManualOrder(siblings);
+  return ordered[0]?.sortOrder ?? null;
 }
 
 /**
@@ -61,19 +119,21 @@ export async function computeReorderKey(options: {
 /**
  * Rebalances an entire sibling group (`workspaceId` + `parentId`) by regenerating strictly
  * ascending, evenly-spaced `sortOrder` keys (`generateNKeysBetween(null, null, n)`) in the
- * group's current `sortOrder asc, id asc` order — i.e. it preserves the existing relative order,
- * it just regains spacing between keys. Persists every row and returns the updated containers
- * (still in the same order) so callers (e.g. `computeReorderKey`'s collision path) can look up
- * a moved page's new neighbours without a second fetch.
+ * group's current manual order (`sortByManualOrder` — nulls-last, `id asc` tiebreak) — i.e. it
+ * preserves the existing relative (visible) order, it just regains spacing between keys.
+ * Persists every row and returns the updated containers (still in the same order) so callers
+ * (e.g. `computeReorderKey`'s collision path) can look up a moved page's new neighbours without
+ * a second fetch. Using the same comparator as the listing endpoints ensures a legacy row with
+ * `sortOrder: null` keeps its "last" position (and receives the largest new key) instead of
+ * jumping to the top the way a naive `sortOrder asc` query would (both SQLite and MySQL order
+ * `NULL` as the smallest value in `ASC`).
  */
 export async function rebalanceSiblingGroup(workspaceId: string, parentId: string): Promise<Container[]> {
   const containerRepository = await getContainerRepository();
-  const siblings = await containerRepository.getByQuery(
-    addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId)
-      .eq('parentId', parentId)
-      .sort('sortOrder', 'asc')
-      .sort('id', 'asc')
+  const fetchedSiblings = await containerRepository.getByQuery(
+    addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId).eq('parentId', parentId)
   );
+  const siblings = sortByManualOrder(fetchedSiblings);
 
   if (siblings.length === 0) {
     return [];

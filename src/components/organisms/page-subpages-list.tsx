@@ -3,6 +3,7 @@
 import { Alert, ActionIcon, Loader, Stack, Text } from '@mantine/core';
 import { IconGripVertical } from '@tabler/icons-react';
 import Link from 'next/link';
+import { useRef, useState } from 'react';
 import {
   DndContext,
   type DragEndEvent,
@@ -34,10 +35,14 @@ type PageSubpagesListProperties = {
 type SubpageRowProperties = {
   page: GetPagesResponse[number]['page'];
   workspaceSlug: string;
+  dragDisabled?: boolean;
 };
 
-function SubpageRow({ page, workspaceSlug }: SubpageRowProperties) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
+function SubpageRow({ page, workspaceSlug, dragDisabled = false }: SubpageRowProperties) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: page.id,
+    disabled: dragDisabled,
+  });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -79,6 +84,14 @@ export function PageSubpagesList({ pageId }: PageSubpagesListProperties) {
   const { reorderPage } = useReorderPage();
   const { showError } = useNotification();
 
+  // Serializes reorder mutations: a drop while a previous `reorderPage` call is still in flight
+  // is ignored (rather than kicking off a second concurrent request), and a stale failure only
+  // rolls back to `previousChildren` if no newer mutation has started since (tracked via
+  // `reorderTokenReference`) — otherwise an earlier failure could clobber a later, already-applied
+  // reorder with its own (now outdated) rollback snapshot.
+  const [isReordering, setIsReordering] = useState(false);
+  const reorderTokenReference = useRef(0);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -108,6 +121,11 @@ export function PageSubpagesList({ pageId }: PageSubpagesListProperties) {
     if (!over || active.id === over.id) {
       return;
     }
+    if (isReordering) {
+      // A previous reorder is still in flight — ignore this drop rather than starting a second
+      // concurrent mutation that could race the first one's rollback/success.
+      return;
+    }
     const activeId = String(active.id);
     const overId = String(over.id);
 
@@ -131,10 +149,23 @@ export function PageSubpagesList({ pageId }: PageSubpagesListProperties) {
 
     void mutate(reordered, { revalidate: false });
 
-    reorderPage(activeId, { beforeId, afterId }).catch((reorderError) => {
-      void mutate(previousChildren, { revalidate: false });
-      showError(reorderError instanceof Error ? reorderError.message : 'Failed to reorder page');
-    });
+    const token = ++reorderTokenReference.current;
+    setIsReordering(true);
+
+    reorderPage(activeId, { beforeId, afterId })
+      .catch((reorderError) => {
+        // Only roll back if this is still the most recent mutation — an older failure must not
+        // clobber a newer, already-applied reorder.
+        if (reorderTokenReference.current === token) {
+          void mutate(previousChildren, { revalidate: false });
+        }
+        showError(reorderError instanceof Error ? reorderError.message : 'Failed to reorder page');
+      })
+      .finally(() => {
+        if (reorderTokenReference.current === token) {
+          setIsReordering(false);
+        }
+      });
   };
 
   return (
@@ -142,7 +173,7 @@ export function PageSubpagesList({ pageId }: PageSubpagesListProperties) {
       <SortableContext items={children.map(({ page }) => page.id)} strategy={verticalListSortingStrategy}>
         <Stack gap={0}>
           {children.map(({ page }) => (
-            <SubpageRow key={page.id} page={page} workspaceSlug={workspaceSlug} />
+            <SubpageRow key={page.id} page={page} workspaceSlug={workspaceSlug} dragDisabled={isReordering} />
           ))}
         </Stack>
       </SortableContext>

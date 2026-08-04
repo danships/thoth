@@ -18,6 +18,8 @@ import type {
   RestoreDataSourceResponse,
   RestorePageResponse,
   RestoreViewResponse,
+  ReorderPageBody,
+  ReorderPageResponse,
   UpdateWorkspaceBody,
   WorkspaceApi,
   CreateAppBody,
@@ -103,10 +105,10 @@ export const api = {
 
     setFavorite: (id: string, starred: boolean) => apiClient.put(`/pages/${id}/favorite`, { starred }),
     reorder: (id: string, options: { beforeId?: string | null; afterId?: string | null }) =>
-      apiClient.post(`/pages/${id}/reorder`, {
+      apiClient.post<DataWrapper<ReorderPageResponse>>(`/pages/${id}/reorder`, {
         beforeId: options.beforeId ?? null,
         afterId: options.afterId ?? null,
-      }),
+      } satisfies ReorderPageBody),
     remove: (id: string) => apiClient.delete(`/pages/${id}`),
     restore: (id: string) => apiClient.post<DataWrapper<RestorePageResponse>>(`/pages/${id}/restore`),
     removePermanently: (id: string) => apiClient.delete(`/pages/${id}/permanent`),

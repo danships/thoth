@@ -213,6 +213,7 @@ export function DataViewTable({
           const freshPages = (await swrFetcher(legacyPagesKey)) as GetPagesResponse;
           const result = computeReorder(freshPages, activeId, overId);
           if (!result) {
+            showError('The sort was removed, but the page could not be reordered. Try dragging it again.');
             return;
           }
           const { reordered, beforeId, afterId } = result;

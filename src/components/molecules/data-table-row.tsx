@@ -16,8 +16,9 @@ type DataTableRowProperties = {
   onPageNameUpdate: (pageId: string, name: string) => void;
   disabled?: boolean;
   onCreateOption?: ((columnId: string, label: string) => Promise<SingleSelectOption>) | undefined;
-  // Manual reordering (THOTH-036) — omitted entirely (no drag handle rendered) when the view
-  // has a custom sort applied and dragging is otherwise disallowed.
+  // Manual reordering (THOTH-036) — when false, no drag-handle cell is rendered. Callers set it
+  // for tables that wrap rows in a `SortableContext`. A custom sort does not disable dragging;
+  // `DataViewTable.handleDragEnd` intercepts that case with a confirm modal.
   dragEnabled?: boolean;
 };
 

@@ -110,15 +110,22 @@ function useViewQueryPages(view: Pick<DataView, 'id' | 'lastUpdated'>, enabled: 
         return optimistic;
       }
       // Full refresh (e.g. new filters/sorts were just applied): reset back to the first page.
-      // Returns the freshly-fetched data directly (rather than `void`) so a caller that needs it
-      // synchronously (e.g. reordering against the just-revalidated manual order right after
-      // clearing a custom sort — THOTH-036) doesn't have to wait for this hook's own state to
-      // re-render, which wouldn't happen within the same synchronous continuation anyway.
+      // Fetches/mutates `baseKey` directly (via the global `mutate`) rather than the currently
+      // bound `mutate` — which is bound to whatever `cursorKey` was at the time this hook last
+      // rendered, and could still be an advanced page after `loadMore` ran. `setCursorKey`
+      // below only takes effect on the *next* render, so calling the bound `mutate` here would
+      // revalidate the wrong (stale) key. Returns the freshly-fetched base page directly (rather
+      // than `void`) so a caller that needs it synchronously (e.g. reordering against the
+      // just-revalidated manual order right after clearing a custom sort — THOTH-036) doesn't
+      // have to wait for this hook's own state to re-render, which wouldn't happen within the
+      // same synchronous continuation anyway.
       setCursorKey(baseKey);
       setAccumulated(undefined);
-      return mutate(undefined, options);
+      const refreshed = await mutateGlobal<GetPagesResponse>(baseKey, undefined, options);
+      setAccumulated(refreshed);
+      return refreshed;
     },
-    [baseKey, mutate, pages]
+    [baseKey, mutate, mutateGlobal, pages]
   );
 
   return {

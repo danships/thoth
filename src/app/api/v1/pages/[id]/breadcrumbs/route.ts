@@ -79,6 +79,7 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
           parentId: currentContainer.parentId || null,
           createdAt: currentContainer.createdAt,
           lastUpdated: currentContainer.lastUpdated,
+          sortOrder: currentContainer.sortOrder ?? null,
         });
 
         // Pages nest directly via parentId.

@@ -20,7 +20,7 @@ async function getChildren(client: ApiClient, parentId: string) {
 }
 
 describe('page reorder API', () => {
-  test('new child pages are appended in creation order, and a reorder moves a page within its sibling group', async () => {
+  test('new child pages are prepended in reverse creation order, and a reorder moves a page within its sibling group', async () => {
     const owner = await getOwner();
     const unique = Date.now();
     const parent = await createPage(owner, { name: `Reorder Parent ${unique}`, workspaceId: SEED.workspace.id });
@@ -29,28 +29,30 @@ describe('page reorder API', () => {
     const second = await createPage(owner, { name: 'Second', parentId: parent.id });
     const third = await createPage(owner, { name: 'Third', parentId: parent.id });
 
-    // New parented pages always land at the end of their sibling group, in ascending sortOrder.
+    // New parented pages always land at the top of their sibling group — each subsequent
+    // creation's sortOrder sorts before the previous one's, so the *last* created page has the
+    // *smallest* sortOrder.
     expect(first.sortOrder).not.toBeNull();
     expect(second.sortOrder).not.toBeNull();
     expect(third.sortOrder).not.toBeNull();
-    expect((first.sortOrder ?? '') < (second.sortOrder ?? '')).toBe(true);
-    expect((second.sortOrder ?? '') < (third.sortOrder ?? '')).toBe(true);
+    expect((third.sortOrder ?? '') < (second.sortOrder ?? '')).toBe(true);
+    expect((second.sortOrder ?? '') < (first.sortOrder ?? '')).toBe(true);
 
     const initialOrder = await getChildren(owner, parent.id);
-    expect(initialOrder.map((page) => page.id)).toEqual([first.id, second.id, third.id]);
+    expect(initialOrder.map((page) => page.id)).toEqual([third.id, second.id, first.id]);
 
-    // Move `third` to the very front (before `first`, no `afterId` neighbour since it's now the
+    // Move `first` to the very front (before `third`, no `afterId` neighbour since it's now the
     // first page).
-    const reorderResponse = await owner.post(`/api/v1/pages/${third.id}/reorder`, {
+    const reorderResponse = await owner.post(`/api/v1/pages/${first.id}/reorder`, {
       beforeId: null,
-      afterId: first.id,
+      afterId: third.id,
     });
     expect(reorderResponse.ok).toBe(true);
     const reordered = await getData<{ id: string; sortOrder: string | null }>(reorderResponse);
-    expect(reordered.id).toBe(third.id);
+    expect(reordered.id).toBe(first.id);
 
     const afterReorder = await getChildren(owner, parent.id);
-    expect(afterReorder.map((page) => page.id)).toEqual([third.id, first.id, second.id]);
+    expect(afterReorder.map((page) => page.id)).toEqual([first.id, third.id, second.id]);
   });
 
   test('rejects an anchor from a different sibling group', async () => {

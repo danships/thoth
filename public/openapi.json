@@ -143,7 +143,8 @@
                                   "createdAt",
                                   "lastUpdated",
                                   "emoji",
-                                  "parentId"
+                                  "parentId",
+                                  "sortOrder"
                                 ],
                                 "additionalProperties": false
                               },
@@ -752,7 +753,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -985,7 +987,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -2021,7 +2024,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -2364,7 +2368,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -3139,8 +3144,8 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Created",
+          "200": {
+            "description": "Successful response",
             "content": {
               "application/json": {
                 "schema": {
@@ -3247,7 +3252,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -13376,7 +13382,8 @@
           "createdAt",
           "lastUpdated",
           "emoji",
-          "parentId"
+          "parentId",
+          "sortOrder"
         ],
         "additionalProperties": false
       },

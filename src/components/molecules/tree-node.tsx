@@ -4,7 +4,7 @@ import { useStore } from '@nanostores/react';
 import { IconDots, IconGripVertical, IconPlus, IconTrash } from '@tabler/icons-react';
 import { computed } from 'nanostores';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   DndContext,
   type DragEndEvent,
@@ -59,6 +59,9 @@ type TreeNodeProperties = {
   // pages rendered inside a parent's SortableContext); `onReorderChildren` is provided by the
   // parent node to persist a reorder of *its own* children.
   dragHandle?: boolean;
+  // Set by the parent while a previous `onReorderChildren` mutation for one of its children is
+  // still in flight, so a fresh drag can't be started on top of it (see `isReordering` above).
+  dragDisabled?: boolean;
   onReorderChildren?: (
     parentId: string,
     movedId: string,
@@ -77,6 +80,7 @@ export function TreeNode({
   isView,
   onDelete,
   dragHandle = false,
+  dragDisabled = false,
   onReorderChildren,
 }: TreeNodeProperties) {
   const $isExpanded = computed($expandedPages, (expandedPages) => expandedPages.get(page.id) ?? false);
@@ -96,6 +100,14 @@ export function TreeNode({
     setChildOrder(childPages.map((child) => child.page.id));
   }
 
+  // Serializes reorder mutations: a drop while a previous `onReorderChildren` call is still in
+  // flight is ignored (rather than kicking off a second concurrent request), and a stale
+  // failure only rolls back `childOrder` if no newer mutation has started since (tracked via
+  // `reorderTokenReference`) — otherwise an earlier failure could clobber a later, already-applied
+  // reorder with its own (now outdated) rollback snapshot.
+  const [isReordering, setIsReordering] = useState(false);
+  const reorderTokenReference = useRef(0);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -110,6 +122,11 @@ export function TreeNode({
     markDragEnded();
     const { active, over } = event;
     if (!over || active.id === over.id || !onReorderChildren) {
+      return;
+    }
+    if (isReordering) {
+      // A previous reorder is still in flight — ignore this drop rather than starting a second
+      // concurrent mutation that could race the first one's rollback/success.
       return;
     }
     const activeId = String(active.id);
@@ -131,10 +148,23 @@ export function TreeNode({
     const beforeId = reordered[movedIndex - 1] ?? null;
     const afterId = reordered[movedIndex + 1] ?? null;
 
-    onReorderChildren(page.id, activeId, beforeId, afterId).catch((reorderError) => {
-      setChildOrder(previousOrder);
-      showError(reorderError instanceof Error ? reorderError.message : 'Failed to reorder page');
-    });
+    const token = ++reorderTokenReference.current;
+    setIsReordering(true);
+
+    onReorderChildren(page.id, activeId, beforeId, afterId)
+      .catch((reorderError) => {
+        // Only roll back if this is still the most recent mutation — an older failure must not
+        // clobber a newer, already-applied reorder.
+        if (reorderTokenReference.current === token) {
+          setChildOrder(previousOrder);
+        }
+        showError(reorderError instanceof Error ? reorderError.message : 'Failed to reorder page');
+      })
+      .finally(() => {
+        if (reorderTokenReference.current === token) {
+          setIsReordering(false);
+        }
+      });
   };
 
   const handleToggle = () => {
@@ -176,7 +206,7 @@ export function TreeNode({
   // Only meaningful when this node is itself a sortable child page (`dragHandle`) — `useSortable`
   // is safe to call unconditionally (a no-op outside a `SortableContext`), so hooks rules stay
   // satisfied without conditionally invoking it.
-  const sortable = useSortable({ id: page.id, disabled: !dragHandle });
+  const sortable = useSortable({ id: page.id, disabled: !dragHandle || dragDisabled });
   const rowStyle = dragHandle
     ? {
         transform: CSS.Transform.toString(sortable.transform),
@@ -302,6 +332,7 @@ export function TreeNode({
                   level={level + 1}
                   parentPageId={page.id}
                   dragHandle={Boolean(onReorderChildren)}
+                  dragDisabled={isReordering}
                   {...(onDelete ? { onDelete } : {})}
                 />
               ))}

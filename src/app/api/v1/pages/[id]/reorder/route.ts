@@ -36,6 +36,10 @@ export const POST = apiRoute<ReorderPageResponse, {}, ReorderPageParameters, Reo
       throw new BadRequestError('Root-level pages cannot be reordered');
     }
 
+    if (body.beforeId === params.id || body.afterId === params.id) {
+      throw new BadRequestError('A page cannot be anchored to itself');
+    }
+
     const containerRepository = await getContainerRepository();
 
     // Single-item list / no-op: both anchors absent means there's nothing to anchor against —
@@ -55,17 +59,20 @@ export const POST = apiRoute<ReorderPageResponse, {}, ReorderPageParameters, Reo
 
     // Anchors must share the moved page's own (workspaceId, parentId) sibling group — this
     // prevents a caller from smuggling a page into a different group via crafted anchor ids,
-    // and re-parenting/moving between parents is out of scope for this ticket.
+    // and re-parenting/moving between parents is out of scope for this ticket. Also excludes
+    // soft-deleted rows and non-page rows, so a client can't anchor against a sibling that no
+    // listing shows.
     const anchorIds: string[] = [body.beforeId, body.afterId].filter((id): id is string => typeof id === 'string');
     const anchors =
       anchorIds.length > 0
         ? await containerRepository.getByQuery(
             addWorkspaceIdToQuery(containerRepository.createQuery(), page.workspaceId)
               .eq('parentId', page.parentId)
+              .eq('type', 'page')
               .in('id', anchorIds)
           )
         : [];
-    const anchorsById = new Map(anchors.map((anchor) => [anchor.id, anchor]));
+    const anchorsById = new Map(anchors.filter((anchor) => !anchor.deletedAt).map((anchor) => [anchor.id, anchor]));
 
     if (body.beforeId && !anchorsById.has(body.beforeId)) {
       throw new BadRequestError('beforeId is not a sibling of the moved page');

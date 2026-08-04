@@ -1,6 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
+import { sortByManualOrder } from '@/lib/database/sort-order-service';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
@@ -27,32 +28,6 @@ const MAX_BATCHES = 50;
 
 function encodeCursor(cursor: PagesTreeCursor): string {
   return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
-}
-
-// Manual-order comparator for parented listings (child expansion/preview) — see THOTH-036.
-// Treats a missing/null `sortOrder` as sorting last, so a stray legacy row (e.g. one created
-// before the backfill migration ran) falls to the end instead of jumping to the top. Applied
-// defensively in application code on top of the DB-level `sort('sortOrder', 'asc')` above, since
-// SuperSave's native NULL ordering across engines isn't guaranteed to match this "nulls last"
-// convention.
-function sortByManualOrder<T extends { sortOrder?: string | null | undefined }>(items: T[]): T[] {
-  return items.toSorted((a, b) => {
-    const aKey = a.sortOrder ?? null;
-    const bKey = b.sortOrder ?? null;
-    if (aKey === null && bKey === null) {
-      return 0;
-    }
-    if (aKey === null) {
-      return 1;
-    }
-    if (bKey === null) {
-      return -1;
-    }
-    if (aKey < bKey) {
-      return -1;
-    }
-    return aKey > bKey ? 1 : 0;
-  });
 }
 
 function decodeCursor(raw: string): PagesTreeCursor {

@@ -211,6 +211,7 @@ export const operations = [
     params: api.reorderPageParametersSchema,
     body: api.reorderPageBodySchema,
     response: api.reorderPageResponseSchema,
+    successStatus: 200,
     errorStatuses: [400, 404],
   },
   {

@@ -27,7 +27,11 @@ test.describe('Pages tree drag-and-drop reordering', () => {
     // Drag-and-drop against a `pnpm dev` (Turbopack) server can occasionally race an in-flight
     // compile/streaming-render with the synthetic pointer gesture, causing the tree to reset or
     // the drop to land as a no-op. Retry the whole interaction a bounded number of times rather
-    // than accept single-attempt flakiness that isn't present in a production build.
+    // than accept single-attempt flakiness that isn't present in a production build. Each retry
+    // first checks the *currently persisted* order — if a prior attempt's request actually
+    // succeeded (only the visual assertion below timed out), dragging again would reverse the
+    // already-correct order, so a further drag is only issued while `first` still precedes
+    // `second`.
     let reordered = false;
     for (let attempt = 1; attempt <= 3 && !reordered; attempt += 1) {
       await page.goto(`/${SEED.workspace.slug}/pages`);
@@ -39,12 +43,22 @@ test.describe('Pages tree drag-and-drop reordering', () => {
       await expect(firstHandle).toBeVisible();
       await expect(secondHandle).toBeVisible();
 
-      const reorderResponse = page.waitForResponse(
+      const firstTextBefore = await scrollPane.getByText(first.name).boundingBox();
+      const secondTextBefore = await scrollPane.getByText(second.name).boundingBox();
+      if (secondTextBefore && firstTextBefore && secondTextBefore.y < firstTextBefore.y) {
+        // Already in the desired order — a previous attempt's request must have persisted
+        // successfully even though its visual assertion timed out. Nothing left to do.
+        reordered = true;
+        break;
+      }
+
+      const reorderResponsePromise = page.waitForResponse(
         (response) =>
           response.url().includes(`/api/v1/pages/${second.id}/reorder`) && response.request().method() === 'POST'
       );
       await dragHandleOnto(page, secondHandle, firstHandle);
-      await reorderResponse;
+      const reorderResponse = await reorderResponsePromise;
+      expect(reorderResponse.ok()).toBe(true);
 
       try {
         await expect(async () => {
