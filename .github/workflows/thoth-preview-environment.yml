@@ -77,8 +77,53 @@ jobs:
             sleep 15
           done
 
-      - name: Deploy preview on VM
+      # The VM pulls the image from ttl.sh itself before running `deploy`, and that
+      # free/best-effort registry occasionally drops the connection mid-layer-pull
+      # (`unexpected EOF`). Retry the SSH deploy step a few times, mirroring the
+      # build/push retry above, so a single flaky pull doesn't fail the whole workflow.
+      - name: Deploy preview on VM (attempt 1)
+        id: deploy-attempt-1
         if: steps.check-secrets.outputs.configured == 'true'
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.THOTH_PREVIEW_VM_HOST }}
+          username: ${{ secrets.THOTH_PREVIEW_VM_USER }}
+          key: ${{ secrets.THOTH_PREVIEW_VM_SSH_KEY }}
+          timeout: 120s
+          command_timeout: 10m
+          script_stop: true
+          script: deploy ${{ github.event.pull_request.number }} ${{ env.IMAGE }}
+
+      - name: Wait before deploy retry
+        if: steps.check-secrets.outputs.configured == 'true' && steps.deploy-attempt-1.outcome == 'failure'
+        run: |
+          echo "::warning::Deploy preview on VM failed (attempt 1/3), retrying in 15s..."
+          sleep 15
+
+      - name: Deploy preview on VM (attempt 2)
+        id: deploy-attempt-2
+        if: steps.check-secrets.outputs.configured == 'true' && steps.deploy-attempt-1.outcome == 'failure'
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.THOTH_PREVIEW_VM_HOST }}
+          username: ${{ secrets.THOTH_PREVIEW_VM_USER }}
+          key: ${{ secrets.THOTH_PREVIEW_VM_SSH_KEY }}
+          timeout: 120s
+          command_timeout: 10m
+          script_stop: true
+          script: deploy ${{ github.event.pull_request.number }} ${{ env.IMAGE }}
+
+      - name: Wait before final deploy retry
+        if: steps.check-secrets.outputs.configured == 'true' && steps.deploy-attempt-1.outcome == 'failure' && steps.deploy-attempt-2.outcome == 'failure'
+        run: |
+          echo "::warning::Deploy preview on VM failed (attempt 2/3), retrying in 15s..."
+          sleep 15
+
+      - name: Deploy preview on VM (attempt 3)
+        id: deploy-attempt-3
+        if: steps.check-secrets.outputs.configured == 'true' && steps.deploy-attempt-1.outcome == 'failure' && steps.deploy-attempt-2.outcome == 'failure'
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.THOTH_PREVIEW_VM_HOST }}
