@@ -5,6 +5,7 @@ import nodePath from 'node:path';
 
 import type { Column } from '@/types/schemas/entities/container';
 import type { PageContainer } from '@/types/database';
+import { NAME_SORT_COLUMN_ID } from '@/types/schemas/entities/data-view-query';
 import type { FilterRule, SortRule } from '@/types/schemas/entities/data-view-query';
 
 describe('page-query-service', () => {
@@ -265,7 +266,7 @@ describe('page-query-service', () => {
       parentId,
       columns,
       filters: [],
-      sorts: [{ columnId: 'name', direction: 'asc' }],
+      sorts: [{ columnId: NAME_SORT_COLUMN_ID, direction: 'asc' }],
       limit: 50,
     });
     expect(ascResult.pages.map((page) => page.name)).toEqual(['Alpha', 'Middle', 'zeta']);
@@ -274,14 +275,16 @@ describe('page-query-service', () => {
       parentId,
       columns,
       filters: [],
-      sorts: [{ columnId: 'name', direction: 'desc' }],
+      sorts: [{ columnId: NAME_SORT_COLUMN_ID, direction: 'desc' }],
       limit: 50,
     });
     expect(descResult.pages.map((page) => page.name)).toEqual(['zeta', 'Middle', 'Alpha']);
   });
 
   test('accepts the "name" sentinel sort columnId even when it is not a data source column', () => {
-    expect(() => assertValidFilterSortRules(columns, [], [{ columnId: 'name', direction: 'asc' }])).not.toThrow();
+    expect(() =>
+      assertValidFilterSortRules(columns, [], [{ columnId: NAME_SORT_COLUMN_ID, direction: 'asc' }])
+    ).not.toThrow();
   });
 
   test('walks cursor pagination without duplicates or skips', async () => {
