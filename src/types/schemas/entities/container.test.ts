@@ -39,4 +39,10 @@ describe('file column/value schemas (THOTH-054)', () => {
     const result = pageValueSchema.safeParse({ type: 'file', value: 123 });
     expect(result.success).toBe(false);
   });
+
+  test('pageValueSchema rejects a file value with an empty-string id', () => {
+    // '' is not a valid uploaded-file id — `null` is the only valid "no file attached" state.
+    const result = pageValueSchema.safeParse({ type: 'file', value: '' });
+    expect(result.success).toBe(false);
+  });
 });

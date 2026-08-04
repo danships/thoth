@@ -63,13 +63,23 @@ describe('extractFileIdsFromValues', () => {
     expect(extractFileIdsFromValues(values, columns)).toEqual([]);
   });
 
-  test('ignores values whose column is no longer a file column (e.g. deleted/retyped)', () => {
+  test('ignores values whose column was deleted', () => {
     const values: Record<string, PageValue> = {
       [fileColumn.id]: { type: 'file', value: 'file-1' },
     };
     // `columns` no longer contains `fileColumn` (simulating a deleted column) — the stale value
     // must not contribute an id.
     expect(extractFileIdsFromValues(values, [stringColumn])).toEqual([]);
+  });
+
+  test('ignores values whose column was retyped from file', () => {
+    // Same id as `fileColumn`, but now a `string` column — the stale `file`-shaped value under
+    // that id must not contribute an id, since the column's *current* type is no longer `file`.
+    const retypedColumn: Column = { id: fileColumn.id, name: fileColumn.name, type: 'string' };
+    const values: Record<string, PageValue> = {
+      [fileColumn.id]: { type: 'file', value: 'file-1' },
+    };
+    expect(extractFileIdsFromValues(values, [retypedColumn])).toEqual([]);
   });
 
   test('ignores non-file values entirely', () => {

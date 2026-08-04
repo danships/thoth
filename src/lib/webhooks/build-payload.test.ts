@@ -40,6 +40,7 @@ function makePage(values: PageContainer['values']): PageContainer {
 
 describe('buildPayload — file column values (THOTH-054)', () => {
   let temporaryDirectory = '';
+  let originalEnvironment: Record<string, string | undefined> = {};
   let uploadedFileRepository: Awaited<ReturnType<(typeof import('@/lib/database'))['getUploadedFileRepository']>>;
   let buildPayload: (typeof import('./build-payload'))['buildPayload'];
 
@@ -47,6 +48,13 @@ describe('buildPayload — file column values (THOTH-054)', () => {
     temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-build-payload-test-'));
     const databaseFile = nodePath.join(temporaryDirectory, 'test.db');
     const mutableEnvironment = process.env as Record<string, string | undefined>;
+    originalEnvironment = {
+      NODE_ENV: mutableEnvironment['NODE_ENV'],
+      DB: mutableEnvironment['DB'],
+      BETTER_AUTH_SECRET: mutableEnvironment['BETTER_AUTH_SECRET'],
+      LOG_LEVEL: mutableEnvironment['LOG_LEVEL'],
+      SUPERSAVE_SKIP_SYNC: mutableEnvironment['SUPERSAVE_SKIP_SYNC'],
+    };
     mutableEnvironment['NODE_ENV'] = 'test';
     mutableEnvironment['DB'] = `sqlite://${databaseFile}`;
     mutableEnvironment['BETTER_AUTH_SECRET'] = 'test-secret-not-for-production-use';
@@ -61,6 +69,14 @@ describe('buildPayload — file column values (THOTH-054)', () => {
   });
 
   afterAll(async () => {
+    const mutableEnvironment = process.env as Record<string, string | undefined>;
+    for (const [key, value] of Object.entries(originalEnvironment)) {
+      if (value === undefined) {
+        delete mutableEnvironment[key];
+      } else {
+        mutableEnvironment[key] = value;
+      }
+    }
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
 

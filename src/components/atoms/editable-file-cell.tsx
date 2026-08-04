@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import { AxiosError } from 'axios';
-import { ActionIcon, Anchor, Box, CloseButton, Group, Image, Loader, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Box, CloseButton, Group, Image, Loader, Text, UnstyledButton } from '@mantine/core';
 import { IconFile, IconUpload } from '@tabler/icons-react';
 import { api } from '@/lib/api/client';
 import { swrFetcher } from '@/lib/swr/fetcher';
@@ -135,17 +135,22 @@ export function EditableFileCell({ value, pageId, disabled = false, onChange }: 
     <Group gap="xs" wrap="nowrap" justify="space-between" w="100%" data-testid="file-cell-filled">
       {hiddenInput}
       {isInlineImage ? (
-        <Image
-          src={api.files.getContentUrl(file.id)}
-          alt={file.filename}
-          h={32}
-          w={32}
-          fit="cover"
-          radius="sm"
+        <UnstyledButton
           onClick={handleUploadClick}
+          disabled={disabled || uploading}
+          aria-label={`Replace ${file.filename}`}
           className={disabled ? undefined : styles['thumbnail']}
-          data-testid="file-cell-thumbnail"
-        />
+        >
+          <Image
+            src={api.files.getContentUrl(file.id)}
+            alt={file.filename}
+            h={32}
+            w={32}
+            fit="cover"
+            radius="sm"
+            data-testid="file-cell-thumbnail"
+          />
+        </UnstyledButton>
       ) : (
         <Anchor
           href={api.files.getContentUrl(file.id)}

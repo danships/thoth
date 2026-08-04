@@ -33,7 +33,7 @@ export const multiSelectValueSchema = z.object({
 // out of scope for this ticket.
 export const fileValueSchema = z.object({
   type: z.literal('file'),
-  value: z.string().nullable(),
+  value: z.string().min(1).nullable(),
 });
 export type FileValue = z.infer<typeof fileValueSchema>;
 

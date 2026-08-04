@@ -127,9 +127,12 @@ export async function buildPayload(
   const filenamesById = new Map<string, string | null>();
   if (fileIds.length > 0) {
     const uploadedFileRepository = await getUploadedFileRepository();
+    const files = await uploadedFileRepository.getByQuery(
+      uploadedFileRepository.createQuery().in('id', fileIds)
+    );
+    const filesById = new Map(files.map((file) => [file.id, file] as const));
     for (const fileId of fileIds) {
-      const file = await uploadedFileRepository.getOneByQuery(uploadedFileRepository.createQuery().eq('id', fileId));
-      filenamesById.set(fileId, file?.filename ?? null);
+      filenamesById.set(fileId, filesById.get(fileId)?.filename ?? null);
     }
   }
 

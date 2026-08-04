@@ -462,7 +462,8 @@
                                     "value": {
                                       "anyOf": [
                                         {
-                                          "type": "string"
+                                          "type": "string",
+                                          "minLength": 1
                                         },
                                         {
                                           "type": "null"
@@ -1426,7 +1427,8 @@
                         "value": {
                           "anyOf": [
                             {
-                              "type": "string"
+                              "type": "string",
+                              "minLength": 1
                             },
                             {
                               "type": "null"
@@ -1613,7 +1615,8 @@
                                   "value": {
                                     "anyOf": [
                                       {
-                                        "type": "string"
+                                        "type": "string",
+                                        "minLength": 1
                                       },
                                       {
                                         "type": "null"
@@ -3961,7 +3964,8 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "type": "string",
+                                            "minLength": 1
                                           },
                                           {
                                             "type": "null"
@@ -4109,7 +4113,8 @@
                                       "value": {
                                         "anyOf": [
                                           {
-                                            "type": "string"
+                                            "type": "string",
+                                            "minLength": 1
                                           },
                                           {
                                             "type": "null"
