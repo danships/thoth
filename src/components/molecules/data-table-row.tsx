@@ -1,4 +1,7 @@
-import { Table } from '@mantine/core';
+import { Table, ActionIcon } from '@mantine/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { IconGripVertical } from '@tabler/icons-react';
 import { EditablePageNameCell } from '@/components/atoms/editable-page-name-cell';
 import { EditableColumnValue } from '@/components/molecules/editable-column-value';
 import type { Column, SingleSelectOption } from '@/types/schemas/entities/container';
@@ -13,6 +16,10 @@ type DataTableRowProperties = {
   onPageNameUpdate: (pageId: string, name: string) => void;
   disabled?: boolean;
   onCreateOption?: ((columnId: string, label: string) => Promise<SingleSelectOption>) | undefined;
+  // Manual reordering (THOTH-036) — when false, no drag-handle cell is rendered. Callers set it
+  // for tables that wrap rows in a `SortableContext`. A custom sort does not disable dragging;
+  // `DataViewTable.handleDragEnd` intercepts that case with a confirm modal.
+  dragEnabled?: boolean;
 };
 
 export function DataTableRow({
@@ -23,9 +30,33 @@ export function DataTableRow({
   onPageNameUpdate,
   disabled = false,
   onCreateOption,
+  dragEnabled = false,
 }: DataTableRowProperties) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    ...(isDragging && { zIndex: 1, position: 'relative' as const, background: 'var(--mantine-color-body)' }),
+  };
+
   return (
-    <Table.Tr>
+    <Table.Tr ref={setNodeRef} style={style}>
+      {dragEnabled && (
+        <Table.Td style={{ width: 32 }}>
+          <ActionIcon
+            variant="subtle"
+            size="sm"
+            aria-label="Reorder page"
+            data-testid={`drag-handle-${page.id}`}
+            {...attributes}
+            {...listeners}
+            style={{ cursor: 'grab' }}
+          >
+            <IconGripVertical size={14} />
+          </ActionIcon>
+        </Table.Td>
+      )}
       <Table.Td>
         <EditablePageNameCell
           value={page.name}

@@ -42,6 +42,7 @@ export const POST = apiRoute<RestorePageResponse, undefined, RestorePageParamete
       emoji: restored.emoji || null,
       cover: restored.cover ?? null,
       parentId: restored.parentId || null,
+      sortOrder: restored.sortOrder ?? null,
       createdAt: restored.createdAt,
       lastUpdated: restored.lastUpdated,
     };

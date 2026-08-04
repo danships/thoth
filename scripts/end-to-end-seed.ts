@@ -13,6 +13,7 @@ import {
   getWorkspaceRepository,
 } from '../src/lib/database/index.js';
 import { getStorageAdapter } from '../src/lib/storage/index.js';
+import { backfillContainerSortOrder } from '../src/lib/database/migrations/container-sort-order-backfill.js';
 import { SEED } from '../tests/fixtures/seed.js';
 import type {
   ContainerAccessCreate,
@@ -1017,7 +1018,14 @@ async function seedAppData() {
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────
-await getDatabase(); // ensures Better Auth tables exist via runMigrations
+const superSave = await getDatabase(); // ensures Better Auth tables exist via runMigrations
 await seedAuthTables();
 await seedAppData();
+// `seedAppData()` creates parented Container rows (child pages, data-source rows) directly via
+// the repository API, bypassing `POST /pages`'s `sortOrder` assignment (THOTH-036) — so without
+// this, every seeded row would have `sortOrder: null` and collide on the same fractional-index
+// key the first time two such rows are compared. Re-run the (idempotent) backfill migration
+// after seeding so all seeded parented rows get a real, distinct manual-order key, exactly as a
+// production database would after the migration ran against pre-existing data.
+await backfillContainerSortOrder(superSave);
 console.log('✅  E2E database seeded');

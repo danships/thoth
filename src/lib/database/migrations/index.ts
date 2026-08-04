@@ -6,6 +6,7 @@ import { backfillSoftDeleteFields } from './soft-delete-backfill';
 import { backfillWorkspaces } from './workspace-backfill';
 import { backfillWorkspaceStorageQuota } from './workspace-storage-quota-backfill';
 import { backfillMemberAccess } from './member-access-backfill';
+import { backfillContainerSortOrder } from './container-sort-order-backfill';
 
 export const migrations: Migration[] = [
   {
@@ -63,6 +64,17 @@ export const migrations: Migration[] = [
     name: 'member-access-backfill',
     run: async (superSave: SuperSave) => {
       await backfillMemberAccess(superSave);
+    },
+  },
+  {
+    // Engine-agnostic backfill of `sortOrder` on pre-existing, parented `Container` rows for
+    // THOTH-036 ("Manual reordering of pages in a view/datasource"). Adding `sortOrder` to
+    // `filterSortFields` (see `entities/container.ts`) lets SuperSave manage the column itself;
+    // this migration only seeds values, matching the existing `lastUpdated desc` child order so
+    // the post-migration manual order is a no-op reshuffle for existing users.
+    name: 'container-sort-order-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillContainerSortOrder(superSave);
     },
   },
 ];

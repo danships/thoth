@@ -1,6 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
+import { sortByManualOrder } from '@/lib/database/sort-order-service';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
@@ -145,13 +146,15 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
       // this listing remains fully unpaginated, per the explicit out-of-scope decision for
       // child listings in this ticket. Content is scoped by workspace membership + grant, not
       // creator (THOTH-042) — anchored on the parent's own (already-authorised) workspace.
+      // Manual order (THOTH-036) is the default for child listings — `sortOrder asc` (root list
+      // ordering is unchanged and stays out of scope, see `fetchRootContainerPage` below).
       containers = await containerRepository.getByQuery(
         addWorkspaceIdToQuery(containerRepository.createQuery(), parent.workspaceId)
           .eq('type', 'page')
           .eq('parentId', query.parentId)
-          .sort('lastUpdated', 'desc')
+          .sort('sortOrder', 'asc')
       );
-      containers = containers.filter((container) => !container.deletedAt);
+      containers = sortByManualOrder(containers.filter((container) => !container.deletedAt));
       pagination = { nextCursor: null, hasMore: false };
     } else {
       // Root list: no existing entity to derive the workspace from, so `workspaceId` is
@@ -204,11 +207,13 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
         ? await filterContainersByGrantForSession(
             session,
             await containerRepository.getByQuery(
-              containerRepository.createQuery().in('parentId', parentIds).sort('lastUpdated', 'desc')
+              containerRepository.createQuery().in('parentId', parentIds).sort('sortOrder', 'asc')
             )
           )
         : [];
-    const visibleChildren = databaseChildren.filter((child) => !child.deletedAt && child.type === 'page');
+    const visibleChildren = sortByManualOrder(
+      databaseChildren.filter((child) => !child.deletedAt && child.type === 'page')
+    );
 
     const childCountByParent = new Map<string, number>();
     for (const child of visibleChildren) {
@@ -249,6 +254,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
               lastUpdated: child.lastUpdated,
               createdAt: child.createdAt,
               parentId: child.parentId || null,
+              sortOrder: child.sortOrder ?? null,
             },
           }));
 
@@ -280,6 +286,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
             lastUpdated: container.lastUpdated,
             createdAt: container.createdAt,
             parentId: container.parentId || null,
+            sortOrder: container.sortOrder ?? null,
           },
           children,
           ...(hasMoreChildren && { hasMoreChildren }),

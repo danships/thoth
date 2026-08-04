@@ -77,12 +77,30 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
     });
   }
   if (sortExpressions.length === 0) {
-    sortExpressions.push({
-      sql: 'createdAt',
-      params: [],
-      direction: 'asc',
-      valueOf: (page) => page.createdAt,
-    });
+    // Manual order (THOTH-036) is the default for parented listings (this raw-SQL path is only
+    // ever used for a `dataView`'s rows, i.e. always parented) — falls back to `sortOrder asc`
+    // instead of `createdAt asc`. `sortOrder` is nullable (legacy rows predating the backfill),
+    // and both SQLite and MySQL order `NULL` as the smallest value in `ASC`, which would put
+    // those rows first — the opposite of the nulls-last rule the in-memory listing paths use
+    // (`sortByManualOrder`). A leading "is this row missing an order" flag (never itself SQL
+    // NULL, so the generic keyset-pagination null-handling below treats it as an ordinary
+    // column) forces null-`sortOrder` rows after every real key, keeping this path consistent
+    // with the in-memory ones. Two separate expressions (rather than one composite `CASE ...,
+    // sortOrder` SQL string) so each key still gets its own `valueOf` for cursor pagination.
+    sortExpressions.push(
+      {
+        sql: 'CASE WHEN sortOrder IS NULL THEN 1 ELSE 0 END',
+        params: [],
+        direction: 'asc',
+        valueOf: (page) => (page.sortOrder === null || page.sortOrder === undefined ? 1 : 0),
+      },
+      {
+        sql: 'sortOrder',
+        params: [],
+        direction: 'asc',
+        valueOf: (page) => page.sortOrder ?? null,
+      }
+    );
   }
   sortExpressions.push({ sql: 'id', params: [], direction: 'asc', valueOf: (page) => page.id });
 

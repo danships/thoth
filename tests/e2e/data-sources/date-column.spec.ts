@@ -12,7 +12,7 @@ test('seeded date cell value is visible in the data view table', async ({ page }
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const dateCell = row.getByRole('cell').nth(3);
+  const dateCell = row.getByRole('cell').nth(4);
 
   await expect(dateCell.locator('input')).toHaveValue('2026-01-31');
 });
@@ -22,7 +22,7 @@ test('can edit a date cell value inline', async ({ page }) => {
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const dateCell = row.getByRole('cell').nth(3);
+  const dateCell = row.getByRole('cell').nth(4);
   const dateInput = dateCell.locator('input');
 
   await dateInput.fill('2026-03-15');

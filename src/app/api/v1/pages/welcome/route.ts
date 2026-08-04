@@ -82,6 +82,7 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
           name: existingRootPage.name,
           emoji: existingRootPage.emoji || null,
           parentId: existingRootPage.parentId || null,
+          sortOrder: existingRootPage.sortOrder ?? null,
           createdAt: existingRootPage.createdAt,
           lastUpdated: existingRootPage.lastUpdated,
         };
@@ -116,6 +117,7 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
         name: createdPage.name,
         emoji: 'emoji' in createdPage ? createdPage.emoji : null,
         parentId: createdPage.parentId || null,
+        sortOrder: 'sortOrder' in createdPage ? (createdPage.sortOrder ?? null) : null,
         createdAt: createdPage.createdAt,
         lastUpdated: createdPage.lastUpdated,
       };

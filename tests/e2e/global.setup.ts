@@ -89,11 +89,32 @@ async function signInAndWriteStorageState(
   );
 }
 
-setup('seed database and write auth storage state', async () => {
+setup('seed database and write auth storage state', async ({ browser }) => {
   execSync('pnpm tsx --env-file=.env.test scripts/end-to-end-seed.ts', { stdio: 'inherit' });
 
   const baseUrl = process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:3000';
 
   // Primary seeded user (workspace owner) — used by the default `chromium` project.
   await signInAndWriteStorageState(baseUrl, SEED.user, path.join(AUTH_DIR, 'user.json'));
+
+  // Warm up the dev server's on-demand (Turbopack) compilation for the sidebar/pages routes
+  // before any real test starts. Without this, the very first spec to hit these routes can
+  // overlap a slow first-time compile (and the resulting React Fast Refresh remount) with a
+  // timing-sensitive interaction — most notably a THOTH-036 drag-and-drop — which can shift the
+  // DOM mid-gesture and cause the drop's trailing `click` to land on (and navigate to) an
+  // unrelated link. A real, authenticated browser navigation (rather than a plain unauthenticated
+  // `fetch`, which would just hit the sign-in redirect and never compile the actual page) forces
+  // that compilation to happen well before any assertions run.
+  const warmupContext = await browser.newContext({ storageState: path.join(AUTH_DIR, 'user.json') });
+  const warmupPage = await warmupContext.newPage();
+  try {
+    for (const warmupPath of [
+      `/${SEED.workspace.slug}/pages`,
+      `/${SEED.workspace.slug}/pages/${SEED.pages.childOverflowHost.id}`,
+    ]) {
+      await warmupPage.goto(`${baseUrl}${warmupPath}`).catch(() => undefined);
+    }
+  } finally {
+    await warmupContext.close();
+  }
 });

@@ -20,6 +20,15 @@ export const pageSchema = pageContainerSchema
     emoji: true,
     cover: true,
     parentId: true,
+    sortOrder: true,
+  })
+  .extend({
+    // `Container.sortOrder` stays optional at the entity-schema level (so pre-existing
+    // create/seed call sites across the codebase don't all need updating), but every route
+    // that returns a `Page` always includes it explicitly (`sortOrder: page.sortOrder ?? null`)
+    // — required (while staying nullable) here so generated API clients see a single
+    // consistent contract instead of "missing" and "null" being observably different.
+    sortOrder: z.string().nullable(),
   })
   .meta({ id: 'Page' });
 export type Page = z.infer<typeof pageSchema>;

@@ -109,6 +109,13 @@ export const containerSchema = z
     name: z.string().min(1),
     deletedAt: z.string().nullable(),
     deletedRootId: z.string().nullable(),
+    // Opaque, lexicographically-sortable key (see `fractional-indexing`) driving manual
+    // ordering within a sibling group (`workspaceId` + `parentId`, `parentId !== null` only —
+    // root-level pages are never manually ordered and keep `sortOrder: null`, see THOTH-036).
+    // Optional (defaults to `null`/absent) so pre-existing create/seed call sites across the
+    // codebase don't all need updating; every *new* parented page is assigned one explicitly in
+    // `POST /pages`.
+    sortOrder: z.string().nullable().optional(),
   })
   .extend(withTrackUpdatesSchema.shape)
   .extend(withWorkspaceIdSchema.shape)

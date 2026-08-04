@@ -18,7 +18,7 @@ test('seeded single-select cell value renders as a colored badge', async ({ page
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const selectCell = row.getByRole('cell').nth(4);
+  const selectCell = row.getByRole('cell').nth(5);
 
   await expect(selectCell.getByText(priorityColumn.options[1].label)).toBeVisible();
 });
@@ -43,7 +43,7 @@ test('renaming an option via Edit Column updates previously-set cells without ch
   await expect(page.getByRole('dialog')).not.toBeVisible();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const selectCell = row.getByRole('cell').nth(4);
+  const selectCell = row.getByRole('cell').nth(5);
   await expect(selectCell.getByText('In Progress')).toBeVisible();
 });
 
@@ -52,7 +52,7 @@ test('can pick a different existing option for a single-select cell', async ({ p
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const selectCell = row.getByRole('cell').nth(4);
+  const selectCell = row.getByRole('cell').nth(5);
 
   await selectCell.getByTestId('single-select-cell-target').click();
   await page.getByRole('option', { name: priorityColumn.options[2].label }).click();
@@ -65,7 +65,7 @@ test('can create a new option from the single-select cell dropdown', async ({ pa
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'OPEN' }) });
-  const selectCell = row.getByRole('cell').nth(4);
+  const selectCell = row.getByRole('cell').nth(5);
 
   await selectCell.getByTestId('single-select-cell-target').click();
   const searchInput = page.locator('input[placeholder="Search or create option"][data-expanded="true"]');

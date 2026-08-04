@@ -90,10 +90,10 @@ function useViewQueryPages(view: Pick<DataView, 'id' | 'lastUpdated'>, enabled: 
   }, [baseKey, pagination, pages, loadingMore, mutateGlobal, showError]);
 
   const resetAndMutate = useCallback(
-    (
+    async (
       updateFunction?: (previous: GetPagesResponse | undefined) => GetPagesResponse | undefined,
       options?: { revalidate: boolean }
-    ) => {
+    ): Promise<GetPagesResponse | undefined> => {
       if (updateFunction) {
         // Optimistic patch (e.g. a single cell/row edit): apply it against the currently
         // rendered — possibly multi-page-accumulated — list, keeping the current cursor
@@ -102,18 +102,30 @@ function useViewQueryPages(view: Pick<DataView, 'id' | 'lastUpdated'>, enabled: 
         // is intentionally left untouched (it only ever holds a single cursor page, not the
         // full accumulated list) — `options.revalidate` still triggers a real refetch when
         // asked for one.
-        setAccumulated(updateFunction(pages));
+        const optimistic = updateFunction(pages);
+        setAccumulated(optimistic);
         if (options?.revalidate) {
-          void mutate();
+          return mutate();
         }
-        return;
+        return optimistic;
       }
       // Full refresh (e.g. new filters/sorts were just applied): reset back to the first page.
+      // Fetches/mutates `baseKey` directly (via the global `mutate`) rather than the currently
+      // bound `mutate` — which is bound to whatever `cursorKey` was at the time this hook last
+      // rendered, and could still be an advanced page after `loadMore` ran. `setCursorKey`
+      // below only takes effect on the *next* render, so calling the bound `mutate` here would
+      // revalidate the wrong (stale) key. Returns the freshly-fetched base page directly (rather
+      // than `void`) so a caller that needs it synchronously (e.g. reordering against the
+      // just-revalidated manual order right after clearing a custom sort — THOTH-036) doesn't
+      // have to wait for this hook's own state to re-render, which wouldn't happen within the
+      // same synchronous continuation anyway.
       setCursorKey(baseKey);
       setAccumulated(undefined);
-      void mutate(undefined, options);
+      const refreshed = await mutateGlobal<GetPagesResponse>(baseKey, undefined, options);
+      setAccumulated(refreshed);
+      return refreshed;
     },
-    [baseKey, mutate, pages]
+    [baseKey, mutate, mutateGlobal, pages]
   );
 
   return {

@@ -48,3 +48,4 @@ export * from './get-page-history';
 export * from './get-page-revision';
 export * from './restore-page-revision';
 export * from './fork-page-revision';
+export * from './reorder-page';

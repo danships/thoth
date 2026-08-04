@@ -8,6 +8,9 @@ type NewPageRowProperties = {
   onSubmit: () => void;
   disabled?: boolean;
   columnCount: number;
+  // When the table renders a leading drag-handle column (THOTH-036), this row needs a matching
+  // empty cell so the "New page name" input still lines up under the "Name" column.
+  hasDragColumn?: boolean;
 };
 
 export function NewPageRow({
@@ -17,9 +20,11 @@ export function NewPageRow({
   onSubmit,
   disabled = false,
   columnCount,
+  hasDragColumn = false,
 }: NewPageRowProperties) {
   return (
     <Table.Tr>
+      {hasDragColumn && <Table.Td />}
       <Table.Td>
         <TextInput
           placeholder="New page name"

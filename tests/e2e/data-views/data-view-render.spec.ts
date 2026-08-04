@@ -25,10 +25,11 @@ test('inline Markdown in a text cell does not break the row/column structure', a
   // so this assertion stays robust if another spec run earlier in the suite added a column to
   // this shared data source: the Markdown row must still have exactly one cell per column, and
   // its rendered Markdown content sits inside that single "Notes" cell rather than spilling into
-  // neighbouring cells or adding extra rows.
+  // neighbouring cells or adding extra rows. Cell 0 is the THOTH-036 drag-handle column, cell 1
+  // is "Name", so "Notes" is cell 2.
   const headerCellCount = await page.getByRole('row').first().getByRole('columnheader').count();
   await expect(row.getByRole('cell')).toHaveCount(headerCellCount);
-  const notesCell = row.getByRole('cell').nth(1);
+  const notesCell = row.getByRole('cell').nth(2);
   await expect(notesCell.locator('strong', { hasText: SEED.dataSource.markdown.boldText })).toBeVisible();
 });
 

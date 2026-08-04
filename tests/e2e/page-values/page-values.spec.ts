@@ -13,7 +13,7 @@ async function openDataView(page: Page) {
 // per `SEED.dataSource`).
 function noteCellForRow(page: Page, rowName: string) {
   const row = page.getByRole('row').filter({ hasText: rowName });
-  return row.getByRole('cell').nth(1);
+  return row.getByRole('cell').nth(2);
 }
 
 // Enters edit mode via the labelled edit control (the accessible `role="button"` target

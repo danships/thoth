@@ -125,6 +125,16 @@
                                         "type": "null"
                                       }
                                     ]
+                                  },
+                                  "sortOrder": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -133,7 +143,8 @@
                                   "createdAt",
                                   "lastUpdated",
                                   "emoji",
-                                  "parentId"
+                                  "parentId",
+                                  "sortOrder"
                                 ],
                                 "additionalProperties": false
                               },
@@ -724,6 +735,16 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "sortOrder": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -732,7 +753,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -947,6 +969,16 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "sortOrder": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -955,7 +987,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -1973,6 +2006,16 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "sortOrder": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -1981,7 +2024,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -2306,6 +2350,16 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "sortOrder": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -2314,7 +2368,8 @@
                         "createdAt",
                         "lastUpdated",
                         "emoji",
-                        "parentId"
+                        "parentId",
+                        "sortOrder"
                       ],
                       "additionalProperties": false
                     }
@@ -3067,6 +3122,240 @@
                 "required": [
                   "starred"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pages/{id}/reorder": {
+      "post": {
+        "operationId": "reorderPage",
+        "summary": "Reorder a page within its sibling group",
+        "tags": [
+          "Pages"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "lastUpdated": {
+                          "type": "string"
+                        },
+                        "emoji": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cover": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "imageUrl": {
+                                  "type": "string",
+                                  "maxLength": 2048,
+                                  "format": "uri"
+                                },
+                                "positionX": {
+                                  "default": 0.5,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "positionY": {
+                                  "default": 0.5,
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                "zoom": {
+                                  "default": 1,
+                                  "type": "number",
+                                  "minimum": 1,
+                                  "maximum": 3
+                                }
+                              },
+                              "required": [
+                                "imageUrl",
+                                "positionX",
+                                "positionY",
+                                "zoom"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "parentId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "sortOrder": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "createdAt",
+                        "lastUpdated",
+                        "emoji",
+                        "parentId",
+                        "sortOrder"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "beforeId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "afterId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
               }
             }
           }
@@ -13075,6 +13364,16 @@
                 "type": "null"
               }
             ]
+          },
+          "sortOrder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -13083,7 +13382,8 @@
           "createdAt",
           "lastUpdated",
           "emoji",
-          "parentId"
+          "parentId",
+          "sortOrder"
         ],
         "additionalProperties": false
       },
