@@ -1,0 +1,18 @@
+.target {
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.thumbnail {
+  cursor: pointer;
+}
+
+.chip {
+  max-width: 160px;
+  overflow: hidden;
+}

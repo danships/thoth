@@ -11,7 +11,14 @@ export type WebhookDeliveryStatus = z.infer<typeof webhookDeliveryStatusSchema>;
 // payload — no internal column/option ids ever appear here (single-select is resolved to its
 // option label, multi-select to an array of option labels, before this point). See
 // `buildPayload` in `src/lib/webhooks/build-payload.ts`.
-export const webhookRawValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]);
+export const webhookRawValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string()),
+  z.object({ id: z.string(), filename: z.string().nullable(), url: z.string() }),
+]);
 export type WebhookRawValue = z.infer<typeof webhookRawValueSchema>;
 
 export const webhookPayloadPageSchema = z.object({

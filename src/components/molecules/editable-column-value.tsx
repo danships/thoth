@@ -4,6 +4,7 @@ import { EditableBooleanCell } from '@/components/atoms/editable-boolean-cell';
 import { EditableDateCell } from '@/components/atoms/editable-date-cell';
 import { EditableSingleSelectCell } from '@/components/atoms/editable-single-select-cell';
 import { EditableMultiSelectCell } from '@/components/atoms/editable-multi-select-cell';
+import { EditableFileCell } from '@/components/atoms/editable-file-cell';
 import type { Column, PageValue, SingleSelectOption } from '@/types/schemas/entities/container';
 
 type EditableColumnValueProperties = {
@@ -20,6 +21,11 @@ type EditableColumnValueProperties = {
    * source string regardless of this flag.
    */
   renderStringAsMarkdown?: boolean;
+  /**
+   * The owning page's id — required by `file` columns (`EditableFileCell`) so an upload can be
+   * associated with this page's `file-usage` immediately. Unused by every other column type.
+   */
+  pageId: string;
 };
 
 /**
@@ -34,7 +40,19 @@ export function EditableColumnValue({
   disabled = false,
   onCreateOption,
   renderStringAsMarkdown = false,
+  pageId,
 }: EditableColumnValueProperties) {
+  if (column.type === 'file') {
+    return (
+      <EditableFileCell
+        value={value?.type === 'file' ? value.value : null}
+        pageId={pageId}
+        onChange={(fileId) => onChange({ type: 'file', value: fileId })}
+        disabled={disabled}
+      />
+    );
+  }
+
   if (column.type === 'date') {
     return (
       <EditableDateCell

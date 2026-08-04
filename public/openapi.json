@@ -451,6 +451,30 @@
                                     "value"
                                   ],
                                   "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "const": "file"
+                                    },
+                                    "value": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "value"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               ]
                             }
@@ -1391,6 +1415,29 @@
                         "type",
                         "value"
                       ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "file"
+                        },
+                        "value": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "value"
+                      ]
                     }
                   ]
                 }
@@ -1548,6 +1595,30 @@
                                     "items": {
                                       "type": "string"
                                     }
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "value"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "file"
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -1796,6 +1867,29 @@
                                   "name",
                                   "type",
                                   "options"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "file"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type"
                                 ],
                                 "additionalProperties": false
                               }
@@ -3856,6 +3950,30 @@
                                       "value"
                                     ],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "const": "file"
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "value"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -3973,6 +4091,30 @@
                                         "items": {
                                           "type": "string"
                                         }
+                                      }
+                                    },
+                                    "required": [
+                                      "type",
+                                      "value"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "const": "file"
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -8076,6 +8218,29 @@
                                   "options"
                                 ],
                                 "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "file"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type"
+                                ],
+                                "additionalProperties": false
                               }
                             ]
                           }
@@ -8505,6 +8670,29 @@
                                   "options"
                                 ],
                                 "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "file"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type"
+                                ],
+                                "additionalProperties": false
                               }
                             ]
                           }
@@ -8850,6 +9038,29 @@
                                   "name",
                                   "type",
                                   "options"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "file"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type"
                                 ],
                                 "additionalProperties": false
                               }
@@ -9308,6 +9519,29 @@
                                   "options"
                                 ],
                                 "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "file"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type"
+                                ],
+                                "additionalProperties": false
                               }
                             ]
                           }
@@ -9658,6 +9892,29 @@
                             "options"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "file"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "type"
+                          ],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -9909,6 +10166,23 @@
                             "color"
                           ]
                         }
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "type"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "file"
                       }
                     },
                     "required": [
@@ -10180,6 +10454,29 @@
                             "options"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "file"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "type"
+                          ],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -10443,6 +10740,22 @@
                                 "color"
                               ]
                             }
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "type": {
+                            "type": "string",
+                            "const": "file"
                           }
                         },
                         "required": [
@@ -13459,6 +13772,29 @@
                     "name",
                     "type",
                     "options"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "file"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type"
                   ],
                   "additionalProperties": false
                 }

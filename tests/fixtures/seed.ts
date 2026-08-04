@@ -162,6 +162,10 @@ export const SEED = {
           { id: 'e2e-opt-urgent-000-0000-0000-000000000001', label: 'Urgent', color: 'red' as const },
         ],
       },
+      // THOTH-054: appended last (not inserted) so existing `nth(...)` cell indices in
+      // `date-column.spec.ts`/`single-select-column.spec.ts`/`multi-select-column.spec.ts` stay
+      // stable — the file cell becomes `nth(6)`.
+      { id: 'e2e-col-file-0000-0000-0000-000000000001', name: 'Attachment', type: 'file' as const },
     ],
     // THOTH-053: named inline-Markdown expectations, seeded onto a page kept separate from
     // `dataSourcePage` (which specs mutate via inline edit) so Markdown-rendering assertions never
@@ -187,6 +191,17 @@ export const SEED = {
     longMarkdownRow: {
       id: 'e2e-page-dsrow-long-0-0000-0000-000000000001',
       name: 'E2E Long Markdown Row',
+    },
+    // THOTH-054: a pre-seeded `uploaded-file` (+ matching `file-usage` row) attached to
+    // `dataSourcePage`'s "Attachment" cell, so the file column has a real, already-attached
+    // image to exercise the inline-thumbnail rendering path without every spec needing to
+    // perform an upload first. A 1x1 transparent PNG, small enough to inline as a data URL here.
+    attachmentFile: {
+      id: 'e2e-file-attach-000-0000-0000-000000000001',
+      filename: 'e2e-seed-attachment.png',
+      mimeType: 'image/png',
+      // 1x1 transparent PNG.
+      base64Content: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
     },
   },
   dataView: {

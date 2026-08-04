@@ -28,6 +28,15 @@ export const multiSelectValueSchema = z.object({
   value: z.array(z.string()),
 });
 
+// References an `uploaded-file`.id, or null = no file attached. Mirrors
+// `singleSelectValueSchema`'s nullable single-id shape exactly (see THOTH-054) — multi-file is
+// out of scope for this ticket.
+export const fileValueSchema = z.object({
+  type: z.literal('file'),
+  value: z.string().nullable(),
+});
+export type FileValue = z.infer<typeof fileValueSchema>;
+
 // Value union used for page values
 export const pageValueSchema = z.discriminatedUnion('type', [
   stringValueSchema,
@@ -36,6 +45,7 @@ export const pageValueSchema = z.discriminatedUnion('type', [
   dateValueSchema,
   singleSelectValueSchema,
   multiSelectValueSchema,
+  fileValueSchema,
 ]);
 export type PageValue = z.infer<typeof pageValueSchema>;
 
@@ -93,6 +103,11 @@ export const multiSelectColumnSchema = baseColumnSchema.extend({
   options: z.array(singleSelectOptionSchema),
 });
 
+// A single-uploaded-file cell (THOTH-054). No extra config, like string/number/boolean — the
+// referenced `uploaded-file` carries its own filename/mimeType/size.
+export const fileColumnSchema = baseColumnSchema.extend({ type: z.literal('file') });
+export type FileColumn = z.infer<typeof fileColumnSchema>;
+
 // Column union used for data source columns
 export const columnSchema = z.discriminatedUnion('type', [
   stringColumnSchema,
@@ -101,6 +116,7 @@ export const columnSchema = z.discriminatedUnion('type', [
   dateColumnSchema,
   singleSelectColumnSchema,
   multiSelectColumnSchema,
+  fileColumnSchema,
 ]);
 export type Column = z.infer<typeof columnSchema>;
 

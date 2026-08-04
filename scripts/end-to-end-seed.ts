@@ -50,6 +50,72 @@ function hashPassword(password: string): Promise<string> {
   });
 }
 
+/**
+ * Upserts an `uploaded-file` row, writes its bytes into the configured storage adapter, and
+ * ensures a `file-usage` row links it to `containerId` — shared by every file-column/upload
+ * fixture (THOTH-040, THOTH-054) so the serve endpoint and inline-thumbnail rendering have real,
+ * already-attached content without every spec needing to perform an upload first.
+ */
+async function upsertUploadedFileWithUsage(parameters: {
+  id: string;
+  filename: string;
+  mimeType: string;
+  content: Buffer;
+  extension: string;
+  containerId: string;
+  workspaceId: string;
+  userId: string;
+  now: string;
+}) {
+  const { id, filename, mimeType, content, extension, containerId, workspaceId, userId, now } = parameters;
+
+  const uploadedFileRepository = await getUploadedFileRepository();
+  const fileUsageRepository = await getFileUsageRepository();
+  const storageAdapter = await getStorageAdapter();
+  const storageKey = `${workspaceId}/${id}`;
+
+  const existingFile = await uploadedFileRepository.getOneByQuery(uploadedFileRepository.createQuery().eq('id', id));
+  await (existingFile
+    ? uploadedFileRepository.update({
+        ...existingFile,
+        filename,
+        mimeType,
+        size: content.length,
+        storageKey,
+        storageType: storageAdapter.type,
+        workspaceId,
+        lastUpdated: now,
+      })
+    : uploadedFileRepository.create({
+        id,
+        filename,
+        mimeType,
+        size: content.length,
+        extension,
+        storageKey,
+        storageType: storageAdapter.type,
+        workspaceId,
+        userId,
+        createdAt: now,
+        lastUpdated: now,
+      } as unknown as UploadedFileCreate));
+
+  await storageAdapter.save(storageKey, content);
+
+  const existingFileUsage = await fileUsageRepository.getOneByQuery(
+    fileUsageRepository.createQuery().eq('fileId', id).eq('containerId', containerId)
+  );
+  if (!existingFileUsage) {
+    await fileUsageRepository.create({
+      fileId: id,
+      containerId,
+      workspaceId,
+      userId,
+      createdAt: now,
+    } as unknown as FileUsageCreate);
+  }
+}
+
 // ── 1. Seed better-auth tables directly via raw SQLite ─────────────────────────
 async function seedAuthTables() {
   const passwordHash = await hashPassword(SEED.user.password);
@@ -441,6 +507,21 @@ async function seedAppData() {
         deletedRootId: null,
       } as unknown as DataSourceContainerCreate));
 
+  // THOTH-054: seed the "Attachment" file column's cell value with a real, already-attached
+  // image (see `upsertUploadedFileWithUsage`) so its inline-thumbnail rendering can be exercised
+  // without every spec needing to perform an upload first.
+  await upsertUploadedFileWithUsage({
+    id: SEED.dataSource.attachmentFile.id,
+    filename: SEED.dataSource.attachmentFile.filename,
+    mimeType: SEED.dataSource.attachmentFile.mimeType,
+    content: Buffer.from(SEED.dataSource.attachmentFile.base64Content, 'base64'),
+    extension: 'png',
+    containerId: SEED.dataSourcePage.id,
+    workspaceId: wsId,
+    userId: uid,
+    now,
+  });
+
   await upsertPage(
     {
       id: SEED.dataSourcePage.id,
@@ -461,6 +542,7 @@ async function seedAppData() {
           type: 'multi-select',
           value: [SEED.dataSource.columns[4].options[0].id, SEED.dataSource.columns[4].options[2].id],
         },
+        [SEED.dataSource.columns[5].id]: { type: 'file', value: SEED.dataSource.attachmentFile.id },
       },
     },
     { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
@@ -1070,53 +1152,17 @@ async function seedAppData() {
     lastUpdated: now,
   });
 
-  const uploadedFileRepository = await getUploadedFileRepository();
-  const fileUsageRepository = await getFileUsageRepository();
-  const storageAdapter = await getStorageAdapter();
-  const storageKey = `${wsId}/${SEED.file.id}`;
-
-  const existingFile = await uploadedFileRepository.getOneByQuery(
-    uploadedFileRepository.createQuery().eq('id', SEED.file.id)
-  );
-  await (existingFile
-    ? uploadedFileRepository.update({
-        ...existingFile,
-        filename: SEED.file.filename,
-        mimeType: SEED.file.mimeType,
-        size: Buffer.byteLength(SEED.file.content),
-        storageKey,
-        storageType: storageAdapter.type,
-        workspaceId: wsId,
-        lastUpdated: now,
-      })
-    : uploadedFileRepository.create({
-        id: SEED.file.id,
-        filename: SEED.file.filename,
-        mimeType: SEED.file.mimeType,
-        size: Buffer.byteLength(SEED.file.content),
-        extension: 'txt',
-        storageKey,
-        storageType: storageAdapter.type,
-        workspaceId: wsId,
-        userId: uid,
-        createdAt: now,
-        lastUpdated: now,
-      } as unknown as UploadedFileCreate));
-
-  await storageAdapter.save(storageKey, Buffer.from(SEED.file.content));
-
-  const existingFileUsage = await fileUsageRepository.getOneByQuery(
-    fileUsageRepository.createQuery().eq('fileId', SEED.file.id).eq('containerId', SEED.file.page.id)
-  );
-  if (!existingFileUsage) {
-    await fileUsageRepository.create({
-      fileId: SEED.file.id,
-      containerId: SEED.file.page.id,
-      workspaceId: wsId,
-      userId: uid,
-      createdAt: now,
-    } as unknown as FileUsageCreate);
-  }
+  await upsertUploadedFileWithUsage({
+    id: SEED.file.id,
+    filename: SEED.file.filename,
+    mimeType: SEED.file.mimeType,
+    content: Buffer.from(SEED.file.content),
+    extension: 'txt',
+    containerId: SEED.file.page.id,
+    workspaceId: wsId,
+    userId: uid,
+    now,
+  });
 }
 
 // ── Entry point ────────────────────────────────────────────────────────────────

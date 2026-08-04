@@ -29,6 +29,7 @@ export const updateDataSourceColumnBodySchema = z
       // complete, current options array so renames/recolors/deletes are one PATCH.
       options: z.array(singleSelectOptionSchema).optional(),
     }),
+    z.object({ name: z.string().min(1).optional(), type: z.literal('file') }),
   ])
   .or(z.object({ name: z.string().min(1) }))
   .refine((object) => Object.keys(object).length > 0, { message: 'No updates provided' });

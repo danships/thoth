@@ -63,6 +63,7 @@ export function PageFieldsEditor({
             onChange={(value) => handleChange(column.id, value)}
             disabled={inProgress}
             onCreateOption={handleCreateOption}
+            pageId={pageId}
           />
         </Group>
       ))}

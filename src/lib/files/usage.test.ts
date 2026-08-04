@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { extractFileIdsFromContent } from './usage';
+import { extractFileIdsFromContent, extractFileIdsFromValues } from './usage';
+import type { Column, PageValue } from '@/types/schemas/entities/container';
 
 describe('extractFileIdsFromContent', () => {
   beforeAll(() => undefined);
@@ -31,5 +32,55 @@ describe('extractFileIdsFromContent', () => {
 
   test('returns an empty list for empty content', () => {
     expect(extractFileIdsFromContent('')).toEqual([]);
+  });
+});
+
+describe('extractFileIdsFromValues', () => {
+  const fileColumn: Column = { id: 'col-file', name: 'Attachment', type: 'file' };
+  const stringColumn: Column = { id: 'col-text', name: 'Notes', type: 'string' };
+  const columns: Column[] = [fileColumn, stringColumn];
+
+  test('returns the ids of file values whose column is a file column', () => {
+    const values: Record<string, PageValue> = {
+      [fileColumn.id]: { type: 'file', value: 'file-1' },
+    };
+    expect(extractFileIdsFromValues(values, columns)).toEqual(['file-1']);
+  });
+
+  test('dedupes ids referenced by multiple file columns', () => {
+    const secondFileColumn: Column = { id: 'col-file-2', name: 'Other Attachment', type: 'file' };
+    const values: Record<string, PageValue> = {
+      [fileColumn.id]: { type: 'file', value: 'file-1' },
+      [secondFileColumn.id]: { type: 'file', value: 'file-1' },
+    };
+    expect(extractFileIdsFromValues(values, [...columns, secondFileColumn])).toEqual(['file-1']);
+  });
+
+  test('ignores null values', () => {
+    const values: Record<string, PageValue> = {
+      [fileColumn.id]: { type: 'file', value: null },
+    };
+    expect(extractFileIdsFromValues(values, columns)).toEqual([]);
+  });
+
+  test('ignores values whose column is no longer a file column (e.g. deleted/retyped)', () => {
+    const values: Record<string, PageValue> = {
+      [fileColumn.id]: { type: 'file', value: 'file-1' },
+    };
+    // `columns` no longer contains `fileColumn` (simulating a deleted column) — the stale value
+    // must not contribute an id.
+    expect(extractFileIdsFromValues(values, [stringColumn])).toEqual([]);
+  });
+
+  test('ignores non-file values entirely', () => {
+    const values: Record<string, PageValue> = {
+      [stringColumn.id]: { type: 'string', value: 'hello' },
+    };
+    expect(extractFileIdsFromValues(values, columns)).toEqual([]);
+  });
+
+  test('returns an empty list for empty/undefined input', () => {
+    expect(extractFileIdsFromValues({}, columns)).toEqual([]);
+    expect(extractFileIdsFromValues(undefined, columns)).toEqual([]);
   });
 });

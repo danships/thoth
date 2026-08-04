@@ -4,12 +4,15 @@ import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retri
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import { extractFileIdsFromContent, extractFileIdsFromValues, syncFileUsageForPage } from '@/lib/files/usage';
+import { getLogger } from '@/lib/logger';
 import type {
   UpdateDataSourceColumnBody,
   UpdateDataSourceColumnParameters,
   UpdateDataSourceColumnResponse,
 } from '@/types/api';
 import { updateDataSourceColumnBodySchema, updateDataSourceColumnParametersSchema } from '@/types/api';
+import type { PageContainer } from '@/types/database';
 
 export const PATCH = apiRoute<
   UpdateDataSourceColumnResponse,
@@ -77,11 +80,38 @@ export const DELETE = apiRoute<void, undefined, UpdateDataSourceColumnParameters
     const dataSource = await dataSourceRetriever.retrieveDataSource(params.id, session.user.id);
     await assertGrantAllowsContainerForSession(session, dataSource, { mutating: true });
 
+    const deletedColumn = (dataSource.columns ?? []).find((c) => c.id === params.columnId);
     const nextColumns = (dataSource.columns ?? []).filter((c) => c.id !== params.columnId);
-    if (nextColumns.length === (dataSource.columns ?? []).length) {
+    if (!deletedColumn) {
       throw new NotFoundError('Column not found', true);
     }
 
     await containerRepository.update({ ...dataSource, columns: nextColumns, lastUpdated: new Date().toISOString() });
+
+    // A `file` column's cell values are the *only* thing that can reference a file id in
+    // `page.values` (THOTH-054) — deleting the column orphans that reference. Reconcile every
+    // child page's `file-usage` against the recomputed union (which, with the column already
+    // gone from `nextColumns`, no longer includes ids from the deleted column's values) so files
+    // referenced only through it stop being retrievable via this data source, while files still
+    // referenced by page content or another file column are preserved. No-op for non-`file`
+    // columns since the union is then unchanged, so skip the per-page work entirely.
+    if (deletedColumn.type === 'file') {
+      const childPages = (await containerRepository.getByQuery(
+        containerRepository.createQuery().eq('parentId', dataSource.id).eq('type', 'page')
+      )) as PageContainer[];
+
+      for (const page of childPages) {
+        try {
+          const union = new Set([
+            ...extractFileIdsFromContent(page.content ?? ''),
+            ...extractFileIdsFromValues(page.values, nextColumns),
+          ]);
+          await syncFileUsageForPage(page.id, session, [...union]);
+        } catch (error) {
+          const logger = await getLogger();
+          logger.error('data-source-columns.delete.sync-file-usage-failed', { pageId: page.id, error });
+        }
+      }
+    }
   }
 );
