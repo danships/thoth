@@ -9,7 +9,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_BASE: ttl.sh/thoth-pr-${{ github.event.pull_request.number }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PR_TAG: pr-${{ github.event.pull_request.number }}
 
 jobs:
   # ── Deploy (opened / synchronize / reopened) ─────────────────────────
@@ -29,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      packages: write
 
     steps:
       - name: Checkout
@@ -50,17 +53,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push image to ttl.sh
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image to ghcr.io
         run: |
-          IMAGE=$(echo "${{ env.IMAGE_BASE }}:24h" | tr '[:upper:]' '[:lower:]')
+          IMAGE=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.PR_TAG }}" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
 
-          # ttl.sh is a free, best-effort registry and occasionally returns
-          # transient 502/500 errors on push, sometimes for extended periods
-          # (observed outages lasting tens of minutes). Retry the whole
-          # build+push with an increasing backoff so a short retry burst
-          # isn't wiped out by a longer-lived registry blip, without
-          # giving up too quickly.
+          # Retry the whole build+push with an increasing backoff so a
+          # short-lived registry blip doesn't fail the whole workflow.
           max_attempts=5
           attempt=1
           backoff=30
@@ -81,10 +87,9 @@ jobs:
             backoff=$((backoff * 2 > 180 ? 180 : backoff * 2))
           done
 
-      # The VM pulls the image from ttl.sh itself before running `deploy`, and that
-      # free/best-effort registry occasionally drops the connection mid-layer-pull
-      # (`unexpected EOF`). Retry the SSH deploy step a few times, mirroring the
-      # build/push retry above, so a single flaky pull doesn't fail the whole workflow.
+      # The VM pulls the image itself before running `deploy`. Retry the SSH
+      # deploy step a few times, mirroring the build/push retry above, so a
+      # single flaky pull doesn't fail the whole workflow.
       - name: Deploy preview on VM (attempt 1)
         id: deploy-attempt-1
         if: steps.check-secrets.outputs.configured == 'true'
@@ -192,6 +197,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      packages: write
 
     steps:
       - name: Check VM secrets configured
@@ -221,6 +227,33 @@ jobs:
         if: steps.check-secrets.outputs.configured != 'true'
         run: |
           echo "::warning::THOTH_PREVIEW_VM_HOST secret is not configured. Skipping SSH teardown step."
+
+      # The preview image is pushed to ghcr.io under the same package as
+      # release images (owner/repo), tagged `pr-<number>`. Delete that tag's
+      # version so preview images don't accumulate indefinitely in the
+      # registry. The GITHUB_TOKEN is granted admin access to packages
+      # published by this repository's own workflows, so no extra PAT is
+      # needed.
+      - name: Delete preview image from ghcr.io
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE: ${{ github.event.repository.name }}
+          TAG: pr-${{ github.event.pull_request.number }}
+        run: |
+          PACKAGE_LOWER=$(echo "${PACKAGE}" | tr '[:upper:]' '[:lower:]')
+
+          VERSION_ID=$(gh api "/users/${OWNER}/packages/container/${PACKAGE_LOWER}/versions" \
+            --paginate \
+            --jq ".[] | select(.metadata.container.tags[]? == \"${TAG}\") | .id" 2>/dev/null | head -n1 || true)
+
+          if [ -z "$VERSION_ID" ]; then
+            echo "::warning::No ghcr.io image found for tag ${TAG}; nothing to delete."
+            exit 0
+          fi
+
+          echo "Deleting ghcr.io package version ${VERSION_ID} (tag ${TAG})..."
+          gh api --method DELETE "/users/${OWNER}/packages/container/${PACKAGE_LOWER}/versions/${VERSION_ID}"
 
       - name: Update PR comment to reflect removal
         if: steps.check-secrets.outputs.configured == 'true'
