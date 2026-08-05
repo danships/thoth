@@ -45,23 +45,25 @@ describe('platform-user service', () => {
     expect(await platformUser.isPlatformAdmin('user-b')).toBe(false);
   });
 
-  test('registration order does not matter — earliest registeredAt wins', async () => {
-    // Register the later user first; the earlier-registered one should still become admin.
+  test('registration order decides admin, not registeredAt — the first call to register wins', async () => {
+    // Register a user whose `createdAt` is *later* first; it should still become admin, because
+    // it's the first projection ever created (0 -> 1), regardless of the `createdAt` timestamp
+    // passed in.
     await platformUser.registerPlatformUser({
-      id: 'later',
-      name: 'Later',
-      email: 'later@test.local',
+      id: 'first-call',
+      name: 'First call',
+      email: 'first-call@test.local',
       createdAt: '2024-03-01T00:00:00.000Z',
     });
     await platformUser.registerPlatformUser({
-      id: 'earlier',
-      name: 'Earlier',
-      email: 'earlier@test.local',
+      id: 'second-call',
+      name: 'Second call',
+      email: 'second-call@test.local',
       createdAt: '2024-01-01T00:00:00.000Z',
     });
 
-    expect(await platformUser.isPlatformAdmin('earlier')).toBe(true);
-    expect(await platformUser.isPlatformAdmin('later')).toBe(false);
+    expect(await platformUser.isPlatformAdmin('first-call')).toBe(true);
+    expect(await platformUser.isPlatformAdmin('second-call')).toBe(false);
   });
 
   test('reconcileInitialPlatformAdministrator dedupes projections by userId', async () => {

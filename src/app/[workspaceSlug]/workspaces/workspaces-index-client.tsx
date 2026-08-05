@@ -7,9 +7,11 @@ import { useDeletedWorkspaces } from '@/lib/hooks/api/use-deleted-workspaces';
 import { useWorkspaces } from '@/lib/hooks/api/use-workspaces';
 import { usePlatformCapabilities } from '@/lib/hooks/api/use-platform-capabilities';
 import { useNotification } from '@/lib/hooks/use-notification';
+import { useDocumentTitle } from '@/lib/hooks/use-document-title';
 import type { WorkspaceApi } from '@/types/api';
 
 export function WorkspacesIndexClient() {
+  useDocumentTitle('Workspaces');
   const { data: workspaces } = useWorkspaces();
   const { data: deletedWorkspaces, mutate: mutateDeleted } = useDeletedWorkspaces();
   const { mutate: mutateActive } = useWorkspaces();

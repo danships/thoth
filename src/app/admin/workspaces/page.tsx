@@ -48,21 +48,23 @@ export default function AdminWorkspacesPage() {
       </Group>
 
       <Paper withBorder p="lg" radius="md">
-        <Table verticalSpacing="sm">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Workspace</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Usage</Table.Th>
-              <Table.Th>Storage quota</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {(data?.items ?? []).map((workspace) => (
-              <WorkspaceRow key={workspace.id} workspace={workspace} onSave={handleSave} />
-            ))}
-          </Table.Tbody>
-        </Table>
+        <Table.ScrollContainer minWidth={640}>
+          <Table verticalSpacing="sm">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Workspace</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Usage</Table.Th>
+                <Table.Th>Storage quota</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {(data?.items ?? []).map((workspace) => (
+                <WorkspaceRow key={workspace.id} workspace={workspace} onSave={handleSave} />
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
         {(data?.items ?? []).length === 0 && (
           <Text size="sm" c="dimmed" mt="sm">
             No workspaces found.

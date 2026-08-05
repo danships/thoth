@@ -34,25 +34,6 @@ function toIsoString(value: Date | string | null | undefined, fallback: string):
   return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
 }
 
-// Deterministic "earliest registered" ordering: oldest `registeredAt` wins, ties broken by
-// lowest `userId`. This is the single rule for who the initial platform admin is.
-function isEarlier(a: PlatformUser, b: PlatformUser): boolean {
-  if (a.registeredAt !== b.registeredAt) {
-    return a.registeredAt < b.registeredAt;
-  }
-  return a.userId < b.userId;
-}
-
-function selectEarliest(rows: PlatformUser[]): PlatformUser | undefined {
-  let earliest: PlatformUser | undefined;
-  for (const row of rows) {
-    if (earliest === undefined || isEarlier(row, earliest)) {
-      earliest = row;
-    }
-  }
-  return earliest;
-}
-
 /**
  * Loads the `platform-user` projection for `userId`, or `undefined` if none exists.
  */
@@ -71,10 +52,11 @@ export async function isPlatformAdmin(userId: string): Promise<boolean> {
 
 /**
  * Called from the Better Auth user-create hook (BEFORE `createWorkspaceForUser`). Creates the
- * projection for the new user (role defaults to `user`), then — while holding the lock — ensures
- * the deterministically-earliest projection overall (and only it) has role `platform_admin`,
- * demoting any others. This bootstraps the very first user on an empty install as admin without
- * any environment allow-list.
+ * projection for the new user, holding the lock so the count check below can't race another
+ * concurrent registration. The rule for who becomes the initial platform admin is simply: the
+ * user who takes the platform from 0 users to 1 (i.e. there were no `platform-user` projections
+ * yet when they registered). No timestamps, environment allow-lists, or re-election involved —
+ * once set, admin status is never revisited here.
  */
 export async function registerPlatformUser(authUser: AuthUserProjectionInput): Promise<void> {
   await withPlatformUserLock(async () => {
@@ -82,26 +64,29 @@ export async function registerPlatformUser(authUser: AuthUserProjectionInput): P
     const now = new Date().toISOString();
 
     const existing = await repository.getOneByQuery(repository.createQuery().eq('userId', authUser.id));
-    if (!existing) {
-      await repository.create({
-        userId: authUser.id,
-        name: authUser.name ?? '',
-        email: authUser.email ?? '',
-        role: 'user',
-        registeredAt: toIsoString(authUser.createdAt, now),
-        createdAt: now,
-        lastUpdated: now,
-      });
+    if (existing) {
+      return;
     }
 
-    await ensureSingleAdmin(repository);
+    const existingRows = await repository.getByQuery(repository.createQuery());
+
+    await repository.create({
+      userId: authUser.id,
+      name: authUser.name ?? '',
+      email: authUser.email ?? '',
+      role: existingRows.length === 0 ? 'platform_admin' : 'user',
+      registeredAt: toIsoString(authUser.createdAt, now),
+      createdAt: now,
+      lastUpdated: now,
+    });
   });
 }
 
 /**
  * Dedupes projections by `userId` (keeps the lowest `id` as canonical, merges newest name/email
- * metadata into it, deletes duplicates), then re-selects the deterministically-earliest
- * projection overall and ensures it alone is `platform_admin`. Safe to call anytime; idempotent.
+ * metadata into it, deletes duplicates), then — if that leaves exactly one projection overall
+ * and it isn't already admin — promotes it (the same 0-to-1 rule as `registerPlatformUser`).
+ * Safe to call anytime; idempotent.
  */
 export async function reconcileInitialPlatformAdministrator(): Promise<void> {
   await withPlatformUserLock(async () => {
@@ -139,26 +124,16 @@ export async function reconcileInitialPlatformAdministrator(): Promise<void> {
       }
     }
 
-    await ensureSingleAdmin(repository);
-  });
-}
-
-// Assumes the caller holds the platform-user lock. Ensures exactly the earliest projection is
-// `platform_admin` and everyone else is `user`.
-async function ensureSingleAdmin(repository: Awaited<ReturnType<typeof getPlatformUserRepository>>): Promise<void> {
-  const rows = await repository.getByQuery(repository.createQuery());
-  const earliest = selectEarliest(rows);
-  if (!earliest) {
-    return;
-  }
-
-  for (const row of rows) {
-    const shouldBeAdmin = row.id === earliest.id;
-    const desiredRole = shouldBeAdmin ? 'platform_admin' : 'user';
-    if (row.role !== desiredRole) {
-      await repository.update({ ...row, role: desiredRole, lastUpdated: new Date().toISOString() });
+    // If, after deduping, there's exactly one projection overall and it isn't already admin,
+    // it's the sole user on the platform — the same "0 to 1" rule `registerPlatformUser` applies
+    // at registration time, just re-checked here for legacy projections that predate that logic
+    // (e.g. dedupe collapsed a race down to a single row). No timestamps involved.
+    const remaining = await repository.getByQuery(repository.createQuery());
+    const [onlyUser] = remaining;
+    if (remaining.length === 1 && onlyUser && onlyUser.role !== 'platform_admin') {
+      await repository.update({ ...onlyUser, role: 'platform_admin', lastUpdated: new Date().toISOString() });
     }
-  }
+  });
 }
 
 /**
@@ -209,8 +184,8 @@ export async function assertPlatformAdmin(session: ApiKeySession): Promise<Platf
 
   if (!platformUser) {
     // A cookie session whose projection somehow doesn't exist yet (e.g. created before this
-    // feature shipped): create it lazily as a non-admin, then re-run reconciliation in case this
-    // is actually the earliest user on the platform.
+    // feature shipped): create it lazily. It only becomes admin if it turns out to be the very
+    // first projection ever created (see `registerPlatformUser`'s 0-to-1 rule).
     await registerPlatformUser({
       id: session.user.id,
       name: session.user.name,

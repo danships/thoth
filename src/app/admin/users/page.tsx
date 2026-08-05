@@ -38,21 +38,23 @@ export default function AdminUsersPage() {
       />
 
       <Paper withBorder p="lg" radius="md">
-        <Table verticalSpacing="sm">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>User</Table.Th>
-              <Table.Th>Role</Table.Th>
-              <Table.Th>Usage</Table.Th>
-              <Table.Th>Storage quota</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {(data?.items ?? []).map((user) => (
-              <UserRow key={user.id} user={user} onSave={handleSave} />
-            ))}
-          </Table.Tbody>
-        </Table>
+        <Table.ScrollContainer minWidth={640}>
+          <Table verticalSpacing="sm">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>User</Table.Th>
+                <Table.Th>Role</Table.Th>
+                <Table.Th>Usage</Table.Th>
+                <Table.Th>Storage quota</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {(data?.items ?? []).map((user) => (
+                <UserRow key={user.id} user={user} onSave={handleSave} />
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
         {(data?.items ?? []).length === 0 && (
           <Text size="sm" c="dimmed" mt="sm">
             No users found.
