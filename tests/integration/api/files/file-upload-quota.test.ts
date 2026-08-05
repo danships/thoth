@@ -20,6 +20,11 @@ async function uploadBytes(size: number): Promise<Response> {
   const form = new FormData();
   const blob = new globalThis.Blob([new Uint8Array(Buffer.alloc(size, 'a'))], { type: 'text/plain' });
   form.set('file', blob, `quota-${size}-${Date.now()}.txt`);
+  // Pin the upload to the seeded workspace we set quotas on. Without this the route falls back to
+  // the owner's *most-recently-updated* workspace, which earlier suites (e.g. data-source soft
+  // delete) may have shifted to a freshly created workspace — leaving the SEED-workspace quota
+  // unenforced and the upload wrongly succeeding.
+  form.set('workspaceId', SEED.workspace.id);
   return client.fetch('/api/v1/files', { method: 'POST', body: form });
 }
 
