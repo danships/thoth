@@ -30,6 +30,7 @@ import { GET_PAGES_ENDPOINT, SUBPAGES_TAB_VALUE } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
 import { useDocumentTitle } from '@/lib/hooks/use-document-title';
+import { useFavicon } from '@/lib/hooks/use-favicon';
 import { extractPageId } from '@/lib/utils/page-url';
 import styles from './page.module.css';
 
@@ -72,6 +73,10 @@ export default function PageDetailsPage() {
   useDocumentTitle(
     pageDetails?.page.name ? [pageDetails.page.name, selectedViewLabel].filter(Boolean).join(' - ') : 'Page'
   );
+
+  // Reflects the open page's emoji as the browser tab favicon (THOTH-068), restoring the
+  // site's default favicon once this page is left or its emoji is cleared.
+  useFavicon(pageDetails?.page.emoji);
 
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);
   const [historyDrawerOpened, { open: openHistoryDrawer, close: closeHistoryDrawer }] = useDisclosure(false);
