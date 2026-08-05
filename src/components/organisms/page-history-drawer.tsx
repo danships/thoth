@@ -33,7 +33,7 @@ import {
   type GetPageHistoryResponse,
   type PageHistoryRevisionSummary,
 } from '@/types/api';
-import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { usePageUrl } from '@/lib/hooks/use-page-url';
 import styles from './page-history-drawer.module.css';
 
 // Accumulates cursor-paginated pages of the history list into one flat timeline for the
@@ -97,7 +97,7 @@ export function PageHistoryDrawer({ pageId, opened, onClose, mutatePageDetails }
   const [forkName, setForkName] = useState('');
 
   const router = useRouter();
-  const { slug: workspaceSlug } = useCurrentWorkspace();
+  const getPageUrl = usePageUrl();
   const { showError, showSuccess } = useNotification();
 
   const {
@@ -155,7 +155,7 @@ export function PageHistoryDrawer({ pageId, opened, onClose, mutatePageDetails }
       setForkModalOpened(false);
       setForkName('');
       handleClose();
-      router.push(`/${workspaceSlug}/pages/${forked.id}`);
+      router.push(getPageUrl(forked));
     } catch {
       showError('Failed to create page from revision');
     }

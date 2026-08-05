@@ -30,6 +30,7 @@ import { GET_PAGES_ENDPOINT, SUBPAGES_TAB_VALUE } from '@/types/api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
 import { useDocumentTitle } from '@/lib/hooks/use-document-title';
+import { extractPageId } from '@/lib/utils/page-url';
 import styles from './page.module.css';
 
 // Labels the currently selected tab for the document title (THOTH-046): the two built-in tabs
@@ -47,7 +48,10 @@ function getSelectedViewLabel(selectedView: string, views: GetDataViewsResponse 
 
 export default function PageDetailsPage() {
   const parameters = useParams();
-  const pageId = `${parameters['id']}`;
+  // The `[id]` route segment may be a bare page id (legacy links, or any id that never got a
+  // slug prefix) or a `{titleSlug}-{id}` combo (THOTH-067) — every lookup/mutation below needs
+  // the real underlying id, never the cosmetic slug prefix.
+  const pageId = extractPageId(`${parameters['id']}`);
 
   const router = useRouter();
   const searchParameters = useSearchParams();

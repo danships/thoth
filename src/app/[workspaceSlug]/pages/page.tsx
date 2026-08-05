@@ -6,6 +6,7 @@ import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { resolveWorkspaceForSlug } from '@/lib/database/resolve-workspace';
 import { PagesEmptyState } from '@/components/organisms/pages-empty-state';
 import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
+import { buildPageUrlId } from '@/lib/utils/page-url';
 import type { ApiKeySession } from '@/lib/auth/session';
 
 export const metadata: Metadata = { title: 'Pages' };
@@ -46,7 +47,7 @@ async function PagesLandingPage({ params, session }: Properties & { session: Api
     return <PagesEmptyState />;
   }
 
-  redirect(`/${workspace.slug}/pages/${rootPages[0]!.id}`);
+  redirect(`/${workspace.slug}/pages/${buildPageUrlId(rootPages[0]!.id, rootPages[0]!.name)}`);
 }
 
 export default withAuthPage<Properties>(PagesLandingPage);

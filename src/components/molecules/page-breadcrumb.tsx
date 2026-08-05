@@ -4,7 +4,7 @@ import { Breadcrumbs, Anchor, Text, Group, Menu, ActionIcon } from '@mantine/cor
 import { useResizeObserver } from '@mantine/hooks';
 import Link from 'next/link';
 import type { Page } from '@/types/api';
-import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { usePageUrl } from '@/lib/hooks/use-page-url';
 import styles from './page-breadcrumb.module.css';
 
 type PageBreadcrumbProperties = {
@@ -20,7 +20,7 @@ function renderPageLabel(page: Page) {
   );
 }
 
-function renderCrumb(page: Page, isLast: boolean, workspaceSlug: string) {
+function renderCrumb(page: Page, isLast: boolean, getPageUrl: (page: { id: string; name?: string | null }) => string) {
   if (isLast) {
     return (
       <Text key={page.id} size="xs" fw={500} component="span">
@@ -30,7 +30,7 @@ function renderCrumb(page: Page, isLast: boolean, workspaceSlug: string) {
   }
 
   return (
-    <Anchor key={page.id} component={Link} href={`/${workspaceSlug}/pages/${page.id}`} size="xs">
+    <Anchor key={page.id} component={Link} href={getPageUrl(page)} size="xs">
       {renderPageLabel(page)}
     </Anchor>
   );
@@ -41,7 +41,7 @@ export function PageBreadcrumb({ pages }: PageBreadcrumbProperties) {
   // (see below) happens after they're declared, not before.
   const [containerReference, containerRect] = useResizeObserver<HTMLDivElement>();
   const [measureReference, measureRect] = useResizeObserver<HTMLDivElement>();
-  const { slug: workspaceSlug } = useCurrentWorkspace();
+  const getPageUrl = usePageUrl();
 
   // A single-entry trail means we're on the root page — nothing to navigate up to.
   if (pages.length <= 1) {
@@ -61,14 +61,14 @@ export function PageBreadcrumb({ pages }: PageBreadcrumbProperties) {
       {/* Hidden clone used purely to measure the natural (unconstrained) width of the full trail. */}
       <div ref={measureReference} className={styles['measure']} aria-hidden="true">
         <Breadcrumbs separator=">">
-          {pages.map((page, index) => renderCrumb(page, index === pages.length - 1, workspaceSlug))}
+          {pages.map((page, index) => renderCrumb(page, index === pages.length - 1, getPageUrl))}
         </Breadcrumbs>
       </div>
 
       <Breadcrumbs separator=">" aria-label="Breadcrumb">
         {isCollapsed
           ? [
-              renderCrumb(firstPage, false, workspaceSlug),
+              renderCrumb(firstPage, false, getPageUrl),
               <Menu key="ellipsis-menu" shadow="md" position="bottom-start">
                 <Menu.Target>
                   <ActionIcon variant="subtle" size="sm" aria-label="Show hidden breadcrumb pages">
@@ -77,15 +77,15 @@ export function PageBreadcrumb({ pages }: PageBreadcrumbProperties) {
                 </Menu.Target>
                 <Menu.Dropdown>
                   {middlePages.map((page) => (
-                    <Menu.Item key={page.id} component={Link} href={`/${workspaceSlug}/pages/${page.id}`}>
+                    <Menu.Item key={page.id} component={Link} href={getPageUrl(page)}>
                       {page.name}
                     </Menu.Item>
                   ))}
                 </Menu.Dropdown>
               </Menu>,
-              renderCrumb(lastPage, true, workspaceSlug),
+              renderCrumb(lastPage, true, getPageUrl),
             ]
-          : pages.map((page, index) => renderCrumb(page, index === pages.length - 1, workspaceSlug))}
+          : pages.map((page, index) => renderCrumb(page, index === pages.length - 1, getPageUrl))}
       </Breadcrumbs>
     </div>
   );

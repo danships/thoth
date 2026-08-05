@@ -16,12 +16,12 @@ async function LegacyCreateSubpagePage({
 }: LegacyCreateSubpageProperties & { session: { user: { id: string } } }) {
   const { id } = await params;
 
-  const slug = await getWorkspaceSlugForContainer(id, session.user.id);
-  if (!slug) {
+  const destination = await getWorkspaceSlugForContainer(id, session.user.id);
+  if (!destination) {
     return redirect('/');
   }
 
-  return redirect(`/${slug}/pages/${id}/create`);
+  return redirect(`/${destination.slug}/pages/${id}/create`);
 }
 
 export default withAuthPage<LegacyCreateSubpageProperties>(LegacyCreateSubpagePage);

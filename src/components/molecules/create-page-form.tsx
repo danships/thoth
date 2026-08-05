@@ -5,6 +5,7 @@ import { useForm } from '@mantine/form';
 import { useRouter } from 'next/navigation';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { usePageUrl } from '@/lib/hooks/use-page-url';
 import { CreatePageBody, CreatePageResponse } from '@/types/api';
 import { PageEmojiPicker } from '@/components/molecules/page-emoji-picker';
 
@@ -16,7 +17,8 @@ type CreatePageFormProperties = {
 export function CreatePageForm({ parentId = null, title = 'Create New Page' }: CreatePageFormProperties) {
   const router = useRouter();
   const { post, inProgress, error } = useCudApi();
-  const { id: workspaceId, slug: workspaceSlug } = useCurrentWorkspace();
+  const { id: workspaceId } = useCurrentWorkspace();
+  const getPageUrl = usePageUrl();
 
   const form = useForm({
     initialValues: {
@@ -40,7 +42,7 @@ export function CreatePageForm({ parentId = null, title = 'Create New Page' }: C
       workspaceId,
     });
 
-    router.push(`/${workspaceSlug}/pages/${page.id}`);
+    router.push(getPageUrl(page));
   };
 
   return (
