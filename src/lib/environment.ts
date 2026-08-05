@@ -32,9 +32,17 @@ const environmentSchema = {
   // external purge job (`pnpm files:purge`) permanently removes it, to tolerate in-progress
   // edits that haven't yet synced their `file-usage` rows.
   FILES_PURGE_GRACE_PERIOD_HOURS: num({ default: 24 }),
+  // Default-off switch (THOTH-064) that relaxes Better Auth's trusted-origin/secure-cookie
+  // enforcement so the E2E suite can sign in over plain HTTP against a standalone-mode server.
+  // Only takes effect together with an exact loopback `PLAYWRIGHT_BASE_URL`; see
+  // `src/lib/auth/auth-options.ts`. Must never be set outside the isolated E2E shard.
+  E2E_TEST_AUTH_RELAXATION_ENABLED: bool({ default: false }),
+  // The exact origin Playwright is testing against. Only consulted for the trusted-origin
+  // relaxation above when `E2E_TEST_AUTH_RELAXATION_ENABLED` is set.
+  PLAYWRIGHT_BASE_URL: str({ default: undefined }),
 } as const;
 
-type Environment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;
+export type Environment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;
 
 let cachedEnvironment: Environment | null = null;
 

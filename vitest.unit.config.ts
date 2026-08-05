@@ -3,7 +3,9 @@ import path from 'node:path';
 
 export default defineConfig({
   test: {
-    include: ['src/**/*.test.ts'],
+    // `scripts/notion-import/**` is an intentionally standalone sub-project (its own
+    // package.json/deps/test runner, see its README) and must not be picked up here.
+    include: ['src/**/*.test.ts', 'scripts/lib/**/*.test.ts'],
     exclude: ['tests/**'],
     environment: 'node',
     testTimeout: 30_000,

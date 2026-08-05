@@ -10,6 +10,7 @@ import { createWorkspaceForUser } from '../database/seed-workspace';
 import { getEnvironment } from '../environment';
 import { slugify } from '../utils/slug';
 import { pickRandomNerdySuffix } from '../utils/nerdy-slug';
+import { resolveAuthOptions } from './auth-options';
 
 let authInstance: Auth<BetterAuthOptions> | null = null;
 
@@ -45,6 +46,7 @@ async function initializeAuth() {
 
     const environment = await getEnvironment();
     const useOidc = hasOidcConfig(environment);
+    const authOptions = resolveAuthOptions(environment);
 
     const databaseHooks = {
       user: {
@@ -66,6 +68,7 @@ async function initializeAuth() {
         database: createDatabaseAdapter(environment.DB),
         advanced: {
           cookiePrefix: 'thoth-auth',
+          ...(authOptions.useSecureCookies === false ? { useSecureCookies: false } : {}),
         },
         plugins: [
           genericOAuth({
@@ -81,7 +84,7 @@ async function initializeAuth() {
             ],
           }),
         ],
-        trustedOrigins: environment.NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
+        trustedOrigins: authOptions.trustedOrigins,
         secret: environment.BETTER_AUTH_SECRET,
         hooks: {},
         databaseHooks,
@@ -92,11 +95,12 @@ async function initializeAuth() {
         database: createDatabaseAdapter(environment.DB),
         advanced: {
           cookiePrefix: 'thoth-auth',
+          ...(authOptions.useSecureCookies === false ? { useSecureCookies: false } : {}),
         },
         emailAndPassword: {
           enabled: true,
         },
-        trustedOrigins: environment.NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
+        trustedOrigins: authOptions.trustedOrigins,
         secret: environment.BETTER_AUTH_SECRET,
         hooks: {},
         databaseHooks,

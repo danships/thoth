@@ -16,10 +16,13 @@ async function signInAndWriteStorageState(
   const isHttps = parsedBaseUrl.protocol === 'https:';
 
   // Log in via the HTTP API to get a real better-auth session cookie.
-  // This avoids manually replicating the internal cookie-signing format.
+  // This avoids manually replicating the internal cookie-signing format. Sending the exact
+  // `Origin` matches a real browser request and is required for Better Auth to accept the
+  // sign-in against the standalone-mode server's (THOTH-064) explicit, loopback-only trusted
+  // origin (see `src/lib/auth/auth-options.ts`).
   const signInResponse = await fetch(`${baseUrl}/api/auth/sign-in/email`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Origin: baseUrl },
     body: JSON.stringify({
       email: credentials.email,
       password: credentials.password,
@@ -105,16 +108,21 @@ setup('seed database and write auth storage state', async ({ browser }) => {
   // unrelated link. A real, authenticated browser navigation (rather than a plain unauthenticated
   // `fetch`, which would just hit the sign-in redirect and never compile the actual page) forces
   // that compilation to happen well before any assertions run.
-  const warmupContext = await browser.newContext({ storageState: path.join(AUTH_DIR, 'user.json') });
-  const warmupPage = await warmupContext.newPage();
-  try {
-    for (const warmupPath of [
-      `/${SEED.workspace.slug}/pages`,
-      `/${SEED.workspace.slug}/pages/${SEED.pages.childOverflowHost.id}`,
-    ]) {
-      await warmupPage.goto(`${baseUrl}${warmupPath}`).catch(() => undefined);
+  //
+  // The standalone production server (THOTH-064, `PLAYWRIGHT_SERVER_MODE=standalone`) serves
+  // pre-compiled routes with no Turbopack warm-up cost, so this step is skipped there.
+  if (process.env['PLAYWRIGHT_SERVER_MODE'] !== 'standalone') {
+    const warmupContext = await browser.newContext({ storageState: path.join(AUTH_DIR, 'user.json') });
+    const warmupPage = await warmupContext.newPage();
+    try {
+      for (const warmupPath of [
+        `/${SEED.workspace.slug}/pages`,
+        `/${SEED.workspace.slug}/pages/${SEED.pages.childOverflowHost.id}`,
+      ]) {
+        await warmupPage.goto(`${baseUrl}${warmupPath}`).catch(() => undefined);
+      }
+    } finally {
+      await warmupContext.close();
     }
-  } finally {
-    await warmupContext.close();
   }
 });
