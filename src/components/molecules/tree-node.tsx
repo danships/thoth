@@ -57,7 +57,13 @@ type TreeNodeProperties = {
   // regular child page node, whose own `page.name` is used instead.
   parentPageName?: string;
   isView?: boolean;
-  onDelete?: (item: { id: string; name: string; isView: boolean; parentPageId?: string }) => Promise<void>;
+  onDelete?: (item: {
+    id: string;
+    name: string;
+    isView: boolean;
+    parentPageId?: string;
+    parentPageName?: string;
+  }) => Promise<void>;
   // Manual reordering (THOTH-036). Only child pages within an *expanded* parent node are
   // draggable — root branches stay permanently out of scope (see spec). `dragHandle` renders
   // this node itself as a sortable item (used when this TreeNode instance is one of the child
@@ -198,6 +204,7 @@ export function TreeNode({
           name: page.name,
           isView: Boolean(isView),
           ...(parentPageId ? { parentPageId } : {}),
+          ...(parentPageName ? { parentPageName } : {}),
         }),
     });
   };

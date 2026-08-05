@@ -9,6 +9,7 @@ import { useNotification } from '@/lib/hooks/use-notification';
 import { usePageUrl } from '@/lib/hooks/use-page-url';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
+import { extractPageId } from '@/lib/utils/page-url';
 import type { GetPagesTreeResponse } from '@/types/api';
 
 type PagesTreeProperties = {
@@ -29,11 +30,13 @@ export function PagesTree({ branches }: PagesTreeProperties) {
       name,
       isView,
       parentPageId,
+      parentPageName,
     }: {
       id: string;
       name: string;
       isView: boolean;
       parentPageId?: string;
+      parentPageName?: string;
     }) => {
       try {
         // For a page deletion, determine — before the delete request removes it — whether the
@@ -44,7 +47,8 @@ export function PagesTree({ branches }: PagesTreeProperties) {
         let shouldRedirectAwayFromPage = false;
         if (!isView) {
           const currentPageIdMatch = /^\/[^/]+\/pages\/([^/]+)$/.exec(pathname);
-          const currentPageId = currentPageIdMatch?.[1];
+          const currentPageRouteId = currentPageIdMatch?.[1];
+          const currentPageId = currentPageRouteId ? extractPageId(currentPageRouteId) : undefined;
           if (currentPageId === id) {
             shouldRedirectAwayFromPage = true;
           } else if (currentPageId) {
@@ -62,7 +66,7 @@ export function PagesTree({ branches }: PagesTreeProperties) {
         await revalidateWorkspacePageData(workspaceId, parentPageId);
 
         if (isView && parentPageId && searchParameters.get('v') === id) {
-          router.replace(getPageUrl({ id: parentPageId }));
+          router.replace(getPageUrl({ id: parentPageId, name: parentPageName }));
         }
 
         if (shouldRedirectAwayFromPage) {
