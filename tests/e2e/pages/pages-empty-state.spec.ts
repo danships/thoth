@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { test, expect } from '../fixtures/test';
 import { getDatabase, getWorkspaceMemberRepository, getWorkspaceRepository } from '../../../src/lib/database/index.js';
 import { slugify } from '../../../src/lib/utils/slug.js';
+import { buildPageUrlId } from '../../../src/lib/utils/page-url.js';
 import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '../../../src/types/schemas/entities/workspace.js';
 import type { WorkspaceCreate, WorkspaceMemberCreate } from '../../../src/types/database/index.js';
 
@@ -118,6 +119,8 @@ test('shows empty-state CTA for a workspace with zero pages, and recreating the 
   expect(secondBody.data.id).toBe(firstBody.data.id);
 
   await page.getByRole('button', { name: 'Recreate Welcome page' }).click();
-  await expect(page).toHaveURL(`/${slug}/pages/${firstBody.data.id}`, { timeout: 10_000 });
+  await expect(page).toHaveURL(`/${slug}/pages/${buildPageUrlId(firstBody.data.id, firstBody.data.name)}`, {
+    timeout: 10_000,
+  });
   await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
 });

@@ -1,6 +1,6 @@
 import { Button } from '@mantine/core';
 import Link from 'next/link';
-import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { usePageUrl } from '@/lib/hooks/use-page-url';
 
 type PageRowActionsCellProperties = {
   pageId: string;
@@ -17,14 +17,14 @@ function stopPropagation(event: React.MouseEvent) {
 }
 
 export function PageRowActionsCell({ pageId, pageName }: PageRowActionsCellProperties) {
-  const { slug: workspaceSlug } = useCurrentWorkspace();
+  const getPageUrl = usePageUrl();
 
   return (
     <Button
       variant="outline"
       size="sm"
       component={Link}
-      href={`/${workspaceSlug}/pages/${pageId}`}
+      href={getPageUrl({ id: pageId, name: pageName })}
       onClick={stopPropagation}
       // `title` (not `aria-label`) so the accessible name stays exactly "OPEN" — the visible
       // button text, and what many pre-THOTH-052 e2e specs already select on via

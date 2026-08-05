@@ -140,14 +140,18 @@ export async function getLandingWorkspaceForUser(userId: string): Promise<Worksp
 }
 
 /**
- * Resolves the current slug of the workspace a given page (`Container`) belongs to, for
- * `userId`. Used by the legacy bare `/pages/[id]` and `/pages/[id]/create` shims to redirect to
- * the correct `/[workspaceSlug]/pages/[id]` URL — the page may belong to *any* of the user's
- * workspaces, not necessarily their default one, so this derives the slug from the page's own
- * `workspaceId` rather than guessing. Returns `undefined` if the page doesn't exist or the user
- * isn't a member of its workspace.
+ * Resolves the current slug of the workspace a given page (`Container`) belongs to, plus the
+ * page's own name (used to build a title-slugged redirect target, THOTH-067), for `userId`. Used
+ * by the legacy bare `/pages/[id]` and `/pages/[id]/create` shims to redirect to the correct
+ * `/[workspaceSlug]/pages/[id]` URL — the page may belong to *any* of the user's workspaces, not
+ * necessarily their default one, so this derives the slug from the page's own `workspaceId`
+ * rather than guessing. Returns `undefined` if the page doesn't exist or the user isn't a member
+ * of its workspace.
  */
-export async function getWorkspaceSlugForContainer(containerId: string, userId: string): Promise<string | undefined> {
+export async function getWorkspaceSlugForContainer(
+  containerId: string,
+  userId: string
+): Promise<{ slug: string; name: string } | undefined> {
   const containerRepository = await getContainerRepository();
   const container = await containerRepository.getOneByQuery(containerRepository.createQuery().eq('id', containerId));
   if (!container) {
@@ -165,7 +169,7 @@ export async function getWorkspaceSlugForContainer(containerId: string, userId: 
     workspaceRepository.createQuery().eq('id', container.workspaceId)
   );
 
-  return workspace?.slug;
+  return workspace ? { slug: workspace.slug, name: container.name } : undefined;
 }
 
 /**

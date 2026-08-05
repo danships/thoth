@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { extractPageId } from '@/lib/utils/page-url';
 
 // Matches the `.md`-suffixed page detail URL — both `/{workspaceSlug}/pages/{id}.md` and the
-// legacy bare `/pages/{id}.md` — capturing just the page `id` (THOTH-048). The `workspaceSlug`
-// segment (if present) is deliberately not captured/used any further: it's purely decorative in
-// the browser URL, the same as the rest of the page detail route, since the destination route
-// resolves/authorizes the page from its own `id` and `workspaceId` alone.
+// legacy bare `/pages/{id}.md` — capturing the page detail `[id]` route segment (THOTH-048),
+// which may itself be a bare `id` or a `{titleSlug}-{id}` combo (THOTH-067); `extractPageId`
+// below resolves it to the real `id`. The `workspaceSlug` segment (if present) is deliberately
+// not captured/used any further: it's purely decorative in the browser URL, the same as the rest
+// of the page detail route, since the destination route resolves/authorizes the page from its
+// own `id` and `workspaceId` alone.
 const MARKDOWN_URL_PATTERN = /^\/(?:[^/]+\/)?pages\/([^/]+)\.md$/;
 
 // Forwards the requested path (+ query string) as a request header so Server Components further
@@ -26,7 +29,8 @@ export function proxy(request: NextRequest) {
   // the `.md` URL.
   const markdownMatch = request.nextUrl.pathname.match(MARKDOWN_URL_PATTERN);
   if (markdownMatch) {
-    const [, id] = markdownMatch;
+    const [, routeId] = markdownMatch;
+    const id = extractPageId(routeId ?? '');
     const url = request.nextUrl.clone();
     url.pathname = `/api/v1/pages/${id}/markdown`;
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });

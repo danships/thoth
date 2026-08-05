@@ -25,6 +25,7 @@ import { markDragEnded } from '@/lib/dnd/suppress-click-after-drag';
 import { $expandedPages, togglePageExpanded } from '@/lib/store/tree-expanded-state';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { useNotification } from '@/lib/hooks/use-notification';
+import { usePageUrl } from '@/lib/hooks/use-page-url';
 import { TreeItem } from '../atoms/tree-item';
 import { TreeToggle } from '../atoms/tree-toggle';
 
@@ -51,6 +52,10 @@ type TreeNodeProperties = {
   }>;
   level?: number;
   parentPageId?: string;
+  // The parent page's name, only meaningful alongside `parentPageId` for a view node (`isView`)
+  // — used to build a title-slugged link back to the parent page (THOTH-067). Absent for a
+  // regular child page node, whose own `page.name` is used instead.
+  parentPageName?: string;
   isView?: boolean;
   onDelete?: (item: { id: string; name: string; isView: boolean; parentPageId?: string }) => Promise<void>;
   // Manual reordering (THOTH-036). Only child pages within an *expanded* parent node are
@@ -77,6 +82,7 @@ export function TreeNode({
   views = [],
   level = 0,
   parentPageId,
+  parentPageName,
   isView,
   onDelete,
   dragHandle = false,
@@ -88,6 +94,7 @@ export function TreeNode({
   const isExpanded = useStore($isExpanded);
   const { slug: workspaceSlug } = useCurrentWorkspace();
   const { showError } = useNotification();
+  const getPageUrl = usePageUrl();
 
   const hasChildren = childPages.length > 0 || views.length > 0;
 
@@ -195,12 +202,13 @@ export function TreeNode({
     });
   };
 
-  // Determine the link URL - if this is a view, link to parent page with view query param
-  const getPageUrl = () => {
+  // Determine the link URL - if this is a view, link to parent page (using its name for the
+  // slug, since `page` here refers to the view itself) with the view query param
+  const getTreeItemUrl = () => {
     if (isView && parentPageId) {
-      return `/${workspaceSlug}/pages/${parentPageId}?v=${page.id}`;
+      return `${getPageUrl({ id: parentPageId, name: parentPageName })}?v=${page.id}`;
     }
-    return `/${workspaceSlug}/pages/${page.id}`;
+    return getPageUrl(page);
   };
 
   // Only meaningful when this node is itself a sortable child page (`dragHandle`) — `useSortable`
@@ -244,7 +252,7 @@ export function TreeNode({
           </ActionIcon>
         )}
         <TreeToggle isExpanded={isExpanded} onToggle={handleToggle} hasChildren={hasChildren} />
-        <TreeItem name={page.name} emoji={page.emoji ?? null} to={getPageUrl()} />
+        <TreeItem name={page.name} emoji={page.emoji ?? null} to={getTreeItemUrl()} />
         <Box style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
           {level === 0 && !isView && (
             <ActionIcon
@@ -306,6 +314,7 @@ export function TreeNode({
               views={[]}
               level={level + 1}
               parentPageId={page.id}
+              parentPageName={page.name}
               isView={true}
               {...(onDelete ? { onDelete } : {})}
             />
@@ -342,7 +351,7 @@ export function TreeNode({
             <Box style={{ paddingLeft: (level + 1) * 20 + 24 }}>
               <Text
                 component={Link}
-                href={`/${workspaceSlug}/pages/${page.id}`}
+                href={getPageUrl(page)}
                 size="xs"
                 c="dimmed"
                 style={{ display: 'block', textDecoration: 'none' }}

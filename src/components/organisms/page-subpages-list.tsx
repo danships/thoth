@@ -24,7 +24,7 @@ import { markDragEnded } from '@/lib/dnd/suppress-click-after-drag';
 import { usePagesByParent } from '@/lib/hooks/api/use-pages';
 import { useReorderPage } from '@/lib/hooks/api/use-reorder-page';
 import { useNotification } from '@/lib/hooks/use-notification';
-import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { usePageUrl } from '@/lib/hooks/use-page-url';
 import type { GetPagesResponse } from '@/types/api';
 import styles from './page-subpages-list.module.css';
 
@@ -34,11 +34,10 @@ type PageSubpagesListProperties = {
 
 type SubpageRowProperties = {
   page: GetPagesResponse[number]['page'];
-  workspaceSlug: string;
   dragDisabled?: boolean;
 };
 
-function SubpageRow({ page, workspaceSlug, dragDisabled = false }: SubpageRowProperties) {
+function SubpageRow({ page, dragDisabled = false }: SubpageRowProperties) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: page.id,
     disabled: dragDisabled,
@@ -48,6 +47,7 @@ function SubpageRow({ page, workspaceSlug, dragDisabled = false }: SubpageRowPro
     transition,
     ...(isDragging && { zIndex: 1, position: 'relative' as const, background: 'var(--mantine-color-body)' }),
   };
+  const getPageUrl = usePageUrl();
 
   return (
     <div ref={setNodeRef} style={style} className={styles['row'] ?? ''}>
@@ -63,7 +63,7 @@ function SubpageRow({ page, workspaceSlug, dragDisabled = false }: SubpageRowPro
         <IconGripVertical size={14} />
       </ActionIcon>
       <Link
-        href={`/${workspaceSlug}/pages/${page.id}`}
+        href={getPageUrl(page)}
         style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit', flex: 1 }}
       >
         <span>{page.emoji ?? '📄'}</span>
@@ -80,7 +80,6 @@ function SubpageRow({ page, workspaceSlug, dragDisabled = false }: SubpageRowPro
 // `api.pages.reorder` (through `useReorderPage`), rolling back on failure.
 export function PageSubpagesList({ pageId }: PageSubpagesListProperties) {
   const { data, error, isLoading, mutate } = usePagesByParent(pageId);
-  const { slug: workspaceSlug } = useCurrentWorkspace();
   const { reorderPage } = useReorderPage();
   const { showError } = useNotification();
 
@@ -173,7 +172,7 @@ export function PageSubpagesList({ pageId }: PageSubpagesListProperties) {
       <SortableContext items={children.map(({ page }) => page.id)} strategy={verticalListSortingStrategy}>
         <Stack gap={0}>
           {children.map(({ page }) => (
-            <SubpageRow key={page.id} page={page} workspaceSlug={workspaceSlug} dragDisabled={isReordering} />
+            <SubpageRow key={page.id} page={page} dragDisabled={isReordering} />
           ))}
         </Stack>
       </SortableContext>

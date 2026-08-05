@@ -6,6 +6,7 @@ import { Box } from '@mantine/core';
 import { TreeNode } from './tree-node';
 import { api } from '@/lib/api/client';
 import { useNotification } from '@/lib/hooks/use-notification';
+import { usePageUrl } from '@/lib/hooks/use-page-url';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { revalidateWorkspacePageData } from '@/lib/swr/revalidate-workspace-page-data';
 import type { GetPagesTreeResponse } from '@/types/api';
@@ -20,6 +21,7 @@ export function PagesTree({ branches }: PagesTreeProperties) {
   const searchParameters = useSearchParams();
   const { id: workspaceId, slug: workspaceSlug } = useCurrentWorkspace();
   const { showError, showSuccess } = useNotification();
+  const getPageUrl = usePageUrl();
 
   const handleDelete = useCallback(
     async ({
@@ -60,7 +62,7 @@ export function PagesTree({ branches }: PagesTreeProperties) {
         await revalidateWorkspacePageData(workspaceId, parentPageId);
 
         if (isView && parentPageId && searchParameters.get('v') === id) {
-          router.replace(`/${workspaceSlug}/pages/${parentPageId}`);
+          router.replace(getPageUrl({ id: parentPageId }));
         }
 
         if (shouldRedirectAwayFromPage) {
@@ -72,7 +74,7 @@ export function PagesTree({ branches }: PagesTreeProperties) {
         showError(`Failed to delete "${name}"`);
       }
     },
-    [pathname, router, searchParameters, showError, showSuccess, workspaceId, workspaceSlug]
+    [pathname, router, searchParameters, showError, showSuccess, workspaceId, workspaceSlug, getPageUrl]
   );
 
   if (!branches || branches.length === 0) {

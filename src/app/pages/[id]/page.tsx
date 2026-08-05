@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { withAuthPage } from '@/lib/auth/with-auth-page';
 import { getWorkspaceSlugForContainer } from '@/lib/database/resolve-workspace';
+import { buildPageUrlId } from '@/lib/utils/page-url';
 
 export const metadata: Metadata = { title: 'Page' };
 
@@ -21,15 +22,15 @@ async function LegacyPageDetailsPage({
   const { id } = await params;
   const query = await searchParams;
 
-  const slug = await getWorkspaceSlugForContainer(id, session.user.id);
-  if (!slug) {
+  const destination = await getWorkspaceSlugForContainer(id, session.user.id);
+  if (!destination) {
     return redirect('/');
   }
 
   const view = query['v'];
   const viewSuffix = typeof view === 'string' ? `?v=${encodeURIComponent(view)}` : '';
 
-  return redirect(`/${slug}/pages/${id}${viewSuffix}`);
+  return redirect(`/${destination.slug}/pages/${buildPageUrlId(id, destination.name)}${viewSuffix}`);
 }
 
 export default withAuthPage<LegacyPageDetailsProperties>(LegacyPageDetailsPage);
