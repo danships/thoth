@@ -14,6 +14,11 @@ import type { OperationRegistry } from './types';
  *   handler returning the raw Markdown body as `text/markdown` (not JSON), so not wrapped by
  *   `apiRoute` and not part of the generated schema. It's the internal rewrite target for the
  *   `.md`-suffixed page detail URL, not a documented API surface of its own.
+ * - `/admin/*` (`src/app/api/v1/admin/**`, THOTH-045): platform-administrator-only operational
+ *   endpoints (settings, per-user and per-workspace storage quotas). Deliberately excluded from
+ *   the public API document — they are an internal administration surface, not part of the
+ *   product API. (`GET /platform/capabilities` IS documented — it's a capability probe usable by
+ *   any authenticated human.)
  *
  * `/config` is registered as `/config` even though `GET_AUTH_CONFIG_ENDPOINT` is `/v1/config`,
  * because the generated document is served with `/api/v1` as its server base URL.
@@ -779,6 +784,15 @@ export const operations = [
     response: api.resendWebhookDeliveryResponseSchema,
     successStatus: 200,
     errorStatuses: [409],
+  },
+  {
+    path: '/platform/capabilities',
+    method: 'get',
+    operationId: 'getPlatformCapabilities',
+    summary: 'Get platform capabilities for the current user',
+    tags: ['Platform'],
+    auth: 'session',
+    response: api.getPlatformCapabilitiesResponseSchema,
   },
   {
     path: '/config',

@@ -1,10 +1,11 @@
 'use client';
 
-import { Anchor, Badge, Button, Container, Divider, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Alert, Badge, Button, Container, Divider, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import Link from 'next/link';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useDeletedWorkspaces } from '@/lib/hooks/api/use-deleted-workspaces';
 import { useWorkspaces } from '@/lib/hooks/api/use-workspaces';
+import { usePlatformCapabilities } from '@/lib/hooks/api/use-platform-capabilities';
 import { useNotification } from '@/lib/hooks/use-notification';
 import type { WorkspaceApi } from '@/types/api';
 
@@ -12,8 +13,11 @@ export function WorkspacesIndexClient() {
   const { data: workspaces } = useWorkspaces();
   const { data: deletedWorkspaces, mutate: mutateDeleted } = useDeletedWorkspaces();
   const { mutate: mutateActive } = useWorkspaces();
+  const { data: capabilities } = usePlatformCapabilities();
   const { post, inProgress } = useCudApi();
   const { showSuccess, showError } = useNotification();
+
+  const canCreateWorkspace = capabilities?.canCreateWorkspace ?? true;
 
   const handleRestore = async (id: string) => {
     try {
@@ -31,10 +35,18 @@ export function WorkspacesIndexClient() {
       <Stack gap="xl">
         <Group justify="space-between" align="center">
           <Title order={2}>Workspaces</Title>
-          <Button component={Link} href="/workspaces/new">
-            New workspace
-          </Button>
+          {canCreateWorkspace && (
+            <Button component={Link} href="/workspaces/new">
+              New workspace
+            </Button>
+          )}
         </Group>
+
+        {!canCreateWorkspace && (
+          <Alert color="gray" title="Workspace creation disabled">
+            Workspace creation is disabled by your platform administrator.
+          </Alert>
+        )}
 
         <Paper withBorder p="lg" radius="md">
           <Stack gap="sm">

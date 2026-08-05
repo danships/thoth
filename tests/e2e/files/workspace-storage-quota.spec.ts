@@ -1,51 +1,51 @@
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
-test('owner can edit the storage quota and it persists', async ({ page }) => {
+// THOTH-045: workspace owners can no longer edit the storage quota — it is managed by platform
+// administrators. The settings page now only shows usage (and a "platform-managed" note).
+test('owner sees storage usage but no quota-edit controls on workspace settings', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/settings`);
 
-  const quotaInput = page.getByLabel('Storage quota in bytes');
-  await expect(quotaInput).toBeVisible();
-  await expect(quotaInput).toBeEnabled();
-
-  const newQuota = 2_097_152; // 2 MB
-  await quotaInput.fill(String(newQuota));
-  await page.getByRole('button', { name: 'Save quota' }).click();
-
-  try {
-    await expect(page.getByText('Storage quota updated')).toBeVisible({ timeout: 6000 });
-    await page.reload();
-    await expect(page.getByLabel('Storage quota in bytes')).toHaveValue(String(newQuota));
-  } finally {
-    // Restore the seeded quota afterwards so the "quota exceeded" case below (and other specs
-    // relying on the small seeded quota) still work regardless of test execution order — even
-    // if an assertion above failed.
-    await page.getByLabel('Storage quota in bytes').fill(String(SEED.workspace.storageQuotaBytes));
-    await page.getByRole('button', { name: 'Save quota' }).click();
-    await expect(page.getByText('Storage quota updated')).toBeVisible({ timeout: 6000 });
-  }
+  await expect(page.getByRole('heading', { name: 'Storage' })).toBeVisible();
+  // The old owner-editable quota controls are gone.
+  await expect(page.getByLabel('Storage quota in bytes')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save quota' })).toHaveCount(0);
+  // Owners are told limits are platform-managed.
+  await expect(page.getByText('Storage limits are managed by your platform administrator.')).toBeVisible();
 });
 
-test('uploading past the workspace quota surfaces a storage-limit alert', async ({ page }) => {
-  await page.goto(`/${SEED.workspace.slug}/pages/${SEED.file.page.id}`);
-  await page.getByRole('tab', { name: 'Contents' }).click();
-
-  const editable = page.locator('.bn-editor[contenteditable="true"]');
-  await expect(editable).toBeVisible({ timeout: 10_000 });
-
-  // The seeded workspace quota is 1 MB; exceed it directly against the upload endpoint (the
-  // editor's own drag/drop upload UI isn't reliably automatable, but this exercises the exact
-  // same code path — quota enforcement in `POST /api/v1/files` — that the editor's `uploadFile`
-  // hook surfaces as a notification).
-  const oversizedForQuota = Buffer.alloc(1_100_000, 'b');
-  const response = await page.request.post('/api/v1/files', {
-    multipart: {
-      file: {
-        name: 'exceeds-quota.bin',
-        mimeType: 'application/octet-stream',
-        buffer: oversizedForQuota,
-      },
-    },
+// The workspace update endpoint no longer accepts `storageQuotaBytes` — submitting it is a 400.
+test('PATCH /api/v1/workspaces rejects a storageQuotaBytes field', async ({ request }) => {
+  const response = await request.patch(`/api/v1/workspaces/${SEED.workspace.id}`, {
+    data: { storageQuotaBytes: 2_097_152 },
   });
-  expect(response.status()).toBe(409);
+  expect(response.status()).toBe(400);
+});
+
+test('uploading past the platform-managed workspace quota surfaces a storage-limit error', async ({ page }) => {
+  // The seeded e2e user is the platform administrator, so it can set the workspace quota via the
+  // admin API. Set a tight 1 MB limit for this workspace.
+  const setQuota = await page.request.patch(`/api/v1/admin/workspaces/${SEED.workspace.id}`, {
+    data: { storageQuotaBytes: 1_048_576 },
+  });
+  expect(setQuota.ok()).toBeTruthy();
+
+  try {
+    const oversizedForQuota = Buffer.alloc(1_100_000, 'b');
+    const response = await page.request.post('/api/v1/files', {
+      multipart: {
+        file: {
+          name: 'exceeds-quota.bin',
+          mimeType: 'application/octet-stream',
+          buffer: oversizedForQuota,
+        },
+      },
+    });
+    expect(response.status()).toBe(409);
+  } finally {
+    // Clear the limit again so other specs' uploads aren't affected by execution order.
+    await page.request.patch(`/api/v1/admin/workspaces/${SEED.workspace.id}`, {
+      data: { storageQuotaBytes: null },
+    });
+  }
 });

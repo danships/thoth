@@ -52,7 +52,9 @@ export type GetWorkspaceStorageUsageParameters = z.infer<typeof getWorkspaceStor
 
 export const getWorkspaceStorageUsageResponseSchema = z.object({
   usedBytes: z.number(),
-  quotaBytes: z.number(),
+  // `null` means "no workspace-level storage limit" (THOTH-045). The value is resolved from the
+  // settings service, not the legacy `workspace.storageQuotaBytes` column.
+  quotaBytes: z.number().nullable(),
 });
 export type GetWorkspaceStorageUsageResponse = z.infer<typeof getWorkspaceStorageUsageResponseSchema>;
 export type GetWorkspaceStorageUsageResponseData = DataWrapper<GetWorkspaceStorageUsageResponse>;

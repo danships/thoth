@@ -44,6 +44,17 @@ import type {
   GetFileResponse,
   DeleteFileResponse,
   GetWorkspaceStorageUsageResponse,
+  GetPlatformCapabilitiesResponse,
+  AdminSettingsResponse,
+  UpdateAdminSettingsBody,
+  GetAdminUsersResponse,
+  GetAdminUsersQuery,
+  UpdateAdminUserBody,
+  UpdateAdminUserResponse,
+  GetAdminWorkspacesResponse,
+  GetAdminWorkspacesQuery,
+  UpdateAdminWorkspaceBody,
+  UpdateAdminWorkspaceResponse,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -198,6 +209,27 @@ export const api = {
     getDetails: (id: string) => apiClient.get<DataWrapper<GetFileResponse>>(`/files/${id}`),
     remove: (id: string) => apiClient.delete<DataWrapper<DeleteFileResponse>>(`/files/${id}`),
     getContentUrl: (id: string) => `/api/v1/files/${id}/content`,
+  },
+
+  // Platform capabilities (THOTH-045) — human cookie session only.
+  platform: {
+    getCapabilities: () => apiClient.get<DataWrapper<GetPlatformCapabilitiesResponse>>('/platform/capabilities'),
+  },
+
+  // Platform administration (THOTH-045). Every endpoint requires a platform-admin cookie session;
+  // deliberately not part of the public OpenAPI surface.
+  admin: {
+    getSettings: () => apiClient.get<DataWrapper<AdminSettingsResponse>>('/admin/settings'),
+    updateSettings: (data: UpdateAdminSettingsBody) =>
+      apiClient.patch<DataWrapper<AdminSettingsResponse>>('/admin/settings', data),
+    listUsers: (parameters?: GetAdminUsersQuery) =>
+      apiClient.get<DataWrapper<GetAdminUsersResponse>>('/admin/users', { params: parameters }),
+    updateUser: (id: string, data: UpdateAdminUserBody) =>
+      apiClient.patch<DataWrapper<UpdateAdminUserResponse>>(`/admin/users/${id}`, data),
+    listWorkspaces: (parameters?: GetAdminWorkspacesQuery) =>
+      apiClient.get<DataWrapper<GetAdminWorkspacesResponse>>('/admin/workspaces', { params: parameters }),
+    updateWorkspace: (id: string, data: UpdateAdminWorkspaceBody) =>
+      apiClient.patch<DataWrapper<UpdateAdminWorkspaceResponse>>(`/admin/workspaces/${id}`, data),
   },
 
   // Apps API

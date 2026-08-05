@@ -7,11 +7,12 @@ import {
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { reserveWorkspaceSlug } from '@/lib/database/workspace-slug';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { getSetting } from '@/lib/settings/service';
+import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
 import { getLogger } from '@/lib/logger';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
-import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
 import type {
   DeleteWorkspaceParameters,
   UpdateWorkspaceBody,
@@ -83,13 +84,10 @@ export const PATCH = apiRoute<UpdateWorkspaceResponse, undefined, UpdateWorkspac
       });
     }
 
-    if (body.storageQuotaBytes !== undefined && body.storageQuotaBytes !== updated.storageQuotaBytes) {
-      updated = await workspaceRepository.update({
-        ...updated,
-        storageQuotaBytes: body.storageQuotaBytes,
-        lastUpdated: now,
-      });
-    }
+    const storageQuotaBytes = await getSetting(STORAGE_QUOTA_BYTES_KEY, {
+      scope: 'workspace',
+      subjectId: updated.id,
+    });
 
     return {
       id: updated.id,
@@ -97,7 +95,7 @@ export const PATCH = apiRoute<UpdateWorkspaceResponse, undefined, UpdateWorkspac
       slug: updated.slug,
       createdAt: updated.createdAt,
       lastUpdated: updated.lastUpdated,
-      storageQuotaBytes: updated.storageQuotaBytes ?? DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
+      storageQuotaBytes,
     };
   }
 );

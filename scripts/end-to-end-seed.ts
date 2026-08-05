@@ -14,6 +14,7 @@ import {
 } from '../src/lib/database/index.js';
 import { getStorageAdapter } from '../src/lib/storage/index.js';
 import { backfillContainerSortOrder } from '../src/lib/database/migrations/container-sort-order-backfill.js';
+import { registerPlatformUser } from '../src/lib/auth/platform-user.js';
 import { SEED } from '../tests/fixtures/seed.js';
 import type {
   ContainerAccessCreate,
@@ -84,6 +85,7 @@ async function upsertUploadedFileWithUsage(parameters: {
         storageKey,
         storageType: storageAdapter.type,
         workspaceId,
+        billingUserId: userId,
         lastUpdated: now,
       })
     : uploadedFileRepository.create({
@@ -96,6 +98,7 @@ async function upsertUploadedFileWithUsage(parameters: {
         storageType: storageAdapter.type,
         workspaceId,
         userId,
+        billingUserId: userId,
         createdAt: now,
         lastUpdated: now,
       } as unknown as UploadedFileCreate));
@@ -1168,6 +1171,14 @@ async function seedAppData() {
 // ── Entry point ────────────────────────────────────────────────────────────────
 const superSave = await getDatabase(); // ensures Better Auth tables exist via runMigrations
 await seedAuthTables();
+// THOTH-045: users were inserted via raw SQL above, so the Better Auth create hook that normally
+// builds the `platform-user` projection never fired. Register each seeded user through the same
+// service the hook uses, in a deterministic order, so exactly one (the earliest by
+// `registeredAt ASC, userId ASC`, i.e. `SEED.user`) is bootstrapped as the platform admin.
+const seededAuthUsers = [SEED.user, SEED.secondUser, SEED.thirdUser];
+for (const authUser of seededAuthUsers) {
+  await registerPlatformUser({ id: authUser.id, name: authUser.name, email: authUser.email });
+}
 await seedAppData();
 // `seedAppData()` creates parented Container rows (child pages, data-source rows) directly via
 // the repository API, bypassing `POST /pages`'s `sortOrder` assignment (THOTH-036) — so without

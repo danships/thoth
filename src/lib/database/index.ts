@@ -15,6 +15,8 @@ import type {
   UploadedFile,
   FileUsage,
   PageRevision,
+  Setting,
+  PlatformUser,
 } from '@/types/database';
 import { getEnvironment } from '../environment';
 import * as entities from './entities';
@@ -46,6 +48,8 @@ async function initializeDatabase() {
   await database.addEntity(entities.UploadedFile);
   await database.addEntity(entities.FileUsage);
   await database.addEntity(entities.PageRevision);
+  await database.addEntity(entities.Setting);
+  await database.addEntity(entities.PlatformUser);
 
   if (!skipSync) {
     await database.runMigrations();
@@ -143,4 +147,14 @@ export async function getFileUsageRepository() {
 export async function getPageRevisionRepository() {
   const database = await getDatabase();
   return database.getRepository<PageRevision>(entities.PAGE_REVISION_NAME);
+}
+
+export async function getSettingRepository() {
+  const database = await getDatabase();
+  return database.getRepository<Setting>(entities.SETTING_NAME);
+}
+
+export async function getPlatformUserRepository() {
+  const database = await getDatabase();
+  return database.getRepository<PlatformUser>(entities.PLATFORM_USER_NAME);
 }

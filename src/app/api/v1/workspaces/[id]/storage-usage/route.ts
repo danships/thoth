@@ -2,9 +2,10 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { getWorkspaceRepository } from '@/lib/database';
 import { getWorkspaceStorageUsage } from '@/lib/files/quota';
+import { getSetting } from '@/lib/settings/service';
+import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
-import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
 import {
   getWorkspaceStorageUsageParametersSchema,
   type GetWorkspaceStorageUsageParameters,
@@ -13,6 +14,8 @@ import {
 
 // Any workspace member (not owner-only, unlike the quota's own configuration) may see how much
 // storage the workspace has used, so the settings UI and editor can both show remaining space.
+// The quota itself is platform-managed (THOTH-045) and sourced from the settings service; it may
+// be `null` ("no workspace limit").
 export const GET = apiRoute<GetWorkspaceStorageUsageResponse, undefined, GetWorkspaceStorageUsageParameters>(
   {
     expectedParamsSchema: getWorkspaceStorageUsageParametersSchema,
@@ -35,10 +38,11 @@ export const GET = apiRoute<GetWorkspaceStorageUsageResponse, undefined, GetWork
     }
 
     const usedBytes = await getWorkspaceStorageUsage(params.id);
+    const quotaBytes = await getSetting(STORAGE_QUOTA_BYTES_KEY, { scope: 'workspace', subjectId: params.id });
 
     return {
       usedBytes,
-      quotaBytes: workspace.storageQuotaBytes ?? DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
+      quotaBytes,
     };
   }
 );

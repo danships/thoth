@@ -1,12 +1,21 @@
 'use client';
 
 import { ActionIcon, Avatar, Group, Loader, Menu, Text } from '@mantine/core';
-import { IconChevronDown, IconKey, IconLayoutGrid, IconLogout, IconPlus, IconSettings } from '@tabler/icons-react';
+import {
+  IconChevronDown,
+  IconKey,
+  IconLayoutGrid,
+  IconLogout,
+  IconPlus,
+  IconSettings,
+  IconShieldLock,
+} from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth/provider';
 import { useWorkspaces } from '@/lib/hooks/api/use-workspaces';
+import { usePlatformCapabilities } from '@/lib/hooks/api/use-platform-capabilities';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { CreateWorkspaceModal } from './create-workspace-modal';
 import type { WorkspaceApi } from '@/types/api';
@@ -17,9 +26,13 @@ import type { WorkspaceApi } from '@/types/api';
 export function WorkspaceMenu() {
   const currentWorkspace = useCurrentWorkspace();
   const { data: workspaces, isLoading } = useWorkspaces();
+  const { data: capabilities } = usePlatformCapabilities();
   const { signOut } = useAuth();
   const router = useRouter();
   const [createModalOpened, setCreateModalOpened] = useState(false);
+
+  const canCreateWorkspace = capabilities?.canCreateWorkspace ?? true;
+  const isPlatformAdmin = capabilities?.isPlatformAdmin ?? false;
 
   const otherWorkspaces = (workspaces ?? []).filter((workspace) => workspace.id !== currentWorkspace.id);
 
@@ -81,7 +94,11 @@ export function WorkspaceMenu() {
               {workspace.name}
             </Menu.Item>
           ))}
-          <Menu.Item leftSection={<IconPlus size={16} />} onClick={() => setCreateModalOpened(true)}>
+          <Menu.Item
+            leftSection={<IconPlus size={16} />}
+            onClick={() => setCreateModalOpened(true)}
+            hidden={!canCreateWorkspace}
+          >
             New workspace
           </Menu.Item>
           <Menu.Item component={Link} href="/workspaces" leftSection={<IconLayoutGrid size={16} />}>
@@ -89,6 +106,12 @@ export function WorkspaceMenu() {
           </Menu.Item>
 
           <Menu.Divider />
+
+          {isPlatformAdmin && (
+            <Menu.Item component={Link} href="/admin" leftSection={<IconShieldLock size={16} />}>
+              Platform administration
+            </Menu.Item>
+          )}
 
           <Menu.Item
             component={Link}

@@ -78,8 +78,10 @@ export const workspaceSchema = workspaceSchemaEntity
     slug: true,
     createdAt: true,
     lastUpdated: true,
-    storageQuotaBytes: true,
   })
+  // Storage quota now comes from the settings service (THOTH-045) and may be `null` ("no
+  // workspace limit"), so the API surface widens the entity's non-null field to `number | null`.
+  .extend({ storageQuotaBytes: z.number().int().nonnegative().nullable() })
   .meta({ id: 'Workspace' });
 export type WorkspaceApi = z.infer<typeof workspaceSchema>;
 

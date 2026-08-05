@@ -6,7 +6,8 @@ import { getWorkspaceDeleteGracePeriodDays } from '@/lib/database/workspace-grac
 import { getLogger } from '@/lib/logger';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { HttpError } from '@/lib/errors/http-error';
-import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
+import { getSetting } from '@/lib/settings/service';
+import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
 import type { RestoreWorkspaceParameters, RestoreWorkspaceResponse } from '@/types/api';
 import { restoreWorkspaceParametersSchema } from '@/types/api';
 
@@ -70,13 +71,18 @@ export const POST = apiRoute<RestoreWorkspaceResponse, undefined, RestoreWorkspa
       slug: restored.slug,
     });
 
+    const storageQuotaBytes = await getSetting(STORAGE_QUOTA_BYTES_KEY, {
+      scope: 'workspace',
+      subjectId: restored.id,
+    });
+
     return {
       id: restored.id,
       name: restored.name,
       slug: restored.slug,
       createdAt: restored.createdAt,
       lastUpdated: restored.lastUpdated,
-      storageQuotaBytes: restored.storageQuotaBytes ?? DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
+      storageQuotaBytes,
     };
   }
 );
