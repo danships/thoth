@@ -1,6 +1,7 @@
 import { getContainerRepository, getFileUsageRepository, getUploadedFileRepository } from '@/lib/database';
 import { assertFileAccess } from '@/lib/files/access';
 import type { ApiKeySession } from '@/lib/auth/session';
+import type { Column, PageValue } from '@/types/schemas/entities/container';
 
 // SuperSave has no composite-unique-constraint support (see `src/types/schemas/entities/
 // file-usage.ts`), so `(fileId, containerId)` uniqueness cannot be enforced at the database
@@ -41,6 +42,30 @@ export function extractFileIdsFromContent(markdown: string): string[] {
     const id = match[1];
     if (id) {
       ids.add(id);
+    }
+  }
+  return [...ids];
+}
+
+/**
+ * Scans a page's `values` for `file` column values and returns the referenced file ids,
+ * deduplicated. Unlike `extractFileIdsFromContent` (which scans markdown), this reads the
+ * structured `PageValue` union directly — a file-column value stores its file id in
+ * `page.values`, never in markdown (THOTH-054). Only columns whose *current* `type` is `file`
+ * are considered, so a value left over from a since-retyped/deleted column is ignored; a `null`
+ * value (empty cell) contributes nothing.
+ */
+export function extractFileIdsFromValues(values: Record<string, PageValue> | undefined, columns: Column[]): string[] {
+  if (!values) {
+    return [];
+  }
+
+  const fileColumnIds = new Set(columns.filter((column) => column.type === 'file').map((column) => column.id));
+
+  const ids = new Set<string>();
+  for (const [columnId, value] of Object.entries(values)) {
+    if (fileColumnIds.has(columnId) && value.type === 'file' && value.value) {
+      ids.add(value.value);
     }
   }
   return [...ids];

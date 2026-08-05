@@ -1,11 +1,15 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository } from '@/lib/database';
+import { getContainerRepository, getUploadedFileRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
+import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { recordValuesRevision } from '@/lib/history/revision-service';
+import { extractFileIdsFromContent, extractFileIdsFromValues, syncFileUsageForPage } from '@/lib/files/usage';
+import { assertFileAccess } from '@/lib/files/access';
+import { getLogger } from '@/lib/logger';
 import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
 import type { PageValue } from '@/types/schemas/entities/container';
@@ -56,6 +60,26 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
           }
         }
       }
+      if (column.type === 'file' && value.type === 'file' && value.value !== null) {
+        const uploadedFileRepository = await getUploadedFileRepository();
+        const file = await uploadedFileRepository.getOneByQuery(
+          uploadedFileRepository.createQuery().eq('id', value.value)
+        );
+        if (!file) {
+          throw new BadRequestError(`Unknown file for column: ${columnId}`);
+        }
+        // Reuses the same "reachable by caller" rule as `syncFileUsageForPage` — a user must not
+        // be able to attach a file they can't already reach by setting an arbitrary id. Never
+        // leak whether the id exists: any access failure is reported identically.
+        try {
+          await assertFileAccess(session, file);
+        } catch (error) {
+          if (error instanceof ForbiddenError) {
+            throw new BadRequestError(`Inaccessible file for column: ${columnId}`);
+          }
+          throw error;
+        }
+      }
     }
 
     const mergedValues = { ...page.values, ...body };
@@ -87,6 +111,23 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
       values: mergedValues,
       lastUpdated: new Date().toISOString(),
     });
+
+    // Reconcile file usage after the values are durably persisted. A file-column value stores
+    // its file id in `page.values`, never in markdown (THOTH-054) — so the union with
+    // content-referenced ids is mandatory here: `syncFileUsageForPage` deletes every `file-usage`
+    // row for this container not in the supplied list, and passing only value ids would wrongly
+    // delete markdown-referenced usage rows. A failure here shouldn't fail the whole request or
+    // skip the change notification — log and continue.
+    try {
+      const union = new Set([
+        ...extractFileIdsFromContent(page.content ?? ''),
+        ...extractFileIdsFromValues(mergedValues, columns),
+      ]);
+      await syncFileUsageForPage(params.id, session, [...union]);
+    } catch (error) {
+      const logger = await getLogger();
+      logger.error('pages.set-values.sync-file-usage-failed', { pageId: params.id, error });
+    }
 
     scheduleNotifyPageChange(
       'page.updated',

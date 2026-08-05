@@ -84,6 +84,7 @@ export function DataTableRow({
               disabled={disabled}
               onCreateOption={onCreateOption}
               renderStringAsMarkdown
+              pageId={page.id}
             />
           </Table.Td>
         )

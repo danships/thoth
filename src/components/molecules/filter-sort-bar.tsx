@@ -185,7 +185,10 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
   // into the same sort `Select` as real columns; listed first since it's the one column every
   // view always has.
   const sortableColumns = useMemo<Column[]>(
-    () => [{ id: NAME_SORT_COLUMN_ID, name: 'Name', type: 'string' }, ...columns],
+    () => [
+      { id: NAME_SORT_COLUMN_ID, name: 'Name', type: 'string' },
+      ...columns.filter((column) => column.type !== 'file'),
+    ],
     [columns]
   );
 

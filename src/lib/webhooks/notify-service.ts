@@ -43,7 +43,7 @@ export async function notifyPageChange(
 
     const results = await Promise.allSettled(
       webhooks.map(async (webhook) => {
-        const payload = buildPayload(
+        const payload = await buildPayload(
           event,
           crypto.randomUUID(),
           container.workspaceId,

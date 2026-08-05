@@ -20,6 +20,11 @@ function formatValue(value: PageValue | undefined): string {
   if (value.type === 'single-select') {
     return value.value ?? '—';
   }
+  if (value.type === 'file') {
+    // No column/repository context available here to resolve a filename (unlike the webhook
+    // payload's `toDisplayValue`) — keep it id-based, matching single-/multi-select above.
+    return value.value ?? '—';
+  }
   return String(value.value);
 }
 

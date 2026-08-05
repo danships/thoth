@@ -392,7 +392,7 @@ export function DataViewTable({
 
   const handleColumnSubmit = async (values: {
     name: string;
-    type: 'string' | 'number' | 'boolean' | 'date' | 'single-select' | 'multi-select';
+    type: 'string' | 'number' | 'boolean' | 'date' | 'single-select' | 'multi-select' | 'file';
     mode?: 'date' | 'time' | 'datetime';
     displayFormat?: string;
     options?: { id: string; label: string; color: SelectColor }[];

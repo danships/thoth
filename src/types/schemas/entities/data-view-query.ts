@@ -59,7 +59,7 @@ export const NAME_SORT_COLUMN_ID = 'name';
 // server-only DB driver imports) so client components (e.g. `FilterSortBar`) can import it
 // without bundling server-only code.
 export const OPERATORS_BY_COLUMN_TYPE: Record<
-  'string' | 'number' | 'boolean' | 'date' | 'single-select' | 'multi-select',
+  'string' | 'number' | 'boolean' | 'date' | 'single-select' | 'multi-select' | 'file',
   readonly FilterOperator[]
 > = {
   string: ['equals', 'notEquals', 'contains', 'notContains', 'isEmpty', 'isNotEmpty'],
@@ -68,6 +68,8 @@ export const OPERATORS_BY_COLUMN_TYPE: Record<
   date: ['equals', 'notEquals', 'gt', 'gte', 'lt', 'lte', 'isEmpty', 'isNotEmpty'],
   'single-select': ['equals', 'notEquals', 'isEmpty', 'isNotEmpty'],
   'multi-select': ['hasAnyOf', 'hasAllOf', 'isEmpty', 'isNotEmpty'],
+  // A file column is only filterable by presence, not content (THOTH-054).
+  file: ['isEmpty', 'isNotEmpty'],
 };
 
 // Operators that require no `value` at all.

@@ -10,7 +10,7 @@ import {
 
 type ColumnFormValues = {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'single-select' | 'multi-select';
+  type: 'string' | 'number' | 'boolean' | 'date' | 'single-select' | 'multi-select' | 'file';
   mode: DateMode;
   displayFormat: string;
   options: SingleSelectOptionDraft[];
@@ -148,6 +148,7 @@ export function ColumnFormModal({
               { value: 'date', label: 'Date' },
               { value: 'single-select', label: 'Single select' },
               { value: 'multi-select', label: 'Multi select' },
+              { value: 'file', label: 'File & media' },
             ]}
             {...form.getInputProps('type')}
             onChange={handleTypeChange}
