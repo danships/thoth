@@ -110,6 +110,9 @@ jobs:
           path: e2e-standalone-stage/
           retention-days: 1
           if-no-files-found: error
+          # `.next` is a dotdir; upload-artifact excludes hidden files/dirs by default, which
+          # silently dropped .next/BUILD_ID (and the rest of .next) from the uploaded artefact.
+          include-hidden-files: true
 
   integration:
     runs-on: ubuntu-latest
