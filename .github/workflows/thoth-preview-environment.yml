@@ -56,11 +56,14 @@ jobs:
           echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
 
           # ttl.sh is a free, best-effort registry and occasionally returns
-          # transient 502/timeout errors on push. Retry the whole build+push
-          # a few times before giving up so flaky registry responses don't
-          # fail the whole workflow.
-          max_attempts=3
+          # transient 502/500 errors on push, sometimes for extended periods
+          # (observed outages lasting tens of minutes). Retry the whole
+          # build+push with an increasing backoff so a short retry burst
+          # isn't wiped out by a longer-lived registry blip, without
+          # giving up too quickly.
+          max_attempts=5
           attempt=1
+          backoff=30
           until docker buildx build \
             --platform linux/amd64 \
             --push \
@@ -72,9 +75,10 @@ jobs:
               echo "::error::docker buildx build/push failed after ${max_attempts} attempts"
               exit 1
             fi
-            echo "::warning::docker buildx build/push failed (attempt ${attempt}/${max_attempts}), retrying in 15s..."
+            echo "::warning::docker buildx build/push failed (attempt ${attempt}/${max_attempts}), retrying in ${backoff}s..."
             attempt=$((attempt + 1))
-            sleep 15
+            sleep "$backoff"
+            backoff=$((backoff * 2 > 180 ? 180 : backoff * 2))
           done
 
       # The VM pulls the image from ttl.sh itself before running `deploy`, and that
