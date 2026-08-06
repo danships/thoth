@@ -26,8 +26,10 @@
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:unit:watch": "vitest --config vitest.unit.config.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
+    "test:e2e": "tsx scripts/run-end-to-end-tests.ts",
+    "test:e2e:changed": "tsx scripts/run-end-to-end-tests.ts --only-changed --pass-with-no-tests",
+    "test:e2e:last-failed": "tsx scripts/run-end-to-end-tests.ts --last-failed",
+    "test:e2e:ui": "tsx scripts/run-end-to-end-tests.ts --ui",
     "test:e2e:report": "playwright show-report",
     "db:seed": "sh scripts/db-seed.sh"
   },

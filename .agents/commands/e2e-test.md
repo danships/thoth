@@ -40,6 +40,27 @@ tests/
 - Unit tests: `pnpm test:unit` (Vitest, `src/**/*.test.ts`)
 - Integration tests: `pnpm test:integration` (Vitest, `tests/integration/api/**/*.test.ts`)
 
+## Running E2E tests (THOTH-064)
+
+`pnpm test:e2e*` scripts all run through the hermetic launcher (`scripts/run-end-to-end-tests.ts`), which
+gives every invocation its own temporary SQLite database and upload folder — so repeated or
+interrupted runs never leak state into the next one — then forwards all CLI args unchanged to
+`pnpm exec playwright test`.
+
+Recommended loop:
+
+- **While implementing**: run the spec you're touching directly, e.g.
+  `pnpm test:e2e -- tests/e2e/pages/page-detail.spec.ts:96`.
+- **Before hand-off**: `pnpm test:e2e:changed` — uses Playwright's Git-diff-based
+  `--only-changed --pass-with-no-tests`. This is an optimisation for local iteration, **not**
+  the pre-push acceptance gate; it can miss tests affected only indirectly.
+- **While diagnosing a failure**: `pnpm test:e2e:last-failed` reruns only the tests recorded in
+  `test-results/.last-run.json` (kept outside the temporary per-run state) against a fresh
+  database.
+- **Before pushing**: the full `pnpm test:e2e` gate — every spec, fresh state.
+- `pnpm test:e2e:ui` opens the Playwright UI mode through the same launcher.
+- `pnpm test:e2e:report` opens the last HTML report.
+
 ## Auth
 
 All tests start authenticated via a seeded session cookie — no login step needed.

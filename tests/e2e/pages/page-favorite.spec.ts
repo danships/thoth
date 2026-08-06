@@ -179,10 +179,17 @@ test.describe('page favorite toggle', () => {
     await expect(favoriteToggleLink).toBeVisible();
     await expect(rootLink).toBeVisible();
 
-    const favoriteToggleBox = await favoriteToggleLink.boundingBox();
-    const rootBox = await rootLink.boundingBox();
-    expect(favoriteToggleBox).not.toBeNull();
-    expect(rootBox).not.toBeNull();
-    expect(favoriteToggleBox!.y).toBeLessThan(rootBox!.y);
+    // `boundingBox()` isn't auto-retried like `expect(locator)` assertions: right after
+    // navigation, the tree can still be re-rendering (e.g. an SWR revalidation reordering the
+    // list) even though both links already report as visible, which can momentarily yield a
+    // `null` box. Wrap the read + comparison in `toPass()` so a transient `null`/mid-reorder
+    // read doesn't fail the test outright.
+    await expect(async () => {
+      const favoriteToggleBox = await favoriteToggleLink.boundingBox();
+      const rootBox = await rootLink.boundingBox();
+      expect(favoriteToggleBox).not.toBeNull();
+      expect(rootBox).not.toBeNull();
+      expect(favoriteToggleBox!.y).toBeLessThan(rootBox!.y);
+    }).toPass();
   });
 });
