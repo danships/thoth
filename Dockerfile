@@ -25,10 +25,17 @@ RUN pnpm build
 # `.next/standalone/apps/web` directly into `/app`, which is only *one* level below
 # `.next/standalone/`'s copied `node_modules` — shifting every such symlink's relative target
 # outside of `/app` entirely (e.g. `next` would resolve to `/node_modules/...`, which doesn't
-# exist) and breaking `node server.js` with `Cannot find module 'next'`. Dereference those
-# symlinks into real files here, while the original `/app/node_modules/.pnpm/...` targets are
-# still reachable, so the flattened copy in `runner` is depth-independent.
+# exist) and breaking `node server.js` with `Cannot find module 'next'`. Dereferencing the
+# `apps/web` symlinks alone (`cp -rL`) isn't enough though: `next`'s own peer-resolved
+# dependencies (`@swc/helpers`, `react`, `react-dom`, `styled-jsx`, ...) live as *siblings* of
+# `next` inside pnpm's `next@<version>_.../node_modules/` scope, not underneath
+# `apps/web/node_modules/next` itself, so Node's directory-walk module resolution never finds
+# them post-flatten either (`Cannot find module '@swc/helpers/...'`). Merge that whole sibling
+# scope into the dereferenced `apps/web/node_modules` too, so it flattens into the same
+# resolvable `node_modules` next expects alongside itself.
 RUN cp -rL apps/web/.next/standalone/apps/web /tmp/standalone-web && \
+    NEXT_PNPM_DIR=$(find apps/web/.next/standalone/node_modules/.pnpm -maxdepth 1 -iname 'next@*' | head -1) && \
+    cp -rL "$NEXT_PNPM_DIR/node_modules/." /tmp/standalone-web/node_modules/ && \
     rm -rf apps/web/.next/standalone/apps/web && \
     mv /tmp/standalone-web apps/web/.next/standalone/apps/web
 
