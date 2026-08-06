@@ -4,24 +4,24 @@ This file gives concise, actionable guidance to help an AI coding agent be immed
 
 High level
 
-- Monorepo managed with pnpm. The app is a Next.js 15 app using the App Router (src/app). TypeScript, React 19, Mantine UI, and Nanostores are used.
-- Backend API routes live under `src/app/api/*` (Next.js route handlers). Front-end code in `src/app` calls those routes through `src/lib/api/client.ts` which uses axios with baseURL `/api/v1`.
+- Monorepo managed with pnpm. The app is a Next.js 15 app using the App Router (apps/web/src/app). TypeScript, React 19, Mantine UI, and Nanostores are used.
+- Backend API routes live under `apps/web/src/app/api/*` (Next.js route handlers). Front-end code in `apps/web/src/app` calls those routes through `apps/web/src/lib/api/client.ts` which uses axios with baseURL `/api/v1`.
 
 Key components and patterns
 
-- Auth: server-side session lookup is used in `src/app/layout.tsx` via `(await getAuth()).api.getSession`. Client-side auth lives in `src/lib/auth/provider.tsx` and `src/lib/auth/client.ts` (use `useAuth()` to access user/session on client).
-- Data layer: simple repository pattern under `src/lib/database`. **Content** (pages, data-sources, DataViews) is scoped by workspace membership + grant via `assertContentAccess`/`addWorkspaceIdToQuery` — never by creator (`addUserIdToQuery` is reserved for **per-user state** like `ContainerAccess`, see THOTH-042 below). API route handlers typically call `getWorkspaceRepository()` and `getContainerRepository()`.
-- API routes: use `apiRoute` wrapper from `src/lib/api/route-wrapper` which enforces schema validation (Zod) and provides typed session. See `src/app/api/v1/pages/*.ts` for examples (GET, POST, tree endpoints).
-- Types & schemas: API shapes and validation live in `src/types/api` and `src/types/schemas`. Prefer reading those files for exact shapes when adding or changing endpoints.
-- Front-end store: Nanostores + a `createFetcherStore` helper (`src/lib/store/fetcher.ts`) are used for data fetching. Example stores: `$rootPagesTree` and `$currentPage` in `src/lib/store/query/`.
+- Auth: server-side session lookup is used in `apps/web/src/app/layout.tsx` via `(await getAuth()).api.getSession`. Client-side auth lives in `apps/web/src/lib/auth/provider.tsx` and `apps/web/src/lib/auth/client.ts` (use `useAuth()` to access user/session on client).
+- Data layer: simple repository pattern under `apps/web/src/lib/database`. **Content** (pages, data-sources, DataViews) is scoped by workspace membership + grant via `assertContentAccess`/`addWorkspaceIdToQuery` — never by creator (`addUserIdToQuery` is reserved for **per-user state** like `ContainerAccess`, see THOTH-042 below). API route handlers typically call `getWorkspaceRepository()` and `getContainerRepository()`.
+- API routes: use `apiRoute` wrapper from `apps/web/src/lib/api/route-wrapper` which enforces schema validation (Zod) and provides typed session. See `apps/web/src/app/api/v1/pages/*.ts` for examples (GET, POST, tree endpoints).
+- Types & schemas: API shapes and validation live in `apps/web/src/types/api` and `apps/web/src/types/schemas`. Prefer reading those files for exact shapes when adding or changing endpoints.
+- Front-end store: Nanostores + a `createFetcherStore` helper (`apps/web/src/lib/store/fetcher.ts`) are used for data fetching. Example stores: `$rootPagesTree` and `$currentPage` in `apps/web/src/lib/store/query/`.
 
 Creating a new API route
 
-- Files: add the route handler at `src/app/api/<your-route>/route.ts`. Next.js routes are file-system based; export functions named `GET`, `POST`, etc.
-- Types first: create Zod schemas and exported types under `src/types/api` (prefer `src/types/api/endpoints/`) and reuse them in the route via `expectedQuerySchema`/`expectedBodySchema`.
+- Files: add the route handler at `apps/web/src/app/api/<your-route>/route.ts`. Next.js routes are file-system based; export functions named `GET`, `POST`, etc.
+- Types first: create Zod schemas and exported types under `apps/web/src/types/api` (prefer `apps/web/src/types/api/endpoints/`) and reuse them in the route via `expectedQuerySchema`/`expectedBodySchema`.
 - Use `apiRoute` wrapper: call `apiRoute<Resp, Query, Body>(options, handler)` so the session is typed and schemas are enforced.
-- Database access: obtain repositories with `getWorkspaceRepository()`/`getContainerRepository()` from `src/lib/database`. **Gate CONTENT with `assertContentAccess`** (membership via `assertWorkspaceAccess` + the unified `AccessGrant`, `src/lib/api/server/workspace-access.ts` + `src/lib/auth/access-grant.ts`) and scope its queries with `addWorkspaceIdToQuery(...)`; **keep PER-USER STATE** (`ContainerAccess`) scoped with `addUserIdToQuery(..., session.user.id)`. See THOTH-042 below for the full rule.
-- Client surface: after implementing the route, add a typed client helper in `src/lib/api/client.ts` (baseURL is `/api/v1`) so front-end code can call the endpoint consistently.
+- Database access: obtain repositories with `getWorkspaceRepository()`/`getContainerRepository()` from `apps/web/src/lib/database`. **Gate CONTENT with `assertContentAccess`** (membership via `assertWorkspaceAccess` + the unified `AccessGrant`, `apps/web/src/lib/api/server/workspace-access.ts` + `apps/web/src/lib/auth/access-grant.ts`) and scope its queries with `addWorkspaceIdToQuery(...)`; **keep PER-USER STATE** (`ContainerAccess`) scoped with `addUserIdToQuery(..., session.user.id)`. See THOTH-042 below for the full rule.
+- Client surface: after implementing the route, add a typed client helper in `apps/web/src/lib/api/client.ts` (baseURL is `/api/v1`) so front-end code can call the endpoint consistently.
 - Validation & errors: rely on Zod for input validation; throw early (or return appropriate HTTP status from the handler) for auth/validation failures so errors surface in logs.
 - Quick checks: run `pnpm lint`, `pnpm lint:tsc` (TypeScript check) and `pnpm build` before opening a PR.
 
@@ -34,33 +34,33 @@ Developer workflows (commands)
 
 Conventions & gotchas
 
-- Routes only live under `src/app/api/*` (Next App Router route handlers). When adding an endpoint, update `src/lib/api/client.ts` for a typed client method.
-- Use types from `src/types/api` for API input/output. API route handlers validate inputs via Zod schemas exported alongside the types.
+- Routes only live under `apps/web/src/app/api/*` (Next App Router route handlers). When adding an endpoint, update `apps/web/src/lib/api/client.ts` for a typed client method.
+- Use types from `apps/web/src/types/api` for API input/output. API route handlers validate inputs via Zod schemas exported alongside the types.
 - **Content vs. per-user state (THOTH-042):** CONTENT rows (`Container` pages/data-sources, `DataView`) are gated by **`assertContentAccess`** — workspace membership (`assertWorkspaceAccess`, which throws `NotFoundError`/404, never 403, for non-members) plus a unified `AccessGrant` (same shape for human members via `memberToAccessGrant` and Apps via `session.appContext.accessGrant`), enforced via `assertGrantAllowsContainer` (reads) and `assertGrantAllowsWrite` (mutations). Content queries use `addWorkspaceIdToQuery(...)`; list/tree routes finish with `filterContainersByGrantForSession(session, rows)`. `userId` on a content row is attribution only — **never** a gate. PER-USER STATE (`ContainerAccess` — starred/last-accessed) stays scoped with `addUserIdToQuery(...)`, the *only* remaining legitimate use of that helper.
-- The repo uses `better-auth` and an OIDC flow. Secrets are expected via env variables validated in `src/lib/environment.ts` (envalid). When running locally, provide env vars (e.g., `BETTER_AUTH_SECRET`, `OIDC_*`).
+- The repo uses `better-auth` and an OIDC flow. Secrets are expected via env variables validated in `apps/web/src/lib/environment.ts` (envalid). When running locally, provide env vars (e.g., `BETTER_AUTH_SECRET`, `OIDC_*`).
 - Prefers `type` aliases over `interface` (see `AGENTS.md`). Follow existing file style (strict TypeScript settings in package.json devDeps).
 
 Where to look first (quick navigation)
 
-- Application shell & session: `src/app/layout.tsx`, `src/app/layout-client.tsx`, `src/lib/auth/provider.tsx`
-- API client: `src/lib/api/client.ts`
-- API route wrapper & examples: `src/lib/api/route-wrapper.ts`, `src/app/api/v1/pages/route.ts`, `src/app/api/v1/pages/tree/route.ts`, `src/app/api/v1/pages/[id]/route.ts`
-- Database repositories & helpers: `src/lib/database/*` and `src/lib/database/helpers.ts`
-- Types & schemas: `src/types/api/*` and `src/types/schemas/*`
-- Stores & data hooks: `src/lib/store/*` (see `createFetcherStore` usage)
+- Application shell & session: `apps/web/src/app/layout.tsx`, `apps/web/src/app/layout-client.tsx`, `apps/web/src/lib/auth/provider.tsx`
+- API client: `apps/web/src/lib/api/client.ts`
+- API route wrapper & examples: `apps/web/src/lib/api/route-wrapper.ts`, `apps/web/src/app/api/v1/pages/route.ts`, `apps/web/src/app/api/v1/pages/tree/route.ts`, `apps/web/src/app/api/v1/pages/[id]/route.ts`
+- Database repositories & helpers: `apps/web/src/lib/database/*` and `apps/web/src/lib/database/helpers.ts`
+- Types & schemas: `apps/web/src/types/api/*` and `apps/web/src/types/schemas/*`
+- Stores & data hooks: `apps/web/src/lib/store/*` (see `createFetcherStore` usage)
 
 Examples to copy/paste
 
-- Create a typed API client call (follow `src/lib/api/client.ts`):
+- Create a typed API client call (follow `apps/web/src/lib/api/client.ts`):
   - pages.create({ name, emoji, parentId }) -> POST `/api/v1/pages`
-- Validate server route input with `apiRoute` and zod schema exported from `src/types/api` (see `src/app/api/v1/pages/route.ts`).
+- Validate server route input with `apiRoute` and zod schema exported from `apps/web/src/types/api` (see `apps/web/src/app/api/v1/pages/route.ts`).
 
 Quality gates
 
 - Run `pnpm build` and `pnpm lint` after making significant changes. Fix TypeScript errors (`pnpm lint:tsc`) before opening PRs.
 - Run `pnpm test:e2e` after implementing any user-facing feature. Every feature must
-  have a Playwright spec in `tests/e2e/`. See `.agents/commands/e2e-test.md` for full conventions.
+  have a Playwright spec in `apps/web/tests/e2e/`. See `.agents/commands/e2e-test.md` for full conventions.
 
 If uncertain
 
-- Check `src/types/api` and corresponding route under `src/app/api/v1/*` to infer exact JSON shape and validation. Read `src/lib/database` to understand repository methods and required scoping.
+- Check `apps/web/src/types/api` and corresponding route under `apps/web/src/app/api/v1/*` to infer exact JSON shape and validation. Read `apps/web/src/lib/database` to understand repository methods and required scoping.

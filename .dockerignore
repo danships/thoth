@@ -1,17 +1,22 @@
 node_modules
+apps/web/node_modules
 .next
+apps/web/.next
 .git
 .github
 docs
-tests/*
-# `scripts/end-to-end-seed.ts` (type-checked as part of `pnpm build`, though
+apps/web/tests/*
+# `apps/web/scripts/end-to-end-seed.ts` (type-checked as part of `pnpm build`, though
 # only ever executed locally/in CI via Playwright's global setup) imports
-# `tests/e2e/constants.ts` and `tests/fixtures/seed.ts`. Keep these files so
+# `apps/web/tests/e2e/constants.ts` and `apps/web/tests/fixtures/seed.ts`. Keep these files so
 # the Docker build's TypeScript check can resolve those imports.
-!tests/e2e/constants.ts
-!tests/fixtures/seed.ts
+!apps/web/tests/e2e/constants.ts
+!apps/web/tests/fixtures/seed.ts
 playwright-report
+apps/web/playwright-report
 test-results
+apps/web/test-results
 .env*
 !.env.test
+!apps/web/.env.test
 *.md

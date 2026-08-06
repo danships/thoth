@@ -5,10 +5,10 @@ description: Use when defining API request/response types, Zod validation schema
 
 ## File Organisation
 
-Each endpoint gets its own file under `src/types/api/endpoints/`:
+Each endpoint gets its own file under `apps/web/src/types/api/endpoints/`:
 
 ```text
-src/types/api/
+apps/web/src/types/api/
 ├── endpoints/
 │   ├── create-page.ts         # POST /pages
 │   ├── get-pages.ts           # GET  /pages
@@ -20,7 +20,7 @@ src/types/api/
 └── index.ts                   # Re-exports everything
 ```
 
-Always re-export new schemas and types from `src/types/api/index.ts`.
+Always re-export new schemas and types from `apps/web/src/types/api/index.ts`.
 
 ## Naming Conventions
 
@@ -94,13 +94,13 @@ export type GetPagesResponse = Array<{
 On the client side, the actual Axios response shape is `DataWrapper<T>` where:
 
 ```typescript
-// src/types/api/utilities.ts
+// apps/web/src/types/api/utilities.ts
 export type DataWrapper<T> = { data: T };
 ```
 
 ## Reusing Entity Schemas
 
-When an entity schema already exists (e.g., `pageSchema` from `src/types/api/entities.ts`), use `.pick()`, `.omit()`, or `.extend()` instead of redefining fields:
+When an entity schema already exists (e.g., `pageSchema` from `apps/web/src/types/api/entities.ts`), use `.pick()`, `.omit()`, or `.extend()` instead of redefining fields:
 
 ```typescript
 import { pageSchema } from '../entities';

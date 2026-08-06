@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import { getContainerRepository, getDataViewRepository, getDatabase } from '../src/lib/database/index.js';
-import { getPageDeleteGracePeriodDays } from '../src/lib/database/page-grace-period.js';
-import { permanentlyDeleteByDeletedRootId } from '../src/lib/database/soft-delete-service.js';
+import { getContainerRepository, getDataViewRepository, getDatabase } from '../apps/web/src/lib/database/index.js';
+import { getPageDeleteGracePeriodDays } from '../apps/web/src/lib/database/page-grace-period.js';
+import { permanentlyDeleteByDeletedRootId } from '../apps/web/src/lib/database/soft-delete-service.js';
 
 const RACE_SAFETY_MARGIN_MS = 60 * 60 * 1000;
 
@@ -26,7 +26,9 @@ async function purgeDeletedPages() {
   const allContainers = await containerRepository.getByQuery(containerRepository.createQuery());
   const allDataViews = await dataViewRepository.getByQuery(dataViewRepository.createQuery());
 
-  const containerRoots = allContainers.filter((container) => container.deletedAt && container.deletedRootId === container.id);
+  const containerRoots = allContainers.filter(
+    (container) => container.deletedAt && container.deletedRootId === container.id
+  );
   const dataViewRoots = allDataViews.filter((dataView) => dataView.deletedAt && dataView.deletedRootId === dataView.id);
 
   let purgedCount = 0;
