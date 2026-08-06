@@ -18,26 +18,6 @@ COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
-# `outputFileTracingRoot` makes the standalone output's `apps/web/node_modules/next` (and the
-# native-module symlinks under `apps/web/.next/node_modules/*`) relative symlinks calibrated
-# for their original nesting depth (`apps/web/.next/standalone/apps/web/...`, i.e. two levels
-# below `apps/web/.next/standalone/`). The `runner` stage below flattens
-# `.next/standalone/apps/web` directly into `/app`, which is only *one* level below
-# `.next/standalone/`'s copied `node_modules` — shifting every such symlink's relative target
-# outside of `/app` entirely (e.g. `next` would resolve to `/node_modules/...`, which doesn't
-# exist) and breaking `node server.js` with `Cannot find module 'next'`. Dereferencing the
-# `apps/web` symlinks alone (`cp -rL`) isn't enough though: `next`'s own peer-resolved
-# dependencies (`@swc/helpers`, `react`, `react-dom`, `styled-jsx`, ...) live as *siblings* of
-# `next` inside pnpm's `next@<version>_.../node_modules/` scope, not underneath
-# `apps/web/node_modules/next` itself, so Node's directory-walk module resolution never finds
-# them post-flatten either (`Cannot find module '@swc/helpers/...'`). Merge that whole sibling
-# scope into the dereferenced `apps/web/node_modules` too, so it flattens into the same
-# resolvable `node_modules` next expects alongside itself.
-RUN cp -rL apps/web/.next/standalone/apps/web /tmp/standalone-web && \
-    NEXT_PNPM_DIR=$(find apps/web/.next/standalone/node_modules/.pnpm -maxdepth 1 -iname 'next@*' | head -1) && \
-    cp -rL "$NEXT_PNPM_DIR/node_modules/." /tmp/standalone-web/node_modules/ && \
-    rm -rf apps/web/.next/standalone/apps/web && \
-    mv /tmp/standalone-web apps/web/.next/standalone/apps/web
 
 FROM base AS runner
 WORKDIR /app
@@ -52,19 +32,26 @@ RUN apk add --no-cache wget && \
 ENV HOME=/home/nextjs
 
 # The monorepo's `outputFileTracingRoot` (see apps/web/next.config.ts) makes Next.js emit the
-# standalone server nested under the traced workspace root, i.e.
-# `apps/web/.next/standalone/apps/web/server.js`, with its own pruned `node_modules` alongside
-# it (`apps/web/.next/standalone/node_modules`). Copy the full production `node_modules` from
-# `deps` first (covers native modules like `better-sqlite3` that output file tracing can miss
-# the binary for), then layer the standalone tree's traced `node_modules` and server files on
-# top, flattening into the same one-process layout the single-package build used to produce.
+# standalone output nested under the traced workspace root: the traced dependency tree lands
+# at `apps/web/.next/standalone/node_modules` (the standalone tree's *root*), and
+# `apps/web/.next/standalone/apps/web/` holds `server.js` plus its own `node_modules` full of
+# *relative* symlinks back into that top-level `node_modules` (e.g.
+# `apps/web/.next/standalone/apps/web/node_modules/next ->
+# ../../../node_modules/.pnpm/next@.../node_modules/next`, itself calibrated for the exact
+# nesting depth `standalone/apps/web/node_modules/`). Copy the full production `node_modules`
+# from `deps` first (covers native modules like `better-sqlite3` that output file tracing can
+# miss the binary for), then copy `standalone/` as a whole — preserving that same nesting
+# intact — so those relative symlinks keep resolving correctly. Flattening `apps/web/`
+# straight into `/app` (as this image used to) shifts the symlinks' relative depth by one
+# level and breaks `node server.js` with `Cannot find module 'next'` /
+# `Cannot find module '@swc/helpers/...'`.
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder /app/apps/web/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone/apps/web ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 USER nextjs
+WORKDIR /app/apps/web
 
 EXPOSE 3000
 ENV PORT=3000
