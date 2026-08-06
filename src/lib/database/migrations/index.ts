@@ -7,6 +7,9 @@ import { backfillWorkspaces } from './workspace-backfill';
 import { backfillWorkspaceStorageQuota } from './workspace-storage-quota-backfill';
 import { backfillMemberAccess } from './member-access-backfill';
 import { backfillContainerSortOrder } from './container-sort-order-backfill';
+import { backfillPlatformUsers } from './platform-user-backfill';
+import { backfillWorkspaceQuotaSettings } from './workspace-quota-settings-backfill';
+import { backfillUploadedFileBillingUser } from './uploaded-file-billing-user-backfill';
 
 export const migrations: Migration[] = [
   {
@@ -75,6 +78,31 @@ export const migrations: Migration[] = [
     name: 'container-sort-order-backfill',
     run: async (superSave: SuperSave) => {
       await backfillContainerSortOrder(superSave);
+    },
+  },
+  {
+    // THOTH-045: projects every existing Better Auth user into a `platform-user` row and
+    // designates the earliest-registered user the sole `platform_admin`. Must run after
+    // `better-auth-tables` (whose `user` table it reads).
+    name: 'platform-user-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillPlatformUsers(superSave);
+    },
+  },
+  {
+    // THOTH-045: migrates non-default `workspace.storageQuotaBytes` values into workspace-scoped
+    // `storage.quota_bytes` settings, the new source of truth for quotas.
+    name: 'workspace-quota-settings-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillWorkspaceQuotaSettings(superSave);
+    },
+  },
+  {
+    // THOTH-045: populates `billingUserId` on existing `uploaded-file` rows so per-user storage
+    // quotas can be enforced against pre-existing uploads.
+    name: 'uploaded-file-billing-user-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillUploadedFileBillingUser(superSave);
     },
   },
 ];

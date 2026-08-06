@@ -10,13 +10,15 @@ export const updateWorkspaceParametersSchema = z.object({
 });
 export type UpdateWorkspaceParameters = z.infer<typeof updateWorkspaceParametersSchema>;
 
-export const updateWorkspaceBodySchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  slug: workspaceSlugSchema.optional(),
-  // Owner-only (THOTH-040): configures the workspace's uploaded-file storage quota. Route
-  // enforces `role === 'owner'` before applying this — see `PATCH /workspaces/:id`.
-  storageQuotaBytes: z.number().int().nonnegative().optional(),
-});
+export const updateWorkspaceBodySchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    slug: workspaceSlugSchema.optional(),
+  })
+  // Storage quota is no longer owner-configurable (THOTH-045) — it's managed by platform
+  // administrators via `/admin/*`. `.strict()` makes a stray `storageQuotaBytes` (or any unknown
+  // key) a 400 rather than silently ignored.
+  .strict();
 export type UpdateWorkspaceBody = z.infer<typeof updateWorkspaceBodySchema>;
 
 export const updateWorkspaceResponseSchema = workspaceSchema;

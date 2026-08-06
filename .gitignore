@@ -49,3 +49,4 @@ db.sqlite-*
 /test-results/
 /tests/e2e/.auth/
 e2e-test.db.tmp/
+.vitest-tmp/

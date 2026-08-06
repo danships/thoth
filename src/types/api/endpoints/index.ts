@@ -49,3 +49,7 @@ export * from './get-page-revision';
 export * from './restore-page-revision';
 export * from './fork-page-revision';
 export * from './reorder-page';
+export * from './platform-capabilities';
+export * from './admin-settings';
+export * from './admin-users';
+export * from './admin-workspaces';

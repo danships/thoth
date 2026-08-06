@@ -6922,10 +6922,16 @@
                           "type": "string"
                         },
                         "storageQuotaBytes": {
-                          "default": 52428800,
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 9007199254740991
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -7171,10 +7177,16 @@
                           "type": "string"
                         },
                         "storageQuotaBytes": {
-                          "default": 52428800,
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 9007199254740991
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -7281,13 +7293,9 @@
                     "minLength": 3,
                     "maxLength": 50,
                     "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
-                  },
-                  "storageQuotaBytes": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -7426,10 +7434,16 @@
                           "type": "string"
                         },
                         "storageQuotaBytes": {
-                          "default": 52428800,
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 9007199254740991
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -7554,7 +7568,14 @@
                           "type": "number"
                         },
                         "quotaBytes": {
-                          "type": "number"
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -13468,6 +13489,73 @@
         ]
       }
     },
+    "/platform/capabilities": {
+      "get": {
+        "operationId": "getPlatformCapabilities",
+        "summary": "Get platform capabilities for the current user",
+        "tags": [
+          "Platform"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "isPlatformAdmin": {
+                          "type": "boolean"
+                        },
+                        "canCreateWorkspace": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "isPlatformAdmin",
+                        "canCreateWorkspace"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/config": {
       "get": {
         "operationId": "getAuthConfig",
@@ -14230,10 +14318,16 @@
             "type": "string"
           },
           "storageQuotaBytes": {
-            "default": 52428800,
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

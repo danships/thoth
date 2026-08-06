@@ -7,6 +7,7 @@ import { createPool } from 'mysql2/promise';
 import { connection } from 'next/server';
 import { getDatabase } from '../database';
 import { createWorkspaceForUser } from '../database/seed-workspace';
+import { registerPlatformUser } from './platform-user';
 import { getEnvironment } from '../environment';
 import { slugify } from '../utils/slug';
 import { pickRandomNerdySuffix } from '../utils/nerdy-slug';
@@ -49,7 +50,17 @@ async function initializeAuth() {
     const databaseHooks = {
       user: {
         create: {
-          after: async (user: { id: string; name?: string; email?: string }) => {
+          after: async (user: { id: string; name?: string; email?: string; createdAt?: Date | string }) => {
+            // Register the platform-user projection BEFORE provisioning the workspace so the
+            // first-ever user is bootstrapped as `platform_admin` (THOTH-045). Purely
+            // operational — confers no workspace content access.
+            await registerPlatformUser({
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              createdAt: user.createdAt,
+            });
+
             const displayName = user.name || user.email?.split('@', 1)[0] || 'my-workspace';
             // e.g. "Ada Lovelace" -> slug base "ada-lovelace-segfault", de-duplicated on the
             // rare collision (see `createWorkspaceForUser`'s `strict: false`).

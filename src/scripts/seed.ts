@@ -29,6 +29,7 @@ import {
   getWorkspaceRepository,
 } from '@/lib/database';
 import { slugify } from '@/lib/utils/slug';
+import { registerPlatformUser } from '@/lib/auth/platform-user';
 import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
 
 const PREVIEW_USER_ID = 'preview-user-1';
@@ -60,6 +61,10 @@ database
 `
   )
   .run({ id: PREVIEW_USER_ID });
+
+// THOTH-045: build the platform-user projection for the raw-inserted preview user so it becomes
+// the platform administrator (it's the only/earliest user on a fresh preview database).
+await registerPlatformUser({ id: PREVIEW_USER_ID, name: 'Preview User', email: 'preview@example.com' });
 
 // Pages are stored by SuperSave behind a generated JSON `contents` column, so
 // they must be created through the repository API (which the rest of the

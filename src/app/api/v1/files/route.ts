@@ -5,10 +5,10 @@ import { assertGrantAllowsWrite, assertGrantAllowsContainerForSession } from '@/
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
-import { getFileUsageRepository, getUploadedFileRepository } from '@/lib/database';
+import { getFileUsageRepository, getUploadedFileRepository, getAppRepository } from '@/lib/database';
 import { getStorageAdapter } from '@/lib/storage';
 import { getFileExtension, isDangerousFile } from '@/lib/files/constants';
-import { assertWithinQuota } from '@/lib/files/quota';
+import { assertWithinStorageQuotas } from '@/lib/files/quota';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { PayloadTooLargeError } from '@/lib/errors/payload-too-large-error';
 import { UnsupportedMediaTypeError } from '@/lib/errors/unsupported-media-type-error';
@@ -93,7 +93,20 @@ export async function POST(request: NextRequest) {
       await assertWorkspaceAccess(session.user.id, workspaceId);
     }
 
-    await assertWithinQuota(workspaceId, file.size);
+    // Resolve who the upload's storage is billed to (THOTH-045). Cookie uploads bill the
+    // uploader. API-key uploads bill the owning App's creator (a real user) even when the
+    // upload's `userId` is the synthetic `app--<id>` identity (`attributionMode: 'app'`).
+    let billingUserId = session.user.id;
+    if (session.appContext) {
+      const appRepository = await getAppRepository();
+      const app = await appRepository.getOneByQuery(appRepository.createQuery().eq('id', session.appContext.appId));
+      if (!app) {
+        throw new BadRequestError('The API key is not associated with a valid app');
+      }
+      billingUserId = app.createdByUserId;
+    }
+
+    await assertWithinStorageQuotas({ workspaceId, billingUserId, additionalBytes: file.size });
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const storageAdapter = await getStorageAdapter();
@@ -111,6 +124,7 @@ export async function POST(request: NextRequest) {
       storageType: storageAdapter.type,
       workspaceId,
       userId: session.user.id,
+      billingUserId,
       createdAt: now,
       lastUpdated: now,
     });

@@ -14,6 +14,8 @@ import { webhookDeliverySchema } from '../schemas/entities/webhook-delivery';
 import { uploadedFileSchema } from '../schemas/entities/uploaded-file';
 import { fileUsageSchema } from '../schemas/entities/file-usage';
 import { pageRevisionSchema } from '../schemas/entities/page-revision';
+import { settingSchema } from '../schemas/entities/setting';
+import { platformUserSchema } from '../schemas/entities/platform-user';
 
 /** Container Entity Schema */
 export { pageContainerSchema, dataSourceContainerSchema } from '../schemas/entities/container';
@@ -178,3 +180,23 @@ export const pageRevisionCreateSchema = pageRevisionSchema.omit({ id: true });
 export type PageRevision = z.infer<typeof pageRevisionSchema>;
 export type PageRevisionCreate = z.infer<typeof pageRevisionCreateSchema>;
 /** End PageRevision Entity Schema */
+
+/** Setting Entity Schema */
+export { settingSchema, settingScopeSchema } from '../schemas/entities/setting';
+export type { SettingScope } from '../schemas/entities/setting';
+
+export const settingCreateSchema = settingSchema.omit({ id: true });
+
+export type Setting = z.infer<typeof settingSchema>;
+export type SettingCreate = z.infer<typeof settingCreateSchema>;
+/** End Setting Entity Schema */
+
+/** PlatformUser Entity Schema */
+export { platformUserSchema, platformUserRoleSchema } from '../schemas/entities/platform-user';
+export type { PlatformUserRole } from '../schemas/entities/platform-user';
+
+export const platformUserCreateSchema = platformUserSchema.omit({ id: true });
+
+export type PlatformUser = z.infer<typeof platformUserSchema>;
+export type PlatformUserCreate = z.infer<typeof platformUserCreateSchema>;
+/** End PlatformUser Entity Schema */

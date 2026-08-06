@@ -12,6 +12,11 @@ export const uploadedFileSchema = z
     extension: z.string().max(32).nullable(),
     storageKey: z.string().min(1),
     storageType: z.string().min(1),
+    // The user whose storage quota this upload counts against (THOTH-045). Optional/nullable for
+    // backward-compatibility with rows created before this field existed (a migration backfills
+    // them); always populated on new uploads. For `app--<id>`-attributed uploads this is the
+    // owning App's `createdByUserId`, so per-user quota is charged to a real user.
+    billingUserId: z.string().min(1).nullable().optional(),
   })
   .extend(withTrackUpdatesSchema.shape)
   .extend(withWorkspaceIdSchema.shape)
