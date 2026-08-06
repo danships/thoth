@@ -25,9 +25,9 @@ Run all scripts from the repository root (the directory containing `package.json
 | Start | `pnpm start` | Run the production build |
 | Lint (all) | `pnpm lint` | Run ESLint + Prettier + TypeScript checks concurrently |
 | ESLint only | `pnpm lint:eslint` | ESLint on `.ts`/`.tsx` files |
-| Prettier check | `pnpm lint:prettier` | Check formatting in `src/` |
+| Prettier check | `pnpm lint:prettier` | Check formatting in `apps/web/src/` |
 | TypeScript check | `pnpm lint:tsc` | `tsc --noEmit` — no compiled output, only type errors |
-| Format | `pnpm format` | Auto-fix Prettier and ESLint in `src/` |
+| Format | `pnpm format` | Auto-fix Prettier and ESLint in `apps/web/src/` |
 | Generate auth schema | `pnpm better-auth:generate` | Regenerate `schema.sql` from auth config |
 | Clear auth | `pnpm scripts:clear-auth` | Dev utility to wipe auth data |
 
@@ -48,4 +48,4 @@ The root `pnpm-workspace.yaml` defines workspace packages. The main application 
 
 ## Environment Variables
 
-The app validates env vars at startup via `src/lib/environment.ts` (using `envalid`). Required variables include `BETTER_AUTH_SECRET`, `OIDC_*`, and `DB`. Copy `.env.example` (if present) or see `src/lib/environment.ts` for the full list before running the dev server.
+The app validates env vars at startup via `apps/web/src/lib/environment.ts` (using `envalid`). Required variables include `BETTER_AUTH_SECRET`, `OIDC_*`, and `DB`. Copy `.env.example` (if present) or see `apps/web/src/lib/environment.ts` for the full list before running the dev server.

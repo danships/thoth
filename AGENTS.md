@@ -4,7 +4,9 @@ This file contains the instructions for AI agents working on the Thoth codebase.
 
 ## Project Overview
 
-Thoth is a Next.js 15 application using React 19, Mantine UI 8, and TypeScript. It's managed with pnpm.
+Thoth is a pnpm monorepo. The Next.js 15 application (React 19, Mantine UI 8, TypeScript) lives in
+`apps/web`; the repository root is a thin workspace orchestrator whose commands delegate to
+`apps/web`. `packages/` is currently empty, reserved for future extracted packages.
 
 **Tech Stack:**
 
@@ -18,14 +20,14 @@ Thoth is a Next.js 15 application using React 19, Mantine UI 8, and TypeScript. 
 
 - Atomic Design Methodology for UI components
 - App Router for routing
-- API routes in `src/app/api/`
+- API routes in `apps/web/src/app/api/`
 - Use TypeScript types over interfaces
 
 ## Creating API Routes
 
 API routes follow this pattern:
 
-### 1. Type Definitions (`src/types/`)
+### 1. Type Definitions (`apps/web/src/types/`)
 
 Create Zod schemas for request/response validation:
 
@@ -51,7 +53,7 @@ export type GetPagesTreeQuery = z.infer<typeof getPagesTreeQuerySchema>;
 export type GetPagesTreeResponse = z.infer<typeof getPagesTreeResponseSchema>;
 ```
 
-### 2. Route Implementation (`src/app/api/{route}/route.ts`)
+### 2. Route Implementation (`apps/web/src/app/api/{route}/route.ts`)
 
 Use the `apiRoute` wrapper with typed parameters. **Content** (pages, data-sources, DataViews)
 is scoped by workspace membership + grant via `assertContentAccess`/`addWorkspaceIdToQuery` —
@@ -99,7 +101,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
 ### API Route Structure
 
 ```
-src/app/api/
+apps/web/src/app/api/
 ├── pages/
 │   └── tree/
 │       └── route.ts          # Handles /api/pages/tree
@@ -117,9 +119,9 @@ src/app/api/
 - Integrate with authentication system (better-auth)
 - Use NextRequest/NextResponse objects
 - Export functions named after HTTP methods (GET, POST, PUT, DELETE, etc.)
-- Whenever a route or its API Zod schemas change, update `src/lib/openapi/registry.ts`, run `pnpm openapi:generate`, and commit the refreshed `public/openapi.json` (served statically at `/openapi.json`).
-- `pnpm lint` includes `lint:openapi`, which fails if `public/openapi.json` drifts from the registry/Zod source of truth.
-- The Docker build already copies `/app/public` into the runtime image (`COPY --from=builder /app/public ./public`), so the committed spec ships automatically.
+- Whenever a route or its API Zod schemas change, update `apps/web/src/lib/openapi/registry.ts`, run `pnpm openapi:generate` (delegates to `pnpm --filter @thoth/web openapi:generate`), and commit the refreshed `apps/web/public/openapi.json` (served statically at `/openapi.json`).
+- `pnpm lint` includes `lint:openapi`, which fails if `apps/web/public/openapi.json` drifts from the registry/Zod source of truth.
+- The Docker build copies the standalone build's `public` directory into the runtime image, so the committed spec ships automatically.
 
 ## General TypeScript Rules
 
@@ -134,7 +136,7 @@ Thoth's authorization model draws a hard line between two kinds of rows:
 - **CONTENT** (`Container` pages/data-sources, `DataView`) — gated by **workspace membership +
   grant**, never by creator identity. `userId` on a content row is attribution/provenance only.
   The canonical chokepoint is `assertContentAccess(session, row, { mutating? })`
-  (`src/lib/api/server/workspace-access.ts`): it asserts the caller is a member of the row's own
+  (`apps/web/src/lib/api/server/workspace-access.ts`): it asserts the caller is a member of the row's own
   `workspaceId` (via `assertWorkspaceAccess`, which throws `NotFoundError` — never 403 — for
   non-members, hiding existence), resolves a single `AccessGrant` for the caller (a human member
   via `memberToAccessGrant`, or an App via `session.appContext.accessGrant` — same shape, same
@@ -155,7 +157,7 @@ granted `read`-only.
 ## File Structure
 
 ```
-src/
+apps/web/src/
 ├── app/                      # Next.js App Router
 │   ├── api/                 # API routes
 │   └── (routes)/            # Page routes
@@ -175,8 +177,8 @@ src/
 
 Before completing tasks, run the relevant quality gates for the scope you changed:
 
-- `pnpm test:unit` — fast Vitest unit tests for isolated logic in `src/**/*.test.ts`
-- `pnpm test:integration` — Vitest API integration tests against a real HTTP server in `tests/integration/api/**/*.test.ts`
+- `pnpm test:unit` — fast Vitest unit tests for isolated logic in `apps/web/src/**/*.test.ts`
+- `pnpm test:integration` — Vitest API integration tests against a real HTTP server in `apps/web/tests/integration/api/**/*.test.ts`
 - `pnpm test` — combined unit + integration suite
 - `pnpm test:e2e` — Playwright browser tests for user-facing flows
 - `pnpm lint` — ESLint + Prettier + TypeScript + OpenAPI drift checks
@@ -185,15 +187,15 @@ Before completing tasks, run the relevant quality gates for the scope you change
 - Only commit changes when explicitly requested by the user
 - Never add custom patches (e.g. via `pnpm patch`/`patches/*.patch`) to work around a broken
   ESLint rule or dependency incompatibility. Instead, disable the offending rule (or fix the
-  root cause via config, e.g. explicit `settings`) in `eslint.config.mjs`.
+  root cause via config, e.g. explicit `settings`) in `apps/web/eslint.config.mjs`.
 
 ## Playwright E2E Tests
 
 Use Playwright for browser/UI interaction coverage. Prefer unit tests for isolated logic and
-`tests/integration/api/` for API-only behavior that does not require a browser.
+`apps/web/tests/integration/api/` for API-only behavior that does not require a browser.
 
-- Tests live in `tests/e2e/` grouped by domain (auth, pages, data-sources, data-views, page-values).
-- Shared seeded data lives in `tests/fixtures/seed.ts` and is re-exported by `tests/e2e/constants.ts` (`SEED.*`).
+- Tests live in `apps/web/tests/e2e/` grouped by domain (auth, pages, data-sources, data-views, page-values).
+- Shared seeded data lives in `apps/web/tests/fixtures/seed.ts` and is re-exported by `apps/web/tests/e2e/constants.ts` (`SEED.*`).
 - Run: `pnpm test:e2e` (local) · `pnpm test:e2e:ui` (interactive) · `pnpm test:e2e:report` (report).
 - See `.agents/commands/e2e-test.md` for full conventions, auth setup, and selector guidance.
 

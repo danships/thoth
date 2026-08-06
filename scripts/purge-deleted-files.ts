@@ -13,8 +13,8 @@ import {
   getDatabase,
   getFileUsageRepository,
   getUploadedFileRepository,
-} from '../src/lib/database/index.js';
-import { getStorageAdapter } from '../src/lib/storage/index.js';
+} from '../apps/web/src/lib/database/index.js';
+import { getStorageAdapter } from '../apps/web/src/lib/storage/index.js';
 
 const DEFAULT_GRACE_PERIOD_HOURS = 24;
 

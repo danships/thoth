@@ -7,12 +7,14 @@ FROM base AS deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile --prod
 
 FROM base AS builder
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
@@ -29,10 +31,18 @@ RUN apk add --no-cache wget && \
 
 ENV HOME=/home/nextjs
 
+# The monorepo's `outputFileTracingRoot` (see apps/web/next.config.ts) makes Next.js emit the
+# standalone server nested under the traced workspace root, i.e.
+# `apps/web/.next/standalone/apps/web/server.js`, with its own pruned `node_modules` alongside
+# it (`apps/web/.next/standalone/node_modules`). Copy the full production `node_modules` from
+# `deps` first (covers native modules like `better-sqlite3` that output file tracing can miss
+# the binary for), then layer the standalone tree's traced `node_modules` and server files on
+# top, flattening into the same one-process layout the single-package build used to produce.
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone/apps/web ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
 
 USER nextjs
 
