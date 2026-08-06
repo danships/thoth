@@ -44,6 +44,19 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 RUN pnpm build
+# `outputFileTracingRoot` makes the standalone output's `apps/web/node_modules/next` (and the
+# native-module symlinks under `apps/web/.next/node_modules/*`) relative symlinks calibrated
+# for their original nesting depth (`apps/web/.next/standalone/apps/web/...`, i.e. two levels
+# below `apps/web/.next/standalone/`). The `runner` stage below flattens
+# `.next/standalone/apps/web` directly into `/app`, which is only *one* level below
+# `.next/standalone/`'s copied `node_modules` — shifting every such symlink's relative target
+# outside of `/app` entirely (e.g. `next` would resolve to `/node_modules/...`, which doesn't
+# exist) and breaking `node server.js` with `Cannot find module 'next'`. Dereference those
+# symlinks into real files here, while the original `/app/node_modules/.pnpm/...` targets are
+# still reachable, so the flattened copy in `runner` is depth-independent.
+RUN cp -rL apps/web/.next/standalone/apps/web /tmp/standalone-web && \
+    rm -rf apps/web/.next/standalone/apps/web && \
+    mv /tmp/standalone-web apps/web/.next/standalone/apps/web
 
 FROM base AS runner
 WORKDIR /app
