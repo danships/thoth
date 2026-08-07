@@ -1,0 +1,205 @@
+# AI Agent Instructions for Thoth Web App
+
+This file contains instructions for AI agents working on the `@thoth/web` package
+(the Next.js application within the Thoth pnpm monorepo). See the [repository-root
+AGENTS.md](../../AGENTS.md) for monorepo-wide conventions.
+
+## Project Overview
+
+`apps/web` is a Next.js 16 application using React 19, Mantine UI 8, and TypeScript.
+
+**Tech Stack:**
+
+- Next.js 16 with App Router
+- React 19
+- Mantine UI 8
+- TypeScript
+- pnpm
+
+**Architecture:**
+
+- Atomic Design Methodology for UI components
+- App Router for routing
+- API routes in `src/app/api/`
+- Use TypeScript types over interfaces
+
+## Creating API Routes
+
+API routes follow this pattern:
+
+### 1. Type Definitions (`src/types/`)
+
+Create Zod schemas for request/response validation:
+
+```typescript
+import { z } from 'zod';
+
+export const getPagesTreeQuerySchema = z.object({
+  parentId: z.string().min(1).optional(),
+});
+
+export const getPagesTreeResponseSchema = z.object({
+  branches: z.array(
+    z.object({
+      page: z.object({
+        id: z.string(),
+        title: z.string(),
+      }),
+    })
+  ),
+});
+
+export type GetPagesTreeQuery = z.infer<typeof getPagesTreeQuerySchema>;
+export type GetPagesTreeResponse = z.infer<typeof getPagesTreeResponseSchema>;
+```
+
+### 2. Route Implementation (`src/app/api/{route}/route.ts`)
+
+Use the `apiRoute` wrapper with typed parameters. **Content** (pages, data-sources, DataViews)
+is scoped by workspace membership + grant via `assertContentAccess`/`addWorkspaceIdToQuery` —
+never by `userId` (creator identity is attribution only, see "Content vs. Per-User State
+Scoping" below):
+
+```typescript
+export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}>(
+  {
+    expectedQuerySchema: getPagesTreeQueryVariablesSchema,
+  },
+  async ({ query }, session) => {
+    const workspaceId = await resolveWorkspaceIdForRequest(query, session.user.id);
+    await assertWorkspaceAccess(session.user.id, workspaceId);
+
+    const containerRepository = await getContainerRepository();
+    const databaseQuery = addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId).sort(
+      'lastUpdated',
+      'desc'
+    );
+
+    if (query?.parentId) {
+      databaseQuery.eq('parentId', query.parentId);
+    }
+
+    const containers = await filterContainersByGrantForSession(
+      session,
+      (await containerRepository.getByQuery(databaseQuery)).filter(
+        (container) => query?.parentId || !container.parentId
+      )
+    );
+
+    return {
+      branches: containers.map((container) => ({
+        page: {
+          id: container.id,
+          name: container.name,
+        },
+      })),
+    };
+  }
+);
+```
+
+### API Route Structure
+
+```
+src/app/api/
+├── pages/
+│   └── tree/
+│       └── route.ts          # Handles /api/pages/tree
+├── users/
+│   └── route.ts              # Handles /api/users
+└── auth/
+    └── login/
+        └── route.ts          # Handles /api/auth/login
+```
+
+### Key Points for API Routes
+
+- Use Zod schemas for request/response validation
+- Implement proper error handling with appropriate HTTP status codes
+- Integrate with authentication system (better-auth)
+- Use NextRequest/NextResponse objects
+- Export functions named after HTTP methods (GET, POST, PUT, DELETE, etc.)
+- Whenever a route or its API Zod schemas change, update `src/lib/openapi/registry.ts`, run `pnpm openapi:generate` (or from the repo root: `pnpm --filter @thoth/web openapi:generate`), and commit the refreshed `public/openapi.json` (served statically at `/openapi.json`).
+- `pnpm lint` includes `lint:openapi`, which fails if `public/openapi.json` drifts from the registry/Zod source of truth.
+- The Docker build copies the standalone build's `public` directory into the runtime image, so the committed spec ships automatically.
+
+## General TypeScript Rules
+
+- Use types instead of interfaces: `type MyType = { ... }` over `interface MyType { ... }`
+- All API endpoints should have typed request/response schemas
+- Use Zod for runtime validation
+
+## Content vs. Per-User State Scoping (THOTH-042)
+
+Thoth's authorization model draws a hard line between two kinds of rows:
+
+- **CONTENT** (`Container` pages/data-sources, `DataView`) — gated by **workspace membership +
+  grant**, never by creator identity. `userId` on a content row is attribution/provenance only.
+  The canonical chokepoint is `assertContentAccess(session, row, { mutating? })`
+  (`src/lib/api/server/workspace-access.ts`): it asserts the caller is a member of the row's own
+  `workspaceId` (via `assertWorkspaceAccess`, which throws `NotFoundError` — never 403 — for
+  non-members, hiding existence), resolves a single `AccessGrant` for the caller (a human member
+  via `memberToAccessGrant`, or an App via `session.appContext.accessGrant` — same shape, same
+  checks), and enforces read scope (`assertGrantAllowsContainer`) and, for mutations, write
+  permission (`assertGrantAllowsWrite`). List/tree routes use the sibling
+  `filterContainersByGrantForSession(session, rows)` instead. Build content queries with
+  `addWorkspaceIdToQuery(query, workspaceId)`, never `addUserIdToQuery`.
+
+- **PER-USER STATE** (`ContainerAccess` — starred/last-accessed) — stays scoped by `userId` via
+  `addUserIdToQuery(query, session.user.id)`. This is the *only* legitimate remaining use of
+  `addUserIdToQuery` for anything resembling a workspace resource.
+
+A member/App scoped to `workspace`/`read_write` (the default for every original owner) is
+unaffected — `assertGrantAllowsContainer` short-circuits and `assertGrantAllowsWrite` always
+passes. The extra enforcement only bites for members explicitly scoped to specific containers or
+granted `read`-only.
+
+## File Structure
+
+```
+src/
+├── app/                      # Next.js App Router
+│   ├── api/                 # API routes
+│   └── (routes)/            # Page routes
+├── components/
+│   ├── atoms/               # Atomic Design: atoms
+│   ├── molecules/           # Atomic Design: molecules
+│   ├── organisms/           # Atomic Design: organisms
+│   └── templates/           # Atomic Design: templates
+├── lib/
+│   ├── hooks/              # Custom React hooks
+│   ├── database/           # Database entities and repositories
+│   └── auth.ts             # Authentication utilities
+└── types/                   # TypeScript type definitions
+```
+
+## Testing & Quality
+
+Before completing tasks, run the relevant quality gates for the scope you changed:
+
+- `pnpm test:unit` — fast Vitest unit tests for isolated logic in `src/**/*.test.ts`
+- `pnpm test:integration` — Vitest API integration tests against a real HTTP server in `tests/integration/api/**/*.test.ts`
+- `pnpm test` — combined unit + integration suite
+- `pnpm test:e2e` — Playwright browser tests for user-facing flows
+- `pnpm lint` — ESLint + Prettier + TypeScript + OpenAPI drift checks
+- `pnpm lint:tsc` — TypeScript-only check when you need to focus on compile errors first
+- `pnpm build` — required before opening a pull request
+- Only commit changes when explicitly requested by the user
+- Never add custom patches (e.g. via `pnpm patch`/`patches/*.patch`) to work around a broken
+  ESLint rule or dependency incompatibility. Instead, disable the offending rule (or fix the
+  root cause via config, e.g. explicit `settings`) in `eslint.config.mjs`.
+
+## Playwright E2E Tests
+
+Use Playwright for browser/UI interaction coverage. Prefer unit tests for isolated logic and
+`tests/integration/api/` for API-only behavior that does not require a browser.
+
+- Tests live in `tests/e2e/` grouped by domain (auth, pages, data-sources, data-views, page-values).
+- Shared seeded data lives in `tests/fixtures/seed.ts` and is re-exported by `tests/e2e/constants.ts` (`SEED.*`).
+- Run (from repo root): `pnpm test:e2e` (local) · `pnpm test:e2e:ui` (interactive) · `pnpm test:e2e:report` (report).
+- See `.agents/commands/e2e-test.md` (repo root) for full conventions, auth setup, and selector guidance.
+
+## Skills
+
+See the [repository-root AGENTS.md](../../AGENTS.md#skills) for the full list of agent skills
+available for this codebase (they apply across the monorepo, including `apps/web`).
