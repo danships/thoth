@@ -13,7 +13,7 @@ import {
   getWorkspaceMemberRepository,
   getWorkspaceRepository,
   getWorkspaceSlugRedirectRepository,
-} from '../src/lib/database/index.js';
+} from '../apps/web/src/lib/database/index.js';
 
 const DEFAULT_GRACE_PERIOD_DAYS = 30;
 const RACE_SAFETY_MARGIN_MS = 60 * 60 * 1000; // 1 hour

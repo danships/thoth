@@ -6,11 +6,11 @@ This document outlines the pattern for creating new API routes in the Thoth Next
 
 API routes in Thoth follow Next.js App Router conventions with these main components:
 
-1. **Type definitions** in `src/types/`
-2. **Route implementation** in `src/app/api/{route}/route.ts`
+1. **Type definitions** in `apps/web/src/types/`
+2. **Route implementation** in `apps/web/src/app/api/{route}/route.ts`
 3. **Request/Response handling** using Next.js Request/Response objects
 
-## 1. Type Definitions (`src/types/`)
+## 1. Type Definitions (`apps/web/src/types/`)
 
 Create type definitions for your API endpoint:
 
@@ -48,7 +48,7 @@ export type GetPagesTreeQuery = z.infer<typeof getPagesTreeQuerySchema>;
 export type GetPagesTreeResponse = z.infer<typeof getPagesTreeResponseSchema>;
 ```
 
-## 2. Route Implementation (`src/app/api/{route}/route.ts`)
+## 2. Route Implementation (`apps/web/src/app/api/{route}/route.ts`)
 
 Create the route handler the route-wrapper:
 
@@ -126,7 +126,7 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
 Next.js App Router automatically handles routing based on file structure:
 
 ```
-src/app/api/
+apps/web/src/app/api/
 ├── pages/
 │   └── tree/
 │       └── route.ts          # Handles /api/pages/tree
@@ -149,7 +149,7 @@ src/app/api/
 ## File Structure
 
 ```
-src/
+apps/web/src/
 ├── app/api/
 │   └── {route}/
 │       └── route.ts          # Route implementation

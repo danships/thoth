@@ -30,7 +30,7 @@ set -e
 : "${DB:=sqlite:///data/thoth.db}"
 export DB
 
-env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' | grep -v -E '^(HOME|PATH|PWD|HOSTNAME|SHLVL|OLDPWD|_)=' > /app/.env
+env | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' | grep -v -E '^(HOME|PATH|PWD|HOSTNAME|SHLVL|OLDPWD|_)=' > /app/apps/web/.env
 
 # The container starts as root (no `USER` directive in Dockerfile.preview)
 # specifically so this can run: the preview deploy tooling may mount `/data`
@@ -52,7 +52,7 @@ if [ "$(id -u)" = '0' ]; then
   # directory itself (not its contents) world-writable so any host user
   # can create that marker file alongside the app's own data.
   chmod 777 /data
-  chown nextjs:nodejs /app/.env
+  chown nextjs:nodejs /app/apps/web/.env
   exec su-exec nextjs "$@"
 fi
 

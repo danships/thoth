@@ -71,11 +71,11 @@ const starred = addUserIdToQuery(containerAccessRepository.createQuery().eq('sta
 ```
 
 `addUserIdToQuery` carries a JSDoc warning that it must never be used to gate content rows — see
-`src/lib/database/helpers.ts`.
+`apps/web/src/lib/database/helpers.ts`.
 
 ## Entities
 
-Entity definitions live in `src/lib/database/entities/`. The three main entities are:
+Entity definitions live in `apps/web/src/lib/database/entities/`. The three main entities are:
 
 | Constant | Entity type | Typical use |
 |----------|-------------|-------------|
@@ -84,7 +84,7 @@ Entity definitions live in `src/lib/database/entities/`. The three main entities
 | `DATA_VIEW_NAME` | `DataView` | Saved data views |
 | `MEMBER_SCOPED_CONTAINER_NAME` | `MemberScopedContainer` | Join table: a workspace member scoped to specific containers (mirrors `AppScopedContainer`) |
 
-Entity TypeScript types are in `src/types/database/`. Always import the type, not the entity class, for typing variables:
+Entity TypeScript types are in `apps/web/src/types/database/`. Always import the type, not the entity class, for typing variables:
 
 ```typescript
 import type { Container, Workspace, DataView } from '@/types/database';
@@ -109,7 +109,7 @@ const page = await containerRepository.create({
 
 ## Retrievers (Complex Queries)
 
-For queries that join or aggregate across multiple entities, use a **retriever** from `src/lib/database/retrievers/` rather than inline repository chaining:
+For queries that join or aggregate across multiple entities, use a **retriever** from `apps/web/src/lib/database/retrievers/` rather than inline repository chaining:
 
 ```typescript
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
@@ -122,7 +122,7 @@ Add new retrievers here when a route's data-fetching logic is complex enough to 
 
 ## Migrations
 
-Database migrations live in `src/lib/database/migrations/`. Migrations run automatically at startup (unless `SUPERSAVE_SKIP_SYNC=true`). When adding a new entity field, create a migration file and register it in `src/lib/database/migrations/index.ts`.
+Database migrations live in `apps/web/src/lib/database/migrations/`. Migrations run automatically at startup (unless `SUPERSAVE_SKIP_SYNC=true`). When adding a new entity field, create a migration file and register it in `apps/web/src/lib/database/migrations/index.ts`.
 
 ## Common Patterns
 
@@ -146,7 +146,7 @@ if (!workspace) throw new Error('Workspace not found');
 
 A workspace member's capability is modelled with the **same shape** as an App's `AccessGrant`
 (`permission`: `'read' | 'read_write'`, `scopeType`: `'workspace' | 'containers' | 'containers_with_children'`),
-stored on the `workspace-member` row. `memberToAccessGrant(member)` (`src/lib/auth/access-grant.ts`)
+stored on the `workspace-member` row. `memberToAccessGrant(member)` (`apps/web/src/lib/auth/access-grant.ts`)
 builds an `AccessGrant` from that row, reading the `member-scoped-container` join table
 (`getMemberScopedContainerRepository()`) when `scopeType` is not `'workspace'` — mirroring
 `appToAccessGrant`. This lets `assertGrantAllowsContainer` / `filterContainersByGrant` /

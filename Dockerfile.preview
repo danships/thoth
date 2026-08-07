@@ -6,8 +6,9 @@
 # include:
 #   - the full `node_modules` (including devDependencies such as `tsx`,
 #     which the seed script is executed with)
-#   - the full source tree (`src/`, `tsconfig.json`, `package.json`) so the
-#     seed script's `@/*` path aliases resolve
+#   - the full source tree (`apps/web/src/`, `apps/web/tsconfig.json`,
+#     `apps/web/package.json`) so the seed script's `@/*` path aliases
+#     resolve
 #
 # Crucially, everything is installed at *build* time. No `pnpm install` (or
 # any other dependency download) happens when the container starts or when
@@ -31,6 +32,7 @@ FROM base AS deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/web/package.json apps/web/package.json
 # Full install (no `--prod`): devDependencies like `tsx` and `typescript`
 # must be present in the final image so the seed script can run without any
 # further installation at runtime.
@@ -39,6 +41,7 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 RUN pnpm build
 
@@ -65,31 +68,45 @@ RUN apk add --no-cache wget su-exec && \
     mkdir -p /home/nextjs /data && \
     chown -R nextjs:nodejs /home/nextjs /app /data
 
-# Full node_modules (dev + prod), already fully installed at build time.
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# The monorepo's `outputFileTracingRoot` (see apps/web/next.config.ts) makes Next.js emit the
+# standalone output nested under the traced workspace root: the traced dependency tree lands
+# at `apps/web/.next/standalone/node_modules` (the standalone tree's *root*), and
+# `apps/web/.next/standalone/apps/web/` holds `server.js` plus its own `node_modules` full of
+# *relative* symlinks back into that top-level `node_modules` (e.g.
+# `apps/web/.next/standalone/apps/web/node_modules/next ->
+# ../../../node_modules/.pnpm/next@.../node_modules/next`, itself calibrated for the exact
+# nesting depth `standalone/apps/web/node_modules/`). Copy the full (dev + prod) `node_modules`
+# already installed at build time, then copy `standalone/` as a whole — preserving that same
+# nesting intact — so those relative symlinks keep resolving correctly. Flattening `apps/web/`
+# straight into `/app` (as this image used to) shifts the symlinks' relative depth by one
+# level and breaks `node server.js` with `Cannot find module 'next'` /
+# `Cannot find module '@swc/helpers/...'`.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 # Overwrite the minimal, traced package.json from the standalone build with
 # the full one, and copy the full source tree (not just the seed script), so
 # `pnpm run db:seed` is runnable in the running container. The seed script
 # imports from `@/lib` and `@/types` via tsx path aliases, so those source
 # directories must also be present, not just src/scripts.
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/package.json ./apps/web/package.json
 # pnpm-workspace.yaml carries the `onlyBuiltDependencies`/`allowBuilds`
 # allowlist (see pnpm-workspace.yaml). Without it present in /app, any
 # `pnpm install` run against this image (e.g. during preview provisioning)
 # falls back to pnpm's default of ignoring build scripts for dependencies
 # like `better-sqlite3`, `esbuild`, `sharp` and `unrs-resolver`, which pnpm
 # treats as a hard error (`ERR_PNPM_IGNORED_BUILDS`) unless explicitly
-# approved or allowlisted.
+# approved or allowlisted. It also marks /app as the pnpm workspace root, so
+# `pnpm run db:seed` (executed with cwd `/app/apps/web`, see WORKDIR below)
+# finds it via pnpm's normal upward search, exactly as it would in local dev.
 COPY --from=builder --chown=nextjs:nodejs /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=builder --chown=nextjs:nodejs /app/pnpm-lock.yaml ./pnpm-lock.yaml
-COPY --from=builder --chown=nextjs:nodejs /app/src ./src
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/src ./apps/web/src
 # tsconfig.json so `tsx` can resolve the `@/*` path aliases used by the seed
 # script (and its imports) when it is executed directly in the running
 # container.
-COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/tsconfig.json ./apps/web/tsconfig.json
 # `scripts/db-seed.sh` is the wrapper `pnpm run db:seed` now points at (see
 # package.json). It drops privileges to `nextjs` before running the seed
 # script when invoked as root — which `docker exec` does by default against
@@ -97,12 +114,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 # connection never leaves root-owned `-wal`/`-shm` files behind that would
 # make the database unwritable for the app's own `nextjs`-owned connection
 # afterwards.
-COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-seed.sh ./scripts/db-seed.sh
-RUN chmod +x ./scripts/db-seed.sh
-# Persist the container's runtime env vars to /app/.env on startup (see
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/scripts/db-seed.sh ./apps/web/scripts/db-seed.sh
+RUN chmod +x ./apps/web/scripts/db-seed.sh
+# Persist the container's runtime env vars to apps/web/.env on startup (see
 # docker-entrypoint.sh) so a later `docker exec ... pnpm run db:seed` can
 # load them via `dotenv/config`, even though that separate exec session
-# does not reliably inherit the runtime environment on its own.
+# does not reliably inherit the runtime environment on its own. The seed
+# script (src/scripts/seed.ts) resolves that `.env` file relative to its own
+# location (two directories up, i.e. `apps/web/.env`), matching this layout.
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
@@ -113,6 +132,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 # start (cheap, idempotent) and then drops privileges to `nextjs` via
 # `su-exec` before execing the app, so the SQLite file underneath it is
 # always writable by the user the app actually runs as.
+
+WORKDIR /app/apps/web
 
 EXPOSE 3000
 ENV PORT=3000

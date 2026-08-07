@@ -2,7 +2,7 @@
   "extends": ["@tsconfig/strictest"],
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": ["esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -12,20 +12,13 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@lib/*": ["./src/lib/*"],
-      "@components/*": ["./src/lib/components/*"],
-      "@types/*": ["./src/lib/types/*"]
+      "@/*": ["./apps/web/src/*"],
+      "@lib/*": ["./apps/web/src/lib/*"],
+      "@components/*": ["./apps/web/src/lib/components/*"],
+      "@types/*": ["./apps/web/src/lib/types/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "scripts/notion-import"]
+  "include": ["scripts/**/*.ts"],
+  "exclude": ["node_modules", "apps/**", "packages/**", "scripts/notion-import"]
 }

@@ -77,7 +77,7 @@ For each route:
 - Request body / query params (field, type, required?)
 - Response shape
 - Error cases (status code + reason)
-- If routes or API schemas change, include an implementation step to update `src/lib/openapi/registry.ts`, run `pnpm openapi:generate`, and commit the regenerated `public/openapi.json`.
+- If routes or API schemas change, include an implementation step to update `apps/web/src/lib/openapi/registry.ts`, run `pnpm openapi:generate`, and commit the regenerated `apps/web/public/openapi.json`.
 - Note that `pnpm lint` runs `lint:openapi` and should fail on OpenAPI drift, and that the Docker image ships the committed spec via the existing `COPY --from=builder /app/public ./public` step.
 
 ---

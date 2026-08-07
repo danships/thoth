@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules
 scripts/notion-import/node_modules
 /.pnp
 .pnp.*
@@ -13,10 +13,12 @@ scripts/notion-import/node_modules
 
 # testing
 /coverage
+apps/web/coverage
 
 # next.js
-/.next/
+.next/
 /out/
+apps/web/out/
 
 # production
 /build
@@ -34,6 +36,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.test
+!apps/web/.env.test
 
 # vercel
 .vercel
@@ -46,7 +49,11 @@ db.sqlite
 db.sqlite-*
 
 /playwright-report/
+apps/web/playwright-report/
 /test-results/
+apps/web/test-results/
 /tests/e2e/.auth/
+apps/web/tests/e2e/.auth/
 e2e-test.db.tmp/
 .vitest-tmp/
+apps/web/.thoth-integration-*/
