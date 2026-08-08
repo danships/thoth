@@ -1,21 +1,15 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { withAuthPage } from '@/lib/auth/with-auth-page';
-import { getLandingWorkspaceForUser } from '@/lib/database/resolve-workspace';
+import { WorkspacesIndexClient } from './workspaces-index-client';
 
 export const metadata: Metadata = { title: 'Workspaces' };
 
-// Legacy bare `/workspaces` URL from before multi-workspace-scoped chrome. Redirects into the
-// user's last-used/default workspace at `/[workspaceSlug]/workspaces`, so the page renders with
-// the same `AppShell` header + page-tree sidebar as the rest of the app instead of standalone.
-async function LegacyWorkspacesIndexPage({ session }: { session: { user: { id: string } } }) {
-  const workspace = await getLandingWorkspaceForUser(session.user.id);
-
-  if (!workspace) {
-    return redirect('/workspaces/new');
-  }
-
-  return redirect(`/${workspace.slug}/workspaces`);
+// The root-level `/workspaces` index — renders directly instead of redirecting into a
+// workspace-scoped URL (THOTH-069). `withAuthPage` still gates the route on a valid session;
+// the list itself is further scoped to the caller's own memberships client-side
+// (`useWorkspaces()`).
+function WorkspacesIndexPage() {
+  return <WorkspacesIndexClient />;
 }
 
-export default withAuthPage(LegacyWorkspacesIndexPage);
+export default withAuthPage(WorkspacesIndexPage);

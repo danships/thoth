@@ -1,5 +1,6 @@
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useDataSources } from '@/lib/hooks/api/use-data-sources';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 import { CreateDataSourceBody, CreateDataSourceResponse, GetDataSourcesResponse } from '@/types/api';
 import { ActionIcon, Button, Card, Group, Loader, Select, Stack, TextInput, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -46,6 +47,7 @@ export function DataSourceSelector({ onSelect }: Properties) {
   });
 
   const { post } = useCudApi();
+  const { id: workspaceId } = useCurrentWorkspace();
   const handleCreateSubmit = useCallback(
     async (values: { name: string }) => {
       if (!values.name) {
@@ -53,12 +55,19 @@ export function DataSourceSelector({ onSelect }: Properties) {
         return;
       }
 
+      // Always pass the current workspace explicitly rather than relying on the API's
+      // default-workspace fallback, so a data source created inline (e.g. from the "Add View"
+      // flow) always lands in the workspace of the page the caller is actually looking at —
+      // not their globally-resolved default workspace, which may differ. Without this, the
+      // breadcrumb trail for records added to the resulting view could terminate early because
+      // the data source/view end up in a different workspace than the hosting page (THOTH-069).
       const createdDataSource = await post<CreateDataSourceResponse, CreateDataSourceBody>('/data-sources', {
         name: values.name,
+        workspaceId,
       });
       onSelect(createdDataSource);
     },
-    [dataSourceForm, post, onSelect]
+    [dataSourceForm, post, onSelect, workspaceId]
   );
 
   const dataSourceOptions = useMemo<Array<{ value: string; label: string }> | undefined>(() => {
