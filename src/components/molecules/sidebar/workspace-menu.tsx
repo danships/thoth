@@ -101,11 +101,7 @@ export function WorkspaceMenu() {
           >
             New workspace
           </Menu.Item>
-          <Menu.Item
-            component={Link}
-            href={`/${currentWorkspace.slug}/workspaces`}
-            leftSection={<IconLayoutGrid size={16} />}
-          >
+          <Menu.Item component={Link} href="/workspaces" leftSection={<IconLayoutGrid size={16} />}>
             Manage workspaces
           </Menu.Item>
 

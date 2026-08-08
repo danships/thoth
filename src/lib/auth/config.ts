@@ -9,6 +9,7 @@ import { getDatabase } from '../database';
 import { createWorkspaceForUser } from '../database/seed-workspace';
 import { registerPlatformUser } from './platform-user';
 import { getEnvironment } from '../environment';
+import { resolveAppUrl } from '../environment/app-url';
 import { slugify } from '../utils/slug';
 import { pickRandomNerdySuffix } from '../utils/nerdy-slug';
 
@@ -46,6 +47,9 @@ async function initializeAuth() {
 
     const environment = await getEnvironment();
     const useOidc = hasOidcConfig(environment);
+    // Explicitly configured rather than relying on better-auth's implicit request-header
+    // inference, which is unsafe in production (trusts a potentially spoofed `Host` header).
+    const appUrl = resolveAppUrl(environment);
 
     const databaseHooks = {
       user: {
@@ -92,7 +96,8 @@ async function initializeAuth() {
             ],
           }),
         ],
-        trustedOrigins: environment.NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
+        baseURL: appUrl,
+        trustedOrigins: [appUrl],
         secret: environment.BETTER_AUTH_SECRET,
         hooks: {},
         databaseHooks,
@@ -107,7 +112,8 @@ async function initializeAuth() {
         emailAndPassword: {
           enabled: true,
         },
-        trustedOrigins: environment.NODE_ENV === 'development' ? ['http://localhost:3000'] : [],
+        baseURL: appUrl,
+        trustedOrigins: [appUrl],
         secret: environment.BETTER_AUTH_SECRET,
         hooks: {},
         databaseHooks,
