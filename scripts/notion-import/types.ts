@@ -26,6 +26,18 @@ export type Mapping = {
   // Server-assigned column/option ids for database properties, keyed by the Notion property
   // name. Populated for `database` mappings so row conversion can reference the correct ids.
   columnMappings?: Record<string, ColumnMapping>;
+  // For `database` mappings only: the id of the wrapping Thoth *page* that hosts a `DataView`
+  // tab pointing at `thothContainerId` (the data-source, which is always created at the
+  // workspace root and has no page of its own — it's only browsable through a page's view
+  // tab). Other content links to a Notion database via this id, never the raw data-source id,
+  // which isn't a navigable page and would otherwise render as a broken link.
+  thothViewPageId?: string | null;
+  // For `database_row` mappings only: whether this row's Notion block content (body) has been
+  // built and written to Thoth at least once. Older mappings (created before row bodies were
+  // imported at all) lack this field/are `false`, so an otherwise-unchanged row can still be
+  // self-healed with its missing body content on a later sync without re-triggering a full
+  // create/update (and without disturbing the column-values conflict-detection hash).
+  rowContentSynced?: boolean;
 };
 
 export type ColumnMapping = {

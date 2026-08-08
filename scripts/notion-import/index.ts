@@ -8,7 +8,7 @@ import { richTextToPlainText } from './convert/rich-text';
 import { hashMarkdown, hashJson } from './hash';
 import { decideInitialAction, decideAfterThothRead } from './sync';
 import type { Config } from './config';
-import { createInitialStateFile, createEmptyStats, type StateFile, type ReportEntry, type SyncOutcome } from './types';
+import { createInitialStateFile, createEmptyStats, type StateFile, type ReportEntry, type SyncOutcome, type Mapping } from './types';
 import type { PrimitiveColumnInput, ThothPageValue } from './thoth-client';
 import { redactSecrets } from './redact';
 
@@ -68,11 +68,17 @@ export type ThothClientLike = {
     name: string;
     columns?: PrimitiveColumnInput[] | undefined;
     workspaceId?: string | undefined;
-  }): Promise<{ id: string; columns: { id: string; name: string }[] }>;
+  }): Promise<{ id: string; columns: { id: string; name: string; type: string }[] }>;
   addDataSourceColumn(
     dataSourceId: string,
     input: unknown
   ): Promise<{ id: string; options?: { id: string; label: string }[] }>;
+  createDataView(input: {
+    name: string;
+    dataSourceId: string;
+    pageId?: string | undefined;
+    workspaceId?: string | undefined;
+  }): Promise<{ id: string }>;
   uploadFile(input: {
     filename: string;
     mimeType: string;
@@ -293,10 +299,42 @@ async function processPage(
   });
 }
 
+// A Notion "database" imports as a Thoth data-source, but data sources are always created at
+// the workspace root and have no page of their own — they're only browsable through a
+// `DataView` tab on a regular page. This creates that wrapping page (placed wherever the
+// database itself would have landed in the page tree) plus a linked view the first time a
+// database mapping is missing one, and is safe to call repeatedly: once `thothViewPageId` is
+// set it's a no-op. This also self-heals mappings created by an older version of this script
+// that never created a view page, so a database imported before this existed becomes navigable
+// on the next sync run without a full reimport.
+async function ensureDatabaseViewPage(
+  context: ImportContext,
+  mapping: Mapping,
+  title: string,
+  thothParentId: string | null
+): Promise<void> {
+  if (context.config.dryRun || mapping.thothViewPageId || !mapping.thothContainerId) {
+    return;
+  }
+  const page = await context.thoth.createPage({
+    name: title,
+    emoji: null,
+    parentId: thothParentId,
+    workspaceId: thothParentId ? undefined : context.config.thothWorkspaceId,
+  });
+  await context.thoth.createDataView({
+    name: 'Table',
+    dataSourceId: mapping.thothContainerId,
+    pageId: page.id,
+  });
+  mapping.thothViewPageId = page.id;
+}
+
 async function processDatabase(
   context: ImportContext,
   notionDatabase: NotionDatabaseLike,
-  thothParentId: string | null
+  thothParentId: string | null,
+  discovered: { id: string; parentNotionId: string }[]
 ): Promise<void> {
   const title = notionDatabase.title?.map((segment) => segment.plain_text).join('') || 'Untitled database';
   const existingMapping = context.state.mappings[notionDatabase.id];
@@ -311,6 +349,9 @@ async function processDatabase(
     if (initial.action === 'skip_archived' && existingMapping) {
       existingMapping.deletedInNotion = true;
     }
+    if (initial.action === 'skip_unchanged' && existingMapping) {
+      await ensureDatabaseViewPage(context, existingMapping, title, thothParentId);
+    }
     pushReport(context, {
       notionId: notionDatabase.id,
       notionType: 'database',
@@ -318,6 +359,22 @@ async function processDatabase(
       outcome: 'skipped_unchanged',
       thothContainerId: existingMapping?.thothContainerId ?? null,
     });
+    // Still walk rows on an unchanged database (rather than returning immediately): a database
+    // itself being unchanged says nothing about whether its rows still need to be self-healed
+    // (e.g. `rowContentSynced` backfill for row body content added by a newer version of this
+    // script, see `processDatabaseRow`). Individual rows still skip via their own
+    // `decideInitialAction` check when they're themselves unchanged.
+    if (
+      initial.action === 'skip_unchanged' &&
+      existingMapping?.columnMappings &&
+      existingMapping.thothContainerId &&
+      !context.config.dryRun
+    ) {
+      const rows = await context.notion.queryDatabaseRows(notionDatabase.dataSourceId);
+      for (const row of rows) {
+        await processDatabaseRow(context, row, existingMapping.thothContainerId, existingMapping.columnMappings, discovered);
+      }
+    }
     return;
   }
 
@@ -354,7 +411,7 @@ async function processDatabase(
       });
       thothDataSourceId = created.id;
       for (const column of created.columns) {
-        columnMappings[column.name] = { thothColumnId: column.id, type: 'string' };
+        columnMappings[column.name] = { thothColumnId: column.id, type: column.type };
       }
 
       for (const { name, definition } of extendedDefinitions) {
@@ -385,7 +442,7 @@ async function processDatabase(
   }
 
   if (!context.config.dryRun) {
-    context.state.mappings[notionDatabase.id] = {
+    const mapping: Mapping = {
       notionType: 'database',
       thothContainerId: thothDataSourceId,
       thothColumnId: null,
@@ -393,7 +450,10 @@ async function processDatabase(
       importedContentHash: hashJson(columnMappings),
       deletedInNotion: false,
       columnMappings,
+      thothViewPageId: existingMapping?.thothViewPageId ?? null,
     };
+    await ensureDatabaseViewPage(context, mapping, title, thothParentId);
+    context.state.mappings[notionDatabase.id] = mapping;
   }
 
   pushReport(context, {
@@ -412,7 +472,7 @@ async function processDatabase(
 
   const rows = await context.notion.queryDatabaseRows(notionDataSourceId);
   for (const row of rows) {
-    await processDatabaseRow(context, row, thothDataSourceId, columnMappings);
+    await processDatabaseRow(context, row, thothDataSourceId, columnMappings, discovered);
   }
 }
 
@@ -423,7 +483,8 @@ async function processDatabaseRow(
   columnMappings: Record<
     string,
     { thothColumnId: string; type: string; optionIdsByLabel?: Record<string, string> | undefined }
-  >
+  >,
+  discovered: { id: string; parentNotionId: string }[]
 ): Promise<void> {
   const title = titleOf(row.properties);
   const existingMapping = context.state.mappings[row.id];
@@ -437,6 +498,23 @@ async function processDatabaseRow(
   if (initial.action === 'skip_unchanged' || initial.action === 'skip_archived') {
     if (initial.action === 'skip_archived' && existingMapping) {
       existingMapping.deletedInNotion = true;
+    }
+    // Self-heal: mappings created before database rows had their Notion block content
+    // (body) imported at all (only column values were) never got `rowContentSynced` set.
+    // Backfill their content once here, on an otherwise-unchanged row, without disturbing
+    // `notionLastEditedTime`/`importedContentHash` tracking used for the values conflict check.
+    if (
+      initial.action === 'skip_unchanged' &&
+      existingMapping &&
+      !existingMapping.rowContentSynced &&
+      existingMapping.thothContainerId &&
+      !context.config.dryRun
+    ) {
+      const rowPageId = existingMapping.thothContainerId;
+      const blockNodes = await buildBlockTree(context, row.id, rowPageId, discovered);
+      const { markdown } = blocksToMarkdown(blockNodes);
+      await context.thoth.setPageContent(rowPageId, markdown);
+      existingMapping.rowContentSynced = true;
     }
     pushReport(context, {
       notionId: row.id,
@@ -468,7 +546,7 @@ async function processDatabaseRow(
 
   if (initial.action === 'create') {
     if (!context.config.dryRun) {
-      const created = await context.thoth.createPage({ name: title, parentId: dataSourceId });
+      const created = await context.thoth.createPage({ name: title, emoji: null, parentId: dataSourceId });
       rowPageId = created.id;
     }
   } else {
@@ -498,6 +576,21 @@ async function processDatabaseRow(
     await context.thoth.updatePageValues(rowPageId, values);
   }
 
+  // Database rows are themselves Notion pages and can have a Markdown body (block content)
+  // beyond their column values — e.g. a "Links" row with a column-list of bullet points. This
+  // was previously never imported (only property values were), leaving row pages with an empty
+  // body in Thoth even though Notion had rich content.
+  const blockNodes = await buildBlockTree(
+    context,
+    row.id,
+    context.config.dryRun ? null : rowPageId,
+    discovered
+  );
+  const { markdown } = blocksToMarkdown(blockNodes);
+  if (!context.config.dryRun && rowPageId) {
+    await context.thoth.setPageContent(rowPageId, markdown);
+  }
+
   if (!context.config.dryRun) {
     context.state.mappings[row.id] = {
       notionType: 'database_row',
@@ -506,6 +599,7 @@ async function processDatabaseRow(
       notionLastEditedTime: row.last_edited_time,
       importedContentHash: hashJson(values),
       deletedInNotion: false,
+      rowContentSynced: true,
     };
   }
 
@@ -541,7 +635,10 @@ async function resolveLinks(context: ImportContext, writtenPageIds: Set<string>)
       // is added to) over the raw Notion id, which isn't meaningful to a reader.
       const linkedTitle = context.state.lastRun.report.find((entry) => entry.notionId === linkedNotionId)?.title;
       if (linkedMapping?.thothContainerId) {
-        return `[${linkedTitle ?? linkedNotionId}](/pages/${linkedMapping.thothContainerId})`;
+        // Databases aren't independently navigable — link to the wrapping page (with its
+        // `DataView` tab) created for them, not the raw data-source id, which isn't a page.
+        const linkTarget = linkedMapping.thothViewPageId ?? linkedMapping.thothContainerId;
+        return `[${linkedTitle ?? linkedNotionId}](/pages/${linkTarget})`;
       }
       // Never silently drop a link the source content pointed to — returning '' would make
       // referenced content vanish without a trace. Keep it visible (even if not clickable) so a
@@ -654,7 +751,22 @@ export async function runImport(
 
       try {
         if (object.object === 'database') {
-          await processDatabase(context, object, thothParentId);
+          await processDatabase(context, object, thothParentId, discovered);
+          // `retrieve()` can resolve a legacy multi-source *database container* id (as
+          // discovered from a `child_database` block, or a `link_to_page`/mention's
+          // `database_id`) to a *different* underlying data-source id — `object.id` here is
+          // always the data-source id actually mapped by `processDatabase`, while `id` is
+          // whatever id the block/mention referenced. Content elsewhere embeds
+          // `{{notion-page-link:<id>}}` placeholders keyed by that original referenced id
+          // (see `convert/blocks.ts`), so without this alias `resolveLinks` below would never
+          // find the mapping and would permanently downgrade the link to "Unresolved Notion
+          // page (<id>)" even though the database imported successfully.
+          if (object.id !== id) {
+            const resolvedMapping = context.state.mappings[object.id];
+            if (resolvedMapping) {
+              context.state.mappings[id] = resolvedMapping;
+            }
+          }
         } else {
           const reportLengthBefore = context.state.lastRun.report.length;
           await processPage(context, object, thothParentId, discovered);

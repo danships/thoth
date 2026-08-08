@@ -9,6 +9,7 @@ import {
 } from './index';
 import { loadConfig } from './config';
 import type { StateFile } from './types';
+import { createEmptyStats } from './types';
 import type { PrimitiveColumnInput, ThothPageValue } from './thoth-client';
 
 const BASE_ENV = {
@@ -105,10 +106,10 @@ class FakeThothClient implements ThothClientLike {
   async createDataSource(input: {
     name: string;
     columns?: PrimitiveColumnInput[];
-  }): Promise<{ id: string; columns: { id: string; name: string }[] }> {
+  }): Promise<{ id: string; columns: { id: string; name: string; type: string }[] }> {
     this.calls.push('createDataSource');
     const id = this.id('ds');
-    const columns = (input.columns ?? []).map((column) => ({ id: this.id('col'), name: column.name }));
+    const columns = (input.columns ?? []).map((column) => ({ id: this.id('col'), name: column.name, type: column.type }));
     return { id, columns };
   }
 
@@ -120,6 +121,13 @@ class FakeThothClient implements ThothClientLike {
     const typed = input as { options?: { label: string }[] };
     const options = typed.options?.map((option) => ({ id: this.id('opt'), label: option.label }));
     return options ? { id: this.id('col'), options } : { id: this.id('col') };
+  }
+
+  async createDataView(_input: { name: string; dataSourceId: string; pageId?: string; workspaceId?: string }): Promise<{
+    id: string;
+  }> {
+    this.calls.push('createDataView');
+    return { id: this.id('view') };
   }
 
   async uploadFile(): Promise<{ id: string; url: string; filename: string }> {
@@ -402,6 +410,177 @@ describe('runImport (database lifecycle)', () => {
       type: 'single-select',
       value: databaseMapping.columnMappings!['Status']!.optionIdsByLabel!['Open'],
     });
+  });
+
+  it('imports a database row Markdown body (block content), not just its column values', async () => {
+    const config = loadConfig(BASE_ENV);
+    const notion = new FakeNotionClient();
+    const thoth = new FakeThothClient();
+    notion.databases.set('db1', notionDatabase('db1', 'Tasks', '2026-01-01T00:00:00.000Z'));
+    notion.rootIds = ['db1'];
+    notion.rows.set('db1', [
+      {
+        id: 'row1',
+        object: 'page',
+        last_edited_time: '2026-01-01T00:00:00.000Z',
+        properties: {
+          Name: { type: 'title', title: [{ plain_text: 'Task 1' }] },
+          Status: { type: 'select', select: { name: 'Open' } },
+        },
+        parent: { type: 'data_source' },
+      },
+    ]);
+    notion.blockChildren.set('row1', [
+      {
+        id: 'block1',
+        type: 'paragraph',
+        paragraph: { rich_text: [{ plain_text: 'Some body content', href: null, annotations: {} }] },
+      },
+    ]);
+
+    const result = await runImport(config, notion, thoth, null);
+
+    expect(result.exitCode).toBe(0);
+    expect(thoth.calls).toContain('setPageContent');
+    const rowMapping = result.state.mappings['row1']!;
+    expect(rowMapping.rowContentSynced).toBe(true);
+    expect(thoth.pageContent.get(rowMapping.thothContainerId!)).toContain('Some body content');
+  });
+
+  it('self-heals a row mapping created before row body content was imported', async () => {
+    const config = loadConfig(BASE_ENV);
+    const notion = new FakeNotionClient();
+    const thoth = new FakeThothClient();
+    notion.databases.set('db1', notionDatabase('db1', 'Tasks', '2026-01-01T00:00:00.000Z'));
+    notion.rootIds = ['db1'];
+    const row: NotionPageLike = {
+      id: 'row1',
+      object: 'page',
+      last_edited_time: '2026-01-01T00:00:00.000Z',
+      properties: {
+        Name: { type: 'title', title: [{ plain_text: 'Task 1' }] },
+        Status: { type: 'select', select: { name: 'Open' } },
+      },
+      parent: { type: 'data_source' },
+    };
+    notion.rows.set('db1', [row]);
+    notion.blockChildren.set('row1', [
+      {
+        id: 'block1',
+        type: 'paragraph',
+        paragraph: { rich_text: [{ plain_text: 'Backfilled body', href: null, annotations: {} }] },
+      },
+    ]);
+
+    // Simulate a pre-existing state file written by an older version of the script, before row
+    // body content was imported at all: a valid mapping with no `rowContentSynced` field and no
+    // change in `notionLastEditedTime` (so the row is otherwise "unchanged").
+    thoth.pageContent.set('page-1', '');
+    thoth.pageValues.set('page-1', {});
+    const priorState: StateFile = {
+      version: 1,
+      connection: { notionWorkspaceId: 'notion-workspace-1', thothWorkspaceId: 'ws_123', targetParentId: null },
+      mappings: {
+        db1: {
+          notionType: 'database',
+          thothContainerId: 'ds-1',
+          thothColumnId: null,
+          notionLastEditedTime: '2026-01-01T00:00:00.000Z',
+          importedContentHash: 'irrelevant',
+          deletedInNotion: false,
+          columnMappings: {
+            Name: { thothColumnId: 'col-name', type: 'string' },
+            Status: { thothColumnId: 'col-status', type: 'single-select', optionIdsByLabel: { Open: 'opt-open' } },
+          },
+        },
+        row1: {
+          notionType: 'database_row',
+          thothContainerId: 'page-1',
+          thothColumnId: null,
+          notionLastEditedTime: '2026-01-01T00:00:00.000Z',
+          importedContentHash: 'irrelevant',
+          deletedInNotion: false,
+        },
+      },
+      lastRun: {
+        startedAt: '2026-01-01T00:00:00.000Z',
+        finishedAt: '2026-01-01T00:00:01.000Z',
+        mode: 'initial',
+        dryRun: false,
+        state: 'completed',
+        stats: createEmptyStats(),
+        error: null,
+        report: [],
+      },
+    };
+
+    const result = await runImport(config, notion, thoth, priorState);
+
+    expect(result.exitCode).toBe(0);
+    expect(thoth.calls).toContain('setPageContent');
+    expect(thoth.pageContent.get('page-1')).toContain('Backfilled body');
+    expect(result.state.mappings['row1']!.rowContentSynced).toBe(true);
+    // Self-heal must not disturb the value-conflict-detection hash the row was already tracking.
+    expect(result.state.mappings['row1']!.importedContentHash).toBe('irrelevant');
+  });
+
+  it('creates a wrapping page with a linked data view so the database is navigable', async () => {
+    const config = loadConfig(BASE_ENV);
+    const notion = new FakeNotionClient();
+    const thoth = new FakeThothClient();
+    notion.databases.set('db1', notionDatabase('db1', 'Tasks', '2026-01-01T00:00:00.000Z'));
+    notion.rootIds = ['db1'];
+
+    const result = await runImport(config, notion, thoth, null);
+
+    expect(result.exitCode).toBe(0);
+    expect(thoth.calls).toContain('createDataView');
+    const databaseMapping = result.state.mappings['db1']!;
+    expect(databaseMapping.thothViewPageId).toBeDefined();
+    // The wrapping page must be a distinct container from the data source itself — a data
+    // source has no page of its own and isn't independently navigable.
+    expect(databaseMapping.thothViewPageId).not.toBe(databaseMapping.thothContainerId);
+  });
+
+  it('self-heals a mapping created before wrapping pages existed, without recreating the data source', async () => {
+    const config = loadConfig(BASE_ENV);
+    const notion = new FakeNotionClient();
+    const thoth = new FakeThothClient();
+    notion.databases.set('db1', notionDatabase('db1', 'Tasks', '2026-01-01T00:00:00.000Z'));
+    notion.rootIds = ['db1'];
+
+    // Simulate a mapping produced by an older version of this script that never created a
+    // wrapping page: same last_edited_time as the source (so the next run treats it as
+    // unchanged), no `thothViewPageId`.
+    const legacyState: StateFile = {
+      version: 1,
+      connection: { notionWorkspaceId: 'notion-workspace-1', thothWorkspaceId: config.thothWorkspaceId, targetParentId: null },
+      mappings: {
+        db1: {
+          notionType: 'database',
+          thothContainerId: 'ds-legacy',
+          thothColumnId: null,
+          notionLastEditedTime: '2026-01-01T00:00:00.000Z',
+          importedContentHash: 'irrelevant',
+          deletedInNotion: false,
+          columnMappings: {
+            Name: { thothColumnId: 'col-name', type: 'string' },
+            Status: { thothColumnId: 'col-status', type: 'single-select', optionIdsByLabel: { Open: 'opt-open' } },
+          },
+        },
+      },
+      lastRun: { startedAt: '', finishedAt: null, mode: 'sync', dryRun: false, state: 'completed', error: null, report: [], stats: createEmptyStats() },
+    };
+
+    const result = await runImport(config, notion, thoth, legacyState);
+
+    expect(result.exitCode).toBe(0);
+    expect(thoth.calls).not.toContain('createDataSource');
+    expect(thoth.calls).toContain('createPage');
+    expect(thoth.calls).toContain('createDataView');
+    const databaseMapping = result.state.mappings['db1']!;
+    expect(databaseMapping.thothContainerId).toBe('ds-legacy');
+    expect(databaseMapping.thothViewPageId).toBeDefined();
   });
 });
 

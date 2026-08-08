@@ -130,12 +130,25 @@ describe('convertPropertyValue', () => {
     });
   });
 
-  it('collapses a date range to its start value', () => {
+  it('collapses a date range to its start value, expanded to a full ISO datetime (Thoth requires offset)', () => {
     const result = convertPropertyValue(
       { date: { start: '2026-01-01', end: '2026-01-05' } },
       { thothColumnId: 'c1', type: 'date' }
     );
-    expect(result).toEqual({ type: 'date', value: '2026-01-01' });
+    expect(result).toEqual({ type: 'date', value: '2026-01-01T00:00:00Z' });
+  });
+
+  it('passes through a date-time start value that already carries an offset', () => {
+    const result = convertPropertyValue(
+      { date: { start: '2026-01-01T09:00:00.000-05:00' } },
+      { thothColumnId: 'c1', type: 'date' }
+    );
+    expect(result).toEqual({ type: 'date', value: '2026-01-01T09:00:00.000-05:00' });
+  });
+
+  it('skips the column when no date is set (Thoth rejects a null date value)', () => {
+    const result = convertPropertyValue({ date: null }, { thothColumnId: 'c1', type: 'date' });
+    expect(result).toEqual({ skipped: expect.stringContaining('c1') });
   });
 
   it('resolves a select value to the mapped Thoth option id', () => {

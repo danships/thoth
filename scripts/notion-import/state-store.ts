@@ -89,6 +89,12 @@ function isValidMapping(value: unknown): boolean {
   ) {
     return false;
   }
+  if (value['thothViewPageId'] !== undefined && !isStringOrNull(value['thothViewPageId'])) {
+    return false;
+  }
+  if (value['rowContentSynced'] !== undefined && typeof value['rowContentSynced'] !== 'boolean') {
+    return false;
+  }
   return true;
 }
 
