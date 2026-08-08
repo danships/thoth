@@ -114,13 +114,19 @@ test.describe('Data View column layout', () => {
       // it, the following ArrowRight can race ahead of pickup under load and be dropped/ignored,
       // making this test flaky (THOTH-052 CI failures).
       await expect(alphaHandle).toHaveAttribute('aria-pressed', 'true');
+      // Even after pickup is confirmed, dnd-kit's droppable rects are (re-)measured
+      // asynchronously (ResizeObserver/scroll listeners). Under CI load the very next
+      // `ArrowRight` can still be evaluated against stale rects and resolve to a no-op move.
+      // Give the measurement a moment to settle before issuing the move, on top of the
+      // outer `toPass` retry which redoes the whole sequence if this still races.
+      await page.waitForTimeout(200);
       await page.keyboard.press('ArrowRight');
       await page.keyboard.press('Space');
 
       await expect(headers.nth(0)).toContainText('Name');
       await expect(headers.nth(1)).toContainText('Alpha');
       await expect(headers.nth(2)).toContainText('Beta');
-    }).toPass({ timeout: 15_000 });
+    }).toPass({ timeout: 30_000 });
   });
 
   test('Columns manager: show Gamma and apply persists it visibly at its stored position', async ({ page }) => {
