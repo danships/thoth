@@ -18,6 +18,13 @@ env:
   # pass it through to the container as APP_URL — otherwise better-auth has
   # no trusted origin to compare against and rejects sign-up/sign-in with an
   # "invalid origin" error.
+  #
+  # The VM's SSH forced-command restriction only authorizes a command that
+  # literally starts with `deploy`, so the URL must be passed as a trailing
+  # positional argument to that script rather than as an `APP_URL=...` env
+  # var prefix (or a separate `export`/`envs:` line) — either of those
+  # changes the command's leading token and gets rejected as "Unauthorized
+  # command".
   PREVIEW_URL: https://thoth-pr-${{ github.event.pull_request.number }}.preview.dbgdan.com
 
 jobs:
@@ -109,7 +116,7 @@ jobs:
           timeout: 120s
           command_timeout: 10m
           script_stop: true
-          script: APP_URL="${{ env.PREVIEW_URL }}" deploy ${{ github.event.pull_request.number }} ${{ env.IMAGE }}
+          script: deploy ${{ github.event.pull_request.number }} ${{ env.IMAGE }} ${{ env.PREVIEW_URL }}
 
       - name: Wait before deploy retry
         if: steps.check-secrets.outputs.configured == 'true' && steps.deploy-attempt-1.outcome == 'failure'
@@ -129,7 +136,7 @@ jobs:
           timeout: 120s
           command_timeout: 10m
           script_stop: true
-          script: APP_URL="${{ env.PREVIEW_URL }}" deploy ${{ github.event.pull_request.number }} ${{ env.IMAGE }}
+          script: deploy ${{ github.event.pull_request.number }} ${{ env.IMAGE }} ${{ env.PREVIEW_URL }}
 
       - name: Wait before final deploy retry
         if: steps.check-secrets.outputs.configured == 'true' && steps.deploy-attempt-1.outcome == 'failure' && steps.deploy-attempt-2.outcome == 'failure'
@@ -148,7 +155,7 @@ jobs:
           timeout: 120s
           command_timeout: 10m
           script_stop: true
-          script: APP_URL="${{ env.PREVIEW_URL }}" deploy ${{ github.event.pull_request.number }} ${{ env.IMAGE }}
+          script: deploy ${{ github.event.pull_request.number }} ${{ env.IMAGE }} ${{ env.PREVIEW_URL }}
 
       - name: Skip deploy (VM secrets not configured)
         if: steps.check-secrets.outputs.configured != 'true'
