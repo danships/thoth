@@ -24,8 +24,10 @@ RUN pnpm build
 # Rather than relying on that heuristic, explicitly prune `.next/standalone` down to an
 # allowlist of what the standalone server actually needs at runtime, so the final image
 # only ever contains the bare minimum regardless of what tracing decides to include.
+# `package.json` is required at runtime: it carries `"type": "module"`, which `server.js`
+# (an ES module) needs to load correctly.
 RUN find .next/standalone -mindepth 1 -maxdepth 1 \
-      ! -name '.next' ! -name 'node_modules' ! -name 'server.js' ! -name 'public' \
+      ! -name '.next' ! -name 'node_modules' ! -name 'server.js' ! -name 'public' ! -name 'package.json' \
       -exec rm -rf {} +
 
 FROM base AS runner
