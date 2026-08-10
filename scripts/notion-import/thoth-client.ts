@@ -192,6 +192,27 @@ export class ThothClient {
     );
   }
 
+  // Data sources are always created at the workspace root (no `parentId` concept of their own)
+  // and aren't independently browsable in the Thoth UI — they're only reachable through a
+  // `DataView` tab on a regular page. Passing `pageId` here links the newly created view onto
+  // that page's `views` list in the same request, which is exactly what makes a Notion database
+  // navigable as "a page with a table" after import (see `processDatabase` in `index.ts`).
+  async createDataView(input: {
+    name: string;
+    dataSourceId: string;
+    pageId?: string | undefined;
+    workspaceId?: string | undefined;
+  }) {
+    return this.request<{ id: string; dataSourceId: string }>(
+      '/views',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      { retryableOnFailure: false }
+    );
+  }
+
   async uploadFile(input: {
     filename: string;
     mimeType: string;

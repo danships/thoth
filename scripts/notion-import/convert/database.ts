@@ -141,7 +141,14 @@ export function convertPropertyValue(
     }
     case 'date': {
       const date = notionValue['date'] as { start?: string } | null | undefined;
-      return { type: 'date', value: date?.start ?? null };
+      const converted = toThothIsoDatetime(date?.start);
+      if (converted === null) {
+        // No date set on this row, or an unparsable value — Thoth's `date` value schema
+        // requires a full ISO 8601 datetime (with offset) and rejects `null`, so there is no
+        // valid payload to send; skip the column rather than send a value the API will reject.
+        return { skipped: `Column '${mapping.thothColumnId}': no date value to convert` };
+      }
+      return { type: 'date', value: converted };
     }
     case 'single-select': {
       const selected = (notionValue['select'] ?? notionValue['status']) as { name?: string } | null | undefined;
@@ -159,6 +166,27 @@ export function convertPropertyValue(
       return { skipped: `Unsupported column type '${type}' during value conversion` };
     }
   }
+}
+
+// Converts a Notion `date` property's `start` string into the full ISO 8601 datetime (with
+// offset) that Thoth's `date` value schema requires. Notion returns either a date-only string
+// (`"2024-01-15"`, for properties without a time component) or a full datetime with an offset
+// (`"2024-01-15T09:00:00.000-05:00"`); the former must be expanded to midnight UTC, the latter
+// is already valid and passed through unchanged. Returns `null` for anything missing/unparsable.
+function toThothIsoDatetime(start: string | undefined): string | null {
+  if (!start) {
+    return null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+    return `${start}T00:00:00Z`;
+  }
+  const parsed = new Date(start);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  // `start` already includes a time + offset/`Z` (Notion's own format) — keep it as-is instead
+  // of re-serializing through `Date`, which would normalize away the original offset.
+  return start;
 }
 
 function extractStringValue(notionValue: Record<string, unknown>): string {
