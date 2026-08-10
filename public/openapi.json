@@ -879,7 +879,6 @@
                 },
                 "required": [
                   "name",
-                  "emoji",
                   "parentId"
                 ]
               }

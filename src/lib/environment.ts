@@ -32,6 +32,14 @@ const environmentSchema = {
   // external purge job (`pnpm files:purge`) permanently removes it, to tolerate in-progress
   // edits that haven't yet synced their `file-usage` rows.
   FILES_PURGE_GRACE_PERIOD_HOURS: num({ default: 24 }),
+  // The public, absolute base URL Thoth is served at (e.g. `https://thoth.example.com`, no
+  // trailing slash). Explicitly wired into `better-auth`'s `baseURL`/`trustedOrigins`
+  // (`src/lib/auth/config.ts`) instead of relying on request-header inference, which is unsafe
+  // in production (host-header spoofing). Optional — falls back to
+  // `http://localhost:${PORT ?? 3000}` via `resolveAppUrl` (`src/lib/environment/app-url.ts`)
+  // for local development. Must stay a runtime-only server var (never `NEXT_PUBLIC_*`), since
+  // the same built Docker image is deployed at several different URLs.
+  APP_URL: url({ default: undefined }),
 } as const;
 
 type Environment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;

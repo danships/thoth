@@ -1,12 +1,12 @@
 'use client';
 
-import { AppShell, Burger, Group, Loader, Title } from '@mantine/core';
+import { AppShell, Loader } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type PropsWithChildren, type ReactNode, Suspense, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/provider';
 import { WorkspaceMenu } from '@/components/molecules/sidebar/workspace-menu';
-import Image from 'next/image';
+import { AppHeader } from '@/components/molecules/app-header';
 
 type LayoutProperties = PropsWithChildren & {
   sidebar: ReactNode;
@@ -72,13 +72,7 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
         <CloseNavbarOnNavigate close={close} />
       </Suspense>
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between" style={{ width: '100%' }}>
-          <Group>
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
-            <Image src="/icons/favicon-32x32.png" width={21} height={21} alt="Thoth Logo" loading="eager" />
-            <Title order={5}>Thoth</Title>
-          </Group>
-        </Group>
+        <AppHeader navbarOpened={opened} onToggleNavbar={toggle} showBurger />
       </AppShell.Header>
 
       <AppShell.Navbar p="md" style={{ display: 'flex', flexDirection: 'column' }}>

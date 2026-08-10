@@ -33,23 +33,50 @@ The dev server runs Next.js with Turbopack and hot-reload at `http://localhost:3
 
 #### Environment variables
 
-The app validates required environment variables at startup (see `src/lib/environment.ts`). At minimum you need:
+The app validates required environment variables at startup (see `src/lib/environment.ts`
+and `src/lib/environment/app-url.ts`). Every key is listed below (variable names copied
+verbatim from `environmentSchema` to avoid drift):
 
-- `NODE_ENV`: `development`, `production`, or `test`.
-- `DB`: database connection string (e.g. `sqlite:///path/to/db.sqlite` or a MySQL connection string).
-- `BETTER_AUTH_SECRET`: secret used by `better-auth` for session/auth handling.
-
-Optional:
-
-- `LOG_LEVEL`: logging verbosity (`error`, `warn`, `info`, `http`, `debug`, `trace`; default `info`).
-- `SUPERSAVE_SKIP_SYNC`: set to `true` to skip automatic schema sync and rely on migrations (used in production).
-- `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISCOVERY_URL`, `OIDC_AUTHORIZATION_URL`: configure OIDC login; if omitted, credentials-based auth is used instead.
+| Variable | Required? | Default | Description |
+|----------|------------|---------|--------------|
+| `NODE_ENV` | Yes | — | `development`, `production`, or `test`. |
+| `DB` | Yes | — | Database connection string (e.g. `sqlite:///path/to/db.sqlite` or a MySQL connection string). |
+| `LOG_LEVEL` | No | `info` | Logging verbosity: `error`, `warn`, `info`, `http`, `debug`, `trace`. |
+| `BETTER_AUTH_SECRET` | Yes | — | Secret used by `better-auth` for session/auth handling. |
+| `APP_URL` | No | `http://localhost:${PORT ?? 3000}` | The public, absolute base URL Thoth is served at (e.g. `https://thoth.example.com`). Explicitly wired into `better-auth`'s `baseURL`/`trustedOrigins` instead of relying on request-header inference. **Must be set in production** — see "Production deployment" below. No trailing slash. |
+| `SUPERSAVE_SKIP_SYNC` | No | `false` | Set to `true` to skip automatic schema sync and rely on migrations instead (recommended for production). |
+| `OIDC_CLIENT_ID` | No | — | OIDC client id. If all four `OIDC_*` vars are set, OIDC login is used; otherwise credentials (email/password) auth is used. |
+| `OIDC_CLIENT_SECRET` | No | — | OIDC client secret. |
+| `OIDC_DISCOVERY_URL` | No | — | OIDC discovery document URL. |
+| `OIDC_AUTHORIZATION_URL` | No | — | OIDC authorization endpoint URL. |
+| `WORKSPACE_DELETE_GRACE_PERIOD_DAYS` | No | `30` | Days a soft-deleted workspace is retained before `pnpm workspaces:purge` permanently removes it. |
+| `PAGE_DELETE_GRACE_PERIOD_DAYS` | No | `30` | Days a soft-deleted page is retained before permanent purge. |
+| `STORAGE_TYPE` | No | `local` | File-storage backend for uploaded files. Only `local` is currently supported. |
+| `STORAGE_LOCAL_FOLDER` | No | `data/uploads` | Folder the local storage adapter writes uploaded file bytes to (relative to the process's cwd). |
+| `MAX_UPLOAD_SIZE_BYTES` | No | `10485760` (10 MB) | Per-file upload size cap, in bytes. |
+| `FILES_PURGE_GRACE_PERIOD_HOURS` | No | `24` | Hours an orphaned uploaded file is retained before `pnpm files:purge` permanently removes it. |
+| `PORT` | No | `3000` | **Runtime/Node var, not validated by `envalid`** — consumed directly by the Node HTTP server (`next start`/Docker entrypoint) before the app's env schema is even checked. Only used indirectly here as the default port in `APP_URL`'s fallback. |
 
 A local MySQL database can be started with Docker Compose:
 
 ```bash
 docker compose up -d
 ```
+
+### Production deployment
+
+- **Always set `APP_URL`** to the exact, absolute public URL of the deployment (e.g.
+  `https://thoth.example.com`, no trailing slash). Thoth passes this explicitly into
+  `better-auth`'s `baseURL` and `trustedOrigins` rather than inferring it from the incoming
+  request's `Host` header, which prevents host-header-based origin spoofing from being trusted
+  for cookie/redirect purposes.
+- Because the Docker image is built once and can be deployed at several different URLs,
+  `APP_URL` is intentionally a **runtime-only, server-side** env var — never a `NEXT_PUBLIC_*`
+  build-time variable. The browser-side auth client talks to the same origin serving the page,
+  so it needs no URL-related env var at all.
+- Set `SUPERSAVE_SKIP_SYNC=true` and manage schema changes via migrations instead of automatic
+  sync.
+- Set `BETTER_AUTH_SECRET` to a strong, unique secret (never reuse the development value).
 
 ### Available scripts
 
