@@ -3,12 +3,6 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
 
-FROM base AS deps
-RUN apk add --no-cache python3 make g++
-WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-RUN pnpm install --frozen-lockfile --prod
-
 FROM base AS builder
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
@@ -17,7 +11,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
-FROM base AS runner
+FROM node:24.18.0-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -29,10 +23,20 @@ RUN apk add --no-cache wget && \
 
 ENV HOME=/home/nextjs
 
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
+# .next/standalone already contains server.js and a trimmed node_modules tree.
+# Turbopack's file tracing can pull in source/config artefacts; delete them here.
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+RUN rm -rf src tests scripts \
+        Dockerfile Dockerfile.preview \
+        commitlint.config.cjs eslint.config.mjs lint-staged.config.js \
+        playwright.config.ts tsconfig.json tsconfig.tsbuildinfo \
+        vitest.unit.config.ts vitest.integration.config.ts \
+        pnpm-lock.yaml pnpm-workspace.yaml next.config.ts \
+        docker-compose.yml docker-entrypoint.sh \
+        AGENTS.md README.md TECH_DEBT.md docs \
+        *.md db.sqlite db.sqlite-shm db.sqlite-wal
 
 USER nextjs
 
