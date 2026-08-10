@@ -17,6 +17,17 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
+# Turbopack's output-file tracing can conservatively include unrelated project files
+# (`src`, `tests`, docs, configs, ...) into `.next/standalone` when it can't statically
+# resolve a dynamic `fs`/`path` call somewhere in the server bundle (see THOTH-070; the
+# build emits an "Encountered unexpected file in NFT list" warning when this happens).
+# Rather than relying on that heuristic, explicitly prune `.next/standalone` down to an
+# allowlist of what the standalone server actually needs at runtime, so the final image
+# only ever contains the bare minimum regardless of what tracing decides to include.
+RUN find .next/standalone -mindepth 1 -maxdepth 1 \
+      ! -name '.next' ! -name 'node_modules' ! -name 'server.js' ! -name 'public' \
+      -exec rm -rf {} +
+
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
