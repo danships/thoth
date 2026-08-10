@@ -3,7 +3,7 @@
 ## Directory structure
 
 ```
-tests/
+apps/web/tests/
 ├── fixtures/
 │   └── seed.ts             # Canonical shared SEED constants
 ├── integration/
@@ -32,13 +32,13 @@ tests/
 ## Suite boundaries
 
 - Playwright specs should only cover flows that require real browser or UI interaction.
-- API-only test cases belong in `tests/integration/api/` (Vitest), not in Playwright specs.
-- Pure logic and isolated helpers belong in unit tests under `src/**/*.test.ts`.
+- API-only test cases belong in `apps/web/tests/integration/api/` (Vitest), not in Playwright specs.
+- Pure logic and isolated helpers belong in unit tests under `apps/web/src/**/*.test.ts`.
 
 ## Other test suites
 
-- Unit tests: `pnpm test:unit` (Vitest, `src/**/*.test.ts`)
-- Integration tests: `pnpm test:integration` (Vitest, `tests/integration/api/**/*.test.ts`)
+- Unit tests: `pnpm test:unit` (Vitest, `apps/web/src/**/*.test.ts`)
+- Integration tests: `pnpm test:integration` (Vitest, `apps/web/tests/integration/api/**/*.test.ts`)
 
 ## Auth
 
@@ -53,13 +53,13 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 ## Seeded data
 
-`tests/fixtures/seed.ts` defines the canonical `SEED` object with fixed UUIDs for the test
+`apps/web/tests/fixtures/seed.ts` defines the canonical `SEED` object with fixed UUIDs for the test
 user, workspace, pages, data source, columns, data view, and a data row with pre-filled
-values. `tests/e2e/constants.ts` re-exports that same object for Playwright imports.
+values. `apps/web/tests/e2e/constants.ts` re-exports that same object for Playwright imports.
 
 Use `SEED.*` IDs in specs. To seed additional data for a new feature, add it to
 `scripts/end-to-end-seed.ts` (idempotent — uses existence checks) and export the new IDs from
-`tests/fixtures/seed.ts`.
+`apps/web/tests/fixtures/seed.ts`.
 
 ## Imports
 

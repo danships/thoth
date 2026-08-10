@@ -5,15 +5,15 @@ description: Use when creating or modifying API route handlers in the Thoth proj
 
 ## File Placement
 
-All versioned API routes live under `src/app/api/v1/<resource>/route.ts`. Next.js App Router maps the file path to the URL:
+All versioned API routes live under `apps/web/src/app/api/v1/<resource>/route.ts`. Next.js App Router maps the file path to the URL:
 
 ```text
-src/app/api/v1/pages/route.ts              → GET/POST  /api/v1/pages
-src/app/api/v1/pages/[id]/route.ts         → GET/PATCH  /api/v1/pages/:id
-src/app/api/v1/pages/[id]/blocks/route.ts  → GET/POST  /api/v1/pages/:id/blocks
+apps/web/src/app/api/v1/pages/route.ts              → GET/POST  /api/v1/pages
+apps/web/src/app/api/v1/pages/[id]/route.ts         → GET/PATCH  /api/v1/pages/:id
+apps/web/src/app/api/v1/pages/[id]/blocks/route.ts  → GET/POST  /api/v1/pages/:id/blocks
 ```
 
-Auth routes are handled by `better-auth` at `src/app/api/auth/[...auth]/route.ts` — do not add custom routes there.
+Auth routes are handled by `better-auth` at `apps/web/src/app/api/auth/[...auth]/route.ts` — do not add custom routes there.
 
 ## The `apiRoute` Wrapper
 
@@ -61,7 +61,7 @@ export const POST = apiRoute<MyResponse, {}, {}, MyBody>(
 
 ## Error Handling
 
-Throw typed errors from `src/lib/errors/` — the wrapper catches them and returns the correct status code.
+Throw typed errors from `apps/web/src/lib/errors/` — the wrapper catches them and returns the correct status code.
 
 ```typescript
 import { BadRequestError } from '@/lib/errors/bad-request-error';      // 400
@@ -78,10 +78,10 @@ When `visibleError` is `false` (the default for `HttpError`), the client receive
 
 ## Adding a Client Helper
 
-After adding a route, expose it through `src/lib/api/client.ts` so front-end code has a single, typed entry point:
+After adding a route, expose it through `apps/web/src/lib/api/client.ts` so front-end code has a single, typed entry point:
 
 ```typescript
-// src/lib/api/client.ts
+// apps/web/src/lib/api/client.ts
 export const api = {
   myResource: {
     list: (params?: MyQuery) => apiClient.get<DataWrapper<MyResponse[]>>('/my-resource', { params }),
@@ -97,10 +97,10 @@ export const api = {
 
 ## Checklist for a New Route
 
-1. Create `src/app/api/v1/<resource>/route.ts`
-2. Define Zod schemas and TS types in `src/types/api/endpoints/<endpoint-name>.ts`
-3. Export types from `src/types/api/index.ts`
+1. Create `apps/web/src/app/api/v1/<resource>/route.ts`
+2. Define Zod schemas and TS types in `apps/web/src/types/api/endpoints/<endpoint-name>.ts`
+3. Export types from `apps/web/src/types/api/index.ts`
 4. Use `apiRoute` wrapper with the correct schema options
 5. Scope DB queries per entity category: CONTENT via `addWorkspaceIdToQuery` + `assertContentAccess`/`filterContainersByGrantForSession`; PER-USER STATE via `addUserIdToQuery` (see `securing-routes` skill, THOTH-042)
-6. Add a typed helper to `src/lib/api/client.ts`
+6. Add a typed helper to `apps/web/src/lib/api/client.ts`
 7. Run `pnpm lint` and `pnpm build`

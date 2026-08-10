@@ -12,13 +12,16 @@ Thoth aims to provide a fast, flexible note‑taking and knowledge management ex
 
 ### Architecture
 
-Thoth is a single Next.js application (not a monorepo) with a single `package.json` at the repository root:
+Thoth is a pnpm monorepo. The Next.js application lives in `apps/web`, with the repository
+root acting as a thin workspace orchestrator (root commands delegate to `apps/web` under the
+hood — you don't need to learn new commands or `cd` into `apps/web`):
 
-- `src/app`: Next.js App Router pages and API routes (`src/app/api`).
-- `src/components`: UI components organized using Atomic Design (`atoms`, `molecules`, `organisms`, `templates`).
-- `src/lib`: shared libraries — auth (`better-auth`), database repositories (SuperSave ORM), API client, environment validation, and Nanostores-based state.
-- `src/types`: shared TypeScript types and Zod schemas for API request/response validation.
-- `tests/e2e`: Playwright end-to-end tests.
+- `apps/web/src/app`: Next.js App Router pages and API routes (`apps/web/src/app/api`).
+- `apps/web/src/components`: UI components organized using Atomic Design (`atoms`, `molecules`, `organisms`, `templates`).
+- `apps/web/src/lib`: shared libraries — auth (`better-auth`), database repositories (SuperSave ORM), API client, environment validation, and Nanostores-based state.
+- `apps/web/src/types`: shared TypeScript types and Zod schemas for API request/response validation.
+- `apps/web/tests/e2e`: Playwright end-to-end tests.
+- `packages/`: reserved for future extracted packages (currently empty).
 
 ### Getting Started
 
@@ -33,8 +36,8 @@ The dev server runs Next.js with Turbopack and hot-reload at `http://localhost:3
 
 #### Environment variables
 
-The app validates required environment variables at startup (see `src/lib/environment.ts`
-and `src/lib/environment/app-url.ts`). Every key is listed below (variable names copied
+The app validates required environment variables at startup (see `apps/web/src/lib/environment.ts`
+and `apps/web/src/lib/environment/app-url.ts`). Every key is listed below (variable names copied
 verbatim from `environmentSchema` to avoid drift):
 
 | Variable | Required? | Default | Description |
@@ -88,7 +91,7 @@ Run these from the repository root:
 | Build | `pnpm build` | Production build via `next build --turbopack` |
 | Start | `pnpm start` | Run the production build |
 | Lint (all) | `pnpm lint` | Run ESLint + Prettier + TypeScript checks concurrently |
-| Format | `pnpm format` | Auto-fix Prettier and ESLint issues in `src/` |
+| Format | `pnpm format` | Auto-fix Prettier and ESLint issues in `apps/web/src/` |
 | Unit tests | `pnpm test:unit` | Run Vitest unit tests |
 | Integration tests | `pnpm test:integration` | Run API integration tests against a live server |
 | All fast tests | `pnpm test` | Run unit + integration tests |
@@ -107,15 +110,15 @@ Run these from the repository root:
 
 Thoth uses three test suites with clear boundaries:
 
-- Unit tests (`src/**/*.test.ts`, Vitest) — fast, isolated checks with no server required.
-- API integration tests (`tests/integration/api/**/*.test.ts`, Vitest) — real HTTP against a spawned Next.js dev server backed by a seeded SQLite database.
-- E2E tests (`tests/e2e/**/*.spec.ts`, Playwright) — browser-based UI interaction tests.
+- Unit tests (`apps/web/src/**/*.test.ts`, Vitest) — fast, isolated checks with no server required.
+- API integration tests (`apps/web/tests/integration/api/**/*.test.ts`, Vitest) — real HTTP against a spawned Next.js dev server backed by a seeded SQLite database.
+- E2E tests (`apps/web/tests/e2e/**/*.spec.ts`, Playwright) — browser-based UI interaction tests.
 
-Shared seeded data constants live in `tests/fixtures/seed.ts` and are re-exported from `tests/e2e/constants.ts` for Playwright. See `.agents/commands/e2e-test.md` for E2E conventions.
+Shared seeded data constants live in `apps/web/tests/fixtures/seed.ts` and are re-exported from `apps/web/tests/e2e/constants.ts` for Playwright. See `.agents/commands/e2e-test.md` for E2E conventions.
 
 ### Contributing
 
-Issues and PRs are welcome. Please follow TypeScript best practices (prefer `type` over `interface`) and the existing Atomic Design conventions in `src/components`. See `AGENTS.md` for detailed guidance on the codebase's patterns and conventions.
+Issues and PRs are welcome. Please follow TypeScript best practices (prefer `type` over `interface`) and the existing Atomic Design conventions in `apps/web/src/components`. See `AGENTS.md` for detailed guidance on the codebase's patterns and conventions.
 
 ### Releasing
 

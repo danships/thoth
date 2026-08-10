@@ -30,7 +30,7 @@ Thoth distinguishes two categories of data, scoped differently:
 
 ## Gating Content: `assertContentAccess`
 
-The single chokepoint for content access is `assertContentAccess` (`src/lib/api/server/workspace-access.ts`).
+The single chokepoint for content access is `assertContentAccess` (`apps/web/src/lib/api/server/workspace-access.ts`).
 It (1) asserts workspace membership via `assertWorkspaceAccess`, (2) resolves the caller's
 `AccessGrant` (a human member via `memberToAccessGrant`, or an App via `session.appContext.accessGrant`),
 (3) enforces read scope with `assertGrantAllowsContainer`, and (4) enforces write permission with
@@ -78,7 +78,7 @@ const starred = await containerAccessRepository.getByQuery(
 ```
 
 `addUserIdToQuery` must **never** be used to gate content rows (`Container`, `DataView`) — see the
-JSDoc on `addUserIdToQuery` in `src/lib/database/helpers.ts`.
+JSDoc on `addUserIdToQuery` in `apps/web/src/lib/database/helpers.ts`.
 
 ## Verifying Resource Access (Content)
 
@@ -97,7 +97,7 @@ sufficient grant scope/permission on a resource they can otherwise see exists.
 
 ## Error Types
 
-Use the typed error classes from `src/lib/errors/`. The `apiRoute` wrapper catches them and maps to the correct HTTP status code.
+Use the typed error classes from `apps/web/src/lib/errors/`. The `apiRoute` wrapper catches them and maps to the correct HTTP status code.
 
 ```typescript
 import { BadRequestError } from '@/lib/errors/bad-request-error';      // 400, visibleError=true
