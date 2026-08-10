@@ -38,6 +38,10 @@ export type Mapping = {
   // self-healed with its missing body content on a later sync without re-triggering a full
   // create/update (and without disturbing the column-values conflict-detection hash).
   rowContentSynced?: boolean;
+  // For `database` mappings only: whether this database's rows have all been successfully
+  // visited by a script version that backfills row body content. Once true, unchanged databases
+  // no longer need to re-query/process every row solely for the row-content self-heal path.
+  databaseRowsBackfilled?: boolean;
 };
 
 export type ColumnMapping = {

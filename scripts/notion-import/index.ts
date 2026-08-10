@@ -8,7 +8,14 @@ import { richTextToPlainText } from './convert/rich-text';
 import { hashMarkdown, hashJson } from './hash';
 import { decideInitialAction, decideAfterThothRead } from './sync';
 import type { Config } from './config';
-import { createInitialStateFile, createEmptyStats, type StateFile, type ReportEntry, type SyncOutcome, type Mapping } from './types';
+import {
+  createInitialStateFile,
+  createEmptyStats,
+  type StateFile,
+  type ReportEntry,
+  type SyncOutcome,
+  type Mapping,
+} from './types';
 import type { PrimitiveColumnInput, ThothPageValue } from './thoth-client';
 import { redactSecrets } from './redact';
 
@@ -322,11 +329,19 @@ async function ensureDatabaseViewPage(
     parentId: thothParentId,
     workspaceId: thothParentId ? undefined : context.config.thothWorkspaceId,
   });
-  await context.thoth.createDataView({
-    name: 'Table',
-    dataSourceId: mapping.thothContainerId,
-    pageId: page.id,
-  });
+  try {
+    await context.thoth.createDataView({
+      name: 'Table',
+      dataSourceId: mapping.thothContainerId,
+      pageId: page.id,
+    });
+  } catch (error) {
+    console.warn(
+      `[notion-import] Failed to create data view for database ${mapping.thothContainerId} on wrapping page ${page.id}: ` +
+        `${error instanceof Error ? error.message : String(error)}`
+    );
+    throw error;
+  }
   mapping.thothViewPageId = page.id;
 }
 
@@ -368,12 +383,20 @@ async function processDatabase(
       initial.action === 'skip_unchanged' &&
       existingMapping?.columnMappings &&
       existingMapping.thothContainerId &&
+      !existingMapping.databaseRowsBackfilled &&
       !context.config.dryRun
     ) {
       const rows = await context.notion.queryDatabaseRows(notionDatabase.dataSourceId);
       for (const row of rows) {
-        await processDatabaseRow(context, row, existingMapping.thothContainerId, existingMapping.columnMappings, discovered);
+        await processDatabaseRow(
+          context,
+          row,
+          existingMapping.thothContainerId,
+          existingMapping.columnMappings,
+          discovered
+        );
       }
+      existingMapping.databaseRowsBackfilled = true;
     }
     return;
   }
@@ -451,9 +474,10 @@ async function processDatabase(
       deletedInNotion: false,
       columnMappings,
       thothViewPageId: existingMapping?.thothViewPageId ?? null,
+      databaseRowsBackfilled: existingMapping?.databaseRowsBackfilled ?? false,
     };
-    await ensureDatabaseViewPage(context, mapping, title, thothParentId);
     context.state.mappings[notionDatabase.id] = mapping;
+    await ensureDatabaseViewPage(context, mapping, title, thothParentId);
   }
 
   pushReport(context, {
@@ -474,6 +498,7 @@ async function processDatabase(
   for (const row of rows) {
     await processDatabaseRow(context, row, thothDataSourceId, columnMappings, discovered);
   }
+  context.state.mappings[notionDatabase.id]!.databaseRowsBackfilled = true;
 }
 
 async function processDatabaseRow(
@@ -580,12 +605,7 @@ async function processDatabaseRow(
   // beyond their column values — e.g. a "Links" row with a column-list of bullet points. This
   // was previously never imported (only property values were), leaving row pages with an empty
   // body in Thoth even though Notion had rich content.
-  const blockNodes = await buildBlockTree(
-    context,
-    row.id,
-    context.config.dryRun ? null : rowPageId,
-    discovered
-  );
+  const blockNodes = await buildBlockTree(context, row.id, context.config.dryRun ? null : rowPageId, discovered);
   const { markdown } = blocksToMarkdown(blockNodes);
   if (!context.config.dryRun && rowPageId) {
     await context.thoth.setPageContent(rowPageId, markdown);
@@ -807,7 +827,7 @@ export async function runImport(
 
   state.lastRun.finishedAt = new Date().toISOString();
 
-  const exitCode =
-    state.lastRun.state === 'completed' ? 0 : (state.lastRun.state === 'partially_completed' ? 1 : 2);
+  // eslint-disable-next-line unicorn/no-nested-ternary
+  const exitCode = state.lastRun.state === 'completed' ? 0 : state.lastRun.state === 'partially_completed' ? 1 : 2;
   return { exitCode, state };
 }
