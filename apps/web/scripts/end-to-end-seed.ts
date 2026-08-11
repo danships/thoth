@@ -13,7 +13,7 @@ import {
   getWorkspaceRepository,
 } from '../src/lib/database/index.js';
 import { getStorageAdapter } from '../src/lib/storage/index.js';
-import { backfillContainerSortOrder } from '../src/lib/database/migrations/container-sort-order-backfill.js';
+import { backfillContainerSortOrder } from '@thoth/database';
 import { registerPlatformUser } from '../src/lib/auth/platform-user.js';
 import { SEED } from '../tests/fixtures/seed.js';
 import type {

@@ -1,7 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import nodePath from 'node:path';
+import { rm } from 'node:fs/promises';
+import { createTestDatabaseFile } from '../../../tests/helpers/create-test-database';
 
 import type { PageContainer } from '@/types/database';
 
@@ -20,14 +19,15 @@ describe('revision-service', () => {
   let MAX_PATCH_BYTES: (typeof import('./constants'))['MAX_PATCH_BYTES'];
 
   beforeAll(async () => {
-    temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-page-revision-test-'));
-    const databaseFile = nodePath.join(temporaryDirectory, 'test.db');
     const mutableEnvironment = process.env as Record<string, string | undefined>;
     mutableEnvironment['NODE_ENV'] = 'test';
-    mutableEnvironment['DB'] = `sqlite://${databaseFile}`;
     mutableEnvironment['BETTER_AUTH_SECRET'] = 'test-secret-not-for-production-use';
     mutableEnvironment['LOG_LEVEL'] = 'error';
-    mutableEnvironment['SUPERSAVE_SKIP_SYNC'] = 'false';
+
+    const { temporaryDirectory: createdDirectory, databaseUrl } =
+      await createTestDatabaseFile('thoth-page-revision-test-');
+    temporaryDirectory = createdDirectory;
+    mutableEnvironment['DB'] = databaseUrl;
 
     const databaseModule = await import('@/lib/database');
     const revisionServiceModule = await import('./revision-service');

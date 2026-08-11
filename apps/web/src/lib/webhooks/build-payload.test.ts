@@ -1,7 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import nodePath from 'node:path';
+import { rm } from 'node:fs/promises';
+import { createTestDatabaseFile } from '../../../tests/helpers/create-test-database';
 
 import type { DataSourceContainer, PageContainer } from '@/types/database';
 
@@ -45,21 +44,21 @@ describe('buildPayload — file column values (THOTH-054)', () => {
   let buildPayload: (typeof import('./build-payload'))['buildPayload'];
 
   beforeAll(async () => {
-    temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-build-payload-test-'));
-    const databaseFile = nodePath.join(temporaryDirectory, 'test.db');
     const mutableEnvironment = process.env as Record<string, string | undefined>;
     originalEnvironment = {
       NODE_ENV: mutableEnvironment['NODE_ENV'],
       DB: mutableEnvironment['DB'],
       BETTER_AUTH_SECRET: mutableEnvironment['BETTER_AUTH_SECRET'],
       LOG_LEVEL: mutableEnvironment['LOG_LEVEL'],
-      SUPERSAVE_SKIP_SYNC: mutableEnvironment['SUPERSAVE_SKIP_SYNC'],
     };
     mutableEnvironment['NODE_ENV'] = 'test';
-    mutableEnvironment['DB'] = `sqlite://${databaseFile}`;
     mutableEnvironment['BETTER_AUTH_SECRET'] = 'test-secret-not-for-production-use';
     mutableEnvironment['LOG_LEVEL'] = 'error';
-    mutableEnvironment['SUPERSAVE_SKIP_SYNC'] = 'false';
+
+    const { temporaryDirectory: createdDirectory, databaseUrl } =
+      await createTestDatabaseFile('thoth-build-payload-test-');
+    temporaryDirectory = createdDirectory;
+    mutableEnvironment['DB'] = databaseUrl;
 
     const databaseModule = await import('@/lib/database');
     const buildPayloadModule = await import('./build-payload');

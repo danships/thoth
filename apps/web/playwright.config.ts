@@ -34,7 +34,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    // Builds `@thoth/database`/`@thoth/storage` (so `next dev` can resolve their package
+    // exports) and runs the standalone migration CLI (THOTH-058) before starting the dev
+    // server — schema sync/migrations are no longer implicit; the web process always opens the
+    // database with sync disabled, so the schema must already exist.
+    command:
+      'pnpm --filter @thoth/database build && pnpm --filter @thoth/storage build && pnpm --filter @thoth/database db:migrate && pnpm dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,

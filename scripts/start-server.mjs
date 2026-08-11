@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const DEFAULT_DB_FILENAME = 'thoth.db';
 const SECRET_FILENAME = 'secret';
@@ -73,6 +73,44 @@ function resolveSecret(homeDirectory) {
 }
 
 /**
+ * Runs the standalone database migration CLI (THOTH-058) before the server starts. The
+ * long-running server process always opens the database with schema sync/migrations disabled,
+ * so the schema must be created/upgraded here first. A migration failure must prevent the
+ * server from starting.
+ */
+function runMigrations(environment) {
+  console.log('Running database migrations...');
+
+  const migrateEntrypoint = path.join(
+    import.meta.dirname,
+    '..',
+    'node_modules',
+    '@thoth',
+    'database',
+    'dist',
+    'cli',
+    'migrate.js'
+  );
+
+  if (!existsSync(migrateEntrypoint)) {
+    console.error(`Migration CLI not found at ${migrateEntrypoint}; aborting startup.`);
+    // eslint-disable-next-line unicorn/no-process-exit
+    process.exit(1);
+  }
+
+  const result = spawnSync('node', [migrateEntrypoint], {
+    stdio: 'inherit',
+    env: { ...process.env, ...environment },
+  });
+
+  if (result.status !== 0) {
+    console.error('Database migration failed; aborting startup.');
+    // eslint-disable-next-line unicorn/no-process-exit
+    process.exit(result.status ?? 1);
+  }
+}
+
+/**
  * Starts the Next.js standalone server with the resolved environment variables.
  */
 function startServer(environment) {
@@ -102,8 +140,7 @@ ensureHomeDirectory(homeDirectory);
 const environment = {
   DB: resolveDatabase(homeDirectory),
   BETTER_AUTH_SECRET: resolveSecret(homeDirectory),
-  // In production (start-server), skip auto-sync and use migrations
-  SUPERSAVE_SKIP_SYNC: 'true',
 };
 
+runMigrations(environment);
 startServer(environment);
