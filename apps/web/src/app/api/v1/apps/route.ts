@@ -2,8 +2,13 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getAppRepository } from '@/lib/database';
 import { syncAppWorkspaceMembership } from '@/lib/database/app-service';
 import { hydrateAppResponse } from '@/lib/database/app-response';
-import { assertContainerIdsBelongToWorkspace, replaceScopedContainers } from '@/lib/database/app-scope-service';
+import {
+  assertContainerIdsBelongToWorkspace,
+  replaceScopedContainers,
+  InvalidContainerIdsError,
+} from '@/lib/database/app-scope-service';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
+import { BadRequestError } from '@/lib/errors/bad-request-error';
 import type { CreateAppBody, CreateAppResponse, GetAppsResponse, ListAppsQuery } from '@/types/api';
 import { createAppBodySchema, listAppsQuerySchema } from '@/types/api';
 
@@ -35,7 +40,14 @@ export const POST = apiRoute<CreateAppResponse, {}, {}, CreateAppBody>(
     await assertWorkspaceAccess(session.user.id, body.workspaceId);
 
     if (body.scopeType !== 'workspace') {
-      await assertContainerIdsBelongToWorkspace(body.containerIds ?? [], body.workspaceId);
+      try {
+        await assertContainerIdsBelongToWorkspace(body.containerIds ?? [], body.workspaceId);
+      } catch (error) {
+        if (error instanceof InvalidContainerIdsError) {
+          throw new BadRequestError(error.message);
+        }
+        throw error;
+      }
     }
 
     const appRepository = await getAppRepository();

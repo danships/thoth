@@ -6,7 +6,7 @@ import { appRetriever } from '@/lib/database/retrievers/app-retriever';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { UpdateWebhookBody, UpdateWebhookResponse, WebhookDetailParameters, WebhookResponse } from '@/types/api';
 import { updateWebhookBodySchema, webhookDetailParametersSchema } from '@/types/api';
-import type { Webhook } from '@/types/database';
+import type { Webhook } from '@thoth/database/types';
 
 async function retrieveWebhookForApp(appId: string, webhookId: string): Promise<Webhook> {
   const webhookRepository = await getWebhookRepository();

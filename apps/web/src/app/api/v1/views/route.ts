@@ -8,7 +8,7 @@ import { assertGrantAllowsContainerForSession, filterContainersByGrantForSession
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateDataViewBody, CreateDataViewResponse, GetDataViewsResponse, GetDataViewsQuery } from '@/types/api';
 import { createDataViewBodySchema, getDataViewsQuerySchema } from '@/types/api';
-import { Container, PageContainer } from '@/types/database';
+import { Container, PageContainer } from '@thoth/database/types';
 
 export const GET = apiRoute<GetDataViewsResponse, GetDataViewsQuery, {}>(
   {

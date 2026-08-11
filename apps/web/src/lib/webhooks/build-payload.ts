@@ -5,7 +5,7 @@ import type {
   WebhookDeliveryEvent,
   WebhookPayload,
   WebhookRawValue,
-} from '@/types/database';
+} from '@thoth/database/types';
 import type { Column, PageValue } from '@/types/schemas/entities/container';
 
 export type ValueChangeInput = Record<string, { previous: PageValue | null; new: PageValue | null }>;

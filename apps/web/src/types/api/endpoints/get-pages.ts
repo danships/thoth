@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { DataWrapper } from '../utilities';
 import { pageSchema } from '../entities';
-import { pageContainerSchema } from '@/types/database';
+import { pageContainerSchema } from '@thoth/database/types';
 
 export const GET_PAGES_ENDPOINT = '/pages';
 

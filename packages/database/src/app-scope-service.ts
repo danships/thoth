@@ -1,5 +1,18 @@
 import { getAppScopedContainerRepository, getContainerRepository } from './repositories';
-import { BadRequestError } from './errors/bad-request-error';
+
+/**
+ * Thrown by `assertContainerIdsBelongToWorkspace` when one or more `containerIds` don't exist,
+ * or exist but belong to a different workspace. This is a plain domain error, not an
+ * HTTP-status-coupled one — the database package has no notion of HTTP semantics. Callers at
+ * the API boundary (e.g. `apps/web/src/app/api/v1/apps/*`) should catch it and translate it
+ * into the appropriate `BadRequestError` (400).
+ */
+export class InvalidContainerIdsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidContainerIdsError';
+  }
+}
 
 /**
  * Guards against a `containerId` spanning a different workspace than the App being
@@ -16,12 +29,12 @@ export async function assertContainerIdsBelongToWorkspace(containerIds: string[]
   const containers = await containerRepository.getByQuery(containerRepository.createQuery().in('id', containerIds));
 
   if (containers.length !== containerIds.length) {
-    throw new BadRequestError('One or more containerIds do not exist');
+    throw new InvalidContainerIdsError('One or more containerIds do not exist');
   }
 
   const outsideWorkspace = containers.some((container) => container.workspaceId !== workspaceId);
   if (outsideWorkspace) {
-    throw new BadRequestError('All containerIds must belong to the App workspace');
+    throw new InvalidContainerIdsError('All containerIds must belong to the App workspace');
   }
 }
 

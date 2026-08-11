@@ -1,4 +1,4 @@
-import type { AppScopeType } from '@/types/database';
+import type { AppScopeType } from '@thoth/database/types';
 
 // User-facing labels for an App's `scopeType` — kept in one place so the wording used across
 // the Apps table/detail modal and the page-detail "Apps" menu always stays in sync.

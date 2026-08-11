@@ -9,7 +9,7 @@ import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { reconstructAt, reconstructValuesAt } from '@/lib/history/reconstruct';
 import { createContentBaseline } from '@/lib/history/revision-service';
-import type { PageRevision, PageContainer, Container } from '@/types/database';
+import type { PageRevision, PageContainer, Container } from '@thoth/database/types';
 import {
   forkPageRevisionBodySchema,
   forkPageRevisionParametersSchema,

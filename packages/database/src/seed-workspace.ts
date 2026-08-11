@@ -1,7 +1,6 @@
 import { getContainerRepository, getWorkspaceMemberRepository, getWorkspaceRepository } from './repositories';
 import { registerContainerAccessForNewPage } from './container-access-service';
-import { generateUniqueWorkspaceSlug, reserveWorkspaceSlug } from './workspace-slug';
-import { ConflictError } from './errors/conflict-error';
+import { generateUniqueWorkspaceSlug, reserveWorkspaceSlug, WorkspaceSlugConflictError } from './workspace-slug';
 import { slugify } from './utils/slug';
 import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from './schemas/entities/workspace';
 import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from './types';
@@ -10,7 +9,7 @@ type CreateWorkspaceOptions = {
   slug?: string;
   nameOverride?: string;
   // When `strict` is true (default, used by `POST /workspaces` where a user typed an explicit
-  // slug), a collision throws `ConflictError`. When false (used by the signup hook's generated
+  // slug), a collision throws `WorkspaceSlugConflictError`. When false (used by the signup hook's generated
   // nerdy slug), a collision is silently de-duplicated with `-2`, `-3`, ... instead.
   strict?: boolean;
 };
@@ -113,7 +112,7 @@ export async function createWorkspaceForUser(
     try {
       return await reserveWorkspaceSlug(candidate, () => createWithSlug(candidate));
     } catch (error) {
-      if (error instanceof ConflictError && attempt < 4) {
+      if (error instanceof WorkspaceSlugConflictError && attempt < 4) {
         continue;
       }
       throw error;
@@ -121,5 +120,5 @@ export async function createWorkspaceForUser(
   }
 
   // Unreachable in practice (the loop either returns or throws), but satisfies the type checker.
-  throw new ConflictError('Unable to reserve a unique workspace slug');
+  throw new WorkspaceSlugConflictError('Unable to reserve a unique workspace slug');
 }

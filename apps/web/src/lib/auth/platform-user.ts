@@ -2,7 +2,7 @@ import { getPlatformUserRepository } from '@/lib/database';
 import { NotAuthorizedError } from '@/lib/errors/not-authorized-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import type { ApiKeySession } from '@/lib/auth/session';
-import type { PlatformUser } from '@/types/database';
+import type { PlatformUser } from '@thoth/database/types';
 
 // Minimal shape of a Better Auth user needed to project a `platform-user` row.
 export type AuthUserProjectionInput = {

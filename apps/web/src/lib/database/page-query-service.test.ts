@@ -3,7 +3,7 @@ import { rm } from 'node:fs/promises';
 import { createTestDatabaseFile } from '../../../tests/helpers/create-test-database';
 
 import type { Column } from '@/types/schemas/entities/container';
-import type { PageContainer } from '@/types/database';
+import type { PageContainer } from '@thoth/database/types';
 import { NAME_SORT_COLUMN_ID } from '@/types/schemas/entities/data-view-query';
 import type { FilterRule, SortRule } from '@/types/schemas/entities/data-view-query';
 

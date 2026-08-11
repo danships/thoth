@@ -8,7 +8,7 @@ import { assertGrantAllowsWrite, grantAllowsContainer, memberToAccessGrant } fro
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { CreateWelcomePageBody, CreateWelcomePageResponse } from '@/types/api';
 import { createWelcomePageBodySchema } from '@/types/api';
-import type { PageContainerCreate } from '@/types/database';
+import type { PageContainerCreate } from '@thoth/database/types';
 
 // SuperSave has no unique-constraint support, so the check-then-create below cannot be made
 // race-safe at the database level. As a mitigation for the common case (double-click, client

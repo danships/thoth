@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { rm } from 'node:fs/promises';
 import { createTestDatabaseFile } from '../../../tests/helpers/create-test-database';
 
-import type { DataSourceContainer, PageContainer } from '@/types/database';
+import type { DataSourceContainer, PageContainer } from '@thoth/database/types';
 
 function makeDataSource(): DataSourceContainer {
   return {

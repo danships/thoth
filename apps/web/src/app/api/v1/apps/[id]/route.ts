@@ -9,7 +9,9 @@ import {
   assertContainerIdsBelongToWorkspace,
   clearScopedContainers,
   replaceScopedContainers,
+  InvalidContainerIdsError,
 } from '@/lib/database/app-scope-service';
+import { BadRequestError } from '@/lib/errors/bad-request-error';
 import type { AppDetailResponse, AppParameters, UpdateAppBody, UpdateAppResponse } from '@/types/api';
 import { appParametersSchema, updateAppBodySchema } from '@/types/api';
 
@@ -47,7 +49,14 @@ export const PATCH = apiRoute<UpdateAppResponse, undefined, AppParameters, Updat
     const nextScopeType = body.scopeType ?? existingApp.scopeType;
 
     if (body.containerIds && nextScopeType !== 'workspace') {
-      await assertContainerIdsBelongToWorkspace(body.containerIds, existingApp.workspaceId);
+      try {
+        await assertContainerIdsBelongToWorkspace(body.containerIds, existingApp.workspaceId);
+      } catch (error) {
+        if (error instanceof InvalidContainerIdsError) {
+          throw new BadRequestError(error.message);
+        }
+        throw error;
+      }
     }
 
     const appRepository = await getAppRepository();

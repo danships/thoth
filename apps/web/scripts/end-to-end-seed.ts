@@ -26,7 +26,7 @@ import type {
   WorkspaceCreate,
   WorkspaceMemberCreate,
   DataViewCreate,
-} from '../src/types/database/index.js';
+} from '@thoth/database/types';
 import type { Column, PageValue } from '../src/types/schemas/entities/container.js';
 
 const DB_PATH = process.env['DB']!.replace('sqlite://', '');

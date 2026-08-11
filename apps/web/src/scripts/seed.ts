@@ -21,7 +21,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 loadDotenv({ path: path.resolve(scriptDirectory, '../../.env') });
 
 import type BetterSqlite3 from 'better-sqlite3';
-import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from '@/types/database';
+import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from '@thoth/database/types';
 import {
   getContainerRepository,
   getDatabase,

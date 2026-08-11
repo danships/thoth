@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { rm } from 'node:fs/promises';
 import { createTestDatabaseFile } from '../../../tests/helpers/create-test-database';
 
-import type { PageContainer } from '@/types/database';
+import type { PageContainer } from '@thoth/database/types';
 
 const stringValue = (value: string) => ({ type: 'string' as const, value });
 

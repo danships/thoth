@@ -5,7 +5,7 @@ import { deliverWebhook } from './deliver-webhook';
 import { resolveDataSourceParent, resolveWebhooksToNotify } from './resolve-webhooks';
 import type { WebhookActor } from './resolve-webhooks';
 import type { ValueChangeInput } from './build-payload';
-import type { Container, WebhookDeliveryEvent } from '@/types/database';
+import type { Container, WebhookDeliveryEvent } from '@thoth/database/types';
 
 // This file only orchestrates page-change notifications. The building blocks it composes live
 // in sibling files: `resolve-webhooks.ts` (which webhooks/apps match a change), `build-payload.ts`

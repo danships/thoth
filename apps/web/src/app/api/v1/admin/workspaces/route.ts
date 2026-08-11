@@ -6,7 +6,7 @@ import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
 import { getWorkspaceStorageUsage } from '@/lib/files/quota';
 import type { AdminWorkspaceItem, GetAdminWorkspacesQuery, GetAdminWorkspacesResponse } from '@/types/api';
 import { getAdminWorkspacesQuerySchema } from '@/types/api';
-import type { Workspace } from '@/types/database';
+import type { Workspace } from '@thoth/database/types';
 
 const DEFAULT_LIMIT = 50;
 

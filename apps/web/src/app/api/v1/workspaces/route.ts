@@ -2,10 +2,12 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getWorkspaceMemberRepository, getWorkspaceRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { createWorkspaceForUser } from '@/lib/database/seed-workspace';
+import { WorkspaceSlugConflictError } from '@/lib/database/workspace-slug';
 import { canCreateWorkspace } from '@/lib/settings/workspace-policy';
 import { getSetting, getSettingsForSubjects } from '@/lib/settings/service';
 import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
+import { ConflictError } from '@/lib/errors/conflict-error';
 import type { CreateWorkspaceBody, CreateWorkspaceResponse, GetWorkspacesResponse } from '@/types/api';
 import { createWorkspaceBodySchema } from '@/types/api';
 
@@ -56,11 +58,19 @@ export const POST = apiRoute<CreateWorkspaceResponse, {}, {}, CreateWorkspaceBod
       throw new ForbiddenError('Workspace creation is disabled by your platform administrator');
     }
 
-    const workspace = await createWorkspaceForUser(session.user.id, body.name, {
-      ...(body.slug ? { slug: body.slug } : {}),
-      nameOverride: body.name,
-      strict: true,
-    });
+    let workspace;
+    try {
+      workspace = await createWorkspaceForUser(session.user.id, body.name, {
+        ...(body.slug ? { slug: body.slug } : {}),
+        nameOverride: body.name,
+        strict: true,
+      });
+    } catch (error) {
+      if (error instanceof WorkspaceSlugConflictError) {
+        throw new ConflictError(error.message);
+      }
+      throw error;
+    }
 
     const storageQuotaBytes = await getSetting(STORAGE_QUOTA_BYTES_KEY, {
       scope: 'workspace',

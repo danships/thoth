@@ -1,6 +1,6 @@
 import { getApiKeyRepository, getAppScopedContainerRepository, getContainerRepository } from '.';
 import { resolveContainerDescendants } from './app-service';
-import type { App, AppScopeType } from '@/types/database';
+import type { App, AppScopeType } from '@thoth/database/types';
 import type { AppContainerSummary, AppResponse } from '@/types/api';
 
 /**

@@ -18,7 +18,7 @@ import { NotFoundError } from '@/lib/errors/not-found-error';
 import { dataViewRetriever } from '@/lib/database/retrievers/data-view-retriever';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { assertValidFilterSortRules, executePageQuery, type PageQueryCursor } from '@/lib/database/page-query-service';
-import type { PageContainer } from '@/types/database';
+import type { PageContainer } from '@thoth/database/types';
 import type { CreatePageBody, CreatePageResponse, GetPagesQuery, GetPagesResponse } from '@/types/api';
 import {
   createPageBodySchema,

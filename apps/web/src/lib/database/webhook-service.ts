@@ -14,7 +14,7 @@ export {
   type RecordDeliveryInput,
 } from '@thoth/database';
 import { maskWebhookSecret } from '@thoth/database';
-import type { Webhook, WebhookDelivery } from '@/types/database';
+import type { Webhook, WebhookDelivery } from '@thoth/database/types';
 import type { WebhookDeliveryResponse, WebhookResponse } from '@/types/api';
 
 /** Shared `Webhook` -> `WebhookResponse` mapper — used by every route that returns a webhook. */

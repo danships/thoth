@@ -21,10 +21,6 @@
       "types": "./dist/schemas/index.d.ts",
       "default": "./dist/schemas/index.js"
     },
-    "./errors": {
-      "types": "./dist/errors/index.d.ts",
-      "default": "./dist/errors/index.js"
-    },
     "./utils/slug": {
       "types": "./dist/utils/slug.d.ts",
       "default": "./dist/utils/slug.js"

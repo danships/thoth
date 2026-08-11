@@ -1,6 +1,6 @@
 import type { Column } from '@/types/schemas/entities/container';
 import type { FilterRule, SortRule } from '@/types/schemas/entities/data-view-query';
-import type { PageContainer } from '@/types/database';
+import type { PageContainer } from '@thoth/database/types';
 
 /** The two storage engines `executePageQuery` knows how to target. Each has its own adapter
  * implementation (see `sqlite-adapter.ts`/`mysql-adapter.ts`) behind the shared

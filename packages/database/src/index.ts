@@ -51,9 +51,15 @@ export {
   deleteScopedContainerReferences,
   addScopedContainer,
   removeScopedContainer,
+  InvalidContainerIdsError,
 } from './app-scope-service';
 export { registerContainerAccessForNewPage } from './container-access-service';
-export { reserveWorkspaceSlug, isWorkspaceSlugAvailable, generateUniqueWorkspaceSlug } from './workspace-slug';
+export {
+  reserveWorkspaceSlug,
+  isWorkspaceSlugAvailable,
+  generateUniqueWorkspaceSlug,
+  WorkspaceSlugConflictError,
+} from './workspace-slug';
 export { createWorkspaceForUser } from './seed-workspace';
 export {
   sortByManualOrder,

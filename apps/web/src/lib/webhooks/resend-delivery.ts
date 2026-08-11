@@ -2,7 +2,7 @@ import { getWebhookDeliveryRepository, getWebhookRepository } from '@/lib/databa
 import { signPayload } from '@/lib/database/webhook-service';
 import { assertPublicHttpsUrl } from './ssrf';
 import { FETCH_TIMEOUT_MS, truncateError } from './deliver-webhook';
-import type { WebhookDelivery } from '@/types/database';
+import type { WebhookDelivery } from '@thoth/database/types';
 
 export type ResendResult = { delivery: WebhookDelivery; webhookDisabled: boolean };
 

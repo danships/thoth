@@ -12,7 +12,7 @@ import type {
   CreateSingleSelectOptionResponse,
 } from '@/types/api';
 import { createSingleSelectOptionBodySchema, createSingleSelectOptionParametersSchema } from '@/types/api';
-import type { DataSourceContainer } from '@/types/database';
+import type { DataSourceContainer } from '@thoth/database/types';
 
 // supersave's repository has no built-in optimistic-concurrency/CAS support (no version/etag
 // column, and `update()` replaces the full row) — so two concurrent creators can both read the

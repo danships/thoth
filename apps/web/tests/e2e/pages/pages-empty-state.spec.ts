@@ -5,7 +5,7 @@ import { getDatabase, getWorkspaceMemberRepository, getWorkspaceRepository } fro
 import { slugify } from '../../../src/lib/utils/slug.js';
 import { buildPageUrlId } from '../../../src/lib/utils/page-url.js';
 import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '../../../src/types/schemas/entities/workspace.js';
-import type { WorkspaceCreate, WorkspaceMemberCreate } from '../../../src/types/database/index.js';
+import type { WorkspaceCreate, WorkspaceMemberCreate } from '@thoth/database/types';
 
 // This spec covers the "recreate Welcome page" empty-state flow, which requires a session for
 // a user whose workspace has zero root pages. The shared seed user/session (used by every other

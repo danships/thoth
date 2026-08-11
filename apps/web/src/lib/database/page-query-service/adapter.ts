@@ -1,6 +1,6 @@
 import { getEnvironment } from '../../environment';
 import type { Engine, Row, SqlFragment } from './types';
-import type { PageContainer } from '@/types/database';
+import type { PageContainer } from '@thoth/database/types';
 
 /**
  * Abstraction over the per-engine SQL dialect differences `executePageQuery` needs (THOTH-037

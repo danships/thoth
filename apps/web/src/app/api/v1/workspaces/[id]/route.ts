@@ -5,7 +5,7 @@ import {
   getWorkspaceSlugRedirectRepository,
 } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
-import { reserveWorkspaceSlug } from '@/lib/database/workspace-slug';
+import { reserveWorkspaceSlug, WorkspaceSlugConflictError } from '@/lib/database/workspace-slug';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { getSetting } from '@/lib/settings/service';
 import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
@@ -13,6 +13,7 @@ import { getLogger } from '@/lib/logger';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import { ConflictError } from '@/lib/errors/conflict-error';
 import type {
   DeleteWorkspaceParameters,
   UpdateWorkspaceBody,
@@ -48,25 +49,32 @@ export const PATCH = apiRoute<UpdateWorkspaceResponse, undefined, UpdateWorkspac
 
     if (body.slug && body.slug !== existing.slug) {
       const oldSlug = existing.slug;
-      updated = await reserveWorkspaceSlug(body.slug, async () => {
-        // Persist the slug change first — the redirect is only created once the rename has
-        // actually succeeded, so a failed update never leaves a dangling redirect for a slug
-        // change that never happened.
-        const result = await workspaceRepository.update({
-          ...existing,
-          slug: body.slug!,
-          lastUpdated: now,
-        });
+      try {
+        updated = await reserveWorkspaceSlug(body.slug, async () => {
+          // Persist the slug change first — the redirect is only created once the rename has
+          // actually succeeded, so a failed update never leaves a dangling redirect for a slug
+          // change that never happened.
+          const result = await workspaceRepository.update({
+            ...existing,
+            slug: body.slug!,
+            lastUpdated: now,
+          });
 
-        const redirectRepository = await getWorkspaceSlugRedirectRepository();
-        await redirectRepository.create({
-          slug: oldSlug,
-          workspaceId: existing.id,
-          createdAt: now,
-        });
+          const redirectRepository = await getWorkspaceSlugRedirectRepository();
+          await redirectRepository.create({
+            slug: oldSlug,
+            workspaceId: existing.id,
+            createdAt: now,
+          });
 
-        return result;
-      });
+          return result;
+        });
+      } catch (error) {
+        if (error instanceof WorkspaceSlugConflictError) {
+          throw new ConflictError(error.message);
+        }
+        throw error;
+      }
 
       logger.info('workspace.rename', {
         actorUserId: session.user.id,

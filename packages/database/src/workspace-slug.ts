@@ -1,6 +1,19 @@
 import { getWorkspaceRepository } from './repositories';
 import { isReservedWorkspaceSlug, slugify } from './utils/slug';
-import { ConflictError } from './errors/conflict-error';
+
+/**
+ * Thrown by `reserveWorkspaceSlug` when the requested slug is a reserved word or already taken
+ * by another workspace. This is a plain domain error, not an HTTP-status-coupled one — the
+ * database package has no notion of HTTP semantics. Callers at the API boundary (e.g.
+ * `apps/web/src/app/api/v1/workspaces/*`) should catch it and translate it into the
+ * appropriate `ConflictError` (409).
+ */
+export class WorkspaceSlugConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WorkspaceSlugConflictError';
+  }
+}
 
 // SuperSave has no unique-constraint support, so the check-then-write below cannot be made
 // race-safe at the database level. This in-process lock, keyed by the slug string itself (not
@@ -25,8 +38,9 @@ async function withSlugLock<T>(slug: string, task: () => Promise<T>): Promise<T>
 /**
  * Validates and reserves a globally unique workspace slug, then invokes `onReserved` (e.g. to
  * create/update the `Workspace` row) while still holding the lock, so the check-then-write is
- * effectively atomic per slug. Throws `ConflictError` (409) if the slug is a reserved word or
- * already taken by another (non-excluded) workspace — `onReserved` is never called in that case.
+ * effectively atomic per slug. Throws `WorkspaceSlugConflictError` if the slug is a reserved
+ * word or already taken by another (non-excluded) workspace — `onReserved` is never called in
+ * that case.
  */
 export async function reserveWorkspaceSlug<T>(
   slug: string,
@@ -35,7 +49,7 @@ export async function reserveWorkspaceSlug<T>(
 ): Promise<T> {
   return withSlugLock(slug, async () => {
     if (isReservedWorkspaceSlug(slug)) {
-      throw new ConflictError(`Slug "${slug}" is reserved and cannot be used`);
+      throw new WorkspaceSlugConflictError(`Slug "${slug}" is reserved and cannot be used`);
     }
 
     const workspaceRepository = await getWorkspaceRepository();
@@ -47,7 +61,7 @@ export async function reserveWorkspaceSlug<T>(
     // (same documented limitation as `parentId`), so the check is done in application code.
     const collides = existing.some((workspace) => workspace.id !== excludeWorkspaceId && !workspace.deletedAt);
     if (collides) {
-      throw new ConflictError(`Slug "${slug}" is already taken`);
+      throw new WorkspaceSlugConflictError(`Slug "${slug}" is already taken`);
     }
 
     return onReserved();

@@ -1,4 +1,4 @@
-import { PageContainer } from '@/types/database';
+import { PageContainer } from '@thoth/database/types';
 import { getContainerRepository } from '..';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';

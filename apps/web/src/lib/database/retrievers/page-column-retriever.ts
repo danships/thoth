@@ -1,5 +1,5 @@
 import type { Column } from '@/types/schemas/entities/container';
-import type { DataSourceContainer, PageContainer } from '@/types/database';
+import type { DataSourceContainer, PageContainer } from '@thoth/database/types';
 import { getDataViewRepository } from '..';
 import { addWorkspaceIdToQuery } from '../helpers';
 import { dataSourceRetriever } from './data-source-retriever';

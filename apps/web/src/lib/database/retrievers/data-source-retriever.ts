@@ -1,4 +1,4 @@
-import { DataSourceContainer } from '@/types/database';
+import { DataSourceContainer } from '@thoth/database/types';
 import { getContainerRepository } from '..';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';

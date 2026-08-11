@@ -12,7 +12,7 @@ import type {
   UpdateDataSourceColumnResponse,
 } from '@/types/api';
 import { updateDataSourceColumnBodySchema, updateDataSourceColumnParametersSchema } from '@/types/api';
-import type { PageContainer } from '@/types/database';
+import type { PageContainer } from '@thoth/database/types';
 import type { Column } from '@/types/schemas/entities/container';
 import type { ApiKeySession } from '@/lib/auth/session';
 import { after } from 'next/server';
