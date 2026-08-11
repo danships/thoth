@@ -1,160 +1,148 @@
-import { SuperSave } from 'supersave';
-import type {
-  Container,
-  ContainerAccess,
-  Workspace,
-  DataView,
-  WorkspaceMember,
-  WorkspaceSlugRedirect,
-  App,
-  ApiKey,
-  AppScopedContainer,
-  MemberScopedContainer,
-  Webhook,
-  WebhookDelivery,
-  UploadedFile,
-  FileUsage,
-  PageRevision,
-  Setting,
-  PlatformUser,
-} from '@/types/database';
+import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from '@thoth/database';
+import {
+  getDatabase as getPackageDatabase,
+  getContainerRepository as getPackageContainerRepository,
+  getContainerAccessRepository as getPackageContainerAccessRepository,
+  getWorkspaceRepository as getPackageWorkspaceRepository,
+  getDataViewRepository as getPackageDataViewRepository,
+  getWorkspaceMemberRepository as getPackageWorkspaceMemberRepository,
+  getWorkspaceSlugRedirectRepository as getPackageWorkspaceSlugRedirectRepository,
+  getAppRepository as getPackageAppRepository,
+  getApiKeyRepository as getPackageApiKeyRepository,
+  getAppScopedContainerRepository as getPackageAppScopedContainerRepository,
+  getMemberScopedContainerRepository as getPackageMemberScopedContainerRepository,
+  getWebhookRepository as getPackageWebhookRepository,
+  getWebhookDeliveryRepository as getPackageWebhookDeliveryRepository,
+  getUploadedFileRepository as getPackageUploadedFileRepository,
+  getFileUsageRepository as getPackageFileUsageRepository,
+  getPageRevisionRepository as getPackagePageRevisionRepository,
+  getSettingRepository as getPackageSettingRepository,
+  getPlatformUserRepository as getPackagePlatformUserRepository,
+} from '@thoth/database';
 import { getEnvironment } from '../environment';
-import * as entities from './entities';
-import { migrations } from './migrations';
 
-let databasePromise: Promise<SuperSave> | undefined;
+let initializationPromise: Promise<void> | undefined;
 
-async function initializeDatabase() {
-  const environment = await getEnvironment();
-  const skipSync = environment.SUPERSAVE_SKIP_SYNC;
-
-  const database = await SuperSave.create(environment.DB, {
-    migrations,
-    skipSync,
-  });
-
-  await database.addEntity(entities.Container);
-  await database.addEntity(entities.ContainerAccess);
-  await database.addEntity(entities.Workspace);
-  await database.addEntity(entities.DataView);
-  await database.addEntity(entities.WorkspaceMember);
-  await database.addEntity(entities.WorkspaceSlugRedirect);
-  await database.addEntity(entities.App);
-  await database.addEntity(entities.ApiKey);
-  await database.addEntity(entities.AppScopedContainer);
-  await database.addEntity(entities.MemberScopedContainer);
-  await database.addEntity(entities.Webhook);
-  await database.addEntity(entities.WebhookDelivery);
-  await database.addEntity(entities.UploadedFile);
-  await database.addEntity(entities.FileUsage);
-  await database.addEntity(entities.PageRevision);
-  await database.addEntity(entities.Setting);
-  await database.addEntity(entities.PlatformUser);
-
-  if (!skipSync) {
-    await database.runMigrations();
-  }
-
-  return database;
-}
-
-export async function getDatabase() {
-  // Cache the in-flight initialization promise (not just the resolved value) so
-  // concurrent callers await the same initialization instead of each racing to
-  // create the database and register entities, which caused duplicate entity
-  // registration (UNIQUE constraint failures) and partially-initialized instances.
-  if (!databasePromise) {
-    databasePromise = initializeDatabase().catch((error: unknown) => {
-      // Allow a subsequent call to retry initialization if it failed.
-      databasePromise = undefined;
+/**
+ * Registers the web-owned `@thoth/database` context exactly once, reading the validated web
+ * environment and always passing `skipSync: true` (THOTH-058): the long-running web process
+ * must never sync schema or run migrations itself — that is exclusively the job of
+ * `packages/database/src/cli/migrate.ts`, run before this process starts. On failure, the
+ * cached promise is cleared so a later call can retry.
+ */
+async function ensureDatabaseContext(): Promise<void> {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      const environment = await getEnvironment();
+      const context = createDatabaseContext({ connectionString: environment.DB, skipSync: true });
+      setDatabaseContext(context);
+    })().catch((error: unknown) => {
+      initializationPromise = undefined;
+      resetDatabaseContext();
       throw error;
     });
   }
 
-  return databasePromise;
+  return initializationPromise;
+}
+
+export async function getDatabase() {
+  await ensureDatabaseContext();
+  return getPackageDatabase();
 }
 
 export async function getContainerRepository() {
-  const database = await getDatabase();
-  return database.getRepository<Container>(entities.CONTAINER_NAME);
+  await ensureDatabaseContext();
+  return getPackageContainerRepository();
 }
 
 export async function getContainerAccessRepository() {
-  const database = await getDatabase();
-  return database.getRepository<ContainerAccess>(entities.CONTAINER_ACCESS_NAME);
+  await ensureDatabaseContext();
+  return getPackageContainerAccessRepository();
 }
 
 export async function getWorkspaceRepository() {
-  const database = await getDatabase();
-  return database.getRepository<Workspace>(entities.WORKSPACE_NAME);
+  await ensureDatabaseContext();
+  return getPackageWorkspaceRepository();
 }
 
 export async function getDataViewRepository() {
-  const database = await getDatabase();
-  return database.getRepository<DataView>(entities.DATA_VIEW_NAME);
+  await ensureDatabaseContext();
+  return getPackageDataViewRepository();
 }
 
 export async function getWorkspaceMemberRepository() {
-  const database = await getDatabase();
-  return database.getRepository<WorkspaceMember>(entities.WORKSPACE_MEMBER_NAME);
+  await ensureDatabaseContext();
+  return getPackageWorkspaceMemberRepository();
 }
 
 export async function getWorkspaceSlugRedirectRepository() {
-  const database = await getDatabase();
-  return database.getRepository<WorkspaceSlugRedirect>(entities.WORKSPACE_SLUG_REDIRECT_NAME);
+  await ensureDatabaseContext();
+  return getPackageWorkspaceSlugRedirectRepository();
 }
 
 export async function getAppRepository() {
-  const database = await getDatabase();
-  return database.getRepository<App>(entities.APP_NAME);
+  await ensureDatabaseContext();
+  return getPackageAppRepository();
 }
 
 export async function getApiKeyRepository() {
-  const database = await getDatabase();
-  return database.getRepository<ApiKey>(entities.API_KEY_NAME);
+  await ensureDatabaseContext();
+  return getPackageApiKeyRepository();
 }
 
 export async function getAppScopedContainerRepository() {
-  const database = await getDatabase();
-  return database.getRepository<AppScopedContainer>(entities.APP_SCOPED_CONTAINER_NAME);
+  await ensureDatabaseContext();
+  return getPackageAppScopedContainerRepository();
 }
 
 export async function getMemberScopedContainerRepository() {
-  const database = await getDatabase();
-  return database.getRepository<MemberScopedContainer>(entities.MEMBER_SCOPED_CONTAINER_NAME);
+  await ensureDatabaseContext();
+  return getPackageMemberScopedContainerRepository();
 }
 
 export async function getWebhookRepository() {
-  const database = await getDatabase();
-  return database.getRepository<Webhook>(entities.WEBHOOK_NAME);
+  await ensureDatabaseContext();
+  return getPackageWebhookRepository();
 }
 
 export async function getWebhookDeliveryRepository() {
-  const database = await getDatabase();
-  return database.getRepository<WebhookDelivery>(entities.WEBHOOK_DELIVERY_NAME);
+  await ensureDatabaseContext();
+  return getPackageWebhookDeliveryRepository();
 }
 
 export async function getUploadedFileRepository() {
-  const database = await getDatabase();
-  return database.getRepository<UploadedFile>(entities.UPLOADED_FILE_NAME);
+  await ensureDatabaseContext();
+  return getPackageUploadedFileRepository();
 }
 
 export async function getFileUsageRepository() {
-  const database = await getDatabase();
-  return database.getRepository<FileUsage>(entities.FILE_USAGE_NAME);
+  await ensureDatabaseContext();
+  return getPackageFileUsageRepository();
 }
 
 export async function getPageRevisionRepository() {
-  const database = await getDatabase();
-  return database.getRepository<PageRevision>(entities.PAGE_REVISION_NAME);
+  await ensureDatabaseContext();
+  return getPackagePageRevisionRepository();
 }
 
 export async function getSettingRepository() {
-  const database = await getDatabase();
-  return database.getRepository<Setting>(entities.SETTING_NAME);
+  await ensureDatabaseContext();
+  return getPackageSettingRepository();
 }
 
 export async function getPlatformUserRepository() {
-  const database = await getDatabase();
-  return database.getRepository<PlatformUser>(entities.PLATFORM_USER_NAME);
+  await ensureDatabaseContext();
+  return getPackagePlatformUserRepository();
+}
+
+/**
+ * Eagerly registers the database context once, at process boot. Package-level DB-pure service
+ * shims (e.g. `@/lib/database/app-service`) call `@thoth/database`'s repository accessors
+ * directly, bypassing the `ensureDatabaseContext()` wrapping above — so the context must
+ * already be registered before any of those are used. Called from `apps/web/src/instrumentation.ts`,
+ * which Next.js runs once before serving any request.
+ */
+export async function initializeDatabase(): Promise<void> {
+  await ensureDatabaseContext();
 }

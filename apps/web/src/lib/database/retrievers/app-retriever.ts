@@ -1,7 +1,7 @@
 import { getAppRepository } from '..';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
-import type { App } from '@/types/database';
+import type { App } from '@thoth/database/types';
 
 class AppRetriever {
   /**

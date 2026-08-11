@@ -1,4 +1,3 @@
-export * from './container';
-export * from './container-access';
-export * from './data-view';
-export * from './workspace';
+// Moved to `@thoth/database/schemas` (THOTH-058). Re-exported here so existing
+// `@/types/schemas/entities/index` import sites don't need to change.
+export * from '@thoth/database/schemas';

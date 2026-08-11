@@ -2,7 +2,7 @@ import { getAdapter } from './adapter';
 import { buildFilterFragment, buildNameSortExpression, buildSortExpression } from './query-builder';
 import { dropStaleRules } from './validation';
 import type { ExecutePageQueryOptions, ExecutePageQueryResult, SqlFragment } from './types';
-import type { PageContainer } from '@/types/database';
+import type { PageContainer } from '@thoth/database/types';
 import { BadRequestError } from '../../errors/bad-request-error';
 import { NAME_SORT_COLUMN_ID } from '@/types/schemas/entities/data-view-query';
 

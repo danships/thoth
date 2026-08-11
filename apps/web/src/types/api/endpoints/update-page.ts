@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { pageSchema } from '../entities';
 import type { DataWrapper } from '../utilities';
-import { pageContainerSchema } from '@/types/database';
+import { pageContainerSchema } from '@thoth/database/types';
 
 // Define the endpoint path
 export const UPDATE_PAGE_ENDPOINT = '/pages/:id';

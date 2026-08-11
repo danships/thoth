@@ -7,7 +7,7 @@ import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { filterContainersByGrantForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
-import type { Container } from '@/types/database';
+import type { Container } from '@thoth/database/types';
 import type { GetPagesTreeQueryVariables, GetPagesTreeResponse, PagesTreeCursor, Page, DataView } from '@/types/api';
 import {
   getPagesTreeQueryVariablesSchema,

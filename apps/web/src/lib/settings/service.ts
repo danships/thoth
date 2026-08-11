@@ -1,6 +1,6 @@
 import { getSettingRepository } from '@/lib/database';
 import { getLogger } from '@/lib/logger';
-import type { Setting, SettingScope } from '@/types/database';
+import type { Setting, SettingScope } from '@thoth/database/types';
 import {
   PLATFORM_SETTING_SUBJECT_ID,
   getSettingDefault,

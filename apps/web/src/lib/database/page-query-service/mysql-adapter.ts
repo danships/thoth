@@ -2,7 +2,7 @@ import type { Pool } from 'mysql2/promise';
 import { getDatabase } from '../index';
 import type { PageQueryEngineAdapter } from './adapter';
 import type { Row, SqlFragment } from './types';
-import type { PageContainer } from '@/types/database';
+import type { PageContainer } from '@thoth/database/types';
 
 /**
  * MySQL/MariaDB implementation of `PageQueryEngineAdapter` (see `adapter.ts` for the rationale).

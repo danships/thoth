@@ -61,11 +61,19 @@ export default async function globalSetup({ provide }: Pick<TestProject, 'provid
     NODE_ENV: 'test',
     DB: `sqlite://${databasePath}`,
     BETTER_AUTH_SECRET: 'integration-test-secret-not-for-production',
-    SUPERSAVE_SKIP_SYNC: 'false',
     LOG_LEVEL: 'error',
     STORAGE_LOCAL_FOLDER: uploadsPath,
     NEXT_TELEMETRY_DISABLED: '1',
   };
+
+  // Create the schema (fresh SQLite file) via the standalone migration CLI before the web
+  // server starts — mirrors production's `db:migrate`-before-`next start` bootstrap.
+  execSync(`pnpm --filter @thoth/database db:migrate`, {
+    cwd: path.resolve(projectRoot, '../..'),
+    env: environment,
+    stdio: 'pipe',
+    timeout: 60_000,
+  });
 
   const serverOutput: string[] = [];
 

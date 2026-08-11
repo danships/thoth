@@ -12,7 +12,7 @@ import type {
   GetDataSourcesResponse,
 } from '@/types/api';
 import { createDataSourceBodySchema, getDataSourcesQuerySchema } from '@/types/api';
-import { DataSourceContainer, DataSourceContainerCreate } from '@/types/database';
+import { DataSourceContainer, DataSourceContainerCreate } from '@thoth/database/types';
 import { randomUUID } from 'node:crypto';
 
 export const GET = apiRoute<GetDataSourcesResponse, GetDataSourcesQuery, {}>(

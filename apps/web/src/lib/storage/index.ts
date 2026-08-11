@@ -1,16 +1,16 @@
+import { createStorageAdapter } from '@thoth/storage';
+import type { StorageAdapter } from '@thoth/storage';
 import { getEnvironment } from '@/lib/environment';
-import { LocalStorageAdapter } from './local-adapter';
-import type { StorageAdapter } from './types';
 
-export type { StorageAdapter } from './types';
+export type { StorageAdapter } from '@thoth/storage';
 
 let cachedAdapter: StorageAdapter | undefined;
 
 /**
- * Factory switching on `STORAGE_TYPE`. Cached after first resolution — every call site shares
- * the same adapter instance, mirroring `getDatabase()`'s caching pattern. Only `'local'` is
- * implemented today; adding e.g. an S3-backed adapter later is a matter of adding a `case` here
- * and implementing `StorageAdapter`, with no changes needed at any call site.
+ * Web-owned adapter around `@thoth/storage`'s `createStorageAdapter` factory (THOTH-058): reads
+ * the validated web environment once and caches the resulting adapter, mirroring
+ * `getDatabase()`'s caching pattern. The package itself never reads environment variables or
+ * decides file access — this is the only place `STORAGE_TYPE`/`STORAGE_LOCAL_FOLDER` are read.
  */
 export async function getStorageAdapter(): Promise<StorageAdapter> {
   if (cachedAdapter) {
@@ -19,13 +19,10 @@ export async function getStorageAdapter(): Promise<StorageAdapter> {
 
   const environment = await getEnvironment();
 
-  switch (environment.STORAGE_TYPE) {
-    case 'local': {
-      cachedAdapter = new LocalStorageAdapter(environment.STORAGE_LOCAL_FOLDER);
-      return cachedAdapter;
-    }
-    default: {
-      throw new Error(`Unsupported STORAGE_TYPE: ${String(environment.STORAGE_TYPE)}`);
-    }
-  }
+  cachedAdapter = createStorageAdapter({
+    type: environment.STORAGE_TYPE,
+    localFolder: environment.STORAGE_LOCAL_FOLDER,
+  });
+
+  return cachedAdapter;
 }

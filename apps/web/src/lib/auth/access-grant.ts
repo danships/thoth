@@ -1,7 +1,7 @@
 import { getAppScopedContainerRepository, getMemberScopedContainerRepository } from '@/lib/database';
 import { resolveContainerDescendants, resolvePageEmbeddedContainerIds } from '@/lib/database/app-service';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
-import type { App, AppPermission, AppScopeType, WorkspaceMember } from '@/types/database';
+import type { App, AppPermission, AppScopeType, WorkspaceMember } from '@thoth/database/types';
 import type { ApiKeySession } from './session';
 
 /**

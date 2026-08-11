@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { pageSchema, dataViewSchema } from '../entities';
 import type { DataWrapper } from '../utilities';
 import { getPageContentResponseSchema } from './get-page-content';
-import { pageContainerSchema } from '@/types/database';
+import { pageContainerSchema } from '@thoth/database/types';
 import { columnSchema } from '@/types/schemas/entities/container';
 
 export const GET_PAGE_DETAILS_ENDPOINT = '/pages/:id';

@@ -75,7 +75,7 @@ const starred = addUserIdToQuery(containerAccessRepository.createQuery().eq('sta
 
 ## Entities
 
-Entity definitions live in `apps/web/src/lib/database/entities/`. The three main entities are:
+Entity definitions live in `packages/database/src/entities/` (part of `@thoth/database`). The three main entities are:
 
 | Constant | Entity type | Typical use |
 |----------|-------------|-------------|
@@ -84,10 +84,10 @@ Entity definitions live in `apps/web/src/lib/database/entities/`. The three main
 | `DATA_VIEW_NAME` | `DataView` | Saved data views |
 | `MEMBER_SCOPED_CONTAINER_NAME` | `MemberScopedContainer` | Join table: a workspace member scoped to specific containers (mirrors `AppScopedContainer`) |
 
-Entity TypeScript types are in `apps/web/src/types/database/`. Always import the type, not the entity class, for typing variables:
+Entity TypeScript types live in `packages/database/src/types.ts`, re-exported via `@thoth/database/types`. Always import the type, not the entity class, for typing variables:
 
 ```typescript
-import type { Container, Workspace, DataView } from '@/types/database';
+import type { Container, Workspace, DataView } from '@thoth/database/types';
 ```
 
 ## Creating Records
@@ -122,7 +122,7 @@ Add new retrievers here when a route's data-fetching logic is complex enough to 
 
 ## Migrations
 
-Database migrations live in `apps/web/src/lib/database/migrations/`. Migrations run automatically at startup (unless `SUPERSAVE_SKIP_SYNC=true`). When adding a new entity field, create a migration file and register it in `apps/web/src/lib/database/migrations/index.ts`.
+Database migrations live in `packages/database/src/migrations/` (part of `@thoth/database`). Unlike before, schema sync/migrations are **never** run automatically by the long-running web process — the web app always opens the database with sync disabled (`skipSync: true`). Instead, run `pnpm db:migrate` (delegates to the standalone `packages/database/src/cli/migrate.ts` CLI) to create/upgrade the schema before starting/upgrading the server; the Docker images and test bootstraps (integration `global-setup.ts`, Playwright's `webServer.command`) run this automatically. Adding a new entity field does not always require a migration — SuperSave often handles new/optional fields automatically. When a migration genuinely is needed (e.g. backfilling existing rows), create a migration file and register it in `packages/database/src/migrations/index.ts`, preserving existing migration names/order so applied-migration tracking on upgraded databases isn't broken.
 
 ## Common Patterns
 

@@ -1,4 +1,4 @@
-import { DataView } from '@/types/database';
+import { DataView } from '@thoth/database/types';
 import { getDataViewRepository } from '..';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';

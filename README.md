@@ -18,10 +18,11 @@ hood — you don't need to learn new commands or `cd` into `apps/web`):
 
 - `apps/web/src/app`: Next.js App Router pages and API routes (`apps/web/src/app/api`).
 - `apps/web/src/components`: UI components organized using Atomic Design (`atoms`, `molecules`, `organisms`, `templates`).
-- `apps/web/src/lib`: shared libraries — auth (`better-auth`), database repositories (SuperSave ORM), API client, environment validation, and Nanostores-based state.
-- `apps/web/src/types`: shared TypeScript types and Zod schemas for API request/response validation.
+- `apps/web/src/lib`: shared libraries — auth (`better-auth`), API client, environment validation, and Nanostores-based state. Thin adapters around `@thoth/database`/`@thoth/storage` also live here (`apps/web/src/lib/database`, `apps/web/src/lib/storage`) so existing import paths and web-specific concerns (sessions, cookies, request auth) stay unchanged.
+- `apps/web/src/types`: shared TypeScript types and Zod schemas for API request/response validation (entity schemas are re-exported from `@thoth/database/schemas`).
 - `apps/web/tests/e2e`: Playwright end-to-end tests.
-- `packages/`: reserved for future extracted packages (currently empty).
+- `packages/database` (`@thoth/database`): framework-agnostic entity schemas, SuperSave entity definitions/repositories, migrations, and DB-pure services shared by the web app (and future services). Has no dependency on Next.js, sessions, or cookies. Its `src/cli/migrate.ts` is the only place schema sync/migrations are ever run — see `pnpm db:migrate` below.
+- `packages/storage` (`@thoth/storage`): the storage adapter contract and local-filesystem implementation, with no dependency on the web environment validator or auth/session concerns.
 
 ### Getting Started
 
@@ -47,7 +48,6 @@ verbatim from `environmentSchema` to avoid drift):
 | `LOG_LEVEL` | No | `info` | Logging verbosity: `error`, `warn`, `info`, `http`, `debug`, `trace`. |
 | `BETTER_AUTH_SECRET` | Yes | — | Secret used by `better-auth` for session/auth handling. |
 | `APP_URL` | No | `http://localhost:${PORT ?? 3000}` | The public, absolute base URL Thoth is served at (e.g. `https://thoth.example.com`). Explicitly wired into `better-auth`'s `baseURL`/`trustedOrigins` instead of relying on request-header inference. **Must be set in production** — see "Production deployment" below. No trailing slash. |
-| `SUPERSAVE_SKIP_SYNC` | No | `false` | Set to `true` to skip automatic schema sync and rely on migrations instead (recommended for production). |
 | `OIDC_CLIENT_ID` | No | — | OIDC client id. If all four `OIDC_*` vars are set, OIDC login is used; otherwise credentials (email/password) auth is used. |
 | `OIDC_CLIENT_SECRET` | No | — | OIDC client secret. |
 | `OIDC_DISCOVERY_URL` | No | — | OIDC discovery document URL. |
@@ -77,8 +77,10 @@ docker compose up -d
   `APP_URL` is intentionally a **runtime-only, server-side** env var — never a `NEXT_PUBLIC_*`
   build-time variable. The browser-side auth client talks to the same origin serving the page,
   so it needs no URL-related env var at all.
-- Set `SUPERSAVE_SKIP_SYNC=true` and manage schema changes via migrations instead of automatic
-  sync.
+- Schema is never synced automatically by the running web process. Before starting/upgrading
+  the server, run `pnpm db:migrate` (delegates to the standalone `@thoth/database` migration
+  CLI) to create/upgrade the schema; the Docker images run this automatically before starting
+  the server.
 - Set `BETTER_AUTH_SECRET` to a strong, unique secret (never reuse the development value).
 
 ### Available scripts
@@ -99,6 +101,7 @@ Run these from the repository root:
 | E2E tests (UI) | `pnpm test:e2e:ui` | Run Playwright tests in interactive UI mode |
 | E2E report | `pnpm test:e2e:report` | Show the last Playwright HTML report |
 | Seed database | `pnpm db:seed` | Seed the database with sample data |
+| Migrate database | `pnpm db:migrate` | Create/upgrade the schema via the standalone `@thoth/database` migration CLI |
 
 ### Standalone scripts
 

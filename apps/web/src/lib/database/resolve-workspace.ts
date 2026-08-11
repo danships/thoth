@@ -9,7 +9,7 @@ import {
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { LAST_WORKSPACE_COOKIE } from '@/lib/workspace/last-workspace-cookie';
-import type { Workspace } from '@/types/database';
+import type { Workspace } from '@thoth/database/types';
 
 /**
  * Resolves the workspace addressed by `slug` for `userId`, enforcing membership the same way

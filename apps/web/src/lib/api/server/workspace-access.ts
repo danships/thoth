@@ -6,7 +6,7 @@ import {
   memberToAccessGrant,
   type AccessGrant,
 } from '@/lib/auth/access-grant';
-import type { WorkspaceMember } from '@/types/database';
+import type { WorkspaceMember } from '@thoth/database/types';
 import type { ApiKeySession } from '@/lib/auth/session';
 
 /**

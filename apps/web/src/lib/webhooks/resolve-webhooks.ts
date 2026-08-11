@@ -1,6 +1,6 @@
 import { getAppRepository, getContainerRepository, getWebhookRepository } from '@/lib/database';
 import { appToAccessGrant, grantAllowsContainer } from '@/lib/auth/access-grant';
-import type { App, Container, DataSourceContainer, Webhook } from '@/types/database';
+import type { App, Container, DataSourceContainer, Webhook } from '@thoth/database/types';
 
 export type WebhookActor = {
   // The id of the App whose own API key caused the change, if any (undefined for a

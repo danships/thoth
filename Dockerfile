@@ -8,6 +8,8 @@ RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/package.json
+COPY packages/database/package.json packages/database/package.json
+COPY packages/storage/package.json packages/storage/package.json
 RUN pnpm install --frozen-lockfile --prod
 
 FROM base AS builder
@@ -15,6 +17,8 @@ RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/package.json
+COPY packages/database/package.json packages/database/package.json
+COPY packages/storage/package.json packages/storage/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
@@ -49,6 +53,17 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
+# The migration CLI (THOTH-058) is not part of the Next.js app and isn't picked up by output
+# file tracing, so it's copied explicitly and run once, before `node server.js`, via the CMD
+# below. A migration failure must prevent the server from starting.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/database/dist ./packages/database/dist
+COPY --from=builder --chown=nextjs:nodejs /app/packages/database/package.json ./packages/database/package.json
+# packages/database/node_modules holds the workspace-local symlinks (e.g. `supersave`) that
+# pnpm creates pointing into the root node_modules' content-addressable store. Node resolves
+# `require('supersave')` from packages/database/dist/context.js by walking up through
+# packages/database/node_modules first, so without this the migration CLI above fails at
+# runtime with `Cannot find module 'supersave'` even though root node_modules is present.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/database/node_modules ./packages/database/node_modules
 # .next/standalone already contains server.js and a trimmed node_modules tree.
 # Turbopack's file tracing can pull in source/config artefacts; delete them here.
 RUN rm -rf apps/web/src apps/web/tests apps/web/scripts \
@@ -71,4 +86,6 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-CMD ["node", "server.js"]
+# Run the standalone migration CLI before starting the server — schema sync/migrations are
+# never performed by the long-running web process itself (THOTH-058).
+CMD ["sh", "-c", "node /app/packages/database/dist/cli/migrate.js && node server.js"]

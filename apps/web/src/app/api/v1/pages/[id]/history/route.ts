@@ -11,7 +11,7 @@ import {
   type GetPageHistoryResponse,
   type PageHistoryRevisionSummary,
 } from '@/types/api/endpoints/get-page-history';
-import type { PageRevision } from '@/types/database';
+import type { PageRevision } from '@thoth/database/types';
 
 // Cursor encodes the last-seen row's sort key (`createdAt` then `id` as a tiebreaker) so paging
 // is stable even when multiple revisions share a millisecond-resolution timestamp.

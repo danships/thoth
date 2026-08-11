@@ -1,26 +1,5 @@
-export const RESERVED_WORKSPACE_SLUGS = ['new', 'api', 'pages', 'login', 'signup', 'workspaces'] as const;
-
-/**
- * Converts arbitrary text into a URL-safe slug: lowercase, alphanumeric segments joined by
- * single hyphens. Falls back to `'workspace'` if the input contains no usable characters
- * (e.g. an all-emoji or all-punctuation name).
- */
-export function slugify(input: string): string {
-  const slug = input
-    .normalize('NFKD')
-    .replaceAll(/[\u0300-\u036F]/g, '')
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '')
-    .replaceAll(/-{2,}/g, '-');
-
-  if (slug.length < 3) {
-    return 'workspace';
-  }
-
-  return slug.slice(0, 50);
-}
-
-export function isReservedWorkspaceSlug(slug: string): boolean {
-  return (RESERVED_WORKSPACE_SLUGS as readonly string[]).includes(slug);
-}
+// Pure — moved to `@thoth/database` (THOTH-058). Re-exported here since `apps/web/src/lib/auth/config.ts`
+// and `apps/web/src/scripts/seed.ts` still import from this path. Imported from the dedicated
+// `@thoth/database/utils/slug` subpath (not the main package entry point) so this stays reachable
+// from client components without pulling in server-only DB/context code (supersave, better-sqlite3).
+export { RESERVED_WORKSPACE_SLUGS, slugify, isReservedWorkspaceSlug } from '@thoth/database/utils/slug';

@@ -4,7 +4,7 @@ import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import type { ApiKeySession } from '@/lib/auth/session';
-import type { UploadedFile } from '@/types/database';
+import type { UploadedFile } from '@thoth/database/types';
 
 /**
  * The sole authorization chokepoint for reading an uploaded file's bytes (`GET

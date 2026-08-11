@@ -5,7 +5,7 @@ import { resolveContainerDescendants } from '@/lib/database/app-service';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
-import type { App } from '@/types/database';
+import type { App } from '@thoth/database/types';
 import type {
   ConnectPageAppBody,
   ConnectPageAppResponse,

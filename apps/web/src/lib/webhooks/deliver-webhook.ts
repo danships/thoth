@@ -1,6 +1,6 @@
 import { recordAndPrune, signPayload } from '@/lib/database/webhook-service';
 import { assertPublicHttpsUrl } from './ssrf';
-import type { Webhook, WebhookPayload } from '@/types/database';
+import type { Webhook, WebhookPayload } from '@thoth/database/types';
 
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_STORED_ERROR_LENGTH = 500;

@@ -4,7 +4,7 @@ import { addUserIdToQuery, addWorkspaceIdToQuery } from './helpers';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { getLogger } from '@/lib/logger';
-import type { Container, PageContainer } from '@/types/database';
+import type { Container, PageContainer } from '@thoth/database/types';
 
 const MAX_DESCENDANT_DEPTH = 50;
 

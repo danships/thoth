@@ -1,0 +1,55 @@
+{
+  "name": "@thoth/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": "24.x"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas/index.d.ts",
+      "default": "./dist/schemas/index.js"
+    },
+    "./utils/slug": {
+      "types": "./dist/utils/slug.d.ts",
+      "default": "./dist/utils/slug.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "prebuild": "pnpm run clean",
+    "lint:tsc": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "tsx src/cli/migrate.ts",
+    "db:migrate:dist": "node ./dist/cli/migrate.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "fractional-indexing": "^4.0.0",
+    "mysql2": "^3.22.5",
+    "supersave": "1.0.0-beta4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tsconfig/strictest": "^2.0.8",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.0",
+    "rimraf": "^6.1.3",
+    "tsx": "^4.19.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

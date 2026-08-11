@@ -3,7 +3,7 @@ import { getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
-import type { Container, PageContainer } from '@/types/database';
+import type { Container, PageContainer } from '@thoth/database/types';
 import type { GetPageBreadcrumbsParameters, GetPageBreadcrumbsResponse, Page } from '@/types/api';
 import { getPageBreadcrumbsParametersSchema } from '@/types/api';
 

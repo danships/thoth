@@ -6,7 +6,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { z } from 'zod';
 import { Column, columnSchema } from '@/types/schemas/entities/container';
 import { randomUUID } from 'node:crypto';
-import { DataSourceContainer } from '@/types/database';
+import { DataSourceContainer } from '@thoth/database/types';
 import { CreateDataSourceColumnBody, createDataSourceColumnBodySchema } from '@/types/api';
 
 export const POST = apiRoute<z.infer<typeof columnSchema>, undefined, { id: string }, CreateDataSourceColumnBody>(

@@ -6,7 +6,7 @@ import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
 import { getUserStorageUsage } from '@/lib/files/quota';
 import type { AdminUserItem, GetAdminUsersQuery, GetAdminUsersResponse } from '@/types/api';
 import { getAdminUsersQuerySchema } from '@/types/api';
-import type { PlatformUser } from '@/types/database';
+import type { PlatformUser } from '@thoth/database/types';
 
 const DEFAULT_LIMIT = 50;
 

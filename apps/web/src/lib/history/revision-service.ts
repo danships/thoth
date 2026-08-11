@@ -1,6 +1,6 @@
 import { getPageRevisionRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
-import type { PageContainer, PageRevision } from '@/types/database';
+import type { PageContainer, PageRevision } from '@thoth/database/types';
 import type { PageValue } from '@/types/schemas/entities/container';
 import { makePatch, summarise } from './delta';
 import { reconstructAt, type ContentRevisionLike } from './reconstruct';

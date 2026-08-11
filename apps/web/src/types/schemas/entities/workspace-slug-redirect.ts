@@ -1,11 +1,3 @@
-import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withWorkspaceIdSchema } from '../utilities';
-import { workspaceSlugSchema } from './workspace';
-
-export const workspaceSlugRedirectSchema = z
-  .object({
-    slug: workspaceSlugSchema,
-  })
-  .extend(z.object({ createdAt: withTrackUpdatesSchema.shape.createdAt }).shape)
-  .extend(withWorkspaceIdSchema.shape)
-  .extend(withIdSchema.shape);
+// Moved to `@thoth/database/schemas` (THOTH-058). Re-exported here so existing
+// `@/types/schemas/entities/workspace-slug-redirect` import sites don't need to change.
+export * from '@thoth/database/schemas';
