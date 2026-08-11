@@ -58,6 +58,12 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 # below. A migration failure must prevent the server from starting.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/dist ./packages/database/dist
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/package.json ./packages/database/package.json
+# packages/database/node_modules holds the workspace-local symlinks (e.g. `supersave`) that
+# pnpm creates pointing into the root node_modules' content-addressable store. Node resolves
+# `require('supersave')` from packages/database/dist/context.js by walking up through
+# packages/database/node_modules first, so without this the migration CLI above fails at
+# runtime with `Cannot find module 'supersave'` even though root node_modules is present.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/database/node_modules ./packages/database/node_modules
 # .next/standalone already contains server.js and a trimmed node_modules tree.
 # Turbopack's file tracing can pull in source/config artefacts; delete them here.
 RUN rm -rf apps/web/src apps/web/tests apps/web/scripts \
