@@ -27,8 +27,8 @@ const environmentSchema = {
     choices: ['error', 'warn', 'info', 'http', 'debug', 'trace'],
     default: 'info',
   }),
-  // Absolute path to the Unix domain socket the worker listens on. Must be absolute outside of
-  // development, where a per-UID private temp directory is used as a convenience default.
+  // Absolute path to the Unix domain socket the worker listens on. When set, must be absolute;
+  // otherwise a per-UID private temp directory is used as a convenience default in any environment.
   JOB_SOCKET_PATH: str({ default: undefined }),
   // How often the runner polls for due jobs when it hasn't been woken by an enqueue/retry.
   JOB_POLL_INTERVAL_MS: positiveInt({ default: 1000 }),
