@@ -60,11 +60,77 @@ verbatim from `environmentSchema` to avoid drift):
 | `FILES_PURGE_GRACE_PERIOD_HOURS` | No | `24` | Hours an orphaned uploaded file is retained before `pnpm files:purge` permanently removes it. |
 | `PORT` | No | `3000` | **Runtime/Node var, not validated by `envalid`** — consumed directly by the Node HTTP server (`next start`/Docker entrypoint) before the app's env schema is even checked. Only used indirectly here as the default port in `APP_URL`'s fallback. |
 
+`@thoth/jobs` (see "Process topology" below) has its own, separate environment schema
+(`apps/jobs/src/environment.ts`) — it never reads `apps/web`'s `DB`/`BETTER_AUTH_SECRET`:
+
+| Variable | Required? | Default | Description |
+|----------|------------|---------|--------------|
+| `JOB_SOCKET_PATH` | No | a per-UID private temp path | Absolute path to the Unix domain socket `@thoth/jobs` listens on. Also read directly by `apps/web`'s `/api/health` route (`apps/web/src/lib/jobs/health.ts`) to reach the same socket — set it once and pass it to both processes (PM2/Docker/dev harness/tests all do this already). |
+| `JOB_POLL_INTERVAL_MS` | No | `1000` | How often the runner polls for due jobs when not woken by an enqueue/retry. |
+| `JOB_SHUTDOWN_TIMEOUT_MS` | No | `10000` | How long the process waits for active handlers to finish/abort on SIGTERM/SIGINT before exiting. PM2's `kill_timeout` for `thoth-jobs` (`pm2.config.js`) is deliberately longer than this. |
+| `JOB_CONCURRENCY` | No | `4` | Maximum number of jobs executed concurrently. |
+| `JOB_RETENTION_MS` | No | `900000` (15 min) | How long terminal (completed/dead) job records are retained in memory before eviction. |
+| `JOB_RETENTION_MAX` | No | `500` | Maximum number of terminal job records retained in memory regardless of age. |
+| `JOB_SCHEDULER_TICK_MS` | No | `5000` | How often the scheduler ticks to ensure the current interval bucket has been enqueued. |
+
 A local MySQL database can be started with Docker Compose:
 
 ```bash
 docker compose up -d
 ```
+
+### Process topology (PM2, web + jobs)
+
+Thoth runs two long-running Node processes side by side, supervised by [PM2](https://pm2.keymetrics.io/)
+in production/preview images (`pm2.config.js` at the repository root) and by a lightweight
+harness locally/in tests (`scripts/dev.mjs`, `apps/web/tests/integration/global-setup.ts`,
+`apps/web/playwright.config.ts`):
+
+- **`thoth-web`** — the Next.js app. The only process that binds an HTTP port (`3000` by
+  default). Runs with schema sync always disabled (`skipSync: true`).
+- **`thoth-jobs`** (`@thoth/jobs`) — an in-memory job queue/scheduler served over a Unix domain
+  socket (never TCP/HTTP). No database access, no exposed port. Never administered via HTTP/UI
+  by design (see THOTH-060 non-goals).
+
+Both are PM2 **fork-mode, single-instance** apps (`instances: 1`) — clustering is not supported:
+the current queue is a single in-process instance, and the web/session/SQLite test topology has
+not been designed for multiple concurrent instances of either process. Each restarts
+**independently** on crash (PM2's bounded restart policy); a jobs crash/restart does not disrupt
+web (or vice versa) — in-flight leased jobs are recovered by `@thoth/jobs` on its own restart.
+
+**Startup ordering:** a one-shot migration (`pnpm db:migrate`, the `@thoth/database` migration
+CLI) must complete **before** PM2 starts either process — see `scripts/start-production.mjs`,
+the sole production/preview entrypoint (`pnpm start`/`pnpm start:production`, and both
+Dockerfiles' `CMD`). PM2 child restarts never re-run migrations. Within PM2, jobs is declared
+first and uses `wait_ready`/`listen_timeout` (jobs signals `process.send('ready')` only after
+DB-free startup — lease recovery, scheduler init, and a secure `0600`-mode Unix socket bind — see
+`apps/jobs/src/index.ts`), but web may start listening before jobs finishes binding; this is
+safe because `/api/health` stays `503` until jobs responds to a real `ping`.
+
+**Health (`GET /api/health`, public, unauthenticated):** returns `200
+{ status: 'ok', components: { web: 'ok', jobs: 'ok' } }` only once a short-timeout
+(`apps/web/src/lib/jobs/health.ts`, 500ms connect/response) protocol `ping` over
+`JOB_SOCKET_PATH` succeeds; otherwise `503 { status: 'unavailable', components: { web: 'ok',
+jobs: 'unavailable' } }`. Never exposes DB state, queue depth, the socket path, process ids, job
+payloads, or exception text — coarse component status only.
+
+**Local targeted commands** (all delegate to root scripts):
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| Full stack dev | `pnpm dev` | Migrate → start `@thoth/jobs` on an isolated socket → wait for a real ping → start `next dev --turbopack`. Fail-fast: either child exiting stops the other and forwards the failure; Ctrl-C/SIGTERM are forwarded to both and only the harness-owned temp socket dir is removed. |
+| Web only | `pnpm dev:web` | Starts only `next dev`, for UI-only debugging. `/api/health` correctly reports `jobs: 'unavailable'` unless you separately start `@thoth/jobs` and export the matching `JOB_SOCKET_PATH` yourself. |
+| Jobs only | `pnpm dev:jobs` | Starts only `@thoth/jobs` (`tsx watch`), e.g. to pair with `dev:web` above. |
+| Build web only | `pnpm build:web` | `next build --turbopack` for `apps/web`. |
+| Build jobs only | `pnpm build:jobs` | Compiles `@thoth/jobs` to `apps/jobs/dist`. |
+
+**Logs:** PM2 merges each app's stdout/stderr into `logs/thoth-jobs-*.log` /
+`logs/thoth-web-*.log` under the working directory (`pm2.config.js`); use `pm2 logs`/`pm2 logs
+thoth-jobs`/`pm2 logs thoth-web` inside the container (`docker exec`) to tail them live.
+
+**Socket security:** the socket's parent directory is created mode `0700`, and the socket file
+itself is `chmod 0600` immediately after bind (both owned by the non-root `nextjs` user in
+Docker) — it is ephemeral runtime state, not part of any persisted volume.
 
 ### Production deployment
 
@@ -89,9 +155,11 @@ Run these from the repository root:
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| Dev server | `pnpm dev` | Start Next.js with Turbopack (hot-reload) |
-| Build | `pnpm build` | Production build via `next build --turbopack` |
-| Start | `pnpm start` | Run the production build |
+| Dev server | `pnpm dev` | Start the full stack (migrate → jobs → web) with Turbopack hot-reload |
+| Dev server (web only) | `pnpm dev:web` | Start only `next dev`, for UI-only debugging |
+| Dev server (jobs only) | `pnpm dev:jobs` | Start only `@thoth/jobs` |
+| Build | `pnpm build` | Production build of `@thoth/jobs` and `apps/web` (`next build --turbopack`) |
+| Start | `pnpm start` / `pnpm start:production` | Migrate once, then run PM2 (`thoth-web` + `thoth-jobs`) via `scripts/start-production.mjs` |
 | Lint (all) | `pnpm lint` | Run ESLint + Prettier + TypeScript checks concurrently |
 | Format | `pnpm format` | Auto-fix Prettier and ESLint issues in `apps/web/src/` |
 | Unit tests | `pnpm test:unit` | Run Vitest unit tests |

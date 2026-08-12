@@ -43,6 +43,7 @@
     "@nanostores/react": "^1.1.0",
     "@tabler/icons-react": "^3.44.0",
     "@thoth/database": "workspace:*",
+    "@thoth/job-protocol": "workspace:*",
     "@thoth/storage": "workspace:*",
     "axios": "^1.18.1",
     "better-auth": "^1.6.23",

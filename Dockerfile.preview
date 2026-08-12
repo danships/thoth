@@ -33,8 +33,10 @@ RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/package.json
+COPY apps/jobs/package.json apps/jobs/package.json
 COPY packages/database/package.json packages/database/package.json
 COPY packages/storage/package.json packages/storage/package.json
+COPY packages/job-protocol/package.json packages/job-protocol/package.json
 # Full install (no `--prod`): devDependencies like `tsx` and `typescript`
 # must be present in the final image so the seed script can run without any
 # further installation at runtime.
@@ -45,6 +47,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
+# Builds the shared packages, then `@thoth/web` (Next standalone output) and `@thoth/jobs`
+# (plain `tsc` output) topologically — see the root `build` script.
 RUN pnpm build
 
 FROM base AS runner
@@ -67,7 +71,8 @@ ENV CI=true
 RUN apk add --no-cache wget su-exec && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 --home /home/nextjs nextjs && \
-    mkdir -p /home/nextjs /data && \
+    mkdir -p /home/nextjs /data /app/run /app/logs && \
+    chmod 0700 /app/run && \
     chown -R nextjs:nodejs /home/nextjs /app /data
 
 # The monorepo's `outputFileTracingRoot` (see apps/web/next.config.ts) makes Next.js emit the
@@ -98,6 +103,21 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/database/package.json ./
 # packages/database/node_modules first, so without this the migration CLI above fails at
 # runtime with `Cannot find module 'supersave'` even though root node_modules is present.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/node_modules ./packages/database/node_modules
+# `@thoth/job-protocol`'s compiled output — required both by `@thoth/jobs` (via its own
+# `node_modules/@thoth/job-protocol` workspace symlink, copied below) and by the health check
+# code traced into the web standalone bundle above.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/job-protocol/dist ./packages/job-protocol/dist
+COPY --from=builder --chown=nextjs:nodejs /app/packages/job-protocol/package.json ./packages/job-protocol/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/packages/job-protocol/node_modules ./packages/job-protocol/node_modules
+# `@thoth/jobs` (THOTH-059/THOTH-060) — the second PM2-managed process. Deliberately imports no
+# Next.js/web/database module and opens no TCP/HTTP port; its `node_modules` carries only its
+# own workspace-local symlinks (e.g. `@thoth/job-protocol` -> ../../../packages/job-protocol).
+COPY --from=builder --chown=nextjs:nodejs /app/apps/jobs/dist ./apps/jobs/dist
+COPY --from=builder --chown=nextjs:nodejs /app/apps/jobs/package.json ./apps/jobs/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/apps/jobs/node_modules ./apps/jobs/node_modules
+# PM2 process file and the migration-then-`pm2-runtime` bootstrap entrypoint (THOTH-060).
+COPY --from=builder --chown=nextjs:nodejs /app/pm2.config.js ./pm2.config.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/start-production.mjs ./scripts/start-production.mjs
 # Overwrite the minimal, traced package.json from the standalone build with
 # the full one, and copy the full source tree (not just the seed script), so
 # `pnpm run db:seed` is runnable in the running container. The seed script
@@ -148,6 +168,13 @@ RUN chmod +x /app/docker-entrypoint.sh
 
 WORKDIR /app/apps/web
 
+# `/app/run` is the short, writable, private (0700) parent directory for the `@thoth/jobs`
+# Unix domain socket (see `apps/jobs/src/socket/server.ts`, which itself enforces the socket
+# file's own 0600 mode on bind). It is ephemeral — not part of `/data` — and recreated on every
+# container start. Only Next.js binds a TCP port (0.0.0.0:3000); `@thoth/jobs` has no TCP/HTTP
+# listener and this image exposes no additional port.
+ENV JOB_SOCKET_PATH=/app/run/jobs.sock
+
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
@@ -156,6 +183,8 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-# Run the standalone migration CLI before starting the server — schema sync/migrations are
-# never performed by the long-running web process itself (THOTH-058).
-CMD ["sh", "-c", "node /app/packages/database/dist/cli/migrate.js && node server.js"]
+# Runs the standalone migration CLI once, then execs `pm2-runtime` (foreground, signal-
+# forwarding) against `pm2.config.js`, which supervises exactly one `thoth-jobs` and one
+# `thoth-web` process (THOTH-060). No shell remains as an unforwarding PID 1 once
+# `docker-entrypoint.sh` has dropped privileges and `exec`'d this.
+CMD ["node", "/app/scripts/start-production.mjs"]

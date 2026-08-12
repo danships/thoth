@@ -59,6 +59,14 @@ async function main(): Promise<void> {
 
   logger.info('job.service.ready', { socketPath, concurrency: environment.JOB_CONCURRENCY });
 
+  // Notifies PM2 (`wait_ready: true`, see root `pm2.config.js`) that the process has finished
+  // its startup sequence — DB/lease recovery, scheduler init, and the secure socket bind/chmod
+  // above are all complete — only now is it safe for PM2 to consider this instance "up" and
+  // route/allow dependents to rely on it. `process.send` only exists when an IPC channel is
+  // present (i.e. under PM2/a Node parent); plain `node dist/index.js` or `tsx` runs (dev,
+  // `apps/jobs` tests) have no such channel and must not throw here.
+  process.send?.('ready');
+
   let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) {

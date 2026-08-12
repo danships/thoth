@@ -8,8 +8,10 @@ RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/package.json
+COPY apps/jobs/package.json apps/jobs/package.json
 COPY packages/database/package.json packages/database/package.json
 COPY packages/storage/package.json packages/storage/package.json
+COPY packages/job-protocol/package.json packages/job-protocol/package.json
 RUN pnpm install --frozen-lockfile --prod
 
 FROM base AS builder
@@ -17,10 +19,14 @@ RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/package.json
+COPY apps/jobs/package.json apps/jobs/package.json
 COPY packages/database/package.json packages/database/package.json
 COPY packages/storage/package.json packages/storage/package.json
+COPY packages/job-protocol/package.json packages/job-protocol/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
+# Builds the shared packages, then `@thoth/web` (Next standalone output) and `@thoth/jobs`
+# (plain `tsc` output) topologically — see the root `build` script.
 RUN pnpm build
 
 FROM node:24.18.0-alpine AS runner
@@ -30,7 +36,8 @@ ENV NODE_ENV=production
 RUN apk add --no-cache wget && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 --home /home/nextjs nextjs && \
-    mkdir -p /home/nextjs && \
+    mkdir -p /home/nextjs /app/run /app/logs && \
+    chmod 0700 /app/run && \
     chown -R nextjs:nodejs /home/nextjs /app
 
 ENV HOME=/home/nextjs
@@ -44,18 +51,19 @@ ENV HOME=/home/nextjs
 # ../../../node_modules/.pnpm/next@.../node_modules/next`, itself calibrated for the exact
 # nesting depth `standalone/apps/web/node_modules/`). Copy the full production `node_modules`
 # from `deps` first (covers native modules like `better-sqlite3` that output file tracing can
-# miss the binary for), then copy `standalone/` as a whole — preserving that same nesting
-# intact — so those relative symlinks keep resolving correctly. Flattening `apps/web/`
-# straight into `/app` (as this image used to) shifts the symlinks' relative depth by one
-# level and breaks `node server.js` with `Cannot find module 'next'` /
+# miss the binary for, and provides `pm2`/`pm2-runtime`), then copy `standalone/` as a whole —
+# preserving that same nesting intact — so those relative symlinks keep resolving correctly.
+# Flattening `apps/web/` straight into `/app` (as this image used to) shifts the symlinks'
+# relative depth by one level and breaks `node server.js` with `Cannot find module 'next'` /
 # `Cannot find module '@swc/helpers/...'`.
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 # The migration CLI (THOTH-058) is not part of the Next.js app and isn't picked up by output
-# file tracing, so it's copied explicitly and run once, before `node server.js`, via the CMD
-# below. A migration failure must prevent the server from starting.
+# file tracing, so it's copied explicitly and run once, before PM2 starts, via
+# `scripts/start-production.mjs`. A migration failure must prevent both PM2 children from
+# starting.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/dist ./packages/database/dist
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/package.json ./packages/database/package.json
 # packages/database/node_modules holds the workspace-local symlinks (e.g. `supersave`) that
@@ -64,6 +72,21 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/database/package.json ./
 # packages/database/node_modules first, so without this the migration CLI above fails at
 # runtime with `Cannot find module 'supersave'` even though root node_modules is present.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/node_modules ./packages/database/node_modules
+# `@thoth/job-protocol`'s compiled output — required both by `@thoth/jobs` (via its own
+# `node_modules/@thoth/job-protocol` workspace symlink, copied below) and by the health check
+# code traced into the web standalone bundle above.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/job-protocol/dist ./packages/job-protocol/dist
+COPY --from=builder --chown=nextjs:nodejs /app/packages/job-protocol/package.json ./packages/job-protocol/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/packages/job-protocol/node_modules ./packages/job-protocol/node_modules
+# `@thoth/jobs` (THOTH-059/THOTH-060) — the second PM2-managed process. Deliberately imports no
+# Next.js/web/database module and opens no TCP/HTTP port; its `node_modules` carries only its
+# own workspace-local symlinks (e.g. `@thoth/job-protocol` -> ../../../packages/job-protocol).
+COPY --from=builder --chown=nextjs:nodejs /app/apps/jobs/dist ./apps/jobs/dist
+COPY --from=builder --chown=nextjs:nodejs /app/apps/jobs/package.json ./apps/jobs/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/apps/jobs/node_modules ./apps/jobs/node_modules
+# PM2 process file and the migration-then-`pm2-runtime` bootstrap entrypoint (THOTH-060).
+COPY --from=builder --chown=nextjs:nodejs /app/pm2.config.js ./pm2.config.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/start-production.mjs ./scripts/start-production.mjs
 # .next/standalone already contains server.js and a trimmed node_modules tree.
 # Turbopack's file tracing can pull in source/config artefacts; delete them here.
 RUN rm -rf apps/web/src apps/web/tests apps/web/scripts \
@@ -77,7 +100,13 @@ RUN rm -rf apps/web/src apps/web/tests apps/web/scripts \
         *.md db.sqlite db.sqlite-shm db.sqlite-wal 2>/dev/null || true
 
 USER nextjs
-WORKDIR /app/apps/web
+
+# `/app/run` is the short, writable, private (0700) parent directory for the `@thoth/jobs`
+# Unix domain socket (see `apps/jobs/src/socket/server.ts`, which itself enforces the socket
+# file's own 0600 mode on bind). It is ephemeral — not part of any persisted volume — and
+# recreated on every container start. Only Next.js binds a TCP port (0.0.0.0:3000); `@thoth/jobs`
+# has no TCP/HTTP listener and this image exposes no additional port.
+ENV JOB_SOCKET_PATH=/app/run/jobs.sock
 
 EXPOSE 3000
 ENV PORT=3000
@@ -86,6 +115,7 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-# Run the standalone migration CLI before starting the server — schema sync/migrations are
-# never performed by the long-running web process itself (THOTH-058).
-CMD ["sh", "-c", "node /app/packages/database/dist/cli/migrate.js && node server.js"]
+# Runs the standalone migration CLI once, then execs `pm2-runtime` (foreground, signal-
+# forwarding) against `pm2.config.js`, which supervises exactly one `thoth-jobs` and one
+# `thoth-web` process (THOTH-060). No shell remains as an unforwarding PID 1.
+CMD ["node", "scripts/start-production.mjs"]

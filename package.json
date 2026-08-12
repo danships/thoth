@@ -6,12 +6,16 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "pnpm --filter @thoth/web dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "pnpm --filter @thoth/web dev",
     "dev:jobs": "pnpm --filter @thoth/jobs dev",
     "predev": "pnpm run build:packages",
     "build:packages": "pnpm --filter @thoth/database build && pnpm --filter @thoth/storage build && pnpm --filter @thoth/job-protocol build",
-    "build": "pnpm run build:packages && pnpm --filter @thoth/web build && pnpm --filter @thoth/jobs build",
-    "start": "pnpm --filter @thoth/web start",
+    "build:web": "pnpm --filter @thoth/web build",
+    "build:jobs": "pnpm --filter @thoth/jobs build",
+    "build": "pnpm run build:packages && pnpm run build:web && pnpm run build:jobs",
+    "start": "node scripts/start-production.mjs",
+    "start:production": "node scripts/start-production.mjs",
     "lint": "concurrently \"pnpm:lint:*\"",
     "prelint": "pnpm run build:packages",
     "lint:eslint": "eslint scripts",
@@ -45,7 +49,8 @@
     "db:seed": "pnpm --filter @thoth/web db:seed"
   },
   "dependencies": {
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "pm2": "^7.0.3"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.0",
