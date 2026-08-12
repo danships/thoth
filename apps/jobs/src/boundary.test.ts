@@ -26,9 +26,19 @@ describe('jobs boundary', () => {
   test('package.json declares no next/web/database dependency', async () => {
     const packageJson = JSON.parse(
       await readFile(nodePath.join(__dirname, '..', 'package.json'), 'utf8')
-    ) as { dependencies?: Record<string, string> };
+    ) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      optionalDependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    };
 
-    const dependencyNames = Object.keys(packageJson.dependencies ?? {});
+    const dependencyNames = [
+      ...Object.keys(packageJson.dependencies ?? {}),
+      ...Object.keys(packageJson.devDependencies ?? {}),
+      ...Object.keys(packageJson.optionalDependencies ?? {}),
+      ...Object.keys(packageJson.peerDependencies ?? {}),
+    ];
     expect(dependencyNames).not.toContain('next');
     expect(dependencyNames).not.toContain('@thoth/web');
     expect(dependencyNames).not.toContain('@thoth/database');
@@ -39,10 +49,15 @@ describe('jobs boundary', () => {
   test('no source file imports next/web/database modules', async () => {
     const files = await listSourceFiles(nodePath.join(__dirname));
     const offenders: string[] = [];
+    // Matches: `import ... from 'next'`, `import 'next/foo'` (side-effect), `require('next')`,
+    // and `import('next')` (dynamic) — for `next`, `@thoth/web`, and `@thoth/database`, with or
+    // without a trailing subpath (e.g. `next/server`, `@thoth/database/schema`).
+    const prohibitedImportPattern =
+      /(?:from\s+|require\(\s*|import\(\s*|^\s*import\s+)['"](next|@thoth\/web|@thoth\/database)(?:\/[^'"]*)?['"]/m;
 
     for (const file of files) {
       const content = await readFile(file, 'utf8');
-      if (/from ['"](next|@thoth\/web|@thoth\/database)/.test(content)) {
+      if (prohibitedImportPattern.test(content)) {
         offenders.push(file);
       }
     }
