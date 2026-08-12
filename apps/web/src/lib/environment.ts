@@ -40,6 +40,11 @@ const environmentSchema = {
   APP_URL: url({ default: undefined }),
 } as const;
 
+// `JOB_SOCKET_PATH` (THOTH-059/THOTH-060) is intentionally NOT part of this schema: it is read
+// directly from `process.env` by `src/lib/jobs/health.ts`, the only consumer, so that the
+// `/api/health` readiness probe never depends on (or fails because of) unrelated app
+// configuration being valid. See that file for details.
+
 type Environment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;
 
 let cachedEnvironment: Environment | null = null;

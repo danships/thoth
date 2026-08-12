@@ -34,12 +34,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // Builds `@thoth/database`/`@thoth/storage` (so `next dev` can resolve their package
-    // exports) and runs the standalone migration CLI (THOTH-058) before starting the dev
-    // server — schema sync/migrations are no longer implicit; the web process always opens the
-    // database with sync disabled, so the schema must already exist.
-    command:
-      'pnpm --filter @thoth/database build && pnpm --filter @thoth/storage build && pnpm --filter @thoth/database db:migrate && pnpm dev',
+    // Runs the same full-stack development harness used locally (`pnpm dev`, see root
+    // `scripts/dev.mjs`): builds `@thoth/database`/`@thoth/storage`/`@thoth/job-protocol`, runs
+    // the standalone migration CLI once (THOTH-058), starts `@thoth/jobs` against a harness-
+    // owned, isolated `JOB_SOCKET_PATH`, waits for a validated ping, then starts `next dev`.
+    // This is the same dual-process (web + jobs) topology as production, so `/api/health` and
+    // any future job-backed flow behave the same under Playwright as they do in Docker.
+    command: 'cd ../.. && pnpm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,

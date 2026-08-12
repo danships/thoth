@@ -6,7 +6,8 @@
 # Persist the container's runtime environment variables to a `.env` file
 # before starting the app.
 #
-# The main `node server.js` process gets variables like `DB` and
+# The migration-then-PM2 bootstrap (`scripts/start-production.mjs`, run via the image's CMD)
+# and the `thoth-web`/`thoth-jobs` processes it starts get variables like `DB` and
 # `BETTER_AUTH_SECRET` directly from the container's runtime environment
 # (e.g. set via `docker run -e` / compose `environment:`), so it works fine.
 #

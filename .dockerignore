@@ -2,6 +2,10 @@ node_modules
 apps/web/node_modules
 .next
 apps/web/.next
+apps/jobs/dist
+packages/database/dist
+packages/storage/dist
+packages/job-protocol/dist
 .git
 .github
 docs
