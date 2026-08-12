@@ -15,11 +15,7 @@ export function getLogger(): winston.Logger {
 
     loggerInstance = winston.createLogger({
       level: environment.LOG_LEVEL,
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.errors({ stack: true }),
-        winston.format.json()
-      ),
+      format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
       defaultMeta: { service: 'thoth-jobs' },
       transports: [
         new winston.transports.Console({

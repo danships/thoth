@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Socket, createConnection } from 'node:net';
+import { StringDecoder } from 'node:string_decoder';
 import {
   JobResponseEnvelopeSchema,
   JobRequestEnvelopeSchema,
@@ -70,11 +71,16 @@ async function sendEnvelope(
     let settled = false;
     let socket: Socket | undefined;
     let responseTimer: ReturnType<typeof setTimeout> | undefined;
+    let connectTimer: ReturnType<typeof setTimeout> | undefined;
+    const decoder = new StringDecoder('utf8');
     let buffer = '';
 
     const cleanup = (): void => {
       if (responseTimer !== undefined) {
         clearTimeout(responseTimer);
+      }
+      if (connectTimer !== undefined) {
+        clearTimeout(connectTimer);
       }
       options.signal?.removeEventListener('abort', onAbort);
       socket?.removeAllListeners();
@@ -106,7 +112,7 @@ async function sendEnvelope(
 
     socket = createConnection({ path: options.socketPath });
 
-    const connectTimer = setTimeout(() => {
+    connectTimer = setTimeout(() => {
       settle(
         new JobClientError('CONNECT_TIMEOUT', 'Timed out connecting to job socket', isConnectTimeoutRetryable())
       );
@@ -122,7 +128,7 @@ async function sendEnvelope(
     });
 
     socket.on('data', (chunk: Buffer) => {
-      buffer += chunk.toString('utf8');
+      buffer += decoder.write(chunk);
 
       if (Buffer.byteLength(buffer, 'utf8') > MAX_FRAME_BYTES) {
         settle(new JobClientError('FRAME_TOO_LARGE', 'Response frame exceeded maximum size', false));

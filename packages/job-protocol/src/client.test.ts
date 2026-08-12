@@ -82,9 +82,71 @@ describe('job-protocol client', () => {
     await expect(pingJobService({ socketPath, signal: controller.signal })).rejects.toBeInstanceOf(JobClientError);
   });
 
-  test('times out when connecting to a non-listening path quickly', async () => {
+  test('reports a retryable CONNECT_FAILED for a missing socket path', async () => {
     await expect(
       pingJobService({ socketPath: nodePath.join(dir, 'nope.sock'), connectTimeoutMs: 100 })
-    ).rejects.toMatchObject({ retryable: true });
+    ).rejects.toMatchObject({ code: 'CONNECT_FAILED', retryable: true });
+  });
+});
+
+describe('job-protocol client error paths requiring dedicated stub servers', () => {
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = await mkdtemp(nodePath.join(tmpdir(), 'thoth-job-protocol-client-error-test-'));
+  });
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('reports RESPONSE_TIMEOUT when the server accepts but never responds', async () => {
+    const socketPath = nodePath.join(dir, 'unresponsive.sock');
+    const sockets = new Set<import('node:net').Socket>();
+    const server = createServer((socket) => {
+      // Accept the connection and read the request, but never write a response.
+      sockets.add(socket);
+      socket.once('close', () => sockets.delete(socket));
+    });
+    await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+
+    try {
+      await expect(
+        pingJobService({ socketPath, responseTimeoutMs: 100 })
+      ).rejects.toMatchObject({ code: 'RESPONSE_TIMEOUT', retryable: true });
+    } finally {
+      // The client destroys its end abruptly; explicitly destroy the accepted server-side
+      // socket too so `server.close()`'s callback isn't left waiting on a lingering connection.
+      for (const socket of sockets) {
+        socket.destroy();
+      }
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  test('reports REQUEST_ID_MISMATCH when the response echoes a different requestId', async () => {
+    const socketPath = nodePath.join(dir, 'mismatched.sock');
+    const server = createServer((socket) => {
+      socket.on('data', () => {
+        socket.end(
+          JSON.stringify({
+            version: 1,
+            requestId: '00000000-0000-0000-0000-000000000000',
+            ok: true,
+            result: {},
+          }) + '\n'
+        );
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+
+    try {
+      await expect(pingJobService({ socketPath })).rejects.toMatchObject({
+        code: 'REQUEST_ID_MISMATCH',
+        retryable: false,
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

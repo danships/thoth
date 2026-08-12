@@ -15,15 +15,24 @@ export type FrameParseResult =
 export class FrameParser {
   private buffer = '';
   private frameEmitted = false;
+  private rejected = false;
 
   public push(chunk: Buffer): FrameParseResult {
     if (this.frameEmitted) {
       return { status: 'multiple-frames' };
     }
 
+    if (this.rejected) {
+      return { status: 'too-large' };
+    }
+
     this.buffer += chunk.toString('utf8');
 
     if (Buffer.byteLength(this.buffer, 'utf8') > MAX_FRAME_BYTES) {
+      // Stop accumulating input immediately — an oversized/hostile connection must not be able
+      // to keep growing the buffer by sending further chunks after the cap is hit.
+      this.buffer = '';
+      this.rejected = true;
       return { status: 'too-large' };
     }
 

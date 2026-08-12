@@ -26,14 +26,16 @@ function currentUid(): number {
 }
 
 /** True if a connection attempt succeeds (the socket is live and accepting), false otherwise. */
-async function probeSocketIsLive(socketPath: string): Promise<boolean> {
+async function probeSocketIsLive(socketPath: string, timeoutMs = 1000): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = createConnection({ path: socketPath });
     const finish = (isLive: boolean): void => {
+      clearTimeout(timer);
       probe.removeAllListeners();
       probe.destroy();
       resolve(isLive);
     };
+    const timer = setTimeout(() => finish(false), timeoutMs);
     probe.once('connect', () => finish(true));
     probe.once('error', () => finish(false));
   });
@@ -110,6 +112,9 @@ export class JobSocketServer {
           resolve();
         });
       });
+      this.server.on('error', (error: Error) => {
+        this.options.logger.error('job.socket.error', { message: error.message });
+      });
     } finally {
       process.umask(previousUmask);
     }
@@ -136,14 +141,21 @@ export class JobSocketServer {
   private handleConnection(socket: Socket): void {
     const parser = new FrameParser();
     const readTimeoutMs = this.options.readTimeoutMs ?? 2000;
+    let responded = false;
 
     const timer = setTimeout(() => {
       socket.destroy();
     }, readTimeoutMs);
 
     const respond = (response: JobResponseEnvelope): void => {
+      if (responded) {
+        return;
+      }
+      responded = true;
       clearTimeout(timer);
-      socket.end(JSON.stringify(JobResponseEnvelopeSchema.parse(response)) + '\n');
+      socket.end(JSON.stringify(JobResponseEnvelopeSchema.parse(response)) + '\n', () => {
+        socket.destroy();
+      });
     };
 
     socket.on('data', (chunk: Buffer) => {
@@ -173,12 +185,25 @@ export class JobSocketServer {
         return;
       }
 
-      void this.handleFrame(result.line, respond);
+      void this.handleFrame(result.line, respond).catch((error: unknown) => {
+        this.options.logger.error('job.socket.handleFrame.unhandled', {
+          message: error instanceof Error ? error.message : 'unknown error',
+        });
+        socket.destroy();
+      });
     });
 
     socket.on('error', () => {
       clearTimeout(timer);
     });
+  }
+
+  /** Bounds and normalizes an untrusted `requestId` so it always satisfies the response schema. */
+  private static normalizeRequestId(value: unknown): string {
+    if (typeof value !== 'string' || value.length === 0) {
+      return 'unknown';
+    }
+    return value.length > 200 ? value.slice(0, 200) : value;
   }
 
   private async handleFrame(line: string, respond: (response: JobResponseEnvelope) => void): Promise<void> {
@@ -199,7 +224,7 @@ export class JobSocketServer {
     if (!parsed.success) {
       const requestId =
         typeof parsedJson === 'object' && parsedJson !== null && 'requestId' in parsedJson
-          ? String((parsedJson as { requestId: unknown }).requestId)
+          ? JobSocketServer.normalizeRequestId((parsedJson as { requestId: unknown }).requestId)
           : 'unknown';
       const version =
         typeof parsedJson === 'object' && parsedJson !== null && 'version' in parsedJson

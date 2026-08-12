@@ -144,6 +144,37 @@ describe('Runner', () => {
     expect(queueService.get(record.id)?.status).toBe('dead');
   });
 
+  test('completes successfully when the handler resolves undefined', async () => {
+    const queueService = new QueueService();
+    const registry = new JobRegistry();
+    const handler = vi.fn().mockResolvedValue(undefined);
+    registry.register<{}>({
+      type: 'unit.undefined-result',
+      payloadVersion: 1,
+      payloadSchema: z.object({}).strict(),
+      priority: 0,
+      maxAttempts: 1,
+      handler,
+    });
+
+    const logger = fakeLogger();
+    const runner = new Runner(queueService, registry, { logger, pollIntervalMs: 20 });
+    const { record } = await queueService.enqueue({
+      type: 'unit.undefined-result',
+      payloadVersion: 1,
+      payload: {},
+      priority: 0,
+      maxAttempts: 1,
+    });
+
+    runner.start();
+    await waitUntil(() => queueService.get(record.id)?.status !== 'queued' && queueService.get(record.id)?.status !== 'running');
+    await runner.stop(100);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(queueService.get(record.id)?.status).toBe('completed');
+  });
+
   test('bounds handler concurrency', async () => {
     const queueService = new QueueService();
     const registry = new JobRegistry();

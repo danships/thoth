@@ -22,7 +22,9 @@ function summarize(value: unknown): string {
     text = value.message;
   } else {
     try {
-      text = JSON.stringify(value);
+      // JSON.stringify returns `undefined` (not the string "undefined") for `undefined`,
+      // functions, and symbols — fall back to `String(value)` so `.length` below never throws.
+      text = JSON.stringify(value) ?? String(value);
     } catch {
       text = String(value);
     }
@@ -85,8 +87,9 @@ export class Runner {
       return;
     }
 
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<void>((resolve) => {
-      setTimeout(() => {
+      timeoutTimer = setTimeout(() => {
         for (const controller of this.activeAbortControllers) {
           controller.abort();
         }
@@ -99,6 +102,9 @@ export class Runner {
     });
 
     await Promise.race([idle, timeout]);
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer);
+    }
   }
 
   private schedulePoll(delayMs: number): void {
@@ -121,16 +127,24 @@ export class Runner {
         break;
       }
       this.activeCount += 1;
-      void this.execute(record).finally(() => {
-        this.activeCount -= 1;
-        if (this.activeCount === 0 && this.shuttingDown) {
-          const waiters = this.idleWaiters;
-          this.idleWaiters = [];
-          for (const resolve of waiters) {
-            resolve();
+      void this.execute(record)
+        .catch((error: unknown) => {
+          this.logger.error('job.execute.unhandled', {
+            jobId: record.id,
+            type: record.type,
+            summary: summarize(error),
+          });
+        })
+        .finally(() => {
+          this.activeCount -= 1;
+          if (this.activeCount === 0 && this.shuttingDown) {
+            const waiters = this.idleWaiters;
+            this.idleWaiters = [];
+            for (const resolve of waiters) {
+              resolve();
+            }
           }
-        }
-      });
+        });
     }
 
     if (this.running && !this.shuttingDown) {
