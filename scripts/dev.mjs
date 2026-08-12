@@ -26,6 +26,20 @@ import path from 'node:path';
 const repositoryRoot = path.resolve(import.meta.dirname, '..');
 const PING_TIMEOUT_MS = 30_000;
 const PING_INTERVAL_MS = 250;
+const SHUTDOWN_TIMEOUT_MS = 5000;
+
+/**
+ * Resolve once a child process has exited (or immediately if it never started/already exited).
+ * Used so shutdown can wait for actual process termination instead of a fixed delay.
+ */
+function waitForExit(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    child.once('exit', () => resolve());
+  });
+}
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { stdio: 'inherit', cwd: repositoryRoot, ...options });
@@ -81,14 +95,19 @@ async function main() {
     exitCode = code;
     jobsChild?.removeAllListeners('exit');
     webChild?.removeAllListeners('exit');
-    if (signal) {
-      jobsChild?.kill(signal);
-      webChild?.kill(signal);
-    } else {
-      jobsChild?.kill('SIGTERM');
-      webChild?.kill('SIGTERM');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    jobsChild?.kill(signal ?? 'SIGTERM');
+    webChild?.kill(signal ?? 'SIGTERM');
+
+    // Wait for both children to actually exit (bounded by a timeout) before touching the
+    // socket directory — Node does not terminate children when the parent calls process.exit(),
+    // so removing the socket/exiting early can leave jobs running mid-shutdown without its socket.
+    const exited = Promise.all([waitForExit(jobsChild), waitForExit(webChild)]);
+    const timeout = new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS));
+    await Promise.race([exited, timeout]);
+    jobsChild?.kill('SIGKILL');
+    webChild?.kill('SIGKILL');
+    await exited;
+
     await cleanup();
     // eslint-disable-next-line unicorn/no-process-exit
     process.exit(exitCode);
@@ -106,7 +125,7 @@ async function main() {
   jobsChild = spawn(jobsTsxBin, ['watch', 'src/index.ts'], {
     stdio: 'inherit',
     cwd: path.join(repositoryRoot, 'apps', 'jobs'),
-    env: { ...process.env, NODE_ENV: 'development', JOB_SOCKET_PATH: socketPath },
+    env: { ...process.env, NODE_ENV: process.env.NODE_ENV ?? 'development', JOB_SOCKET_PATH: socketPath },
   });
   jobsChild.on('error', (error) => {
     console.error('[dev] Failed to start jobs:', error);
