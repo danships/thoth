@@ -47,6 +47,7 @@ next-env.d.ts
 
 # package build output
 packages/*/dist/
+apps/jobs/dist/
 
 db.sqlite
 db.sqlite-*
