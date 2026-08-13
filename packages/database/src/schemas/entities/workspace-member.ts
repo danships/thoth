@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities';
-import { appPermissionSchema, appScopeTypeSchema } from './app';
+import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities.js';
+import { appPermissionSchema, appScopeTypeSchema } from './app.js';
 
 // 'app' is an additive role (THOTH-026): assigned to the synthetic `app--<id>` owner id so
 // App-attributed content can pass the standard `assertWorkspaceAccess` membership check.

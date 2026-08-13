@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities';
+import { withIdSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities.js';
 
 // Many-to-many join between an `uploaded-file` and the pages (`container`) it is used on. Also
 // the visibility boundary for the file (see `src/lib/files/access.ts`): a file is retrievable

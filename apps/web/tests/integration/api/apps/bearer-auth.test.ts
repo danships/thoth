@@ -128,6 +128,23 @@ describe('bearer-token API authentication', () => {
       url: 'https://192.0.2.1/hook',
     });
     expect(createResponse.status).toBe(401);
+
+    // A separate, owner-created webhook is used here purely to exercise the deliveries/resend
+    // routes with a valid path — the App bearer key must still be rejected before it can read
+    // or resend any delivery for it (THOTH-061: management/resend stays session-only).
+    const webhookResponse = await owner.post(`/api/v1/apps/${app.id}/webhooks`, {
+      label: 'Bearer-auth deliveries probe',
+      url: 'https://192.0.2.1/hook',
+    });
+    const webhook = await getData<{ id: string }>(webhookResponse);
+
+    const deliveriesResponse = await bearerClient.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
+    expect(deliveriesResponse.status).toBe(401);
+
+    const resendResponse = await bearerClient.post(
+      `/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries/some-delivery-id/resend`
+    );
+    expect(resendResponse.status).toBe(401);
   });
 
   test('an App with attributionMode "app" attributes created content to the App, not the creator', async () => {

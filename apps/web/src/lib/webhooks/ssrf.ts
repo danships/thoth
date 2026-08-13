@@ -90,9 +90,10 @@ async function resolveIsPublicHost(hostname: string): Promise<boolean> {
  * metadata address `169.254.169.254`), private, or unspecified. Literal private-IP hostnames
  * and non-resolving hosts are rejected too.
  *
- * Called both at config time (`POST`/`PATCH /apps/:id/webhooks*`) and immediately before every
- * delivery/resend (`deliverWebhook`/`resendDelivery`) — the short-TTL cache above means a
- * config-time pass doesn't permanently vouch for a hostname, defending against DNS rebinding.
+ * Called at config time (`POST`/`PATCH /apps/:id/webhooks*`) here in `apps/web` — actual
+ * delivery/resend now runs entirely inside `@thoth/jobs` (THOTH-061), which re-runs an
+ * equivalent check (`apps/jobs/src/handlers/webhooks/ssrf.ts`) immediately before every attempt,
+ * since a config-time pass here can never permanently vouch for a hostname (DNS rebinding).
  */
 export async function assertPublicHttpsUrl(rawUrl: string): Promise<void> {
   let parsed: URL;

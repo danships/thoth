@@ -268,7 +268,7 @@ export function TreeNode({
               component={Link}
               href={`/${workspaceSlug}/pages/${page.id}/create`}
               aria-label="Add child page"
-              onClick={(event) => {
+              onClick={(event: React.MouseEvent) => {
                 event.stopPropagation();
               }}
             >

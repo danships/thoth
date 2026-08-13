@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withParentIdSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities';
+import { withIdSchema, withParentIdSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities.js';
 
 // `ContainerAccess` tracks a per-`(userId, containerId)` "last accessed" fact — it doesn't
 // track "last updated" in the general sense the other entities do (`withTrackUpdatesSchema`),

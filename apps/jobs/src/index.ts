@@ -1,22 +1,30 @@
-import { getEnvironment } from './environment';
-import { getLogger } from './logger';
-import { resolveJobSocketPath } from './socket/socket-path';
-import { QueueService } from './queue/queue-service';
-import { createJobRegistry } from './handlers/index';
-import { Runner } from './runner/runner';
-import { Scheduler, type ScheduleDefinition } from './scheduler/scheduler';
-import { JobSocketServer } from './socket/server';
+import { getEnvironment } from './environment.js';
+import { getLogger } from './logger.js';
+import { resolveJobSocketPath } from './socket/socket-path.js';
+import { QueueService } from './queue/queue-service.js';
+import { createJobRegistry } from './handlers/index.js';
+import { Runner } from './runner/runner.js';
+import { Scheduler, type ScheduleDefinition } from './scheduler/scheduler.js';
+import { JobSocketServer } from './socket/server.js';
+import { createDatabaseContext, setDatabaseContext } from '@thoth/database';
 
 /**
- * Process entry point for `@thoth/jobs` (THOTH-059). Wires the in-memory queue, runner,
- * scheduler, and Unix-socket server together, then handles SIGTERM/SIGINT for orderly shutdown:
- * reject new IPC, stop schedules/claims, close the socket, wait (bounded) for active work, exit.
- * Deliberately imports no Next.js/web/database module and opens no TCP/HTTP port.
+ * Process entry point for `@thoth/jobs` (THOTH-059, DB access added THOTH-061). Wires the
+ * shared `@thoth/database` context, in-memory queue, runner, scheduler, and Unix-socket server
+ * together, then handles SIGTERM/SIGINT for orderly shutdown: reject new IPC, stop
+ * schedules/claims, close the socket, wait (bounded) for active work, exit. Deliberately imports
+ * no Next.js/`@thoth/web` module and opens no TCP/HTTP port.
  */
 async function main(): Promise<void> {
   const environment = getEnvironment();
   const logger = getLogger();
   const socketPath = resolveJobSocketPath();
+
+  // Always `skipSync: true` (THOTH-058/THOTH-061): schema sync/migrations are exclusively the
+  // job of `packages/database/src/cli/migrate.ts`, run once before either PM2-managed process
+  // starts. A PM2-triggered restart of this process must never re-run migrations.
+  const databaseContext = createDatabaseContext({ connectionString: environment.DB, skipSync: true });
+  setDatabaseContext(databaseContext);
 
   const queueService = new QueueService();
   const registry = createJobRegistry(environment.NODE_ENV);
@@ -43,15 +51,16 @@ async function main(): Promise<void> {
     wake: () => runner.wake(),
   });
 
-  const retentionInterval = setInterval(() => {
-    void queueService
-      .sweepRetention(environment.JOB_RETENTION_MS, environment.JOB_RETENTION_MAX)
-      .then((evicted) => {
+  const retentionInterval = setInterval(
+    () => {
+      void queueService.sweepRetention(environment.JOB_RETENTION_MS, environment.JOB_RETENTION_MAX).then((evicted) => {
         if (evicted.length > 0) {
           logger.info('job.retention.evicted', { count: evicted.length });
         }
       });
-  }, Math.min(environment.JOB_RETENTION_MS, 60_000));
+    },
+    Math.min(environment.JOB_RETENTION_MS, 60_000)
+  );
 
   runner.start();
   scheduler.start();
@@ -79,6 +88,7 @@ async function main(): Promise<void> {
     scheduler.stop();
     await server.stop();
     await runner.stop(environment.JOB_SHUTDOWN_TIMEOUT_MS);
+    await databaseContext.close();
 
     logger.info('job.service.stopped', { signal });
     process.exit(0);
@@ -88,12 +98,21 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
-if (require.main === module) {
-  main().catch((error: unknown) => {
-    // eslint-disable-next-line no-console
-    console.error('Fatal error starting @thoth/jobs', error);
-    process.exit(1);
-  });
+// Deliberately unconditional (no `import.meta.url === file://${process.argv[1]}` / `require.main
+// === module` style guard): this file is only ever run as this process's own entrypoint — direct
+// `node`/`tsx` invocation, or spawned as a standalone child process by
+// `index.integration.test.ts` — never `import`ed by another module for its side effects. A
+// same-module-URL guard like that is also unsound under `pm2-runtime` fork mode specifically:
+// PM2 spawns apps by launching *its own* `ProcessContainerFork.js` as the process entrypoint and
+// then dynamically imports the target script from inside it, so `process.argv[1]` there is
+// PM2's own internal file, not this one — the guard would evaluate to `false` and silently skip
+// `main()` entirely (no socket bind, no readiness signal) while `wait_ready`/`listen_timeout`
+// still let PM2 mark the app "online" once the timeout elapses.
+try {
+  await main();
+} catch (error: unknown) {
+  console.error('Fatal error starting @thoth/jobs', error);
+  process.exit(1);
 }
 
 export { main };

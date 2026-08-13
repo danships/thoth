@@ -3,6 +3,7 @@ import { getContainerRepository } from '@/lib/database';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { toWebhookActor } from '@/lib/webhooks/actor';
 import { extractFileIdsFromContent, syncFileUsageForPage } from '@/lib/files/usage';
 import { getLogger } from '@/lib/logger';
 import { recordContentRevision } from '@/lib/history/revision-service';
@@ -60,6 +61,6 @@ export const POST = apiRoute(
       logger.error('pages.set-content.sync-file-usage-failed', { pageId: params.id, error });
     }
 
-    scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
+    scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
   }
 );

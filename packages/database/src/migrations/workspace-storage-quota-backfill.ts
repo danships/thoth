@@ -1,7 +1,7 @@
 import type { SuperSave } from 'supersave';
-import * as entities from '../entities';
-import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '../schemas/entities/workspace';
-import type { Workspace } from '../types';
+import * as entities from '../entities/index.js';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '../schemas/entities/workspace.js';
+import type { Workspace } from '../types.js';
 
 /**
  * One-time backfill for `Workspace` rows created before THOTH-040's storage-quota field:

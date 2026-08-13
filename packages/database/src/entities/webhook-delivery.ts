@@ -2,9 +2,11 @@ import type { EntityDefinition } from 'supersave';
 
 export const NAME = 'webhook-delivery';
 
-// A history row of one delivery attempt for a `webhook`. Capped at 25 rows per `webhookId` (see
-// `recordAndPrune` in `src/lib/database/webhook-service.ts`) — a resend updates the row in place
-// instead of growing history further.
+// One row = the immutable payload for one destination plus its mutable attempt history
+// (THOTH-061). Capped at 25 *terminal* rows per `webhookId` (see
+// `packages/database/src/webhook-delivery-service.ts`) — pending/retrying rows and rows
+// referenced by an active job are never pruned. A resend resets the same row rather than
+// creating a new one.
 export const WebhookDelivery: EntityDefinition = {
   name: NAME,
   relations: [],
@@ -15,5 +17,7 @@ export const WebhookDelivery: EntityDefinition = {
     containerId: 'string',
     status: 'string',
     createdAt: 'string',
+    sourceJobId: 'string',
+    nextAttemptAt: 'string',
   },
 };

@@ -1,8 +1,8 @@
 import type { SuperSave } from 'supersave';
 import type { Database } from 'better-sqlite3';
 import type { Pool } from 'mysql2/promise';
-import * as entities from '../entities';
-import type { PlatformUser, PlatformUserCreate } from '../types';
+import * as entities from '../entities/index.js';
+import type { PlatformUser, PlatformUserCreate } from '../types.js';
 
 type AuthUserRow = {
   id: string;

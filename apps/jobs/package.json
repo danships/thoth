@@ -2,7 +2,7 @@
   "name": "@thoth/jobs",
   "version": "0.1.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "main": "./dist/index.js",
   "engines": {
     "node": "24.x"
@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@thoth/database": "workspace:*",
     "@thoth/job-protocol": "workspace:*",
     "envalid": "^8.2.0",
     "winston": "^3.19.0",

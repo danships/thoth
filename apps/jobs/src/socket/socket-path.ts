@@ -1,6 +1,6 @@
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
-import { getEnvironment } from '../environment';
+import { getEnvironment } from '../environment.js';
 
 /**
  * Resolves the Unix-socket path the jobs worker binds to.

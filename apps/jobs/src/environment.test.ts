@@ -1,8 +1,9 @@
 import { describe, test, expect, afterEach } from 'vitest';
-import { getEnvironment, resetEnvironmentCacheForTests } from './environment';
+import { getEnvironment, resetEnvironmentCacheForTests } from './environment.js';
 
 const REQUIRED_BASE_ENV = {
   NODE_ENV: 'test',
+  DB: 'sqlite://:memory:',
 };
 
 const NUMERIC_KEYS = [
@@ -14,7 +15,7 @@ const NUMERIC_KEYS = [
   'JOB_SCHEDULER_TICK_MS',
 ] as const;
 
-function withEnv(overrides: Record<string, string>): NodeJS.ProcessEnv {
+function withEnvironment(overrides: Record<string, string>): NodeJS.ProcessEnv {
   return { ...REQUIRED_BASE_ENV, ...overrides };
 }
 
@@ -25,79 +26,79 @@ describe('jobs environment boundary validation', () => {
 
   test('accepts defaults with no timing/concurrency overrides', () => {
     resetEnvironmentCacheForTests();
-    const originalEnv = process.env;
-    process.env = withEnv({});
+    const originalEnvironment = process.env;
+    process.env = withEnvironment({});
     try {
       expect(() => getEnvironment()).not.toThrow();
     } finally {
-      process.env = originalEnv;
+      process.env = originalEnvironment;
     }
   });
 
   test.each(NUMERIC_KEYS)('rejects zero for %s', (key) => {
     resetEnvironmentCacheForTests();
-    const originalEnv = process.env;
-    process.env = withEnv({ [key]: '0' });
+    const originalEnvironment = process.env;
+    process.env = withEnvironment({ [key]: '0' });
     try {
       expect(() => getEnvironment()).toThrow();
     } finally {
-      process.env = originalEnv;
+      process.env = originalEnvironment;
     }
   });
 
   test.each(NUMERIC_KEYS)('rejects negative values for %s', (key) => {
     resetEnvironmentCacheForTests();
-    const originalEnv = process.env;
-    process.env = withEnv({ [key]: '-1' });
+    const originalEnvironment = process.env;
+    process.env = withEnvironment({ [key]: '-1' });
     try {
       expect(() => getEnvironment()).toThrow();
     } finally {
-      process.env = originalEnv;
+      process.env = originalEnvironment;
     }
   });
 
   test.each(NUMERIC_KEYS)('rejects fractional values for %s', (key) => {
     resetEnvironmentCacheForTests();
-    const originalEnv = process.env;
-    process.env = withEnv({ [key]: '1.5' });
+    const originalEnvironment = process.env;
+    process.env = withEnvironment({ [key]: '1.5' });
     try {
       expect(() => getEnvironment()).toThrow();
     } finally {
-      process.env = originalEnv;
+      process.env = originalEnvironment;
     }
   });
 
   test.each(NUMERIC_KEYS)('rejects Infinity for %s', (key) => {
     resetEnvironmentCacheForTests();
-    const originalEnv = process.env;
-    process.env = withEnv({ [key]: 'Infinity' });
+    const originalEnvironment = process.env;
+    process.env = withEnvironment({ [key]: 'Infinity' });
     try {
       expect(() => getEnvironment()).toThrow();
     } finally {
-      process.env = originalEnv;
+      process.env = originalEnvironment;
     }
   });
 
   test.each(NUMERIC_KEYS)('rejects NaN for %s', (key) => {
     resetEnvironmentCacheForTests();
-    const originalEnv = process.env;
-    process.env = withEnv({ [key]: 'not-a-number' });
+    const originalEnvironment = process.env;
+    process.env = withEnvironment({ [key]: 'not-a-number' });
     try {
       expect(() => getEnvironment()).toThrow();
     } finally {
-      process.env = originalEnv;
+      process.env = originalEnvironment;
     }
   });
 
   test.each(NUMERIC_KEYS)('accepts a valid finite positive integer for %s', (key) => {
     resetEnvironmentCacheForTests();
-    const originalEnv = process.env;
-    process.env = withEnv({ [key]: '42' });
+    const originalEnvironment = process.env;
+    process.env = withEnvironment({ [key]: '42' });
     try {
       const environment = getEnvironment();
       expect(environment[key]).toBe(42);
     } finally {
-      process.env = originalEnv;
+      process.env = originalEnvironment;
     }
   });
 });

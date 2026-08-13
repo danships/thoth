@@ -1,12 +1,13 @@
-import { getUploadedFileRepository } from '@/lib/database';
-import type {
-  DataSourceContainer,
-  PageContainer,
-  WebhookDeliveryEvent,
-  WebhookPayload,
-  WebhookRawValue,
-} from '@thoth/database/types';
-import type { Column, PageValue } from '@/types/schemas/entities/container';
+import {
+  getUploadedFileRepository,
+  type Column,
+  type DataSourceContainer,
+  type PageContainer,
+  type PageValue,
+  type WebhookDeliveryEvent,
+  type WebhookPayload,
+  type WebhookRawValue,
+} from '@thoth/database';
 
 export type ValueChangeInput = Record<string, { previous: PageValue | null; new: PageValue | null }>;
 
@@ -84,12 +85,13 @@ function collectFileValueIds(
 }
 
 /**
- * Assembles the outbound webhook body — the single place internal column ids/option ids are
- * resolved to human-readable column names/option labels. `values`/`dataSourceId` are only
- * included when `dataSource` is supplied; `changes` only when `valueChanges` is supplied. Async
- * because `file` values require a batch lookup of `uploaded-file.filename` (see
- * `collectFileValueIds`/`toDisplayValue`).
- * Columns no longer present on the data source are silently skipped.
+ * Assembles the outbound webhook body (moved from `apps/web` in THOTH-061 — dispatch now reads
+ * the current page/data-source snapshot inside this process) — the single place internal
+ * column ids/option ids are resolved to human-readable column names/option labels.
+ * `values`/`dataSourceId` are only included when `dataSource` is supplied; `changes` only when
+ * `valueChanges` is supplied. Async because `file` values require a batch lookup of
+ * `uploaded-file.filename` (see `collectFileValueIds`/`toDisplayValue`). Columns no longer
+ * present on the data source are silently skipped.
  */
 export async function buildPayload(
   event: WebhookDeliveryEvent,

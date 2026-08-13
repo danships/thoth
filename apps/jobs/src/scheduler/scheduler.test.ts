@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from 'vitest';
 import type { Logger } from 'winston';
-import { QueueService } from '../queue/queue-service';
-import { Scheduler, type ScheduleDefinition } from './scheduler';
+import { QueueService } from '../queue/queue-service.js';
+import { Scheduler, type ScheduleDefinition } from './scheduler.js';
 
 function fakeLogger(): Logger {
   return {

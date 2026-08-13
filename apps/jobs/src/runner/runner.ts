@@ -1,9 +1,9 @@
 import type { Logger } from 'winston';
 import { RetryableJobError, type JobExecutionContext } from '@thoth/job-protocol';
-import type { QueueService } from '../queue/queue-service';
-import type { JobRegistry } from '../handlers/registry';
-import type { JobRecord } from '../queue/types';
-import { computeBackoffMs } from './backoff';
+import type { QueueService } from '../queue/queue-service.js';
+import type { JobRegistry } from '../handlers/registry.js';
+import type { JobRecord } from '../queue/types.js';
+import { computeBackoffMs } from './backoff.js';
 
 export type RunnerOptions = {
   concurrency?: number;
@@ -186,6 +186,26 @@ export class Runner {
       maxAttempts: record.maxAttempts,
       signal: controller.signal,
       now: this.clock,
+      enqueueChild: async (input) => {
+        const childDefinition = this.registry.get(input.type);
+        if (!childDefinition) {
+          throw new Error(`Unknown child job type: ${input.type}`);
+        }
+        const result = await this.queueService.enqueue(
+          {
+            type: input.type,
+            payloadVersion: input.payloadVersion,
+            payload: input.payload,
+            priority: childDefinition.priority,
+            maxAttempts: childDefinition.maxAttempts,
+            ...(input.dedupeKey === undefined ? {} : { dedupeKey: input.dedupeKey }),
+            ...(childDefinition.coalesce === undefined ? {} : { coalesce: childDefinition.coalesce }),
+          },
+          this.clock()
+        );
+        this.wake();
+        return { jobId: result.record.id, disposition: result.disposition };
+      },
     };
 
     try {
@@ -204,7 +224,7 @@ export class Runner {
     const exhausted = record.attempts >= record.maxAttempts;
 
     if (retryable && !exhausted) {
-      const delayMs = computeBackoffMs(record.attempts, { random: this.random });
+      const delayMs = error.retryAfterMs ?? computeBackoffMs(record.attempts, { random: this.random });
       const runAt = new Date(this.clock().getTime() + delayMs);
       await this.queueService.retry(record.id, runAt, this.clock());
       this.logger.info('job.retry', {

@@ -2,7 +2,7 @@
   "name": "@thoth/job-protocol",
   "version": "0.1.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "engines": {
@@ -27,6 +27,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@thoth/database": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

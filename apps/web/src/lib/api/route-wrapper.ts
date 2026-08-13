@@ -42,6 +42,9 @@ export function apiRoute<
       // so pagination metadata is part of the regular JSON payload rather than hidden in an
       // out-of-band header (THOTH-037).
       setResponseMeta: (fields: Record<string, unknown>) => void;
+      // Overrides the default 200 (or 204 for an `undefined` result) success status code — e.g.
+      // `202` for a route that only durably accepted async work (THOTH-061 webhook resend).
+      setResponseStatus: (status: number) => void;
     },
     session: ApiKeySession,
     request_: NextRequest
@@ -134,6 +137,7 @@ export function apiRoute<
       // Call the handler
       const responseHeaders: Record<string, string> = {};
       const responseMeta: Record<string, unknown> = {};
+      let responseStatus: number | undefined;
       const result = await handler(
         {
           body: body as ExpectedBody,
@@ -145,16 +149,22 @@ export function apiRoute<
           setResponseMeta: (fields) => {
             Object.assign(responseMeta, fields);
           },
+          setResponseStatus: (status) => {
+            responseStatus = status;
+          },
         },
         session,
         request
       );
 
       if (result === undefined) {
-        return new Response(null, { status: 204, headers: responseHeaders });
+        return new Response(null, { status: responseStatus ?? 204, headers: responseHeaders });
       }
       // Return the result
-      return NextResponse.json({ data: result, ...responseMeta }, { headers: responseHeaders });
+      return NextResponse.json(
+        { data: result, ...responseMeta },
+        { ...(responseStatus === undefined ? {} : { status: responseStatus }), headers: responseHeaders }
+      );
     } catch (error) {
       const logger = await getLogger();
       logger.error('API route error:', error);

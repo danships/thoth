@@ -1,4 +1,4 @@
-import { getContainerAccessRepository } from './repositories';
+import { getContainerAccessRepository } from './repositories.js';
 
 type NewPageForAccess = {
   id: string;

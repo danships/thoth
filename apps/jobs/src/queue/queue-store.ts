@@ -1,4 +1,4 @@
-import type { CreateJobRecordInput, JobRecord } from './types';
+import type { CreateJobRecordInput, JobRecord } from './types.js';
 
 /**
  * Pure in-memory store primitives for job records (THOTH-059). No mutation policy lives here —
@@ -57,7 +57,7 @@ export class QueueStore {
   public selectDue(now: Date): JobRecord[] {
     return this.all()
       .filter((record) => record.status === 'queued' && record.runAt.getTime() <= now.getTime())
-      .sort((a, b) => {
+      .toSorted((a, b) => {
         if (a.priority !== b.priority) {
           return b.priority - a.priority;
         }
@@ -70,7 +70,9 @@ export class QueueStore {
 
   /** True if a non-terminal (`queued`/`running`) record of the given type exists. */
   public hasActiveOfType(type: string): boolean {
-    return this.all().some((record) => record.type === type && (record.status === 'queued' || record.status === 'running'));
+    return this.all().some(
+      (record) => record.type === type && (record.status === 'queued' || record.status === 'running')
+    );
   }
 
   /**
@@ -82,7 +84,7 @@ export class QueueStore {
     const evicted: string[] = [];
     const terminal = this.all()
       .filter((record) => record.status === 'completed' || record.status === 'dead')
-      .sort((a, b) => (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0));
+      .toSorted((a, b) => (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0));
 
     for (const [index, record] of terminal.entries()) {
       const age = now.getTime() - (record.completedAt?.getTime() ?? now.getTime());

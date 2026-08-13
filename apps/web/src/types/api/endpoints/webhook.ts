@@ -83,6 +83,15 @@ export const resendWebhookDeliveryParametersSchema = z.object({
 });
 export type ResendWebhookDeliveryParameters = z.infer<typeof resendWebhookDeliveryParametersSchema>;
 
-export const resendWebhookDeliveryResponseSchema = webhookDeliveryResponseSchema;
+// Asynchronous: the route submits a `webhook.redeliver` job and returns HTTP 202 immediately
+// (THOTH-061) — it never performs an outbound fetch itself. `delivery` is the *pre-enqueue*
+// snapshot (the row's state as read by the route, before the job runs) — the actual reset to
+// `pending` happens asynchronously inside `webhook.redeliver`, after the response is sent, so it
+// is never reflected in this field. The UI polls the deliveries-listing endpoint until the row
+// reaches a terminal status.
+export const resendWebhookDeliveryResponseSchema = z.object({
+  jobId: z.string(),
+  delivery: webhookDeliveryResponseSchema,
+});
 export type ResendWebhookDeliveryResponse = z.infer<typeof resendWebhookDeliveryResponseSchema>;
 export type ResendWebhookDeliveryResponseData = DataWrapper<ResendWebhookDeliveryResponse>;

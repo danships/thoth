@@ -1,8 +1,8 @@
 import type { SuperSave } from 'supersave';
-import * as entities from '../entities';
-import type { Setting, SettingCreate } from '../types';
-import type { Workspace } from '../types';
-import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '../schemas/entities/workspace';
+import * as entities from '../entities/index.js';
+import type { Setting, SettingCreate } from '../types.js';
+import type { Workspace } from '../types.js';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '../schemas/entities/workspace.js';
 
 const STORAGE_QUOTA_KEY = 'storage.quota_bytes';
 

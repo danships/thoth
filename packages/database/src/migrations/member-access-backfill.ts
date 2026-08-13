@@ -1,6 +1,6 @@
 import type { SuperSave } from 'supersave';
-import * as entities from '../entities';
-import type { WorkspaceMember, WorkspaceMemberCreate } from '../types';
+import * as entities from '../entities/index.js';
+import type { WorkspaceMember, WorkspaceMemberCreate } from '../types.js';
 
 // role -> permission/scopeType mapping for pre-existing `workspace-member` rows created before
 // THOTH-042. Existing members receive workspace scope. Viewers receive `read`; all other roles

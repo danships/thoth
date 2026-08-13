@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { FrameParser } from './frame-parser';
+import { FrameParser } from './frame-parser.js';
 import { MAX_FRAME_BYTES } from '@thoth/job-protocol';
 
 describe('FrameParser', () => {

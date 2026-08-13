@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema } from '../utilities';
+import { withIdSchema, withTrackUpdatesSchema } from '../utilities.js';
 
 // Scopes a `setting` row applies at. `platform` rows use a fixed sentinel `subjectId`
 // (`PLATFORM_SETTING_SUBJECT_ID`); `user`/`workspace` rows use the Better Auth user id or the

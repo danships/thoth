@@ -1,5 +1,7 @@
 import { describe, test, expect } from 'vitest';
-import { computeBackoffMs } from './backoff';
+import { computeBackoffMs } from './backoff.js';
+
+const fixedRandom = () => 0.5;
 
 describe('computeBackoffMs', () => {
   test('never spins (always returns a non-negative delay)', () => {
@@ -32,7 +34,7 @@ describe('computeBackoffMs', () => {
   });
 
   test('delay is deterministic for a fixed random function', () => {
-    const random = () => 0.5;
+    const random = fixedRandom;
     const first = computeBackoffMs(2, { random });
     const second = computeBackoffMs(2, { random });
     expect(first).toBe(second);

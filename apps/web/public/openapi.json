@@ -13321,73 +13321,16 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "event": {
-                          "type": "string",
-                          "enum": [
-                            "page.created",
-                            "page.updated"
-                          ]
-                        },
-                        "containerId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "success",
-                            "failed"
-                          ]
-                        },
-                        "httpStatus": {
-                          "anyOf": [
-                            {
-                              "type": "integer",
-                              "minimum": -9007199254740991,
-                              "maximum": 9007199254740991
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "error": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "maxLength": 500
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "attempts": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "createdAt": {
+                        "jobId": {
                           "type": "string"
                         },
-                        "lastAttemptAt": {
-                          "type": "string"
+                        "delivery": {
+                          "$ref": "#/components/schemas/WebhookDelivery"
                         }
                       },
                       "required": [
-                        "id",
-                        "event",
-                        "containerId",
-                        "status",
-                        "httpStatus",
-                        "error",
-                        "attempts",
-                        "createdAt",
-                        "lastAttemptAt"
+                        "jobId",
+                        "delivery"
                       ],
                       "additionalProperties": false
                     }
@@ -14240,8 +14183,11 @@
           "status": {
             "type": "string",
             "enum": [
+              "pending",
+              "retrying",
               "success",
-              "failed"
+              "failed",
+              "cancelled"
             ]
           },
           "httpStatus": {
@@ -14276,7 +14222,34 @@
             "type": "string"
           },
           "lastAttemptAt": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextAttemptAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -14288,7 +14261,9 @@
           "error",
           "attempts",
           "createdAt",
-          "lastAttemptAt"
+          "lastAttemptAt",
+          "nextAttemptAt",
+          "completedAt"
         ],
         "additionalProperties": false
       },

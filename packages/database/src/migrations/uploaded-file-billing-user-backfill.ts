@@ -1,7 +1,7 @@
 import type { SuperSave } from 'supersave';
-import * as entities from '../entities';
-import type { App, UploadedFile } from '../types';
-import { parseAppOwnerId } from '../app-service';
+import * as entities from '../entities/index.js';
+import type { App, UploadedFile } from '../types.js';
+import { parseAppOwnerId } from '../app-service.js';
 
 /**
  * One-time backfill for THOTH-045: populates `billingUserId` on existing `uploaded-file` rows.

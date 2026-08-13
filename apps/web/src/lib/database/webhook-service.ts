@@ -1,5 +1,5 @@
-// DB-pure webhook persistence (secret minting/masking/signing, delivery recording/pruning,
-// deletion) moved to `@thoth/database` (THOTH-058). `WebhookResponse`/`WebhookDeliveryResponse`
+// DB-pure webhook persistence (secret minting/masking/signing, delivery lifecycle, deletion)
+// moved to `@thoth/database` (THOTH-058/THOTH-061). `WebhookResponse`/`WebhookDeliveryResponse`
 // mapping stays web-owned here since it depends on `@/types/api`, which the shared package must
 // not import.
 export {
@@ -7,11 +7,9 @@ export {
   generateWebhookSecret,
   maskWebhookSecret,
   signPayload,
-  recordAndPrune,
   deleteWebhook,
   deleteWebhooksForApp,
   listWebhooksForApp,
-  type RecordDeliveryInput,
 } from '@thoth/database';
 import { maskWebhookSecret } from '@thoth/database';
 import type { Webhook, WebhookDelivery } from '@thoth/database/types';
@@ -45,5 +43,7 @@ export function toDeliveryResponse(delivery: WebhookDelivery): WebhookDeliveryRe
     attempts: delivery.attempts,
     createdAt: delivery.createdAt,
     lastAttemptAt: delivery.lastAttemptAt,
+    nextAttemptAt: delivery.nextAttemptAt,
+    completedAt: delivery.completedAt,
   };
 }

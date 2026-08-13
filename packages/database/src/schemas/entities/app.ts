@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withWorkspaceIdSchema } from '../utilities';
+import { withIdSchema, withTrackUpdatesSchema, withWorkspaceIdSchema } from '../utilities.js';
 
 export const appAttributionModeSchema = z.enum(['creator', 'app']);
 export type AppAttributionMode = z.infer<typeof appAttributionModeSchema>;

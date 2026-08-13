@@ -4,6 +4,7 @@ import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retri
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { toWebhookActor } from '@/lib/webhooks/actor';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { recordValuesRevision } from '@/lib/history/revision-service';
@@ -13,7 +14,7 @@ import { getLogger } from '@/lib/logger';
 import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
 import { pageValueSchema } from '@/types/schemas/entities/container';
 import type { PageValue } from '@/types/schemas/entities/container';
-import type { ValueChangeInput } from '@/lib/webhooks/build-payload';
+import type { ValueChangeInput } from '@/lib/webhooks/notify-service';
 import { z } from 'zod';
 
 const bodySchema = z.record(z.string(), pageValueSchema);
@@ -85,7 +86,8 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
     const mergedValues = { ...page.values, ...body };
 
     // Capture the raw before/after `PageValue`s (keyed by column id) for changed columns only —
-    // `notifyPageChange`/`buildPayload` resolves column-id -> name and single-select id -> label
+    // The `webhook.dispatch` job's dispatch/build-payload handler (in `@thoth/jobs`) resolves
+    // column-id -> name and single-select id -> label
     // centrally, so this stays a dumb diff.
     const valueChanges: ValueChangeInput = {};
     for (const [columnId, newValue] of Object.entries(body)) {
@@ -132,7 +134,7 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
     scheduleNotifyPageChange(
       'page.updated',
       updatedPage,
-      { appId: session.appContext?.appId },
+      toWebhookActor(session),
       Object.keys(valueChanges).length > 0 ? { valueChanges } : undefined
     );
   }

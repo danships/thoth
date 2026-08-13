@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { EnqueueJobRequestEnvelopeSchema, JobRequestEnvelopeSchema, JobResponseEnvelopeSchema } from './envelope';
+import { EnqueueJobRequestEnvelopeSchema, JobRequestEnvelopeSchema, JobResponseEnvelopeSchema } from './envelope.js';
 
 describe('JobRequestEnvelopeSchema', () => {
   test('accepts a valid ping request', () => {

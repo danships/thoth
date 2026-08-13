@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withWorkspaceIdSchema } from '../utilities';
+import { withIdSchema, withTrackUpdatesSchema, withWorkspaceIdSchema } from '../utilities.js';
 
 // https-only, size-bounded delivery target. Format/SSRF validation (DNS-aware) happens
 // separately in `src/lib/webhooks/ssrf.ts` — this schema only enforces shape.

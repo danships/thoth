@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema } from '../utilities';
+import { withIdSchema } from '../utilities.js';
 
 // Join row linking an `App` to a `Container` (page or data source) it is explicitly scoped to.
 // See `src/lib/database/entities/app-scoped-container.ts` for the table's purpose.

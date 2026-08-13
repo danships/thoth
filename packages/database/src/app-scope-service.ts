@@ -1,4 +1,4 @@
-import { getAppScopedContainerRepository, getContainerRepository } from './repositories';
+import { getAppScopedContainerRepository, getContainerRepository } from './repositories.js';
 
 /**
  * Thrown by `assertContainerIdsBelongToWorkspace` when one or more `containerIds` don't exist,

@@ -6,8 +6,8 @@
 // Usage: `DB=sqlite://./data/thoth.db node dist/cli/migrate.js` (or `tsx src/cli/migrate.ts` in
 // development). Reads only the `DB` environment variable — no other application configuration
 // is required to migrate the schema.
-import { createDatabaseContext } from '../context';
-import { migrations } from '../migrations';
+import { createDatabaseContext } from '../context.js';
+import { migrations } from '../migrations/index.js';
 
 async function main(): Promise<void> {
   const connectionString = process.env['DB'];
@@ -33,8 +33,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
+try {
+  await main();
+} catch (error: unknown) {
   console.error('Migration failed:', error instanceof Error ? error.message : error);
   // eslint-disable-next-line unicorn/no-process-exit
   process.exit(1);
-});
+}

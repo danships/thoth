@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ExternalJobRequestSchema } from './external-job';
+import { ExternalJobRequestSchema } from './external-job.js';
 
 /**
  * Versioned request/response envelopes for the job Unix-socket IPC protocol (THOTH-059).

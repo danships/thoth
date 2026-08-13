@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema } from '../utilities';
+import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema } from '../utilities.js';
 
 // URL-safe, globally unique identifier used as the workspace's URL prefix. Allowed chars
 // `[a-z0-9-]`, 3-50 chars, must start/end alphanumeric, no consecutive hyphens.

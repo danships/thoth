@@ -1,4 +1,4 @@
-import { getDatabaseContext } from './context';
+import { getDatabaseContext } from './context.js';
 
 /**
  * Convenience, module-level repository/database getters that delegate to whatever

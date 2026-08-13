@@ -17,9 +17,9 @@ import type {
   PageRevision,
   Setting,
   PlatformUser,
-} from './types';
-import * as entities from './entities';
-import { migrations } from './migrations';
+} from './types.js';
+import * as entities from './entities/index.js';
+import { migrations } from './migrations/index.js';
 
 export type CreateDatabaseContextOptions = {
   /** SuperSave connection string, e.g. `sqlite://path/to/file.db` or a MySQL connection URL. */

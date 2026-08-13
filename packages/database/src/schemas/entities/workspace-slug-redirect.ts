@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withWorkspaceIdSchema } from '../utilities';
-import { workspaceSlugSchema } from './workspace';
+import { withIdSchema, withTrackUpdatesSchema, withWorkspaceIdSchema } from '../utilities.js';
+import { workspaceSlugSchema } from './workspace.js';
 
 export const workspaceSlugRedirectSchema = z
   .object({

@@ -13,6 +13,7 @@ import {
 import { getMinSiblingSortOrder, sortByManualOrder } from '@/lib/database/sort-order-service';
 import { generateKeyBetween } from 'fractional-indexing';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { toWebhookActor } from '@/lib/webhooks/actor';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { dataViewRetriever } from '@/lib/database/retrievers/data-view-retriever';
@@ -449,7 +450,7 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
     // off this table.
     await registerContainerAccessForNewPage(createdPage, session.user.id);
 
-    scheduleNotifyPageChange('page.created', createdPage, { appId: session.appContext?.appId });
+    scheduleNotifyPageChange('page.created', createdPage, toWebhookActor(session));
 
     const returnValue: CreatePageResponse = {
       id: createdPage.id,

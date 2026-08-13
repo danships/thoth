@@ -5,7 +5,7 @@ import {
   withTrackUpdatesSchema,
   withUserIdSchema,
   withWorkspaceIdSchema,
-} from '../utilities';
+} from '../utilities.js';
 
 export const stringValueSchema = z.object({ type: z.literal('string'), value: z.string() });
 export const numberValueSchema = z.object({ type: z.literal('number'), value: z.number() });

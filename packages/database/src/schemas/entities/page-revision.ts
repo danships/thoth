@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities';
+import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities.js';
 
 export const pageRevisionKindSchema = z.enum(['snapshot', 'patch', 'consolidated']);
 export type PageRevisionKind = z.infer<typeof pageRevisionKindSchema>;

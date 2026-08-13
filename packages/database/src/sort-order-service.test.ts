@@ -2,16 +2,16 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
-import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from './context';
-import { getContainerRepository } from './repositories';
-import type { PageContainer } from './types';
+import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from './context.js';
+import { getContainerRepository } from './repositories.js';
+import type { PageContainer } from './types.js';
 
 describe('sort-order-service', () => {
   let temporaryDirectory = '';
   let containerRepository: Awaited<ReturnType<typeof getContainerRepository>>;
-  let getMaxSiblingSortOrder: (typeof import('./sort-order-service'))['getMaxSiblingSortOrder'];
-  let computeReorderKey: (typeof import('./sort-order-service'))['computeReorderKey'];
-  let rebalanceSiblingGroup: (typeof import('./sort-order-service'))['rebalanceSiblingGroup'];
+  let getMaxSiblingSortOrder: (typeof import('./sort-order-service.js'))['getMaxSiblingSortOrder'];
+  let computeReorderKey: (typeof import('./sort-order-service.js'))['computeReorderKey'];
+  let rebalanceSiblingGroup: (typeof import('./sort-order-service.js'))['rebalanceSiblingGroup'];
 
   const workspaceId = 'workspace-1';
   const parentId = 'parent-1';
@@ -27,7 +27,7 @@ describe('sort-order-service', () => {
     // test file's own registration.
     setDatabaseContext(createDatabaseContext({ connectionString: `sqlite://${databaseFile}`, skipSync: false }));
 
-    const sortOrderServiceModule = await import('./sort-order-service');
+    const sortOrderServiceModule = await import('./sort-order-service.js');
 
     containerRepository = await getContainerRepository();
     getMaxSiblingSortOrder = sortOrderServiceModule.getMaxSiblingSortOrder;
@@ -39,7 +39,6 @@ describe('sort-order-service', () => {
     resetDatabaseContext();
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
-
 
   async function createTestPage(
     options: { parentId?: string; sortOrder?: string | null } = {}
