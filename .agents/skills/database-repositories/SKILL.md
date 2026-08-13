@@ -139,7 +139,36 @@ scheduled/business logic that only jobs (or only web) will call, put the orchest
 app, importing the querying/algorithm primitives it needs from `@thoth/database`'s root or
 `./types` exports rather than growing the database package with app-specific logic.
 
-## Common Patterns
+## Auth-Free Maintenance Primitives (THOTH-063)
+
+`packages/database/src/services/maintenance/` holds the DB-pure primitives behind every
+destructive purge operation: eligible-row batch selection, workspace cascade deletion, deleted
+page/data-view root permanent deletion, dangling file-usage resolution, and terminal job-row
+pruning queries. These are **pure `@thoth/database`-context functions** — no environment reading,
+no logging, no `process.exit`, no HTTP/session concerns. Both the scheduled `@thoth/jobs` handlers
+(`apps/jobs/src/handlers/maintenance/`) and the manual `pnpm {workspaces,pages,files}:purge` CLI
+wrappers (`scripts/purge-*.ts`) call these same functions — never re-implement purge logic in a
+caller. See `docs/JOBS_AND_MAINTENANCE.md` at the repo root for the full operations reference
+(schedules, grace/retention environment variables, retry semantics).
+
+Key invariants preserved by these primitives (do not weaken when extending them):
+
+- **Content is scoped by workspace/root identity, never creator `userId`** — same THOTH-042 rule
+  as the rest of the database layer.
+- **Grace period + 1-hour race-safety margin**: a candidate is only eligible if its `deletedAt`
+  is valid and older than the configured grace threshold, *and* its `lastUpdated` is older than a
+  1-hour margin (protects against deleting something that was just touched/restored).
+  Malformed/missing timestamps are always treated as **not eligible**, never as eligible.
+- **Immediate revalidation before delete**: the primitive re-fetches/re-checks the target
+  immediately before the destructive operation, not just at initial selection time, so a
+  restore/upload-attach racing the scan is never purged.
+- **Idempotent targets**: a row already deleted by an earlier (possibly crashed) attempt is
+  success, not an error; a partially-completed cascade simply continues from whatever remains.
+- **Cascade completeness**: when adding a new workspace-scoped entity, you must add it to the
+  workspace cascade deletion order in `workspace-cascade.ts` — there is a dedicated test that
+  fails when a new workspace-scoped entity is registered without a corresponding cascade policy.
+
+
 
 ```typescript
 // CONTENT: fetch by id (no owner gate), then assert access on the row's own workspaceId

@@ -18,6 +18,12 @@ importers:
 
   .:
     dependencies:
+      '@thoth/database':
+        specifier: workspace:*
+        version: link:packages/database
+      '@thoth/storage':
+        specifier: workspace:*
+        version: link:packages/storage
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -76,6 +82,9 @@ importers:
       '@thoth/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@thoth/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       envalid:
         specifier: ^8.2.0
         version: 8.2.0

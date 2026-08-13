@@ -154,6 +154,14 @@ export class QueueService {
     return this.serialize(() => this.store.sweepRetention(now, maxAgeMs, maxCount));
   }
 
+  /** See `QueueStore#pruneTerminalByPolicy` — used by the `maintenance.prune-jobs` job. */
+  public async pruneTerminalByPolicy(
+    options: { completedMaxAgeMs: number; deadMaxAgeMs: number; limit: number; offset: number },
+    now: Date = new Date()
+  ): Promise<{ ids: string[]; totalEligible: number }> {
+    return this.serialize(() => this.store.pruneTerminalByPolicy(now, options));
+  }
+
   public async hasActiveOfType(type: string): Promise<boolean> {
     return this.serialize(() => this.store.hasActiveOfType(type));
   }

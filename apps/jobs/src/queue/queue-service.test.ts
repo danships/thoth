@@ -230,4 +230,35 @@ describe('QueueService', () => {
     expect(service.get(terminalOld.id)).toBeUndefined();
     expect(service.get(active.id)).toBeDefined();
   });
+
+  test('pruneTerminalByPolicy prunes only terminal records past their own retention window', async () => {
+    const service = new QueueService();
+    const now = new Date('2026-01-01T00:00:00.000Z');
+
+    const { record: oldDead } = await service.enqueue(
+      { type: 'a', payloadVersion: 1, payload: {}, priority: 0, maxAttempts: 1 },
+      now
+    );
+    await service.claimNextDue(now);
+    await service.markDead(oldDead.id, 'boom', new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000));
+
+    const { record: active } = await service.enqueue(
+      { type: 'b', payloadVersion: 1, payload: {}, priority: 0, maxAttempts: 1 },
+      now
+    );
+
+    const result = await service.pruneTerminalByPolicy(
+      {
+        completedMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
+        deadMaxAgeMs: 30 * 24 * 60 * 60 * 1000,
+        limit: 100,
+        offset: 0,
+      },
+      now
+    );
+
+    expect(result.ids).toContain(oldDead.id);
+    expect(service.get(oldDead.id)).toBeUndefined();
+    expect(service.get(active.id)).toBeDefined();
+  });
 });

@@ -56,6 +56,29 @@ const environmentSchema = {
   // Base delay (ms) for the full-jitter exponential backoff between webhook delivery attempts
   // (THOTH-061). Overridable for the same reason as `WEBHOOK_DELIVERY_TIMEOUT_MS` above.
   WEBHOOK_DELIVERY_BACKOFF_BASE_MS: positiveInt({ default: 500 }),
+  // Storage backend for the `maintenance.purge-files` handler (THOTH-063) — read here, and only
+  // here, mirroring `apps/web`'s own `STORAGE_TYPE`/`STORAGE_LOCAL_FOLDER`. Both processes must
+  // agree on these values in any real deployment (same backend, same folder) since they operate
+  // on the same `uploaded-file` rows/bytes.
+  STORAGE_TYPE: str({ choices: ['local'], default: 'local' }),
+  STORAGE_LOCAL_FOLDER: str({ default: 'data/uploads' }),
+  // Grace periods (THOTH-063) — must match `apps/web`'s `WORKSPACE_DELETE_GRACE_PERIOD_DAYS`/
+  // `PAGE_DELETE_GRACE_PERIOD_DAYS`/`FILES_PURGE_GRACE_PERIOD_HOURS` in any real deployment,
+  // since both processes reason about the same soft-deleted/orphaned rows.
+  WORKSPACE_DELETE_GRACE_PERIOD_DAYS: positiveInt({ default: 30 }),
+  PAGE_DELETE_GRACE_PERIOD_DAYS: positiveInt({ default: 30 }),
+  FILES_PURGE_GRACE_PERIOD_HOURS: positiveInt({ default: 24 }),
+  // Bounded batch size per maintenance purge execution (THOTH-063) — keeps one bounded pass's
+  // read/delete volume (and therefore lease/heartbeat time) small regardless of total estate
+  // size; a continuation picks up where a batch left off via its `offset` payload field.
+  MAINTENANCE_PURGE_BATCH_SIZE: positiveInt({ default: 100 }),
+  // Terminal job-record retention (THOTH-063), used by `maintenance.prune-jobs`. Distinct from
+  // `JOB_RETENTION_MS`/`JOB_RETENTION_MAX` above (a short, always-on in-memory hygiene sweep) —
+  // these are the longer, operator-configurable horizons the THOTH-063 spec calls for: at least
+  // 7 days for `completed`, at least 30 days for `dead` (so a dead job stays diagnosable for a
+  // month by default).
+  JOB_COMPLETED_RETENTION_DAYS: positiveInt({ default: 7 }),
+  JOB_DEAD_RETENTION_DAYS: positiveInt({ default: 30 }),
 };
 
 export type JobsEnvironment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;

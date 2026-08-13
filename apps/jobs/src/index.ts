@@ -2,6 +2,7 @@ import { getEnvironment } from './environment.js';
 import { getLogger } from './logger.js';
 import { resolveJobSocketPath } from './socket/socket-path.js';
 import { QueueService } from './queue/queue-service.js';
+import { setQueueService } from './queue/queue-context.js';
 import { createJobRegistry } from './handlers/index.js';
 import { Runner } from './runner/runner.js';
 import { Scheduler, type ScheduleDefinition } from './scheduler/scheduler.js';
@@ -27,6 +28,10 @@ async function main(): Promise<void> {
   setDatabaseContext(databaseContext);
 
   const queueService = new QueueService();
+  // Registered before the registry is built (THOTH-063): `maintenance.prune-jobs` reads this
+  // singleton at handler execution time (`handlers/maintenance/prune-jobs.ts`) to prune the
+  // queue's own terminal job records — the only handler that needs direct queue access.
+  setQueueService(queueService);
   const registry = createJobRegistry(environment.NODE_ENV);
   const runner = new Runner(queueService, registry, {
     concurrency: environment.JOB_CONCURRENCY,
@@ -34,13 +39,16 @@ async function main(): Promise<void> {
     logger,
   });
 
-  // `history.scan` is the only production interval schedule (THOTH-062): runs hourly, discovers
-  // pages with revisions, and fans out bounded `history.maintain` jobs. Webhooks/purge scheduling
-  // (if ever added) land in later tickets. Disabled under `NODE_ENV === 'test'`: the process
-  // integration suite (`index.integration.test.ts`) asserts an enqueued `test.noop` produces
-  // exactly one terminal job log, and unit/integration tests exercise `history.scan`/
-  // `history.maintain` directly rather than through wall-clock scheduling.
+  // Production interval schedules (THOTH-062/THOTH-063): `history.scan` runs hourly, discovers
+  // pages with revisions, and fans out bounded `history.maintain` jobs. The four
+  // `maintenance.*` jobs convert the former `scripts/purge-deleted-*.ts` cron scripts into
+  // scheduled handlers — hourly for files (a short grace period, THOTH-040's original cadence),
+  // daily for workspaces/pages (30-day grace periods) and job-record pruning. Disabled under
+  // `NODE_ENV === 'test'`: the process integration suite (`index.integration.test.ts`) asserts
+  // an enqueued `test.noop` produces exactly one terminal job log, and unit/integration tests
+  // exercise every handler directly rather than through wall-clock scheduling.
   const HOUR_MS = 60 * 60 * 1000;
+  const DAY_MS = 24 * HOUR_MS;
   const schedules: ScheduleDefinition[] =
     environment.NODE_ENV === 'test'
       ? []
@@ -53,6 +61,38 @@ async function main(): Promise<void> {
             // queued job's own priority once enqueued, but keeping the values consistent here
             // avoids confusion.
             priority: 6,
+            maxAttempts: 3,
+            payloadVersion: 1,
+            payload: {},
+          },
+          {
+            type: 'maintenance.purge-files',
+            intervalMs: HOUR_MS,
+            priority: 2,
+            maxAttempts: 3,
+            payloadVersion: 1,
+            payload: { offset: 0 },
+          },
+          {
+            type: 'maintenance.purge-pages',
+            intervalMs: DAY_MS,
+            priority: 2,
+            maxAttempts: 3,
+            payloadVersion: 1,
+            payload: { offset: 0 },
+          },
+          {
+            type: 'maintenance.purge-workspaces',
+            intervalMs: DAY_MS,
+            priority: 2,
+            maxAttempts: 3,
+            payloadVersion: 1,
+            payload: { offset: 0 },
+          },
+          {
+            type: 'maintenance.prune-jobs',
+            intervalMs: DAY_MS,
+            priority: 1,
             maxAttempts: 3,
             payloadVersion: 1,
             payload: {},

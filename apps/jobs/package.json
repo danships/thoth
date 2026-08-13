@@ -20,6 +20,7 @@
     "@thoth/database": "workspace:*",
     "@thoth/job-protocol": "workspace:*",
     "@thoth/shared": "workspace:*",
+    "@thoth/storage": "workspace:*",
     "envalid": "^8.2.0",
     "winston": "^3.19.0",
     "zod": "^4.4.3"

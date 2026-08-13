@@ -96,4 +96,33 @@ export class QueueStore {
 
     return evicted;
   }
+
+  /**
+   * Bounded, policy-driven terminal-job pruning (THOTH-063), used by the `maintenance.prune-jobs`
+   * job rather than the generic in-memory hygiene sweep above: `completed` rows use
+   * `completedMaxAgeMs`, `dead` rows use `deadMaxAgeMs` (defaults: at least 7 and 30 days
+   * respectively — see `apps/jobs/src/environment.ts`). Never touches `queued`/`running` records.
+   * `offset`/`limit` bound a single execution the same way the maintenance purge handlers do —
+   * `totalEligible` lets the caller decide whether a continuation is needed.
+   */
+  public pruneTerminalByPolicy(
+    now: Date,
+    options: { completedMaxAgeMs: number; deadMaxAgeMs: number; limit: number; offset: number }
+  ): { ids: string[]; totalEligible: number } {
+    const eligible = this.all().filter((record) => {
+      if (record.status !== 'completed' && record.status !== 'dead') {
+        return false;
+      }
+      const age = now.getTime() - (record.completedAt?.getTime() ?? now.getTime());
+      const maxAgeMs = record.status === 'completed' ? options.completedMaxAgeMs : options.deadMaxAgeMs;
+      return age > maxAgeMs;
+    });
+
+    const batch = eligible.slice(options.offset, options.offset + options.limit);
+    for (const record of batch) {
+      this.records.delete(record.id);
+    }
+
+    return { ids: batch.map((record) => record.id), totalEligible: eligible.length };
+  }
 }

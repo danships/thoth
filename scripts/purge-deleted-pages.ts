@@ -1,85 +1,68 @@
-import 'dotenv/config';
-import { getContainerRepository, getDataViewRepository, getDatabase } from '../apps/web/src/lib/database/index.js';
-import { getPageDeleteGracePeriodDays } from '../apps/web/src/lib/database/page-grace-period.js';
-import { permanentlyDeleteByDeletedRootId } from '../apps/web/src/lib/database/soft-delete-service.js';
+// scripts/purge-deleted-pages.ts
+//
+// Manual CLI wrapper over `@thoth/database`'s `maintenance.selectPurgeableDeletedRoots`/
+// `maintenance.permanentlyDeleteDeletedRoot` — the same bounded, restart-safe primitives the
+// scheduled `maintenance.purge-pages` job (`apps/jobs/src/handlers/maintenance/purge-pages.ts`)
+// calls (THOTH-063). Run via `pnpm pages:purge`.
+//
+// Scoped by workspace/root id only, never by creator `userId` (THOTH-042). Do not run this
+// manually while `apps/jobs`' own daily schedule for the same purge type could also be running —
+// see the identical caution in `purge-deleted-workspaces.ts`.
+import { maintenance } from '@thoth/database';
+import {
+  bootstrapDatabase,
+  getGracePeriodDaysEnvironmentVariable,
+  getMaintenanceBatchSize,
+  runPurgeCli,
+} from './purge-cli-shared.js';
 
-const RACE_SAFETY_MARGIN_MS = 60 * 60 * 1000;
+const DEFAULT_PAGE_DELETE_GRACE_PERIOD_DAYS = 30;
 
-function isPastGracePeriod(deletedAt: string, graceThreshold: number): boolean {
-  const deletedAtMs = Date.parse(deletedAt);
-  return !Number.isNaN(deletedAtMs) && deletedAtMs <= graceThreshold;
-}
+async function purgeDeletedPages(): Promise<string> {
+  bootstrapDatabase();
 
-function isOutsideRaceSafetyMargin(lastUpdated: string): boolean {
-  const lastUpdatedMs = Date.parse(lastUpdated);
-  return Number.isNaN(lastUpdatedMs) || lastUpdatedMs <= Date.now() - RACE_SAFETY_MARGIN_MS;
-}
-
-async function purgeDeletedPages() {
-  await getDatabase();
-
-  const gracePeriodDays = await getPageDeleteGracePeriodDays();
-  const graceThreshold = Date.now() - gracePeriodDays * 24 * 60 * 60 * 1000;
-
-  const containerRepository = await getContainerRepository();
-  const dataViewRepository = await getDataViewRepository();
-  const allContainers = await containerRepository.getByQuery(containerRepository.createQuery());
-  const allDataViews = await dataViewRepository.getByQuery(dataViewRepository.createQuery());
-
-  const containerRoots = allContainers.filter(
-    (container) => container.deletedAt && container.deletedRootId === container.id
+  const gracePeriodDays = getGracePeriodDaysEnvironmentVariable(
+    'PAGE_DELETE_GRACE_PERIOD_DAYS',
+    DEFAULT_PAGE_DELETE_GRACE_PERIOD_DAYS
   );
-  const dataViewRoots = allDataViews.filter((dataView) => dataView.deletedAt && dataView.deletedRootId === dataView.id);
+  const batchSize = getMaintenanceBatchSize();
+  const nowMs = Date.now();
+  const graceThresholdMs = maintenance.graceThresholdMs(nowMs, gracePeriodDays);
 
   let purgedCount = 0;
+  let skippedCount = 0;
+  let offset = 0;
 
-  for (const root of [...containerRoots, ...dataViewRoots]) {
-    if (!root.deletedAt || !isPastGracePeriod(root.deletedAt, graceThreshold)) {
-      continue;
+  for (;;) {
+    const batch = await maintenance.selectPurgeableDeletedRoots({ graceThresholdMs, nowMs, limit: batchSize, offset });
+    if (batch.candidates.length === 0) {
+      break;
     }
 
-    if (!isOutsideRaceSafetyMargin(root.lastUpdated)) {
-      continue;
-    }
+    for (const candidate of batch.candidates) {
+      const outcome = await maintenance.permanentlyDeleteDeletedRoot(
+        candidate.id,
+        candidate.workspaceId,
+        graceThresholdMs
+      );
 
-    if ('type' in root) {
-      const revalidated = await containerRepository.getOneByQuery(containerRepository.createQuery().eq('id', root.id));
-      if (
-        !revalidated ||
-        !revalidated.deletedAt ||
-        revalidated.deletedRootId !== revalidated.id ||
-        !isPastGracePeriod(revalidated.deletedAt, graceThreshold)
-      ) {
-        continue;
+      if (outcome.status === 'purged') {
+        purgedCount += 1;
+        console.log(
+          `Purged ${candidate.kind} root ${candidate.id} (${outcome.deletedContainerIds.length} container(s), ${outcome.deletedViewIds.length} view(s))`
+        );
+      } else {
+        skippedCount += 1;
       }
-
-      // `permanentlyDeleteByDeletedRootId` re-verifies `deletedAt` for every record it resolves
-      // (including the root) immediately before deleting it, so a restore racing with this
-      // revalidation still can't cause an already-restored record to be deleted. SuperSave has
-      // no transaction support, so this per-record re-check right before the delete is the
-      // closest available approximation of atomicity between the two operations.
-      await permanentlyDeleteByDeletedRootId(revalidated.id, revalidated.userId, revalidated.workspaceId);
-      purgedCount += 1;
-      console.log(`Purged ${revalidated.type} ${revalidated.id} (${revalidated.name})`);
-      continue;
     }
 
-    const revalidated = await dataViewRepository.getOneByQuery(dataViewRepository.createQuery().eq('id', root.id));
-    if (
-      !revalidated ||
-      !revalidated.deletedAt ||
-      revalidated.deletedRootId !== revalidated.id ||
-      !isPastGracePeriod(revalidated.deletedAt, graceThreshold)
-    ) {
-      continue;
+    offset += batch.candidates.length;
+    if (offset >= batch.totalEligible) {
+      break;
     }
-
-    await permanentlyDeleteByDeletedRootId(revalidated.id, revalidated.userId, revalidated.workspaceId);
-    purgedCount += 1;
-    console.log(`Purged data-view ${revalidated.id} (${revalidated.name})`);
   }
 
-  console.log(`✅  Purge complete. ${purgedCount} deleted root item(s) permanently deleted.`);
+  return `${purgedCount} deleted root item(s) permanently deleted, ${skippedCount} skipped (restored/raced)`;
 }
 
-await purgeDeletedPages();
+void runPurgeCli('pages:purge', purgeDeletedPages);

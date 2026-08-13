@@ -6,6 +6,12 @@ import {
   webhookRedeliverJobDefinition,
 } from './webhooks/index.js';
 import { historyScanJobDefinition, historyMaintainJobDefinition } from './history/index.js';
+import {
+  maintenancePurgeWorkspacesJobDefinition,
+  maintenancePurgePagesJobDefinition,
+  maintenancePurgeFilesJobDefinition,
+  maintenancePruneJobsJobDefinition,
+} from './maintenance/index.js';
 
 /**
  * Builds the internal job registry for this process. The `test.noop` handler is only wired
@@ -16,6 +22,10 @@ import { historyScanJobDefinition, historyMaintainJobDefinition } from './histor
  * `history.scan`/`history.maintain` (THOTH-062) are likewise production job types — scheduled
  * internally (`history.scan` hourly, see `../index.ts`), never reachable externally except when
  * `NODE_ENV === 'test'` gates the matching test-only schema in `@thoth/job-protocol`.
+ * `maintenance.purge-workspaces`/`maintenance.purge-pages`/`maintenance.purge-files`/
+ * `maintenance.prune-jobs` (THOTH-063) are production job types too, and — unlike
+ * `history.scan`/`history.maintain` — are **never** reachable externally in any environment;
+ * `@thoth/job-protocol`'s `external-job.ts` doesn't reference them at all.
  */
 export function createJobRegistry(nodeEnvironment: string): JobRegistry {
   const registry = new JobRegistry();
@@ -25,6 +35,10 @@ export function createJobRegistry(nodeEnvironment: string): JobRegistry {
   registry.register(webhookRedeliverJobDefinition);
   registry.register(historyScanJobDefinition);
   registry.register(historyMaintainJobDefinition);
+  registry.register(maintenancePurgeWorkspacesJobDefinition);
+  registry.register(maintenancePurgePagesJobDefinition);
+  registry.register(maintenancePurgeFilesJobDefinition);
+  registry.register(maintenancePruneJobsJobDefinition);
 
   if (nodeEnvironment === 'test') {
     registry.register(testNoopJobDefinition);
