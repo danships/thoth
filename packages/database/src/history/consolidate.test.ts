@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { makePatch } from './delta';
-import { reconstructAt, type ContentRevisionLike } from './reconstruct';
-import { selectConsolidationRun, type ConsolidationCandidateRevision } from './consolidate';
-import { CONSOLIDATION_AGE_MS } from './constants';
+import { makePatch } from './delta.js';
+import { reconstructAt, type ContentRevisionLike } from './reconstruct.js';
+import { selectConsolidationRun, selectAllConsolidationRuns, type ConsolidationCandidateRevision } from './consolidate.js';
+import { CONSOLIDATION_AGE_MS } from './constants.js';
 
 describe('consolidate', () => {
   let now = new Date(0);
@@ -89,5 +89,21 @@ describe('consolidate', () => {
 
   test('uses CONSOLIDATION_AGE_MS as the cutoff', () => {
     expect(CONSOLIDATION_AGE_MS === 24 * 60 * 60 * 1000).toBeTruthy();
+  });
+
+  test('selectAllConsolidationRuns finds every sealed run, not just the first', () => {
+    const multiRun: ConsolidationCandidateRevision[] = [
+      { id: 'a1', sequence: 1, kind: 'snapshot', createdAt: old(50) },
+      { id: 'a2', sequence: 2, kind: 'patch', createdAt: old(49) },
+      { id: 'a3', sequence: 3, kind: 'snapshot', createdAt: old(48) },
+      { id: 'a4', sequence: 4, kind: 'patch', createdAt: old(47) },
+      { id: 'a5', sequence: 5, kind: 'snapshot', createdAt: old(46) },
+      // Trailing open run: not sealed, must never be returned.
+      { id: 'a6', sequence: 6, kind: 'patch', createdAt: now.toISOString() },
+    ];
+    const runs = selectAllConsolidationRuns(multiRun, now);
+    expect(runs.length).toBe(2);
+    expect(runs[0]!.ids).toEqual(['a2']);
+    expect(runs[1]!.ids).toEqual(['a4']);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { makePatch } from './delta';
-import { nearestBaseline, reconstructAt, reconstructValuesAt, type ContentRevisionLike } from './reconstruct';
-import type { PageValue } from '@/types/schemas/entities/container';
+import { makePatch } from './delta.js';
+import { nearestBaseline, reconstructAt, reconstructValuesAt, type ContentRevisionLike } from './reconstruct.js';
+import type { PageValue } from '../schemas/entities/container.js';
 
 const stringValue = (value: string): PageValue => ({ type: 'string', value });
 

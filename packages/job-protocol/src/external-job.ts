@@ -5,6 +5,12 @@ import {
   type WebhookDispatchExternalJobRequest,
   type WebhookRedeliverExternalJobRequest,
 } from './webhook-job.js';
+import {
+  historyScanTestJobRequestSchema,
+  historyMaintainTestJobRequestSchema,
+  type HistoryScanTestJobRequest,
+  type HistoryMaintainTestJobRequest,
+} from './history-job.js';
 
 /**
  * External job payload accepted over the Unix-socket IPC boundary (THOTH-059/THOTH-061).
@@ -46,6 +52,22 @@ export const TestNoopExternalJobRequestSchema = z
 export type TestNoopExternalJobRequest = z.infer<typeof TestNoopExternalJobRequestSchema>;
 
 export {
+  historyScanPayloadV1Schema,
+  historyMaintainPayloadV1Schema,
+  historyScanTestJobRequestSchema,
+  historyMaintainTestJobRequestSchema,
+  historyMaintainDedupeKey,
+  historyScanCursorSchema,
+} from './history-job.js';
+export type {
+  HistoryScanPayloadV1,
+  HistoryMaintainPayloadV1,
+  HistoryScanTestJobRequest,
+  HistoryMaintainTestJobRequest,
+  HistoryScanCursor,
+} from './history-job.js';
+
+export {
   webhookDispatchExternalJobRequestSchema,
   webhookRedeliverExternalJobRequestSchema,
   webhookDispatchPayloadV1Schema,
@@ -72,11 +94,23 @@ const productionExternalJobSchemas = [
 
 /**
  * The externally accepted job schema. Production environments accept exactly the two webhook
- * job types (THOTH-061); test runs additionally accept `test.noop`.
+ * job types (THOTH-061); test runs additionally accept `test.noop` plus the internal-only
+ * `history.scan`/`history.maintain` types (THOTH-062), so integration/e2e tests can drive real
+ * scan/maintenance runs through the actual job service without a production "run maintenance"
+ * HTTP endpoint.
  */
 export const ExternalJobRequestSchema: z.ZodType<ExternalJobRequest> = isTestEnvironment()
-  ? z.discriminatedUnion('type', [...productionExternalJobSchemas, TestNoopExternalJobRequestSchema])
+  ? z.discriminatedUnion('type', [
+      ...productionExternalJobSchemas,
+      TestNoopExternalJobRequestSchema,
+      historyScanTestJobRequestSchema,
+      historyMaintainTestJobRequestSchema,
+    ])
   : z.discriminatedUnion('type', productionExternalJobSchemas);
 
 export type ExternalJobRequest =
-  TestNoopExternalJobRequest | WebhookDispatchExternalJobRequest | WebhookRedeliverExternalJobRequest;
+  | TestNoopExternalJobRequest
+  | WebhookDispatchExternalJobRequest
+  | WebhookRedeliverExternalJobRequest
+  | HistoryScanTestJobRequest
+  | HistoryMaintainTestJobRequest;

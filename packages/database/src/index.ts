@@ -94,6 +94,40 @@ export {
 export type { AccessGrant } from './access-grant-service.js';
 export { RESERVED_WORKSPACE_SLUGS, slugify, isReservedWorkspaceSlug } from './utils/slug.js';
 
+// Page-history (THOTH-058/THOTH-062): synchronous recording (`revision-service`) stays hot-path
+// only; consolidation/retention maintenance (`maintenance`) and scan-cursor discovery
+// (`scan-query`) are consumed exclusively by the `@thoth/jobs` scheduled `history.maintain`/
+// `history.scan` handlers. Pure algorithm modules (`delta`/`reconstruct`/`coalesce`/`consolidate`)
+// are exported for both web (diff rendering, reconstruction in API routes) and jobs (maintenance).
+export {
+  recordContentRevision,
+  recordValuesRevision,
+  createContentBaseline,
+  getContentRevisions,
+  getValuesRevisions,
+  buildContentFields,
+  nearestBaseline,
+} from './history/revision-service.js';
+export { maintainPageHistory } from './history/maintenance.js';
+export type { MaintenanceOutcome, MaintainPageHistoryInput } from './history/maintenance.js';
+export { fetchPageRevisionScanBatch } from './history/scan-query.js';
+export type { PageRevisionScanCursor, PageRevisionScanBatch } from './history/scan-query.js';
+export { makePatch, applyPatch, summarise, diffOps } from './history/delta.js';
+export type { ApplyPatchResult, ChangeSummary, DiffOp } from './history/delta.js';
+export { reconstructAt, reconstructValuesAt } from './history/reconstruct.js';
+export type { ContentRevisionLike, ValuesRevisionLike } from './history/reconstruct.js';
+export { shouldCoalesce, nextCoalesceWindowEnd } from './history/coalesce.js';
+export type { CoalesceHead } from './history/coalesce.js';
+export { selectConsolidationRun, selectAllConsolidationRuns } from './history/consolidate.js';
+export type { ConsolidationCandidateRevision, ConsolidationRun } from './history/consolidate.js';
+export {
+  COALESCE_WINDOW_MS,
+  SNAPSHOT_INTERVAL,
+  CONSOLIDATION_AGE_MS,
+  MAX_REVISIONS,
+  MAX_PATCH_BYTES,
+} from './history/constants.js';
+
 // Re-exported (in addition to `@thoth/database/schemas`) so packages using `moduleResolution:
 // Node10` (which cannot resolve the `exports` map's `./schemas` subpath) — e.g.
 // `@thoth/job-protocol`'s webhook job schemas — can still import it from the package root.

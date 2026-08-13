@@ -1,3 +1,8 @@
+// Page-history algorithm constants (THOTH-058/THOTH-062). Values are unchanged from the
+// original `apps/web/src/lib/history` module — this is a straight relocation so the same
+// algorithms can be shared by both the web save path (synchronous recording) and the jobs
+// service (scheduled consolidation/retention maintenance).
+
 // A same-author save within this window of the current head revision's `coalesceWindowEnd`
 // coalesces into that revision instead of appending a new one. Each coalescing save extends the
 // window, so a continuous editing session (e.g. autosave every ~1.5s) collapses into a single

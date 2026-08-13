@@ -8,8 +8,7 @@ import { NotFoundError } from '@/lib/errors/not-found-error';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
-import { reconstructAt, reconstructValuesAt } from '@/lib/history/reconstruct';
-import { createContentBaseline } from '@/lib/history/revision-service';
+import { reconstructAt, reconstructValuesAt, createContentBaseline } from '@thoth/database';
 import type { PageRevision, PageContainer, Container } from '@thoth/database/types';
 import {
   forkPageRevisionBodySchema,

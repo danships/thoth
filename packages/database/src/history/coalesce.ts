@@ -1,4 +1,4 @@
-import { COALESCE_WINDOW_MS } from './constants';
+import { COALESCE_WINDOW_MS } from './constants.js';
 
 export type CoalesceHead = {
   author: string;

@@ -34,10 +34,30 @@ async function main(): Promise<void> {
     logger,
   });
 
-  // No production interval schedules are wired yet (webhooks/purge/history land in later
-  // tickets); the scheduler runs with an empty list so its bucket/catch-up machinery is proven
-  // out without any real production side effects.
-  const schedules: ScheduleDefinition[] = [];
+  // `history.scan` is the only production interval schedule (THOTH-062): runs hourly, discovers
+  // pages with revisions, and fans out bounded `history.maintain` jobs. Webhooks/purge scheduling
+  // (if ever added) land in later tickets. Disabled under `NODE_ENV === 'test'`: the process
+  // integration suite (`index.integration.test.ts`) asserts an enqueued `test.noop` produces
+  // exactly one terminal job log, and unit/integration tests exercise `history.scan`/
+  // `history.maintain` directly rather than through wall-clock scheduling.
+  const HOUR_MS = 60 * 60 * 1000;
+  const schedules: ScheduleDefinition[] =
+    environment.NODE_ENV === 'test'
+      ? []
+      : [
+          {
+            type: 'history.scan',
+            intervalMs: HOUR_MS,
+            // Below webhook delivery/redeliver, above `history.maintain` itself (matches the
+            // priority wired in `handlers/history/scan.ts`) — the scheduler doesn't own the
+            // queued job's own priority once enqueued, but keeping the values consistent here
+            // avoids confusion.
+            priority: 6,
+            maxAttempts: 3,
+            payloadVersion: 1,
+            payload: {},
+          },
+        ];
   const scheduler = new Scheduler(queueService, schedules, {
     logger,
     tickIntervalMs: environment.JOB_SCHEDULER_TICK_MS,

@@ -28,8 +28,23 @@ export {
   ExternalJobRequestSchema,
   TestNoopExternalJobRequestSchema,
   TestNoopJobPayloadSchema,
+  historyScanPayloadV1Schema,
+  historyMaintainPayloadV1Schema,
+  historyScanTestJobRequestSchema,
+  historyMaintainTestJobRequestSchema,
+  historyMaintainDedupeKey,
+  historyScanCursorSchema,
 } from './external-job.js';
-export type { ExternalJobRequest, TestNoopExternalJobRequest, TestNoopJobPayload } from './external-job.js';
+export type {
+  ExternalJobRequest,
+  TestNoopExternalJobRequest,
+  TestNoopJobPayload,
+  HistoryScanPayloadV1,
+  HistoryMaintainPayloadV1,
+  HistoryScanTestJobRequest,
+  HistoryMaintainTestJobRequest,
+  HistoryScanCursor,
+} from './external-job.js';
 
 export {
   webhookDispatchExternalJobRequestSchema,

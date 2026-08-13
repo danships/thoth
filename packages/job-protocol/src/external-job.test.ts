@@ -57,6 +57,31 @@ describe('ExternalJobRequestSchema (test environment)', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  test('accepts history.scan and history.maintain only in test environment', () => {
+    const scanResult = ExternalJobRequestSchema.safeParse({
+      type: 'history.scan',
+      payloadVersion: 1,
+      payload: {},
+    });
+    expect(scanResult.success).toBe(true);
+
+    const maintainResult = ExternalJobRequestSchema.safeParse({
+      type: 'history.maintain',
+      payloadVersion: 1,
+      payload: { workspaceId: 'workspace-1', containerId: 'page-1' },
+    });
+    expect(maintainResult.success).toBe(true);
+  });
+
+  test('rejects unknown fields smuggled onto history.maintain (strict)', () => {
+    const result = ExternalJobRequestSchema.safeParse({
+      type: 'history.maintain',
+      payloadVersion: 1,
+      payload: { workspaceId: 'workspace-1', containerId: 'page-1', priority: 5 },
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('webhook.dispatch external schema', () => {

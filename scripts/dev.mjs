@@ -75,8 +75,12 @@ async function main() {
   console.log('[dev] Running database migrations...');
   run('pnpm', ['run', 'db:migrate']);
 
-  const socketDirectory = await mkdtemp(path.join(tmpdir(), 'thoth-dev-'));
-  const socketPath = path.join(socketDirectory, 'jobs.sock');
+  const socketDirectory = process.env.JOB_SOCKET_PATH ? undefined : await mkdtemp(path.join(tmpdir(), 'thoth-dev-'));
+  // Respects an already-set `JOB_SOCKET_PATH` (e.g. `.env.test`, used by the e2e harness so
+  // Playwright spec files can open a client connection to the same socket the dev-mode jobs
+  // process is bound to — see `history-fixture.ts`/`page-history.spec.ts`, THOTH-062) instead
+  // of always generating a fresh ephemeral one.
+  const socketPath = process.env.JOB_SOCKET_PATH ?? path.join(socketDirectory, 'jobs.sock');
 
   let jobsChild;
   let webChild;
@@ -84,7 +88,12 @@ async function main() {
   let exitCode = 0;
 
   const cleanup = async () => {
-    await rm(socketDirectory, { recursive: true, force: true }).catch(() => undefined);
+    // Only remove the socket directory this run created itself — never a caller-provided
+    // `JOB_SOCKET_PATH`'s directory (e.g. the e2e harness's fixed path in `.env.test`), which
+    // may be reused by `reuseExistingServer` across multiple local runs.
+    if (socketDirectory) {
+      await rm(socketDirectory, { recursive: true, force: true }).catch(() => undefined);
+    }
   };
 
   const shutdown = async (signal, code) => {

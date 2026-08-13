@@ -1,14 +1,23 @@
-import { getPageRevisionRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
-import type { PageContainer, PageRevision } from '@thoth/database/types';
-import type { PageValue } from '@/types/schemas/entities/container';
-import { makePatch, summarise } from './delta';
-import { reconstructAt, type ContentRevisionLike } from './reconstruct';
-import { nextCoalesceWindowEnd, shouldCoalesce } from './coalesce';
-import { selectConsolidationRun } from './consolidate';
-import { MAX_PATCH_BYTES, MAX_REVISIONS, SNAPSHOT_INTERVAL } from './constants';
+import { getPageRevisionRepository } from '../repositories.js';
+import { addUserIdToQuery } from '../helpers.js';
+import type { PageContainer } from '../types.js';
+import type { PageValue } from '../schemas/entities/container.js';
+import type { PageRevision } from '../types.js';
+import { makePatch, summarise } from './delta.js';
+import { reconstructAt, type ContentRevisionLike } from './reconstruct.js';
+import { nextCoalesceWindowEnd, shouldCoalesce } from './coalesce.js';
+import { MAX_PATCH_BYTES, SNAPSHOT_INTERVAL } from './constants.js';
 
-async function loadRevisions(containerId: string, target: 'content' | 'values'): Promise<PageRevision[]> {
+/**
+ * Records immediate revision state for page saves (THOTH-058/THOTH-062). Consolidation
+ * (`selectConsolidationRun`/`selectAllConsolidationRuns`) and retention (`MAX_REVISIONS`
+ * enforcement) are deliberately NOT performed here — they moved to the scheduled
+ * `history.maintain` job (`./maintenance.ts`) so a page save never pays for background
+ * housekeeping. Everything that must be immediately visible in the history timeline — the
+ * lazy first-save baseline, same-author coalescing, patch/snapshot selection, summary counts,
+ * and values reverse-deltas — remains synchronous here.
+ */
+export async function loadRevisions(containerId: string, target: 'content' | 'values'): Promise<PageRevision[]> {
   const repo = await getPageRevisionRepository();
   const revisions = await repo.getByQuery(
     repo.createQuery().eq('containerId', containerId).eq('target', target).sort('sequence', 'asc')
@@ -90,7 +99,8 @@ export async function createContentBaseline({
  * on the very first save it lazily creates a baseline snapshot of the pre-edit content (no
  * migration needed for pre-existing pages), otherwise either coalesces into the live head (same
  * author, still within the coalesce window) or appends a new revision — periodically as a full
- * baseline snapshot — and opportunistically consolidates one sealed aged run of patches.
+ * baseline snapshot. Consolidation/retention are handled asynchronously by scheduled
+ * maintenance (`./maintenance.ts`), never here.
  */
 export async function recordContentRevision({ page, newContent, author }: RecordContentRevisionInput): Promise<void> {
   const repo = await getPageRevisionRepository();
@@ -178,7 +188,7 @@ export async function recordContentRevision({ page, newContent, author }: Record
   const fields = buildContentFields(baseContent, newContent, forceSnapshot);
   const summary = summarise(baseContent, newContent);
 
-  const created = await repo.create({
+  await repo.create({
     containerId: page.id,
     sequence: newSequence,
     previousSequence: head.sequence,
@@ -196,94 +206,6 @@ export async function recordContentRevision({ page, newContent, author }: Record
     createdAt: nowIso,
     lastUpdated: nowIso,
   });
-
-  await consolidateContentRevisions([...revisions, created], now);
-  await enforceRetention(page.id, 'content');
-}
-
-/**
- * Opportunistically merges one sealed, aged-out run of `patch` rows (between two baselines) into
- * a single `consolidated` snapshot at the run's last sequence — bounded (touches at most one run
- * per call) so it stays cheap on the hot save path.
- */
-async function consolidateContentRevisions(revisions: PageRevision[], now: Date): Promise<void> {
-  const run = selectConsolidationRun(
-    revisions.map((revision) => ({
-      id: revision.id,
-      sequence: revision.sequence,
-      kind: revision.kind,
-      createdAt: revision.createdAt,
-    })),
-    now
-  );
-  if (!run) {
-    return;
-  }
-
-  const repo = await getPageRevisionRepository();
-  const content = reconstructAt(
-    revisions.map((revision) => toContentRevisionLike(revision)),
-    run.endSequence
-  );
-  const lastInRun = revisions.find((revision) => revision.sequence === run.endSequence)!;
-
-  // Convert the existing row at `run.endSequence` (the last patch in the run — always part of
-  // `run.ids`) into the consolidated baseline in place, rather than `create`-ing a second row at
-  // the same sequence and deleting the original afterwards. Two rows sharing a `sequence` would
-  // otherwise exist simultaneously for the duration of the delete loop below, so an interrupted
-  // run (a failed `deleteUsingId`, or the process stopping mid-loop) could leave a genuine
-  // duplicate behind — which row `nearestBaseline`/`revisions.at(-1)` then picks is undefined.
-  await repo.update({
-    ...lastInRun,
-    previousSequence: run.previousSequence,
-    kind: 'consolidated',
-    content,
-    patch: '',
-    consolidated: true,
-    lastUpdated: now.toISOString(),
-  });
-
-  for (const id of run.ids) {
-    if (id === lastInRun.id) {
-      continue;
-    }
-    await repo.deleteUsingId(id);
-  }
-}
-
-/**
- * Enforces `MAX_REVISIONS` per `(containerId, target)`. For `content`, prunes by dropping
- * everything below the second-oldest baseline (oldest restore points expire first) — the
- * second-oldest baseline always survives, so reconstruction of any remaining row still finds a
- * preceding baseline. For `values`, simply drops the oldest rows (no baselines to preserve).
- */
-async function enforceRetention(containerId: string, target: 'content' | 'values'): Promise<void> {
-  const repo = await getPageRevisionRepository();
-  const revisions = await loadRevisions(containerId, target);
-  if (revisions.length <= MAX_REVISIONS) {
-    return;
-  }
-
-  if (target === 'values') {
-    const excess = revisions.length - MAX_REVISIONS;
-    for (const revision of revisions.slice(0, excess)) {
-      await repo.deleteUsingId(revision.id);
-    }
-    return;
-  }
-
-  const baselines = revisions
-    .filter((revision) => revision.kind !== 'patch')
-    .toSorted((a, b) => a.sequence - b.sequence);
-  if (baselines.length < 2) {
-    return;
-  }
-  const secondOldestBaselineSequence = baselines[1]!.sequence;
-  for (const revision of revisions) {
-    if (revision.sequence < secondOldestBaselineSequence) {
-      await repo.deleteUsingId(revision.id);
-    }
-  }
 }
 
 type RecordValuesRevisionInput = {
@@ -295,7 +217,8 @@ type RecordValuesRevisionInput = {
 /**
  * Records a values change as a reverse-delta: one appended `target: 'values'` row storing only
  * the changed columns mapped to their *prior* value (or `null` if previously unset). Forms its
- * own gap-free sequence stream, independent of the content stream.
+ * own gap-free sequence stream, independent of the content stream. Retention is enforced only by
+ * scheduled maintenance (`./maintenance.ts`), never on this hot path.
  */
 export async function recordValuesRevision({ page, changed, author }: RecordValuesRevisionInput): Promise<void> {
   const repo = await getPageRevisionRepository();
@@ -328,8 +251,6 @@ export async function recordValuesRevision({ page, changed, author }: RecordValu
     createdAt: now,
     lastUpdated: now,
   });
-
-  await enforceRetention(page.id, 'values');
 }
 
 /** Loads every `target: 'content'` revision for a page, scoped to its owner, oldest first. */
@@ -356,5 +277,4 @@ export async function getValuesRevisions(containerId: string, userId: string): P
 
 // Re-exported for consumers that only need the pure baseline lookup (e.g. the history GET
 // endpoint deciding whether a given revision id is even reconstructable).
-
-export { nearestBaseline } from './reconstruct';
+export { nearestBaseline } from './reconstruct.js';

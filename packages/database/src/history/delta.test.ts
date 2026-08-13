@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { applyPatch, makePatch, summarise } from './delta';
+import { applyPatch, makePatch, summarise } from './delta.js';
 
 // Round-trip: prev -> patch -> apply -> next
 function roundTrip(previous: string, next: string) {

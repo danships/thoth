@@ -1,6 +1,6 @@
-import { applyPatch } from './delta';
-import type { PageValue } from '@/types/schemas/entities/container';
-import type { PageRevisionKind } from '@/types/schemas/entities/page-revision';
+import { applyPatch } from './delta.js';
+import type { PageValue } from '../schemas/entities/container.js';
+import type { PageRevisionKind } from '../schemas/entities/page-revision.js';
 
 // Minimal shape reconstruction needs — decoupled from the full `PageRevision` database entity
 // so this module stays pure/testable without a database.

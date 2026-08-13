@@ -235,6 +235,12 @@ export default async function globalSetup({ provide }: Pick<TestProject, 'provid
 
   // Write env so workers pick it up
   process.env['INTEGRATION_BASE_URL'] = baseUrl;
+  // Exposed so tests can enqueue `history.maintain`/`history.scan` directly over the real
+  // running jobs process (THOTH-062's test-only external job schemas), and can open a second
+  // `@thoth/database` context against the same SQLite file to fixture-age history rows before
+  // triggering maintenance — mirrors production's separate jobs/web processes sharing one DB.
+  process.env['INTEGRATION_JOB_SOCKET_PATH'] = socketPath;
+  process.env['INTEGRATION_DATABASE_URL'] = environment['DB'] as string;
 
   return async () => {
     // Teardown: kill both children (web then jobs) and clean up
