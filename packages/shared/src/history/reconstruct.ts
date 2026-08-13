@@ -1,19 +1,22 @@
 import { applyPatch } from './delta.js';
-import type { PageValue } from '../schemas/entities/container.js';
-import type { PageRevisionKind } from '../schemas/entities/page-revision.js';
+
+// Mirrors `@thoth/database`'s `PageRevisionKind` (`pageRevisionKindSchema`). Duplicated here
+// (rather than imported) so this package stays free of a dependency on `@thoth/database` — it's
+// the other way around, `@thoth/database` depends on `@thoth/shared`.
+export type RevisionKind = 'snapshot' | 'patch' | 'consolidated';
 
 // Minimal shape reconstruction needs — decoupled from the full `PageRevision` database entity
 // so this module stays pure/testable without a database.
 export type ContentRevisionLike = {
   sequence: number;
-  kind: PageRevisionKind;
+  kind: RevisionKind;
   content: string;
   patch: string;
 };
 
 export type ValuesRevisionLike = {
   sequence: number;
-  valuesBefore: string; // JSON: Record<string, PageValue | null>
+  valuesBefore: string; // JSON: Record<string, TValue | null>
 };
 
 /**
@@ -85,22 +88,25 @@ export function reconstructAt(revisions: readonly ContentRevisionLike[], targetS
  * and walking values revisions with `sequence > targetSeq` in descending order, assigning each
  * `[columnId, oldValue]` pair from `valuesBefore` back onto the accumulator (`null` deletes the
  * key). Applying newest-first correctly rolls back columns changed multiple times.
+ *
+ * Generic over the stored value shape (`TValue`, e.g. `@thoth/database`'s `PageValue`) so this
+ * package never needs to depend on the entity type itself.
  */
-export function reconstructValuesAt(
-  currentValues: Record<string, PageValue>,
+export function reconstructValuesAt<TValue>(
+  currentValues: Record<string, TValue>,
   valuesRevisions: readonly ValuesRevisionLike[],
   targetSeq: number
-): Record<string, PageValue> {
-  const result: Record<string, PageValue> = { ...currentValues };
+): Record<string, TValue> {
+  const result: Record<string, TValue> = { ...currentValues };
 
   const toUndo = valuesRevisions
     .filter((revision) => revision.sequence > targetSeq)
     .toSorted((a, b) => b.sequence - a.sequence);
 
   for (const revision of toUndo) {
-    let before: Record<string, PageValue | null>;
+    let before: Record<string, TValue | null>;
     try {
-      before = JSON.parse(revision.valuesBefore || '{}') as Record<string, PageValue | null>;
+      before = JSON.parse(revision.valuesBefore || '{}') as Record<string, TValue | null>;
     } catch {
       // A malformed `valuesBefore` row shouldn't take down the whole reconstruction — skip it
       // and keep applying the rest of the (well-formed) undo chain.

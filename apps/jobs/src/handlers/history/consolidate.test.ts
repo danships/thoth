@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { makePatch, reconstructAt, type ContentRevisionLike } from '@thoth/database';
+import { makePatch, reconstructAt, type ContentRevisionLike } from '@thoth/shared';
 import {
   selectConsolidationRun,
   selectAllConsolidationRuns,

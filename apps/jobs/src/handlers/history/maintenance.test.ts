@@ -8,11 +8,8 @@ import {
   resetDatabaseContext,
   getContainerRepository,
   getPageRevisionRepository,
-  reconstructAt,
-  makePatch,
-  COALESCE_WINDOW_MS,
-  MAX_REVISIONS,
 } from '@thoth/database';
+import { reconstructAt, makePatch, COALESCE_WINDOW_MS, MAX_REVISIONS } from '@thoth/shared';
 import type { PageContainer, PageRevisionKind } from '@thoth/database/types';
 import { maintainPageHistory } from './maintenance.js';
 

@@ -94,14 +94,17 @@ export {
 export type { AccessGrant } from './access-grant-service.js';
 export { RESERVED_WORKSPACE_SLUGS, slugify, isReservedWorkspaceSlug } from './utils/slug.js';
 
-// Page-history (THOTH-058/THOTH-062): synchronous recording (`revision-service`) and the pure
-// algorithm modules it relies on (`delta`/`reconstruct`/`coalesce`) stay here since they're
-// shared, environment-neutral hot-path code consumed directly by both web (recording on save,
-// diff rendering/reconstruction in API routes) and jobs (`history.maintain`'s consolidation
-// step). Business-logic orchestration for consolidation/retention maintenance itself, plus the
-// consolidation-run-selection algorithm and scan-cursor discovery query it exclusively depends
-// on, are NOT db-related — they live in `apps/jobs/src/handlers/history/` (`maintenance.ts`,
-// `consolidate.ts`, `scan-query.ts`), importing repositories/types from this package instead.
+// Page-history (THOTH-058/THOTH-062): only the DB-backed synchronous recording lives here.
+// The pure, environment-neutral algorithm modules it relies on (`delta`/`reconstruct`/
+// `coalesce`/`constants`) moved to `@thoth/shared` — they carry no business logic tied to this
+// package's persistence layer, and are consumed directly by both `apps/web` (recording on save
+// via this package, plus diff rendering/reconstruction in API routes) and `apps/jobs`
+// (`history.maintain`'s consolidation step), which should import them from `@thoth/shared`
+// rather than through here. Business-logic orchestration for consolidation/retention
+// maintenance itself, plus the consolidation-run-selection algorithm and scan-cursor discovery
+// query it exclusively depends on, are NOT db-related — they live in
+// `apps/jobs/src/handlers/history/` (`maintenance.ts`, `consolidate.ts`, `scan-query.ts`),
+// importing repositories/types from this package and pure algorithms from `@thoth/shared`.
 export {
   recordContentRevision,
   recordValuesRevision,
@@ -109,15 +112,7 @@ export {
   getContentRevisions,
   getValuesRevisions,
   buildContentFields,
-  nearestBaseline,
 } from './history/revision-service.js';
-export { makePatch, applyPatch, summarise, diffOps } from './history/delta.js';
-export type { ApplyPatchResult, ChangeSummary, DiffOp } from './history/delta.js';
-export { reconstructAt, reconstructValuesAt } from './history/reconstruct.js';
-export type { ContentRevisionLike, ValuesRevisionLike } from './history/reconstruct.js';
-export { shouldCoalesce, nextCoalesceWindowEnd } from './history/coalesce.js';
-export type { CoalesceHead } from './history/coalesce.js';
-export { COALESCE_WINDOW_MS, SNAPSHOT_INTERVAL, MAX_REVISIONS, MAX_PATCH_BYTES } from './history/constants.js';
 
 
 // Re-exported (in addition to `@thoth/database/schemas`) so packages using `moduleResolution:

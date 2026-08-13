@@ -1,12 +1,18 @@
+import {
+  makePatch,
+  summarise,
+  reconstructAt,
+  nextCoalesceWindowEnd,
+  shouldCoalesce,
+  MAX_PATCH_BYTES,
+  SNAPSHOT_INTERVAL,
+  type ContentRevisionLike,
+} from '@thoth/shared';
 import { getPageRevisionRepository } from '../repositories.js';
 import { addUserIdToQuery } from '../helpers.js';
 import type { PageContainer } from '../types.js';
 import type { PageValue } from '../schemas/entities/container.js';
 import type { PageRevision } from '../types.js';
-import { makePatch, summarise } from './delta.js';
-import { reconstructAt, type ContentRevisionLike } from './reconstruct.js';
-import { nextCoalesceWindowEnd, shouldCoalesce } from './coalesce.js';
-import { MAX_PATCH_BYTES, SNAPSHOT_INTERVAL } from './constants.js';
 
 /**
  * Records immediate revision state for page saves (THOTH-058/THOTH-062). Consolidation
@@ -275,6 +281,3 @@ export async function getValuesRevisions(containerId: string, userId: string): P
   );
 }
 
-// Re-exported for consumers that only need the pure baseline lookup (e.g. the history GET
-// endpoint deciding whether a given revision id is even reconstructable).
-export { nearestBaseline } from './reconstruct.js';

@@ -1,12 +1,9 @@
 import {
   getContainerRepository,
   getPageRevisionRepository,
-  reconstructAt,
-  COALESCE_WINDOW_MS,
-  MAX_REVISIONS,
   type PageRevision,
-  type ContentRevisionLike,
 } from '@thoth/database';
+import { reconstructAt, COALESCE_WINDOW_MS, MAX_REVISIONS, type ContentRevisionLike } from '@thoth/shared';
 import { selectAllConsolidationRuns, type ConsolidationCandidateRevision } from './consolidate.js';
 
 /**

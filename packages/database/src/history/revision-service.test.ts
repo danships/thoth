@@ -12,8 +12,7 @@ import {
   getValuesRevisions,
   buildContentFields,
 } from './revision-service.js';
-import { reconstructAt } from './reconstruct.js';
-import { SNAPSHOT_INTERVAL, MAX_PATCH_BYTES } from './constants.js';
+import { reconstructAt, SNAPSHOT_INTERVAL, MAX_PATCH_BYTES } from '@thoth/shared';
 
 const stringValue = (value: string) => ({ type: 'string' as const, value });
 
