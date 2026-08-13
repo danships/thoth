@@ -2,12 +2,20 @@ import { getPageRevisionRepository } from '../repositories.js';
 import type { PageRevision } from '../types.js';
 
 /**
- * Stable `(createdAt, id)` cursor pagination over `page-revision` rows (THOTH-062), mirroring
- * the cursor pattern already used by the pages-tree/page-history API routes: order by
- * `createdAt` ascending, break ties by `id` ascending, and use `[createdAt, id]` of the last row
- * in a batch as the next cursor. Used by the `history.scan` job to discover distinct
- * `(workspaceId, containerId)` pairs without ever loading the whole `page-revision` table into
- * memory at once.
+ * Stable `createdAt`-based cursor pagination over `page-revision` rows (THOTH-062). Used by the
+ * `history.scan` job to discover distinct `(workspaceId, containerId)` pairs without ever loading
+ * the whole `page-revision` table into memory at once.
+ *
+ * `id` is kept in the cursor shape for protocol/schema compatibility (`historyScanCursorSchema`
+ * in `@thoth/job-protocol` requires it), but pagination is driven entirely by `createdAt`: every
+ * distinct `createdAt` "group" of rows is always returned in full, atomically, within a single
+ * batch — never split across two batches. This sidesteps a real inconsistency in the underlying
+ * query builder, where `sort()` always applies `COLLATE NOCASE` while `gt`/`gte` filters compare
+ * with plain binary collation; the (randomly generated, mixed-case) `page-revision` `id` column
+ * can genuinely sort differently under the two collations, so an `id`-based tie-break/cursor
+ * boundary could otherwise silently disagree with itself between pages and drop or duplicate
+ * rows. `createdAt` is a fixed-width ISO-8601 string whose only letters are the constant `T`/`Z`,
+ * so it never has that problem.
  */
 export type PageRevisionScanCursor = { createdAt: string; id: string };
 
@@ -16,25 +24,40 @@ export type PageRevisionScanBatch = {
   nextCursor: PageRevisionScanCursor | null;
 };
 
-// Over-fetch buffer to absorb rows sharing the exact same `createdAt` as the cursor position
-// without under-fetching real results — mirrors the pattern used by other cursor-paginated
-// queries in this codebase (e.g. the pages-tree route).
-const SAFETY_MARGIN = 5;
+// Generous cap on how many rows a single `createdAt` group may contain — large enough that a
+// realistic same-instant write burst (or fixture-aged rows all backdated to one identical
+// timestamp) is never truncated, while still bounding a single query.
+const MAX_GROUP_SIZE = 5000;
 
-function compareOldestFirst(a: Pick<PageRevision, 'createdAt' | 'id'>, b: Pick<PageRevision, 'createdAt' | 'id'>): number {
-  const byCreatedAt = a.createdAt.localeCompare(b.createdAt);
-  if (byCreatedAt !== 0) {
-    return byCreatedAt;
+type PageRevisionRepository = Awaited<ReturnType<typeof getPageRevisionRepository>>;
+
+/** Finds the smallest `createdAt` strictly after `floor` (or the very first, if `floor` is
+ * `undefined`), or `undefined` once the table is exhausted. */
+async function findNextDistinctTimestamp(
+  repository: PageRevisionRepository,
+  floor: string | undefined
+): Promise<string | undefined> {
+  let query = repository.createQuery().sort('createdAt', 'asc').limit(1);
+  if (floor !== undefined) {
+    query = query.gt('createdAt', floor);
   }
-  return a.id.localeCompare(b.id);
+  const [row] = await repository.getByQuery(query);
+  return row?.createdAt;
+}
+
+/** Fetches every row sharing the exact `createdAt` value, bounded by `MAX_GROUP_SIZE`. */
+async function fetchTimestampGroup(repository: PageRevisionRepository, createdAt: string): Promise<PageRevision[]> {
+  return repository.getByQuery(repository.createQuery().eq('createdAt', createdAt).limit(MAX_GROUP_SIZE));
 }
 
 /**
- * Fetches one bounded, `(createdAt, id)`-ordered batch of `page-revision` rows starting strictly
- * after `cursor` (or from the very beginning when `cursor` is `undefined`). Rows sharing the
- * cursor's exact `createdAt` are fetched then filtered/tie-broken in memory (SuperSave's query
- * builder can't express a portable compound `(createdAt, id) > (cursor)` boundary directly), the
- * same technique used elsewhere in this codebase for cursor pagination.
+ * Fetches one bounded batch of `page-revision` rows with a `createdAt` strictly after `cursor`
+ * (or from the very beginning when `cursor` is `undefined`), accumulating whole `createdAt`
+ * groups (never a partial group) until at least `limit` rows have been collected or the table is
+ * exhausted. Because every group is consumed atomically, resuming from `cursor.createdAt` with a
+ * strict `gt` is always safe — even if the exact row that produced the cursor was since deleted
+ * (e.g. by `history.maintain`), since the boundary is the timestamp value itself, not a specific
+ * row's identity.
  */
 export async function fetchPageRevisionScanBatch(
   cursor: PageRevisionScanCursor | undefined,
@@ -42,24 +65,29 @@ export async function fetchPageRevisionScanBatch(
 ): Promise<PageRevisionScanBatch> {
   const repository = await getPageRevisionRepository();
 
-  let query = repository.createQuery().sort('createdAt', 'asc').sort('id', 'asc').limit(limit + 1 + SAFETY_MARGIN);
-  if (cursor) {
-    query = query.gte('createdAt', cursor.createdAt);
+  const collected: PageRevision[] = [];
+  let floor = cursor?.createdAt;
+
+  while (collected.length < limit) {
+    const nextTimestamp = await findNextDistinctTimestamp(repository, floor);
+    if (nextTimestamp === undefined) {
+      floor = undefined;
+      break;
+    }
+    const group = await fetchTimestampGroup(repository, nextTimestamp);
+    collected.push(...group);
+    floor = nextTimestamp;
   }
 
-  const fetched = await repository.getByQuery(query);
-  const sorted = fetched.toSorted(compareOldestFirst);
+  if (collected.length === 0) {
+    return { rows: [], nextCursor: null };
+  }
 
-  const startIndex = cursor
-    ? sorted.findIndex((row) => row.createdAt === cursor.createdAt && row.id === cursor.id) + 1
-    : 0;
-
-  const batch = sorted.slice(startIndex, startIndex + limit + 1);
-  const hasMore = batch.length > limit;
-  const rows = batch.slice(0, limit);
+  const hasMore = floor !== undefined && (await findNextDistinctTimestamp(repository, floor)) !== undefined;
+  const lastRow = collected.at(-1)!;
 
   return {
-    rows,
-    nextCursor: hasMore && rows.length > 0 ? { createdAt: rows.at(-1)!.createdAt, id: rows.at(-1)!.id } : null,
+    rows: collected,
+    nextCursor: hasMore ? { createdAt: lastRow.createdAt, id: lastRow.id } : null,
   };
 }

@@ -13,6 +13,8 @@ import { COALESCE_WINDOW_MS, MAX_REVISIONS } from './constants.js';
 
 const WORKSPACE_ID = 'workspace-1';
 
+const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
 describe('maintenance', () => {
   let temporaryDirectory = '';
   let containerRepository: Awaited<ReturnType<typeof getContainerRepository>>;
@@ -89,8 +91,6 @@ describe('maintenance', () => {
       lastUpdated: input.createdAt,
     });
   }
-
-  const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 
   test('returns a no-op when the page is missing', async () => {
     const outcome = await maintainPageHistory({ workspaceId: WORKSPACE_ID, containerId: 'does-not-exist' });
@@ -317,6 +317,52 @@ describe('maintenance', () => {
     expect(remaining.length).toBeLessThanOrEqual(MAX_REVISIONS);
     // The oldest surviving row must be one of the later sequences, never sequence 1.
     expect(remaining[0]!.sequence).toBeGreaterThan(1);
+
+    // Re-running maintenance after the stream has already been pruned must not report it as
+    // malformed — the surviving stream no longer starts at sequence 1, and `isChainValid` must
+    // validate contiguity relative to the first surviving sequence rather than assuming 1.
+    const secondOutcome = await maintainPageHistory({ workspaceId: WORKSPACE_ID, containerId: page.id });
+    expect(secondOutcome.status).toBe('completed');
+    if (secondOutcome.status === 'completed') {
+      expect(secondOutcome.malformedStreams).not.toContain('values');
+    }
+  }, 20_000);
+
+  test('prunes only the allowed oldest excess content revisions beyond MAX_REVISIONS, keeping the second-oldest baseline', async () => {
+    const page = await createTestPage({ lastUpdated: hoursAgo(48) });
+    const total = MAX_REVISIONS + 3;
+
+    // Two baselines: the very first row (sequence 1) and a second one part-way through, so
+    // retention has somewhere safe to stop (never dropping below the second-oldest baseline).
+    const secondBaselineSequence = 2;
+    for (let sequence = 1; sequence <= total; sequence += 1) {
+      const isBaseline = sequence === 1 || sequence === secondBaselineSequence;
+      await createRevision({
+        containerId: page.id,
+        target: 'content',
+        sequence,
+        previousSequence: sequence === 1 ? null : sequence - 1,
+        kind: isBaseline ? 'snapshot' : 'patch',
+        ...(isBaseline ? { content: `content-${sequence}` } : { patch: makePatch('', `content-${sequence}`) }),
+        createdAt: hoursAgo(48 - sequence * 0.001),
+      });
+    }
+
+    const outcome = await maintainPageHistory({ workspaceId: WORKSPACE_ID, containerId: page.id });
+    expect(outcome.status).toBe('completed');
+    if (outcome.status === 'completed') {
+      expect(outcome.rowsPruned).toBeGreaterThan(0);
+    }
+
+    const repo = await getPageRevisionRepository();
+    const remaining = await repo.getByQuery(
+      repo.createQuery().eq('containerId', page.id).eq('target', 'content').sort('sequence', 'asc')
+    );
+    // Only rows below the second-oldest baseline may ever be pruned for `content` — the baseline
+    // itself (sequence 2) and everything from it onward must still survive.
+    expect(remaining.some((revision) => revision.sequence === secondBaselineSequence)).toBe(true);
+    expect(remaining.every((revision) => revision.sequence >= secondBaselineSequence)).toBe(true);
+    expect(remaining.length).toBe(total - (secondBaselineSequence - 1));
   }, 20_000);
 
   test('does not prune content with fewer than two baselines', async () => {

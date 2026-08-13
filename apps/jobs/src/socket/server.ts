@@ -270,6 +270,17 @@ export class JobSocketServer {
       return;
     }
 
+    if (request.kind === 'status') {
+      const record = this.options.queueService.get(request.jobId);
+      respond({
+        version: 1,
+        requestId: request.requestId,
+        ok: true,
+        result: record ? { found: true, status: record.status } : { found: false },
+      });
+      return;
+    }
+
     const definition = this.options.registry.get(request.job.type);
     if (!definition) {
       respond({

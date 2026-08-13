@@ -43,9 +43,30 @@ export const PingRequestEnvelopeSchema = z
 
 export type PingRequestEnvelope = z.infer<typeof PingRequestEnvelopeSchema>;
 
+export const JobStatusSchema = z.enum(['queued', 'running', 'completed', 'dead']);
+export type JobStatusValue = z.infer<typeof JobStatusSchema>;
+
+/**
+ * `status`: test-only lookup of an in-process job's current lifecycle state by `jobId` (see
+ * `external-job.ts` — only reachable when `NODE_ENV === 'test'`). Lets integration tests wait for
+ * a specific enqueued job's terminal state (`completed`/`dead`) instead of polling side effects
+ * that may be true before the job has actually run.
+ */
+export const StatusRequestEnvelopeSchema = z
+  .object({
+    version: z.literal(JOB_PROTOCOL_VERSION),
+    requestId: z.uuid(),
+    kind: z.literal('status'),
+    jobId: z.string().min(1).max(200),
+  })
+  .strict();
+
+export type StatusRequestEnvelope = z.infer<typeof StatusRequestEnvelopeSchema>;
+
 export const JobRequestEnvelopeSchema = z.discriminatedUnion('kind', [
   EnqueueJobRequestEnvelopeSchema,
   PingRequestEnvelopeSchema,
+  StatusRequestEnvelopeSchema,
 ]);
 
 export type JobRequestEnvelope = z.infer<typeof JobRequestEnvelopeSchema>;
@@ -66,6 +87,10 @@ export const JobResponseSuccessSchema = z
       .object({
         jobId: z.string().min(1).optional(),
         disposition: JobDispositionSchema.optional(),
+        // Only populated for `status` responses; `found: false` means the job is unknown to this
+        // process (never enqueued here, or its in-memory record has already been reaped).
+        found: z.boolean().optional(),
+        status: JobStatusSchema.optional(),
       })
       .strict(),
   })

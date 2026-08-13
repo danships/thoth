@@ -8,7 +8,7 @@
 // backdating the relevant rows, then enqueuing `history.maintain` directly over the real running
 // jobs process's Unix socket (only reachable in `NODE_ENV === 'test'`, see
 // `@thoth/job-protocol`'s `external-job.ts`).
-import { enqueueJob, type JobResponseEnvelope } from '@thoth/job-protocol';
+import { enqueueJob, getJobStatus, type JobResponseEnvelope } from '@thoth/job-protocol';
 import {
   createDatabaseContext,
   setDatabaseContext,
@@ -35,15 +35,21 @@ export function getJobSocketPath(): string {
  * whatever context was previously active. Kept short-lived and serialised per call so it never
  * interleaves with another fixture helper's own context swap.
  */
+let fixtureContextQueue: Promise<unknown> = Promise.resolve();
+
 async function withFixtureDatabaseContext<T>(runWithContext: () => Promise<T>): Promise<T> {
-  const context = createDatabaseContext({ connectionString: getIntegrationDatabaseUrl(), skipSync: true });
-  setDatabaseContext(context);
-  try {
-    return await runWithContext();
-  } finally {
-    await context.close();
-    resetDatabaseContext();
-  }
+  const run = fixtureContextQueue.then(async () => {
+    const context = createDatabaseContext({ connectionString: getIntegrationDatabaseUrl(), skipSync: true });
+    setDatabaseContext(context);
+    try {
+      return await runWithContext();
+    } finally {
+      await context.close();
+      resetDatabaseContext();
+    }
+  });
+  fixtureContextQueue = run.catch(() => undefined);
+  return run;
 }
 
 const AGE_BACKDATE_MS = 25 * 60 * 60 * 1000; // past the 24h consolidation-age + 5-minute coalesce window
@@ -111,6 +117,27 @@ export async function waitUntil(predicate: () => Promise<boolean>, timeoutMs = 1
   for (;;) {
     if (await predicate()) return;
     if (Date.now() > deadline) throw new Error(`waitUntil: condition not met within ${timeoutMs}ms`);
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
+/**
+ * Polls the real running jobs process for `jobId`'s status (over the same test-only socket used
+ * to enqueue it) until it reaches a terminal state (`completed`/`dead`), or throws once
+ * `timeoutMs` elapses. Lets integration tests assert on side effects only after the job that
+ * produces them has actually finished running, rather than racing a `waitUntil` predicate that
+ * may already be true before the job executed.
+ */
+export async function waitForJobCompletion(jobId: string, timeoutMs = 10_000, intervalMs = 100): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const response = await getJobStatus(jobId, { socketPath: getJobSocketPath() });
+    if (response.ok && response.result.found && (response.result.status === 'completed' || response.result.status === 'dead')) {
+      return;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`waitForJobCompletion: job ${jobId} did not reach a terminal state within ${timeoutMs}ms`);
+    }
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }

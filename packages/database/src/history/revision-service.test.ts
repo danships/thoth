@@ -20,15 +20,18 @@ const stringValue = (value: string) => ({ type: 'string' as const, value });
 describe('revision-service', () => {
   let temporaryDirectory = '';
   let containerRepository: Awaited<ReturnType<typeof getContainerRepository>>;
+  let databaseContext: ReturnType<typeof createDatabaseContext>;
 
   beforeAll(async () => {
     temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-revision-service-test-'));
     const databaseFile = nodePath.join(temporaryDirectory, 'test.db');
-    setDatabaseContext(createDatabaseContext({ connectionString: `sqlite://${databaseFile}`, skipSync: false }));
+    databaseContext = createDatabaseContext({ connectionString: `sqlite://${databaseFile}`, skipSync: false });
+    setDatabaseContext(databaseContext);
     containerRepository = await getContainerRepository();
   });
 
   afterAll(async () => {
+    await databaseContext.close();
     resetDatabaseContext();
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
@@ -147,7 +150,7 @@ describe('revision-service', () => {
     expect(contentRevisions.length).toBe(2);
   });
 
-  test('never consolidates or prunes on the synchronous save path, even past MAX_REVISIONS/CONSOLIDATION_AGE_MS', async () => {
+  test('never consolidates or prunes on the synchronous save path across a snapshot interval boundary', async () => {
     const page = await createTestPage('start');
     // Force many appended (non-coalescing, alternating-author) revisions well past a single
     // snapshot interval — the hot path must never merge/prune any of them.

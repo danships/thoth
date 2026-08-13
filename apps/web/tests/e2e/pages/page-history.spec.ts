@@ -45,17 +45,20 @@ function getDatabase(): InstanceType<typeof Database> {
  * avoids a real 5-minute wait between saves). */
 function forceNextSaveToAppend(pageId: string): void {
   const database = getDatabase();
-  const head = database
-    .prepare(
-      `SELECT id FROM page_revision WHERE "containerId" = ? AND target = 'content' ORDER BY sequence DESC LIMIT 1`
-    )
-    .get(pageId) as { id: string } | undefined;
-  if (head) {
-    database
-      .prepare(`UPDATE page_revision SET contents = json_set(contents, '$.coalesceWindowEnd', ?) WHERE id = ?`)
-      .run(new Date(Date.now() - 1000).toISOString(), head.id);
+  try {
+    const head = database
+      .prepare(
+        `SELECT id FROM page_revision WHERE "containerId" = ? AND target = 'content' ORDER BY sequence DESC LIMIT 1`
+      )
+      .get(pageId) as { id: string } | undefined;
+    if (head) {
+      database
+        .prepare(`UPDATE page_revision SET contents = json_set(contents, '$.coalesceWindowEnd', ?) WHERE id = ?`)
+        .run(new Date(Date.now() - 1000).toISOString(), head.id);
+    }
+  } finally {
+    database.close();
   }
-  database.close();
 }
 
 /** Backdates every `page-revision` row and the page's own `lastUpdated` for `pageId` well past
@@ -63,19 +66,22 @@ function forceNextSaveToAppend(pageId: string): void {
  * sees a quiet page with a sealed, eligible content run (THOTH-062). */
 function agePageHistory(pageId: string): void {
   const database = getDatabase();
-  const backdated = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(); // 30h ago
-  database
-    .prepare(
-      `UPDATE page_revision
-       SET contents = json_set(contents, '$.createdAt', ?, '$.lastUpdated', ?, '$.coalesceWindowEnd', ?)
-       WHERE "containerId" = ?`
-    )
-    .run(backdated, backdated, backdated, pageId);
-  database.prepare(`UPDATE container SET contents = json_set(contents, '$.lastUpdated', ?) WHERE id = ?`).run(
-    backdated,
-    pageId
-  );
-  database.close();
+  try {
+    const backdated = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(); // 30h ago
+    database
+      .prepare(
+        `UPDATE page_revision
+         SET contents = json_set(contents, '$.createdAt', ?, '$.lastUpdated', ?, '$.coalesceWindowEnd', ?)
+         WHERE "containerId" = ?`
+      )
+      .run(backdated, backdated, backdated, pageId);
+    database.prepare(`UPDATE container SET contents = json_set(contents, '$.lastUpdated', ?) WHERE id = ?`).run(
+      backdated,
+      pageId
+    );
+  } finally {
+    database.close();
+  }
 }
 
 /** Polls the existing history HTTP API (rather than a raw `better-sqlite3` connection, which
@@ -92,10 +98,12 @@ async function waitForConsolidation(
     const response = await request.get(`/api/v1/pages/${pageId}/history`, {
       params: { target: 'content', limit: '50' },
     });
-    expect(response.ok()).toBeTruthy();
-    const history = await getData<{ revisions: Array<{ id: string; kind: string }> }>(response);
-    if (history.revisions.some((revision) => revision.kind === 'consolidated')) return;
+    if (response.ok()) {
+      const history = await getData<{ revisions: Array<{ id: string; kind: string }> }>(response);
+      if (history.revisions.some((revision) => revision.kind === 'consolidated')) return;
+    }
     if (Date.now() > deadline) {
+      expect(response.ok()).toBeTruthy();
       throw new Error(`waitForConsolidation: no consolidated revision appeared for page ${pageId} within ${timeoutMs}ms`);
     }
     await new Promise((resolve) => setTimeout(resolve, 500));

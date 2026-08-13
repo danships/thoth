@@ -12,8 +12,7 @@ describe('KeyedLock', () => {
       order.push('first-end');
     });
     const second = lock.withLock('a', async () => {
-      order.push('second-start');
-      order.push('second-end');
+      order.push('second-start', 'second-end');
     });
 
     await Promise.all([first, second]);
@@ -31,8 +30,7 @@ describe('KeyedLock', () => {
       order.push('a-end');
     });
     const b = lock.withLock('b', async () => {
-      order.push('b-start');
-      order.push('b-end');
+      order.push('b-start', 'b-end');
     });
 
     await Promise.all([a, b]);

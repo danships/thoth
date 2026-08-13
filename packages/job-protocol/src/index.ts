@@ -7,6 +7,8 @@ export {
   JobErrorCodeSchema,
   EnqueueJobRequestEnvelopeSchema,
   PingRequestEnvelopeSchema,
+  StatusRequestEnvelopeSchema,
+  JobStatusSchema,
   JobRequestEnvelopeSchema,
   JobDispositionSchema,
   JobResponseSuccessSchema,
@@ -17,6 +19,8 @@ export type {
   JobErrorCode,
   EnqueueJobRequestEnvelope,
   PingRequestEnvelope,
+  StatusRequestEnvelope,
+  JobStatusValue,
   JobRequestEnvelope,
   JobDisposition,
   JobResponseSuccess,
@@ -79,5 +83,5 @@ export {
   DEFAULT_RESPONSE_TIMEOUT_MS,
 } from './frame.js';
 
-export { JobClientError, pingJobService, enqueueJob } from './client.js';
+export { JobClientError, pingJobService, enqueueJob, getJobStatus } from './client.js';
 export type { JobClientErrorCode, JobClientOptions } from './client.js';

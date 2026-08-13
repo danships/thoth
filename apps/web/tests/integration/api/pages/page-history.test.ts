@@ -7,7 +7,7 @@ import {
   agePageHistoryFixture,
   readPageHistoryFixture,
   enqueueHistoryMaintain,
-  waitUntil,
+  waitForJobCompletion,
 } from '../../support/fixtures';
 
 type PageApi = { id: string };
@@ -73,14 +73,22 @@ describe('page history API', () => {
     await agePageHistoryFixture(pageEntity.id);
     const enqueueResponse = await enqueueHistoryMaintain(SEED.workspace.id, pageEntity.id);
     expect(enqueueResponse.ok).toBe(true);
+    if (!enqueueResponse.ok) throw new Error('unreachable: asserted above');
+    const jobId = enqueueResponse.result.jobId;
+    expect(typeof jobId).toBe('string');
+
+    // Wait for the actual enqueued job to reach a terminal state before inspecting revision
+    // history — otherwise the assertions below could pass trivially before `history.maintain`
+    // has even run.
+    await waitForJobCompletion(jobId!);
 
     // With only a baseline + one open trailing patch (no closing snapshot yet), the run is never
     // sealed — maintenance completes as a safe no-op rather than consolidating anything. Assert
     // list/detail/restore all still function correctly after that no-op execution.
-    await waitUntil(async () => {
-      const revisions = await readPageHistoryFixture(pageEntity.id);
-      return revisions.filter((revision) => revision.target === 'content').length === contentRevisionsBefore.length;
-    });
+    const afterRevisions = await readPageHistoryFixture(pageEntity.id);
+    expect(afterRevisions.filter((revision) => revision.target === 'content').length).toBe(
+      contentRevisionsBefore.length
+    );
 
     const historyResponse = await client.get(`/api/v1/pages/${pageEntity.id}/history`, {
       params: { target: 'content' },

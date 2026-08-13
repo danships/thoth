@@ -54,24 +54,22 @@ function toConsolidationCandidate(revision: PageRevision): ConsolidationCandidat
 
 /**
  * Validates the basic chain invariants maintenance requires before ever mutating a stream:
- * unique, gap-free sequences starting at 1, and every `previousSequence` pointing strictly
- * before its own row's sequence (or `null` only for the very first row). Returns `true` when the
- * stream is safe to operate on.
+ * unique, gap-free sequences relative to the first surviving revision (retention may have
+ * pruned the stream down from sequence 1, so the first row is not required to start there, nor
+ * to have a `null` `previousSequence`), and every `previousSequence` on a later row pointing
+ * strictly before its own row's sequence. Returns `true` when the stream is safe to operate on.
  */
 function isChainValid(revisions: readonly PageRevision[]): boolean {
   if (revisions.length === 0) {
     return true;
   }
   const sorted = revisions.toSorted((a, b) => a.sequence - b.sequence);
+  const firstSequence = sorted[0]!.sequence;
   for (const [index, revision] of sorted.entries()) {
-    if (revision.sequence !== index + 1) {
+    if (revision.sequence !== firstSequence + index) {
       return false;
     }
-    if (index === 0) {
-      if (revision.previousSequence !== null) {
-        return false;
-      }
-    } else if (revision.previousSequence !== null && revision.previousSequence >= revision.sequence) {
+    if (index > 0 && revision.previousSequence !== null && revision.previousSequence >= revision.sequence) {
       return false;
     }
   }
@@ -100,7 +98,8 @@ function fingerprintsMatch(a: StreamFingerprint, b: StreamFingerprint): boolean 
  */
 async function runConsolidation(
   allRevisions: readonly PageRevision[],
-  run: { ids: string[]; endSequence: number; previousSequence: number | null }
+  run: { ids: string[]; endSequence: number; previousSequence: number | null },
+  now: Date
 ): Promise<number> {
   const repo = await getPageRevisionRepository();
   const lastInRun = allRevisions.find((revision) => revision.sequence === run.endSequence);
@@ -118,7 +117,7 @@ async function runConsolidation(
       content,
       patch: '',
       consolidated: true,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now.toISOString(),
     });
   }
 
@@ -269,7 +268,7 @@ export async function maintainPageHistory({
   let rowsPruned = 0;
 
   for (const run of runsToProcess) {
-    const deleted = await runConsolidation(contentRevisions, run);
+    const deleted = await runConsolidation(contentRevisions, run, now);
     rowsPruned += deleted;
     runsConsolidated += 1;
   }

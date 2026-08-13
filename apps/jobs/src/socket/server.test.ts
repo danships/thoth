@@ -106,6 +106,52 @@ describe('JobSocketServer', () => {
     await server.stop();
   });
 
+  test('reports status for a known job and found:false for an unknown one', async () => {
+    const socketPath = nodePath.join(temporaryDirectory, 'jobs.sock');
+    const { server } = buildServer(socketPath);
+    await server.start();
+
+    const enqueueResponse = await sendRaw(
+      socketPath,
+      JSON.stringify({
+        version: 1,
+        requestId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+        kind: 'enqueue',
+        job: { type: 'test.noop', payloadVersion: 1, payload: {} },
+      }) + '\n'
+    );
+    const jobId = JSON.parse(enqueueResponse.trim()).result.jobId as string;
+
+    const statusResponse = await sendRaw(
+      socketPath,
+      JSON.stringify({
+        version: 1,
+        requestId: 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb',
+        kind: 'status',
+        jobId,
+      }) + '\n'
+    );
+    const parsedStatus = JSON.parse(statusResponse.trim());
+    expect(parsedStatus.ok).toBe(true);
+    expect(parsedStatus.result.found).toBe(true);
+    expect(['queued', 'running', 'completed', 'dead']).toContain(parsedStatus.result.status);
+
+    const unknownResponse = await sendRaw(
+      socketPath,
+      JSON.stringify({
+        version: 1,
+        requestId: 'cccccccc-1111-4111-8111-cccccccccccc',
+        kind: 'status',
+        jobId: 'does-not-exist',
+      }) + '\n'
+    );
+    const parsedUnknown = JSON.parse(unknownResponse.trim());
+    expect(parsedUnknown.ok).toBe(true);
+    expect(parsedUnknown.result.found).toBe(false);
+
+    await server.stop();
+  });
+
   test('rejects malformed JSON', async () => {
     const socketPath = nodePath.join(temporaryDirectory, 'jobs.sock');
     const { server } = buildServer(socketPath);

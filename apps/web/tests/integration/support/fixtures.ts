@@ -28,4 +28,5 @@ export {
   readPageHistoryFixture,
   enqueueHistoryMaintain,
   waitUntil,
+  waitForJobCompletion,
 } from './history-fixture';
