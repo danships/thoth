@@ -7,7 +7,7 @@ import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
-import { recordValuesRevision } from '@/lib/history/revision-service';
+import { recordValuesRevision } from '@thoth/database';
 import { extractFileIdsFromContent, extractFileIdsFromValues, syncFileUsageForPage } from '@/lib/files/usage';
 import { assertFileAccess } from '@/lib/files/access';
 import { getLogger } from '@/lib/logger';

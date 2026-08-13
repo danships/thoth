@@ -21,3 +21,12 @@ export function getBaseUrl(): string {
   if (!url) throw new Error('INTEGRATION_BASE_URL not set — is global-setup running?');
   return url;
 }
+
+export {
+  getJobSocketPath,
+  agePageHistoryFixture,
+  readPageHistoryFixture,
+  enqueueHistoryMaintain,
+  waitUntil,
+  waitForJobCompletion,
+} from './history-fixture';

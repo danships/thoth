@@ -1,51 +1,37 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { rm } from 'node:fs/promises';
-import { createTestDatabaseFile } from '../../../tests/helpers/create-test-database';
-
-import type { PageContainer } from '@thoth/database/types';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import nodePath from 'node:path';
+import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from '../context.js';
+import { getContainerRepository } from '../repositories.js';
+import type { PageContainer } from '../types.js';
+import {
+  recordContentRevision,
+  recordValuesRevision,
+  getContentRevisions,
+  getValuesRevisions,
+  buildContentFields,
+} from './revision-service.js';
+import { reconstructAt, SNAPSHOT_INTERVAL, MAX_PATCH_BYTES } from '@thoth/shared';
 
 const stringValue = (value: string) => ({ type: 'string' as const, value });
 
 describe('revision-service', () => {
   let temporaryDirectory = '';
-  let containerRepository: Awaited<ReturnType<(typeof import('@/lib/database'))['getContainerRepository']>>;
-  let recordContentRevision: (typeof import('./revision-service'))['recordContentRevision'];
-  let recordValuesRevision: (typeof import('./revision-service'))['recordValuesRevision'];
-  let getContentRevisions: (typeof import('./revision-service'))['getContentRevisions'];
-  let getValuesRevisions: (typeof import('./revision-service'))['getValuesRevisions'];
-  let buildContentFields: (typeof import('./revision-service'))['buildContentFields'];
-  let reconstructAt: (typeof import('./reconstruct'))['reconstructAt'];
-  let SNAPSHOT_INTERVAL: (typeof import('./constants'))['SNAPSHOT_INTERVAL'];
-  let MAX_PATCH_BYTES: (typeof import('./constants'))['MAX_PATCH_BYTES'];
+  let containerRepository: Awaited<ReturnType<typeof getContainerRepository>>;
+  let databaseContext: ReturnType<typeof createDatabaseContext>;
 
   beforeAll(async () => {
-    const mutableEnvironment = process.env as Record<string, string | undefined>;
-    mutableEnvironment['NODE_ENV'] = 'test';
-    mutableEnvironment['BETTER_AUTH_SECRET'] = 'test-secret-not-for-production-use';
-    mutableEnvironment['LOG_LEVEL'] = 'error';
-
-    const { temporaryDirectory: createdDirectory, databaseUrl } =
-      await createTestDatabaseFile('thoth-page-revision-test-');
-    temporaryDirectory = createdDirectory;
-    mutableEnvironment['DB'] = databaseUrl;
-
-    const databaseModule = await import('@/lib/database');
-    const revisionServiceModule = await import('./revision-service');
-    const reconstructModule = await import('./reconstruct');
-    const constantsModule = await import('./constants');
-
-    containerRepository = await databaseModule.getContainerRepository();
-    recordContentRevision = revisionServiceModule.recordContentRevision;
-    recordValuesRevision = revisionServiceModule.recordValuesRevision;
-    getContentRevisions = revisionServiceModule.getContentRevisions;
-    getValuesRevisions = revisionServiceModule.getValuesRevisions;
-    buildContentFields = revisionServiceModule.buildContentFields;
-    reconstructAt = reconstructModule.reconstructAt;
-    SNAPSHOT_INTERVAL = constantsModule.SNAPSHOT_INTERVAL;
-    MAX_PATCH_BYTES = constantsModule.MAX_PATCH_BYTES;
+    temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-revision-service-test-'));
+    const databaseFile = nodePath.join(temporaryDirectory, 'test.db');
+    databaseContext = createDatabaseContext({ connectionString: `sqlite://${databaseFile}`, skipSync: false });
+    setDatabaseContext(databaseContext);
+    containerRepository = await getContainerRepository();
   });
 
   afterAll(async () => {
+    await databaseContext.close();
+    resetDatabaseContext();
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
@@ -161,5 +147,19 @@ describe('revision-service', () => {
 
     const contentRevisions = await getContentRevisions(page.id, 'user-1');
     expect(contentRevisions.length).toBe(2);
+  });
+
+  test('never consolidates or prunes on the synchronous save path across a snapshot interval boundary', async () => {
+    const page = await createTestPage('start');
+    // Force many appended (non-coalescing, alternating-author) revisions well past a single
+    // snapshot interval — the hot path must never merge/prune any of them.
+    for (let index = 0; index < SNAPSHOT_INTERVAL + 5; index += 1) {
+      await recordContentRevision({ page, newContent: `content ${index}`, author: `author-${index}` });
+    }
+    const revisions = await getContentRevisions(page.id, 'user-1');
+    // 1 (lazy baseline) + 1 (first edit) + (SNAPSHOT_INTERVAL + 5 - 1) further appended edits.
+    expect(revisions.length).toBe(2 + SNAPSHOT_INTERVAL + 5 - 1);
+    // No row should ever be marked `consolidated` by the synchronous path.
+    expect(revisions.some((revision) => revision.consolidated)).toBe(false);
   });
 });

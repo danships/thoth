@@ -124,6 +124,21 @@ Add new retrievers here when a route's data-fetching logic is complex enough to 
 
 Database migrations live in `packages/database/src/migrations/` (part of `@thoth/database`). Unlike before, schema sync/migrations are **never** run automatically by the long-running web process — the web app always opens the database with sync disabled (`skipSync: true`). Instead, run `pnpm db:migrate` (delegates to the standalone `packages/database/src/cli/migrate.ts` CLI) to create/upgrade the schema before starting/upgrading the server; the Docker images and test bootstraps (integration `global-setup.ts`, Playwright's `webServer.command`) run this automatically. Adding a new entity field does not always require a migration — SuperSave often handles new/optional fields automatically. When a migration genuinely is needed (e.g. backfilling existing rows), create a migration file and register it in `packages/database/src/migrations/index.ts`, preserving existing migration names/order so applied-migration tracking on upgraded databases isn't broken.
 
+## Package Scope: DB Querying vs. Business Logic (THOTH-062)
+
+`@thoth/database` (`packages/database/`) is scoped to **DB types, configuration and querying** —
+repositories, entity/migration definitions, and pure algorithm helpers reused by multiple
+consumers (e.g. `delta`/`reconstruct`/`coalesce`/`consolidate` under `src/history/`, used by both
+the web app's diff rendering and job maintenance). It deliberately does **not** own
+business/orchestration logic that is only ever invoked from one place. For example, page-history
+consolidation/retention orchestration (`maintainPageHistory`) lives in
+`apps/jobs/src/handlers/history/maintenance.ts`, not in `packages/database` — it composes the
+package's repositories, types, and pure algorithm exports, but the maintenance business logic
+itself belongs with its sole caller (the `history.maintain` job handler). When adding new
+scheduled/business logic that only jobs (or only web) will call, put the orchestration in that
+app, importing the querying/algorithm primitives it needs from `@thoth/database`'s root or
+`./types` exports rather than growing the database package with app-specific logic.
+
 ## Common Patterns
 
 ```typescript

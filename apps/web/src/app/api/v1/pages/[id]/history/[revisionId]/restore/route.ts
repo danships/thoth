@@ -5,8 +5,8 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
-import { reconstructAt, reconstructValuesAt } from '@/lib/history/reconstruct';
-import { recordContentRevision, recordValuesRevision } from '@/lib/history/revision-service';
+import { reconstructAt, reconstructValuesAt } from '@thoth/shared';
+import { recordContentRevision, recordValuesRevision } from '@thoth/database';
 import type { PageValue } from '@/types/schemas/entities/container';
 import {
   restorePageRevisionParametersSchema,

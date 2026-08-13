@@ -37,6 +37,7 @@
     "db:migrate:dist": "node ./dist/cli/migrate.js"
   },
   "dependencies": {
+    "@thoth/shared": "workspace:*",
     "better-sqlite3": "^12.11.1",
     "fractional-indexing": "^4.0.0",
     "mysql2": "^3.22.5",

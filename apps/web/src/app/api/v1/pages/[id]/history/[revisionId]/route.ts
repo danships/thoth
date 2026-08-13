@@ -4,7 +4,7 @@ import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
-import { reconstructAt, reconstructValuesAt } from '@/lib/history/reconstruct';
+import { reconstructAt, reconstructValuesAt } from '@thoth/shared';
 import {
   getPageRevisionParametersSchema,
   type GetPageRevisionParameters,

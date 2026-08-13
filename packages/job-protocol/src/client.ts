@@ -192,3 +192,14 @@ export async function enqueueJob(job: ExternalJobRequest, options: JobClientOpti
   });
   return sendEnvelope(envelope, options);
 }
+
+/** Sends a `status` request for `jobId` and returns the parsed response envelope (test-only). */
+export async function getJobStatus(jobId: string, options: JobClientOptions): Promise<JobResponseEnvelope> {
+  const envelope = JobRequestEnvelopeSchema.parse({
+    version: 1,
+    requestId: randomUUID(),
+    kind: 'status',
+    jobId,
+  });
+  return sendEnvelope(envelope, options);
+}

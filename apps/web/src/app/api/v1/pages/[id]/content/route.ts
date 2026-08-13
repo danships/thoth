@@ -6,7 +6,7 @@ import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
 import { extractFileIdsFromContent, syncFileUsageForPage } from '@/lib/files/usage';
 import { getLogger } from '@/lib/logger';
-import { recordContentRevision } from '@/lib/history/revision-service';
+import { recordContentRevision } from '@thoth/database';
 import {
   GetPageContentParameters,
   getPageContentParametersSchema,

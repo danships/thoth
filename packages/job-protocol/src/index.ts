@@ -7,6 +7,8 @@ export {
   JobErrorCodeSchema,
   EnqueueJobRequestEnvelopeSchema,
   PingRequestEnvelopeSchema,
+  StatusRequestEnvelopeSchema,
+  JobStatusSchema,
   JobRequestEnvelopeSchema,
   JobDispositionSchema,
   JobResponseSuccessSchema,
@@ -17,6 +19,8 @@ export type {
   JobErrorCode,
   EnqueueJobRequestEnvelope,
   PingRequestEnvelope,
+  StatusRequestEnvelope,
+  JobStatusValue,
   JobRequestEnvelope,
   JobDisposition,
   JobResponseSuccess,
@@ -28,8 +32,23 @@ export {
   ExternalJobRequestSchema,
   TestNoopExternalJobRequestSchema,
   TestNoopJobPayloadSchema,
+  historyScanPayloadV1Schema,
+  historyMaintainPayloadV1Schema,
+  historyScanTestJobRequestSchema,
+  historyMaintainTestJobRequestSchema,
+  historyMaintainDedupeKey,
+  historyScanCursorSchema,
 } from './external-job.js';
-export type { ExternalJobRequest, TestNoopExternalJobRequest, TestNoopJobPayload } from './external-job.js';
+export type {
+  ExternalJobRequest,
+  TestNoopExternalJobRequest,
+  TestNoopJobPayload,
+  HistoryScanPayloadV1,
+  HistoryMaintainPayloadV1,
+  HistoryScanTestJobRequest,
+  HistoryMaintainTestJobRequest,
+  HistoryScanCursor,
+} from './external-job.js';
 
 export {
   webhookDispatchExternalJobRequestSchema,
@@ -64,5 +83,5 @@ export {
   DEFAULT_RESPONSE_TIMEOUT_MS,
 } from './frame.js';
 
-export { JobClientError, pingJobService, enqueueJob } from './client.js';
+export { JobClientError, pingJobService, enqueueJob, getJobStatus } from './client.js';
 export type { JobClientErrorCode, JobClientOptions } from './client.js';

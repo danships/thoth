@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { COALESCE_WINDOW_MS } from './constants';
-import { nextCoalesceWindowEnd, shouldCoalesce } from './coalesce';
+import { COALESCE_WINDOW_MS } from './constants.js';
+import { nextCoalesceWindowEnd, shouldCoalesce } from './coalesce.js';
 
 describe('coalesce', () => {
   let now = new Date(0);

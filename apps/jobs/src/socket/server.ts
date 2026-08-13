@@ -49,8 +49,14 @@ async function probeSocketIsLive(socketPath: string, timeoutMs = 1000): Promise<
  */
 async function prepareSocketPath(socketPath: string): Promise<void> {
   const parentDirectory = nodePath.dirname(socketPath);
-  await mkdir(parentDirectory, { recursive: true, mode: 0o700 });
-  await chmod(parentDirectory, 0o700);
+  // `mkdir` with `recursive: true` only returns the path of the first directory it actually
+  // created; if the parent already existed (e.g. it's a shared system directory like `/tmp`)
+  // it resolves to `undefined` and we must not attempt to chmod it — the process may not own
+  // it (chmod would fail with EPERM) and locking down a shared directory would be unsafe.
+  const createdDirectory = await mkdir(parentDirectory, { recursive: true, mode: 0o700 });
+  if (createdDirectory) {
+    await chmod(parentDirectory, 0o700);
+  }
 
   let stat;
   try {
@@ -261,6 +267,17 @@ export class JobSocketServer {
 
     if (request.kind === 'ping') {
       respond({ version: 1, requestId: request.requestId, ok: true, result: {} });
+      return;
+    }
+
+    if (request.kind === 'status') {
+      const record = this.options.queueService.get(request.jobId);
+      respond({
+        version: 1,
+        requestId: request.requestId,
+        ok: true,
+        result: record ? { found: true, status: record.status } : { found: false },
+      });
       return;
     }
 

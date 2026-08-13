@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { makePatch } from './delta';
-import { nearestBaseline, reconstructAt, reconstructValuesAt, type ContentRevisionLike } from './reconstruct';
-import type { PageValue } from '@/types/schemas/entities/container';
+import { makePatch } from './delta.js';
+import { nearestBaseline, reconstructAt, reconstructValuesAt, type ContentRevisionLike } from './reconstruct.js';
 
-const stringValue = (value: string): PageValue => ({ type: 'string', value });
+type TestValue = { type: 'string'; value: string };
+const stringValue = (value: string): TestValue => ({ type: 'string', value });
 
 describe('reconstruct', () => {
   let states: string[] = [];
