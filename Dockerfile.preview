@@ -37,6 +37,7 @@ COPY apps/jobs/package.json apps/jobs/package.json
 COPY packages/database/package.json packages/database/package.json
 COPY packages/storage/package.json packages/storage/package.json
 COPY packages/job-protocol/package.json packages/job-protocol/package.json
+COPY packages/shared/package.json packages/shared/package.json
 # Full install (no `--prod`): devDependencies like `tsx` and `typescript`
 # must be present in the final image so the seed script can run without any
 # further installation at runtime.
@@ -103,6 +104,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/database/package.json ./
 # packages/database/node_modules first, so without this the migration CLI above fails at
 # runtime with `Cannot find module 'supersave'` even though root node_modules is present.
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/node_modules ./packages/database/node_modules
+# `@thoth/shared`'s compiled output — `@thoth/database` (see packages/database/src/history/
+# revision-service.ts) imports the pure history algorithms extracted into this package, so it
+# must be present at runtime for the migration CLI and the web/jobs processes that depend on
+# `@thoth/database`.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder --chown=nextjs:nodejs /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/packages/shared/node_modules ./packages/shared/node_modules
 # `@thoth/job-protocol`'s compiled output — required both by `@thoth/jobs` (via its own
 # `node_modules/@thoth/job-protocol` workspace symlink, copied below) and by the health check
 # code traced into the web standalone bundle above.
