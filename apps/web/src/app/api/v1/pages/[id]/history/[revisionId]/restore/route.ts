@@ -4,6 +4,7 @@ import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { toWebhookActor } from '@/lib/webhooks/actor';
 import { reconstructAt, reconstructValuesAt } from '@/lib/history/reconstruct';
 import { recordContentRevision, recordValuesRevision } from '@/lib/history/revision-service';
 import type { PageValue } from '@/types/schemas/entities/container';
@@ -45,7 +46,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
       // new revision ("restored to sequence N") shows up at the top of the timeline.
       await recordContentRevision({ page, newContent: restoredContent, author: session.user.id });
 
-      scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
+      scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
 
       const contentRevisions = await repository.getByQuery(
         repository.createQuery().eq('containerId', params.id).eq('target', 'content').sort('sequence', 'desc').limit(1)
@@ -102,7 +103,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
       await recordValuesRevision({ page, changed, author: session.user.id });
     }
 
-    scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
+    scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
 
     const newHeadValuesRevisions = await repository.getByQuery(
       repository.createQuery().eq('containerId', params.id).eq('target', 'values').sort('sequence', 'desc').limit(1)

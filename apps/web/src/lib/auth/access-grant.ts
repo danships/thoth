@@ -1,7 +1,6 @@
-import { getAppScopedContainerRepository, getMemberScopedContainerRepository } from '@/lib/database';
-import { resolveContainerDescendants, resolvePageEmbeddedContainerIds } from '@/lib/database/app-service';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
-import type { App, AppPermission, AppScopeType, WorkspaceMember } from '@thoth/database/types';
+import { grantAllowsContainer, filterContainersByGrant, memberToAccessGrant } from '@thoth/database';
+import type { AccessGrant } from '@thoth/database';
 import type { ApiKeySession } from './session';
 
 /**
@@ -16,64 +15,14 @@ import type { ApiKeySession } from './session';
  * already enforce for every caller (session or bearer-token alike): membership first, then
  * per-content scope. Permission/scope violations here throw `ForbiddenError` (403) — never
  * `NotAuthorizedError` (401), which is reserved for "who even are you" failures.
+ *
+ * The non-throwing `AccessGrant` primitives (`appToAccessGrant`, `memberToAccessGrant`,
+ * `grantAllowsContainer`, `filterContainersByGrant`) moved to `@thoth/database` in THOTH-061 so
+ * `@thoth/jobs`' webhook dispatch handler can resolve the exact same scope semantics without
+ * depending on this web-only module. Only the throwing/session-aware wrappers stay here.
  */
-export type AccessGrant = {
-  workspaceId: string;
-  permission: AppPermission;
-  scopeType: AppScopeType;
-  scopedContainerIds?: string[];
-};
-
-export async function appToAccessGrant(app: App): Promise<AccessGrant> {
-  if (app.scopeType === 'workspace') {
-    return {
-      workspaceId: app.workspaceId,
-      permission: app.permission,
-      scopeType: app.scopeType,
-    };
-  }
-
-  const appScopedContainerRepository = await getAppScopedContainerRepository();
-  const scopedRows = await appScopedContainerRepository.getByQuery(
-    appScopedContainerRepository.createQuery().eq('appId', app.id)
-  );
-
-  return {
-    workspaceId: app.workspaceId,
-    permission: app.permission,
-    scopeType: app.scopeType,
-    scopedContainerIds: scopedRows.map((row) => row.containerId),
-  };
-}
-
-/**
- * Builds the same `AccessGrant` shape from a workspace-member row, so human members and App
- * keys flow through the identical scope/permission checks (`assertGrantAllowsContainer` /
- * `filterContainersByGrant` / `assertGrantAllowsWrite`). Mirrors `appToAccessGrant`. Called by
- * `assertContentAccess` — never call this ahead of time and cache it, since a user's grant
- * differs per workspace and must be resolved from the member row for the *target* workspace.
- */
-export async function memberToAccessGrant(member: WorkspaceMember): Promise<AccessGrant> {
-  if (member.scopeType === 'workspace') {
-    return {
-      workspaceId: member.workspaceId,
-      permission: member.permission,
-      scopeType: member.scopeType,
-    };
-  }
-
-  const memberScopedContainerRepository = await getMemberScopedContainerRepository();
-  const scopedRows = await memberScopedContainerRepository.getByQuery(
-    memberScopedContainerRepository.createQuery().eq('workspaceMemberId', member.id)
-  );
-
-  return {
-    workspaceId: member.workspaceId,
-    permission: member.permission,
-    scopeType: member.scopeType,
-    scopedContainerIds: scopedRows.map((row) => row.containerId),
-  };
-}
+export { appToAccessGrant, memberToAccessGrant, grantAllowsContainer, filterContainersByGrant } from '@thoth/database';
+export type { AccessGrant } from '@thoth/database';
 
 export function assertGrantAllowsWrite(grant: AccessGrant): void {
   if (grant.permission === 'read') {
@@ -88,75 +37,6 @@ export async function assertGrantAllowsContainer(
   if (!(await grantAllowsContainer(grant, container))) {
     throw new ForbiddenError('Container is outside the API key scope');
   }
-}
-
-/**
- * Non-throwing predicate version of `assertGrantAllowsContainer` — used by
- * `src/lib/webhooks/resolve-webhooks.ts`'s resolver, which needs to test many (grant, container)
- * pairs and simply keep/discard rather than catch an exception per pair. `assertGrantAllowsContainer`
- * throws ⇔ this returns `false`; kept in perfect parity by having the throwing wrapper delegate here.
- */
-export async function grantAllowsContainer(
-  grant: AccessGrant,
-  container: { id: string; workspaceId: string }
-): Promise<boolean> {
-  if (grant.workspaceId !== container.workspaceId) {
-    return false;
-  }
-
-  if (grant.scopeType === 'workspace') {
-    return true;
-  }
-
-  const scopedContainerIds = grant.scopedContainerIds ?? [];
-
-  if (grant.scopeType === 'containers') {
-    if (scopedContainerIds.includes(container.id)) {
-      return true;
-    }
-    // Data sources are never granted on their own — access to a page implicitly covers the
-    // data source(s) embedded on it and the rows they display.
-    const embedded = await resolvePageEmbeddedContainerIds(scopedContainerIds, grant.workspaceId);
-    return embedded.has(container.id);
-  }
-
-  // 'containers_with_children'
-  if (scopedContainerIds.includes(container.id)) {
-    return true;
-  }
-
-  const descendants = await resolveContainerDescendants(scopedContainerIds, grant.workspaceId);
-  return descendants.has(container.id);
-}
-
-/**
- * Filters a list of containers down to the ones `grant` permits — used by list/tree routes
- * (e.g. `GET /pages/tree`) so an App-authenticated caller can never enumerate out-of-scope
- * containers via a listing endpoint, even if they can't fetch them individually. For
- * `'containers_with_children'`, resolves the descendant set once and filters the whole list
- * against it (rather than one lookup per item).
- */
-export async function filterContainersByGrant<T extends { id: string; workspaceId: string }>(
-  grant: AccessGrant,
-  containers: T[]
-): Promise<T[]> {
-  const scoped = containers.filter((container) => container.workspaceId === grant.workspaceId);
-
-  if (grant.scopeType === 'workspace') {
-    return scoped;
-  }
-
-  const scopedContainerIds = new Set(grant.scopedContainerIds);
-
-  if (grant.scopeType === 'containers') {
-    // See `assertGrantAllowsContainer`: page scope implicitly covers embedded data sources/rows.
-    const embedded = await resolvePageEmbeddedContainerIds([...scopedContainerIds], grant.workspaceId);
-    return scoped.filter((container) => scopedContainerIds.has(container.id) || embedded.has(container.id));
-  }
-
-  // 'containers_with_children'
-  const descendants = await resolveContainerDescendants([...scopedContainerIds], grant.workspaceId);
-  return scoped.filter((container) => scopedContainerIds.has(container.id) || descendants.has(container.id));
 }
 
 /**

@@ -61,10 +61,14 @@ verbatim from `environmentSchema` to avoid drift):
 | `PORT` | No | `3000` | **Runtime/Node var, not validated by `envalid`** — consumed directly by the Node HTTP server (`next start`/Docker entrypoint) before the app's env schema is even checked. Only used indirectly here as the default port in `APP_URL`'s fallback. |
 
 `@thoth/jobs` (see "Process topology" below) has its own, separate environment schema
-(`apps/jobs/src/environment.ts`) — it never reads `apps/web`'s `DB`/`BETTER_AUTH_SECRET`:
+(`apps/jobs/src/environment.ts`) — it never reads `apps/web`'s `BETTER_AUTH_SECRET`, but since
+THOTH-061 it opens its own database connection, so `DB` must be set for both processes (the same
+connection string works for a single-SQLite-file deployment):
 
 | Variable | Required? | Default | Description |
 |----------|------------|---------|--------------|
+| `NODE_ENV` | Yes | — | `development`, `production`, or `test`. |
+| `DB` | Yes | — | Database connection string, same value as `apps/web`'s `DB` above. Used to load/update webhook deliveries (`webhook.dispatch`/`webhook.deliver`/`webhook.redeliver`, THOTH-061). Opened with schema sync/migrations disabled — `apps/web` owns migrations. |
 | `JOB_SOCKET_PATH` | No | a per-UID private temp path | Absolute path to the Unix domain socket `@thoth/jobs` listens on. Also read directly by `apps/web`'s `/api/health` route (`apps/web/src/lib/jobs/health.ts`) to reach the same socket — set it once and pass it to both processes (PM2/Docker/dev harness/tests all do this already). |
 | `JOB_POLL_INTERVAL_MS` | No | `1000` | How often the runner polls for due jobs when not woken by an enqueue/retry. |
 | `JOB_SHUTDOWN_TIMEOUT_MS` | No | `10000` | How long the process waits for active handlers to finish/abort on SIGTERM/SIGINT before exiting. PM2's `kill_timeout` for `thoth-jobs` (`pm2.config.js`) is deliberately longer than this. |
@@ -72,6 +76,8 @@ verbatim from `environmentSchema` to avoid drift):
 | `JOB_RETENTION_MS` | No | `900000` (15 min) | How long terminal (completed/dead) job records are retained in memory before eviction. |
 | `JOB_RETENTION_MAX` | No | `500` | Maximum number of terminal job records retained in memory regardless of age. |
 | `JOB_SCHEDULER_TICK_MS` | No | `5000` | How often the scheduler ticks to ensure the current interval bucket has been enqueued. |
+| `WEBHOOK_DELIVERY_TIMEOUT_MS` | No | `5000` | Per-attempt network timeout (ms) for outbound webhook delivery fetches (THOTH-061). |
+| `WEBHOOK_DELIVERY_BACKOFF_BASE_MS` | No | `500` | Base delay (ms) for full-jitter exponential backoff between webhook delivery retry attempts (THOTH-061). |
 
 A local MySQL database can be started with Docker Compose:
 

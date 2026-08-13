@@ -1,8 +1,16 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { rm } from 'node:fs/promises';
-import { createTestDatabaseFile } from '../../../tests/helpers/create-test-database';
-
-import type { DataSourceContainer, PageContainer } from '@thoth/database/types';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import nodePath from 'node:path';
+import {
+  createDatabaseContext,
+  resetDatabaseContext,
+  setDatabaseContext,
+  getUploadedFileRepository,
+  type DataSourceContainer,
+  type PageContainer,
+} from '@thoth/database';
+import { buildPayload } from './build-payload';
 
 function makeDataSource(): DataSourceContainer {
   return {
@@ -37,45 +45,23 @@ function makePage(values: PageContainer['values']): PageContainer {
   };
 }
 
+// Moved from `apps/web/src/lib/webhooks/build-payload.test.ts` (THOTH-061) alongside the
+// `buildPayload` implementation itself.
 describe('buildPayload — file column values (THOTH-054)', () => {
   let temporaryDirectory = '';
-  let originalEnvironment: Record<string, string | undefined> = {};
-  let uploadedFileRepository: Awaited<ReturnType<(typeof import('@/lib/database'))['getUploadedFileRepository']>>;
-  let buildPayload: (typeof import('./build-payload'))['buildPayload'];
+  let uploadedFileRepository: Awaited<ReturnType<typeof getUploadedFileRepository>>;
 
   beforeAll(async () => {
-    const mutableEnvironment = process.env as Record<string, string | undefined>;
-    originalEnvironment = {
-      NODE_ENV: mutableEnvironment['NODE_ENV'],
-      DB: mutableEnvironment['DB'],
-      BETTER_AUTH_SECRET: mutableEnvironment['BETTER_AUTH_SECRET'],
-      LOG_LEVEL: mutableEnvironment['LOG_LEVEL'],
-    };
-    mutableEnvironment['NODE_ENV'] = 'test';
-    mutableEnvironment['BETTER_AUTH_SECRET'] = 'test-secret-not-for-production-use';
-    mutableEnvironment['LOG_LEVEL'] = 'error';
+    temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-build-payload-test-'));
+    const databaseFile = nodePath.join(temporaryDirectory, 'test.db');
+    const context = createDatabaseContext({ connectionString: `sqlite://${databaseFile}`, skipSync: false });
+    setDatabaseContext(context);
 
-    const { temporaryDirectory: createdDirectory, databaseUrl } =
-      await createTestDatabaseFile('thoth-build-payload-test-');
-    temporaryDirectory = createdDirectory;
-    mutableEnvironment['DB'] = databaseUrl;
-
-    const databaseModule = await import('@/lib/database');
-    const buildPayloadModule = await import('./build-payload');
-
-    uploadedFileRepository = await databaseModule.getUploadedFileRepository();
-    buildPayload = buildPayloadModule.buildPayload;
+    uploadedFileRepository = await getUploadedFileRepository();
   });
 
   afterAll(async () => {
-    const mutableEnvironment = process.env as Record<string, string | undefined>;
-    for (const [key, value] of Object.entries(originalEnvironment)) {
-      if (value === undefined) {
-        delete mutableEnvironment[key];
-      } else {
-        mutableEnvironment[key] = value;
-      }
-    }
+    resetDatabaseContext();
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
 

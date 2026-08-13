@@ -2,6 +2,7 @@ import { getContainerRepository } from '@/lib/database';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { toWebhookActor } from '@/lib/webhooks/actor';
 import { extractFileIdsFromContent, syncFileUsageForPage } from '@/lib/files/usage';
 import { getLogger } from '@/lib/logger';
 import type { ApiKeySession } from '@/lib/auth/session';
@@ -64,7 +65,7 @@ export async function mutatePageContent(
     logger.error('pages.mutate-content.sync-file-usage-failed', { pageId: id, error });
   }
 
-  scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
+  scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
 
   return {
     content: 'content' in updatedPage ? (updatedPage.content ?? '') : '',

@@ -27,8 +27,23 @@ export type {
 export { ExternalJobRequestSchema, TestNoopExternalJobRequestSchema, TestNoopJobPayloadSchema } from './external-job';
 export type { ExternalJobRequest, TestNoopExternalJobRequest, TestNoopJobPayload } from './external-job';
 
+export {
+  webhookDispatchExternalJobRequestSchema,
+  webhookRedeliverExternalJobRequestSchema,
+  webhookDispatchPayloadV1Schema,
+  webhookRedeliverPayloadV1Schema,
+  webhookActorSchema,
+} from './webhook-job';
+export type {
+  WebhookDispatchExternalJobRequest,
+  WebhookRedeliverExternalJobRequest,
+  WebhookDispatchPayloadV1,
+  WebhookRedeliverPayloadV1,
+  WebhookActor,
+} from './webhook-job';
+
 export { RetryableJobError } from './registry';
-export type { JobStatus, JobExecutionContext, JobHandler, JobDefinition } from './registry';
+export type { JobStatus, JobExecutionContext, JobHandler, JobDefinition, JobCoalescePolicy, EnqueueChildFn } from './registry';
 
 export {
   MAX_FRAME_BYTES,

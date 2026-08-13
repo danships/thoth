@@ -101,6 +101,11 @@ export default async function globalSetup({ provide }: Pick<TestProject, 'provid
     STORAGE_LOCAL_FOLDER: uploadsPath,
     NEXT_TELEMETRY_DISABLED: '1',
     JOB_SOCKET_PATH: socketPath,
+    // Shrinks the otherwise-real webhook delivery network timeout/backoff (THOTH-061) so tests
+    // against an intentionally unreachable webhook URL (192.0.2.1) reach a terminal delivery
+    // status in seconds rather than minutes, without touching production defaults.
+    WEBHOOK_DELIVERY_TIMEOUT_MS: '300',
+    WEBHOOK_DELIVERY_BACKOFF_BASE_MS: '50',
   };
 
   // Create the schema (fresh SQLite file) via the standalone migration CLI before either

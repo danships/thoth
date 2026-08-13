@@ -1,12 +1,12 @@
 import { cleanEnv, makeValidator, str, EnvError } from 'envalid';
 
 /**
- * Environment validation for `@thoth/jobs` (THOTH-059).
+ * Environment validation for `@thoth/jobs` (THOTH-059, extended THOTH-061).
  *
  * Deliberately does NOT import `apps/web`'s environment validator: the jobs process must be
- * able to boot without any Next.js/web dependency and without a `DB` variable — job state is
- * held entirely in memory (see the package README / THOTH-059 spec), so there is nothing here
- * that requires a database connection string.
+ * able to boot without any Next.js/web dependency. Since THOTH-061 it does require its own `DB`
+ * connection string (see below) to resolve/dispatch/deliver webhooks — job *scheduling* state
+ * itself still lives entirely in memory (see the package README / THOTH-059 spec).
  */
 
 // envalid's built-in `num()` validator (parseFloat under the hood) accepts zero, negative,
@@ -27,6 +27,12 @@ const environmentSchema = {
     choices: ['error', 'warn', 'info', 'http', 'debug', 'trace'],
     default: 'info',
   }),
+  // SuperSave connection string (THOTH-061) — the jobs process now reads/writes application
+  // data directly (webhooks, deliveries, pages, apps, ...) to resolve and deliver webhook
+  // dispatch/redeliver jobs. Always opened with `skipSync: true` (see `apps/jobs/src/index.ts`)
+  // — schema sync/migrations remain the exclusive job of `packages/database/src/cli/migrate.ts`,
+  // run once before either PM2-managed process starts.
+  DB: str(),
   // Absolute path to the Unix domain socket the worker listens on. When set, must be absolute;
   // otherwise a per-UID private temp directory is used as a convenience default in any environment.
   JOB_SOCKET_PATH: str({ default: undefined }),
@@ -43,6 +49,13 @@ const environmentSchema = {
   JOB_RETENTION_MAX: positiveInt({ default: 500 }),
   // How often the scheduler ticks to ensure the current interval bucket has been enqueued.
   JOB_SCHEDULER_TICK_MS: positiveInt({ default: 5000 }),
+  // Per-attempt abort timeout for outbound webhook delivery fetches (THOTH-061). Overridable
+  // (only) so the integration test harness can shrink an otherwise-real network timeout against
+  // an intentionally unreachable test URL, without changing production behaviour.
+  WEBHOOK_DELIVERY_TIMEOUT_MS: positiveInt({ default: 5000 }),
+  // Base delay (ms) for the full-jitter exponential backoff between webhook delivery attempts
+  // (THOTH-061). Overridable for the same reason as `WEBHOOK_DELIVERY_TIMEOUT_MS` above.
+  WEBHOOK_DELIVERY_BACKOFF_BASE_MS: positiveInt({ default: 500 }),
 };
 
 export type JobsEnvironment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;

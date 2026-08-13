@@ -122,4 +122,71 @@ test.describe('Apps settings UI', () => {
 
     await expect(page.getByRole('row', { name: new RegExp(updatedLabel) })).toBeVisible({ timeout: 10_000 });
   });
+
+  // THOTH-061: webhook delivery execution moved to `@thoth/jobs`; this covers the resulting
+  // async lifecycle in the UI (Pending/Retrying badges, a disabled Resend button while a
+  // delivery is already in flight, and no duplicate row for the same webhook after resend).
+  test('a webhook delivery shows Pending/Retrying, disables Resend while active, and reaches a terminal state on the same row', async ({
+    page,
+  }) => {
+    // Full retry exhaustion against an unreachable URL (5 attempts, each with its own network
+    // timeout, plus backoff) legitimately takes longer than the suite's default 30s test
+    // timeout — extend just this test rather than the whole suite.
+    test.setTimeout(120_000);
+
+    await page.goto(`/${SEED.workspace.slug}/settings/apps`);
+    await page.waitForLoadState('networkidle');
+
+    const label = `E2E Webhook Delivery App ${Date.now()}`;
+    await page.getByRole('button', { name: 'New App' }).click();
+    await page.getByLabel('Label').fill(label);
+    await page.getByRole('button', { name: 'Create App' }).click();
+
+    const row = page.getByRole('row', { name: new RegExp(label) });
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await row.click();
+    await expect(page).toHaveURL(/\/settings\/apps\/[^/]+$/, { timeout: 15_000 });
+
+    // An unreachable-but-well-formed HTTPS URL (documentation/test range, RFC 5737) — the SSRF
+    // guard accepts it at config time (public, https), but every delivery attempt against it
+    // times out, so the delivery stays non-terminal (`pending`/`retrying`) long enough to assert
+    // the in-flight UI, without depending on any real external endpoint.
+    await page.getByLabel('Label', { exact: true }).fill('Delivery watcher');
+    await page.getByLabel('URL').fill('https://192.0.2.1/webhooks/thoth-e2e');
+    await page.getByRole('button', { name: 'Add webhook' }).click();
+
+    // Creating a webhook shows its one-time signing secret in a modal (mirrors the API key
+    // flow above) — dismiss it before interacting with the rest of the page, since Mantine
+    // marks the underlying content inert (and so unreachable via the accessibility tree) while
+    // the modal is open.
+    await expect(page.getByText('Copy this secret now')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Done' }).click();
+
+    const webhookRow = page.getByRole('button', { name: /Delivery watcher/ });
+    await expect(webhookRow).toBeVisible({ timeout: 10_000 });
+    await webhookRow.click();
+
+    await expect(page.getByRole('heading', { name: 'Deliveries' })).toBeVisible();
+
+    // Trigger a page mutation for a page in this workspace via the API (faster/more reliable
+    // than driving the page editor through the UI) so the App's webhook receives a
+    // `page.updated` event and a delivery row is created.
+    await page.request.patch(`/api/v1/pages/${SEED.pages.root.id}`, { data: { name: SEED.pages.root.name } });
+
+    const deliveryRow = page.locator('table tbody tr').last();
+    await expect(deliveryRow).toBeVisible({ timeout: 15_000 });
+    await expect(deliveryRow.getByText(/Pending|Retrying/)).toBeVisible({ timeout: 15_000 });
+
+    // While the delivery is active, the row's Resend button must stay disabled — clicking
+    // resend must never race a running attempt for the same row.
+    const resendButton = deliveryRow.getByRole('button', { name: 'Resend delivery' });
+    await expect(resendButton).toBeDisabled();
+
+    // The delivery eventually exhausts its retries against the unreachable URL and reaches a
+    // terminal state, still on the very same row (no duplicate delivery is ever created for
+    // this webhook from a single page mutation).
+    await expect(deliveryRow.getByText(/Failed|Success|Cancelled/)).toBeVisible({ timeout: 60_000 });
+    await expect(resendButton).toBeEnabled();
+    await expect(page.locator('table tbody tr').filter({ hasText: SEED.pages.root.id })).toHaveCount(1);
+  });
 });

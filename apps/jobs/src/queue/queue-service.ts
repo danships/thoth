@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { JobDisposition } from '@thoth/job-protocol';
+import type { JobDisposition, JobCoalescePolicy } from '@thoth/job-protocol';
 import { QueueStore } from './queue-store';
 import type { JobRecord } from './types';
 
@@ -11,6 +11,8 @@ export type EnqueueInput = {
   maxAttempts: number;
   dedupeKey?: string;
   runAt?: Date;
+  /** Per-type coalescing policy (THOTH-061) — see `JobCoalescePolicy` for semantics. */
+  coalesce?: JobCoalescePolicy<unknown>;
 };
 
 export type EnqueueResult = {
@@ -56,14 +58,23 @@ export class QueueService {
       if (input.dedupeKey) {
         const existing = this.store.findActiveByDedupeKey(input.dedupeKey);
         if (existing) {
-          existing.payload = input.payload;
+          if (input.coalesce) {
+            existing.payload = input.coalesce.merge(existing.payload, input.payload);
+            const cappedRunAt = existing.createdAt.getTime() + input.coalesce.maxDebounceMs;
+            const debouncedRunAt = now.getTime() + input.coalesce.debounceMs;
+            existing.runAt = new Date(Math.min(cappedRunAt, debouncedRunAt));
+          } else {
+            existing.payload = input.payload;
+            existing.runAt = input.runAt ?? existing.runAt;
+          }
           existing.payloadVersion = input.payloadVersion;
-          existing.runAt = input.runAt ?? existing.runAt;
           existing.updatedAt = now;
           this.store.set(existing);
           return { record: existing, disposition: 'coalesced' as const };
         }
       }
+
+      const initialRunAt = input.runAt ?? (input.coalesce ? new Date(now.getTime() + input.coalesce.debounceMs) : now);
 
       const record = this.store.create({
         id: randomUUID(),
@@ -73,7 +84,7 @@ export class QueueService {
         priority: input.priority,
         maxAttempts: input.maxAttempts,
         ...(input.dedupeKey === undefined ? {} : { dedupeKey: input.dedupeKey }),
-        runAt: input.runAt ?? now,
+        runAt: initialRunAt,
         now,
       });
 

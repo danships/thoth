@@ -6,6 +6,7 @@ import {
   JobRequestEnvelopeSchema,
   JobResponseEnvelopeSchema,
   type JobResponseEnvelope,
+  type JobCoalescePolicy,
   MAX_FRAME_BYTES,
 } from '@thoth/job-protocol';
 import type { QueueService } from '../queue/queue-service';
@@ -272,7 +273,14 @@ export class JobSocketServer {
     }
 
     try {
-      const dedupeKey = 'dedupeKey' in request.job ? (request.job as { dedupeKey?: string }).dedupeKey : undefined;
+      const derivedDedupeKey = definition.dedupeKey?.(request.job.payload);
+      // Only fall back to a caller-supplied `dedupeKey` for job types that don't define their
+      // own derivation (e.g. `test.noop`) — production external types (`webhook.dispatch`,
+      // `webhook.redeliver`) never accept a caller-supplied dedupe key in their schema at all
+      // (see `packages/job-protocol/src/webhook-job.ts`), so this fallback can never be abused
+      // to spoof a coalescing key for those types.
+      const dedupeKey =
+        derivedDedupeKey ?? ('dedupeKey' in request.job ? (request.job as { dedupeKey?: string }).dedupeKey : undefined);
       const result = await this.options.queueService.enqueue({
         type: request.job.type,
         payloadVersion: request.job.payloadVersion,
@@ -280,6 +288,7 @@ export class JobSocketServer {
         priority: definition.priority,
         maxAttempts: definition.maxAttempts,
         ...(dedupeKey === undefined ? {} : { dedupeKey }),
+        ...(definition.coalesce === undefined ? {} : { coalesce: definition.coalesce as JobCoalescePolicy<unknown> }),
       });
 
       this.options.logger.info('job.enqueue', {

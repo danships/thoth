@@ -7,6 +7,7 @@ import { pageColumnRetriever } from '@/lib/database/retrievers/page-column-retri
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { getLogger } from '@/lib/logger';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { toWebhookActor } from '@/lib/webhooks/actor';
 import type {
   DeletePageParameters,
   GetPageDetailsParameters,
@@ -143,7 +144,7 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
       lastUpdated: new Date().toISOString(),
     });
 
-    scheduleNotifyPageChange('page.updated', updatedPage, { appId: session.appContext?.appId });
+    scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
 
     return {
       id: updatedPage.id,

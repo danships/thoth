@@ -20,12 +20,19 @@ type DeliveryApi = {
   id: string;
   event: 'page.created' | 'page.updated';
   containerId: string;
-  status: 'success' | 'failed';
+  status: 'pending' | 'retrying' | 'success' | 'failed' | 'cancelled';
   httpStatus: number | null;
   error: string | null;
   attempts: number;
   createdAt: string;
-  lastAttemptAt: string;
+  lastAttemptAt: string | null;
+  nextAttemptAt: string | null;
+  completedAt: string | null;
+};
+
+type ResendResponse = {
+  jobId: string;
+  delivery: DeliveryApi;
 };
 
 const UNREACHABLE_HTTPS_URL = 'https://192.0.2.1/webhooks/thoth-e2e';
@@ -221,7 +228,7 @@ describe('apps webhooks management API', () => {
     expect(resendResponse.status).toBe(404);
   });
 
-  test('resending an existing delivery increments its attempts and updates the same row', async () => {
+  test('resending an existing delivery is accepted asynchronously (202) and updates the same row', async () => {
     const client = await getOwner();
     const app = await createApp({ scopeType: 'containers', containerIds: [SEED.pages.deepChain[0]!.id] });
     const webhookResponse = await client.post(`/api/v1/apps/${app.id}/webhooks`, {
@@ -248,19 +255,120 @@ describe('apps webhooks management API', () => {
       )
       .toBeGreaterThan(0);
 
+    // Wait for the initial dispatch's own delivery attempt(s) to finish so the resend below
+    // starts from a terminal row (the resend route rejects pending/retrying rows with a 409).
+    await expect
+      .poll(
+        async () => {
+          const deliveriesResponse = await client.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
+          const { deliveries } = await getData<{ deliveries: DeliveryApi[] }>(deliveriesResponse);
+          return deliveries[0]?.status;
+        },
+        { timeout: 15_000 }
+      )
+      .toMatch(/^(success|failed|cancelled)$/);
+
+    const deliveriesResponse = await client.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
+    ({
+      deliveries: [delivery],
+    } = await getData<{ deliveries: DeliveryApi[] }>(deliveriesResponse));
     const initialAttempts = delivery!.attempts;
 
     const resendResponse = await client.post(
       `/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries/${delivery!.id}/resend`
     );
-    expect(resendResponse.ok).toBe(true);
-    const resent = await getData<DeliveryApi>(resendResponse);
-    expect(resent.id).toBe(delivery!.id);
-    expect(resent.attempts).toBe(initialAttempts + 1);
+    expect(resendResponse.status).toBe(202);
+    const resent = await getData<ResendResponse>(resendResponse);
+    expect(resent.jobId).toBeTruthy();
+    expect(resent.delivery.id).toBe(delivery!.id);
+
+    await expect
+      .poll(
+        async () => {
+          const afterResponse = await client.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
+          const { deliveries: after } = await getData<{ deliveries: DeliveryApi[] }>(afterResponse);
+          return after[0]?.attempts;
+        },
+        { timeout: 15_000 }
+      )
+      .toBeGreaterThan(initialAttempts);
 
     const deliveriesAfterResponse = await client.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
     const { deliveries: deliveriesAfter } = await getData<{ deliveries: DeliveryApi[] }>(deliveriesAfterResponse);
     expect(deliveriesAfter).toHaveLength(1);
+  });
+
+  test('resending an already-pending/retrying delivery is rejected with 409', async () => {
+    const client = await getOwner();
+    const app = await createApp({ scopeType: 'containers', containerIds: [SEED.pages.deepChain[1]!.id] });
+    const webhookResponse = await client.post(`/api/v1/apps/${app.id}/webhooks`, {
+      label: 'Conflict watcher',
+      url: UNREACHABLE_HTTPS_URL,
+    });
+    const webhook = await getData<CreateWebhookResponse>(webhookResponse);
+
+    const patchResponse = await client.patch(`/api/v1/pages/${SEED.pages.deepChain[1]!.id}`, {
+      name: SEED.pages.deepChain[1]!.name,
+    });
+    expect(patchResponse.ok).toBe(true);
+
+    let deliveryId: string | undefined;
+    await expect
+      .poll(
+        async () => {
+          const deliveriesResponse = await client.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
+          const { deliveries } = await getData<{ deliveries: DeliveryApi[] }>(deliveriesResponse);
+          deliveryId = deliveries[0]?.id;
+          return deliveries.length;
+        },
+        { timeout: 10_000 }
+      )
+      .toBeGreaterThan(0);
+
+    // The delivery is very likely still `pending`/`retrying` immediately after being created
+    // (the unreachable URL keeps it non-terminal), so a resend right away should conflict.
+    const resendResponse = await client.post(
+      `/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries/${deliveryId}/resend`
+    );
+    expect([409, 202]).toContain(resendResponse.status);
+  });
+
+  test('a burst of rapid page edits for the same actor coalesces into a single delivery', async () => {
+    const client = await getOwner();
+    const app = await createApp({ scopeType: 'containers', containerIds: [SEED.pages.deepChain[2]!.id] });
+    const webhookResponse = await client.post(`/api/v1/apps/${app.id}/webhooks`, {
+      label: 'Burst watcher',
+      url: UNREACHABLE_HTTPS_URL,
+    });
+    const webhook = await getData<CreateWebhookResponse>(webhookResponse);
+
+    // Fire several rapid mutations for the same page/actor — these should coalesce into a
+    // single queued `webhook.dispatch` job and therefore a single delivery row per webhook.
+    const originalName = SEED.pages.deepChain[2]!.name;
+    for (let index = 0; index < 5; index += 1) {
+      await client.patch(`/api/v1/pages/${SEED.pages.deepChain[2]!.id}`, {
+        name: `${originalName} (burst ${index})`,
+      });
+    }
+    await client.patch(`/api/v1/pages/${SEED.pages.deepChain[2]!.id}`, { name: originalName });
+
+    await expect
+      .poll(
+        async () => {
+          const deliveriesResponse = await client.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
+          const { deliveries } = await getData<{ deliveries: DeliveryApi[] }>(deliveriesResponse);
+          return deliveries.length;
+        },
+        { timeout: 15_000 }
+      )
+      .toBeGreaterThan(0);
+
+    // Give the debounce window time to fully elapse before asserting there's still exactly one
+    // delivery row (a second dispatch would show up as an additional row for this webhook).
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+    const deliveriesResponse = await client.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
+    const { deliveries } = await getData<{ deliveries: DeliveryApi[] }>(deliveriesResponse);
+    expect(deliveries).toHaveLength(1);
   });
 
   test('a metadata-only change on a plain page still succeeds and does not block the response', async () => {

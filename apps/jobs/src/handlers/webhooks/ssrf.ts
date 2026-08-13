@@ -1,6 +1,5 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
-import { BadRequestError } from '@/lib/errors/bad-request-error';
 
 // Short-TTL cache of hostname -> resolved-safe boolean, so repeated deliveries to the same host
 // don't re-resolve DNS on every single send, while still being re-checked often enough to
@@ -85,31 +84,31 @@ async function resolveIsPublicHost(hostname: string): Promise<boolean> {
 }
 
 /**
- * DNS-aware, egress-independent SSRF guard for webhook URLs. Requires `https:`, then resolves
- * the hostname and rejects if *any* resolved address is loopback, link-local (incl. the cloud
- * metadata address `169.254.169.254`), private, or unspecified. Literal private-IP hostnames
- * and non-resolving hosts are rejected too.
+ * DNS-aware, egress-independent SSRF guard for webhook URLs (moved from `apps/web` in
+ * THOTH-061 — this process now performs the outbound delivery, so it owns the guard). Requires
+ * `https:`, then resolves the hostname and rejects if *any* resolved address is loopback,
+ * link-local (incl. the cloud metadata address `169.254.169.254`), private, or unspecified.
+ * Literal private-IP hostnames and non-resolving hosts are rejected too.
  *
- * Called at config time (`POST`/`PATCH /apps/:id/webhooks*`) here in `apps/web` — actual
- * delivery/resend now runs entirely inside `@thoth/jobs` (THOTH-061), which re-runs an
- * equivalent check (`apps/jobs/src/handlers/webhooks/ssrf.ts`) immediately before every attempt,
- * since a config-time pass here can never permanently vouch for a hostname (DNS rebinding).
+ * Called immediately before every delivery/redelivery attempt — the short-TTL cache above means
+ * a past pass doesn't permanently vouch for a hostname, defending against DNS rebinding. Throws
+ * a plain `Error` (not a web `BadRequestError`) since this package must stay Next.js-independent.
  */
 export async function assertPublicHttpsUrl(rawUrl: string): Promise<void> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
   } catch {
-    throw new BadRequestError('url must be a valid URL');
+    throw new Error('url must be a valid URL');
   }
 
   if (parsed.protocol !== 'https:') {
-    throw new BadRequestError('url must use the https protocol');
+    throw new Error('url must use the https protocol');
   }
 
   const hostname = parsed.hostname;
   const isPublic = await resolveIsPublicHost(hostname);
   if (!isPublic) {
-    throw new BadRequestError('url resolves to a private, local, or unresolvable address');
+    throw new Error('url resolves to a private, local, or unresolvable address');
   }
 }

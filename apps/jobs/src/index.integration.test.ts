@@ -35,6 +35,7 @@ describe('jobs process integration', () => {
         ...process.env,
         NODE_ENV: 'test',
         JOB_SOCKET_PATH: socketPath,
+        DB: `sqlite://${nodePath.join(nodePath.dirname(socketPath), 'jobs-test.db')}`,
         LOG_LEVEL: 'info',
       },
     });

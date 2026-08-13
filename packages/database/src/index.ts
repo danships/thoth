@@ -73,13 +73,35 @@ export {
   generateWebhookSecret,
   maskWebhookSecret,
   signPayload,
-  recordAndPrune,
+  createPendingDelivery,
+  findDeliveryBySourceJobAndWebhook,
+  recordDeliveryAttempt,
+  scheduleDeliveryRetry,
+  completeDelivery,
+  resetDeliveryForResend,
+  pruneTerminalDeliveries,
   deleteWebhook,
   deleteWebhooksForApp,
   listWebhooksForApp,
 } from './webhook-service';
-export type { RecordDeliveryInput } from './webhook-service';
+export type {
+  CreatePendingDeliveryInput,
+  DeliveryAttemptOutcome,
+} from './webhook-service';
+export {
+  appToAccessGrant,
+  memberToAccessGrant,
+  grantAllowsContainer,
+  filterContainersByGrant,
+} from './access-grant-service';
+export type { AccessGrant } from './access-grant-service';
 export { RESERVED_WORKSPACE_SLUGS, slugify, isReservedWorkspaceSlug } from './utils/slug';
+
+// Re-exported (in addition to `@thoth/database/schemas`) so packages using `moduleResolution:
+// Node10` (which cannot resolve the `exports` map's `./schemas` subpath) — e.g.
+// `@thoth/job-protocol`'s webhook job schemas — can still import it from the package root.
+export { pageValueSchema } from './schemas/entities/container';
+export type { PageValue } from './schemas/entities/container';
 
 // Entity definitions (for consumers that need entity/table names directly)
 export * as entities from './entities';
@@ -87,6 +109,8 @@ export * as entities from './entities';
 // Types (also available via the `@thoth/database/types` subpath)
 export type {
   Container,
+  PageContainer,
+  DataSourceContainer,
   ContainerAccess,
   DataView,
   Workspace,
@@ -104,3 +128,13 @@ export type {
   Setting,
   PlatformUser,
 } from './types';
+// Column/webhook-payload shapes also needed via the Node10-resolvable root entry (see the
+// `pageValueSchema` comment above) — `apps/jobs`' dispatch/deliver handlers import these.
+export type { Column } from './schemas/entities/container';
+export type {
+  WebhookDeliveryEvent,
+  WebhookDeliveryStatus,
+  WebhookPayload,
+  WebhookRawValue,
+} from './schemas/entities/webhook-delivery';
+export { TERMINAL_WEBHOOK_DELIVERY_STATUSES } from './schemas/entities/webhook-delivery';

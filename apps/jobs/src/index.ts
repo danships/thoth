@@ -6,17 +6,25 @@ import { createJobRegistry } from './handlers/index';
 import { Runner } from './runner/runner';
 import { Scheduler, type ScheduleDefinition } from './scheduler/scheduler';
 import { JobSocketServer } from './socket/server';
+import { createDatabaseContext, setDatabaseContext } from '@thoth/database';
 
 /**
- * Process entry point for `@thoth/jobs` (THOTH-059). Wires the in-memory queue, runner,
- * scheduler, and Unix-socket server together, then handles SIGTERM/SIGINT for orderly shutdown:
- * reject new IPC, stop schedules/claims, close the socket, wait (bounded) for active work, exit.
- * Deliberately imports no Next.js/web/database module and opens no TCP/HTTP port.
+ * Process entry point for `@thoth/jobs` (THOTH-059, DB access added THOTH-061). Wires the
+ * shared `@thoth/database` context, in-memory queue, runner, scheduler, and Unix-socket server
+ * together, then handles SIGTERM/SIGINT for orderly shutdown: reject new IPC, stop
+ * schedules/claims, close the socket, wait (bounded) for active work, exit. Deliberately imports
+ * no Next.js/`@thoth/web` module and opens no TCP/HTTP port.
  */
 async function main(): Promise<void> {
   const environment = getEnvironment();
   const logger = getLogger();
   const socketPath = resolveJobSocketPath();
+
+  // Always `skipSync: true` (THOTH-058/THOTH-061): schema sync/migrations are exclusively the
+  // job of `packages/database/src/cli/migrate.ts`, run once before either PM2-managed process
+  // starts. A PM2-triggered restart of this process must never re-run migrations.
+  const databaseContext = createDatabaseContext({ connectionString: environment.DB, skipSync: true });
+  setDatabaseContext(databaseContext);
 
   const queueService = new QueueService();
   const registry = createJobRegistry(environment.NODE_ENV);
@@ -79,6 +87,7 @@ async function main(): Promise<void> {
     scheduler.stop();
     await server.stop();
     await runner.stop(environment.JOB_SHUTDOWN_TIMEOUT_MS);
+    await databaseContext.close();
 
     logger.info('job.service.stopped', { signal });
     process.exit(0);

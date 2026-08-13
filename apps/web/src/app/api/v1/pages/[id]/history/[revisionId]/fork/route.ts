@@ -7,6 +7,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
+import { toWebhookActor } from '@/lib/webhooks/actor';
 import { reconstructAt, reconstructValuesAt } from '@/lib/history/reconstruct';
 import { createContentBaseline } from '@/lib/history/revision-service';
 import type { PageRevision, PageContainer, Container } from '@thoth/database/types';
@@ -134,7 +135,7 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
     // the forked content) — never shares/continues the source page's revision stream.
     await createContentBaseline({ page: createdPage, content: reconstructedContent, author: session.user.id });
 
-    scheduleNotifyPageChange('page.created', createdPage, { appId: session.appContext?.appId });
+    scheduleNotifyPageChange('page.created', createdPage, toWebhookActor(session));
 
     return {
       id: createdPage.id,

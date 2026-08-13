@@ -1,12 +1,15 @@
-import { getAppRepository, getContainerRepository, getWebhookRepository } from '@/lib/database';
-import { appToAccessGrant, grantAllowsContainer } from '@/lib/auth/access-grant';
-import type { App, Container, DataSourceContainer, Webhook } from '@thoth/database/types';
-
-export type WebhookActor = {
-  // The id of the App whose own API key caused the change, if any (undefined for a
-  // session-cookie-driven change) — used for `suppressOwnChanges` matching.
-  appId?: string | undefined;
-};
+import {
+  appToAccessGrant,
+  getAppRepository,
+  getContainerRepository,
+  getWebhookRepository,
+  grantAllowsContainer,
+  type App,
+  type Container,
+  type DataSourceContainer,
+  type Webhook,
+} from '@thoth/database';
+import type { WebhookActor } from '@thoth/job-protocol';
 
 /**
  * Reverse of `filterContainersByGrant`: given a changed container, finds every enabled webhook
@@ -14,9 +17,13 @@ export type WebhookActor = {
  * source — see "Data-source rule" below), excluding archived Apps and honouring per-webhook
  * `suppressOwnChanges`. Dedupes by `webhook.id`.
  *
+ * Moved from `apps/web` in THOTH-061 — this process reloads current webhook/App/grant state
+ * itself rather than trusting a caller-supplied snapshot (the `webhook.dispatch` job payload
+ * never carries webhook ids/URLs/secrets or App/grant data).
+ *
  * `parentDataSource` is the container's already-resolved data-source parent (see
- * `resolveDataSourceParent`), passed in so callers that also need it (e.g. `notifyPageChange`
- * for the outbound payload) don't trigger the lookup twice.
+ * `resolveDataSourceParent`), passed in so callers that also need it (e.g. `buildPayload` for
+ * the outbound payload) don't trigger the lookup twice.
  */
 export async function resolveWebhooksToNotify(
   container: Container,
@@ -41,6 +48,8 @@ export async function resolveWebhooksToNotify(
   const grantCache = new Map<string, ReturnType<typeof appToAccessGrant>>();
   const matched = new Map<string, Webhook>();
 
+  const actorAppId = actor.type === 'app' ? actor.appId : undefined;
+
   for (const webhook of candidateWebhooks) {
     if (matched.has(webhook.id)) {
       continue;
@@ -51,7 +60,7 @@ export async function resolveWebhooksToNotify(
       continue;
     }
 
-    if (webhook.suppressOwnChanges && actor.appId === webhook.appId) {
+    if (webhook.suppressOwnChanges && actorAppId === webhook.appId) {
       continue;
     }
 

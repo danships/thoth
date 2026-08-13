@@ -1,19 +1,26 @@
 import { z } from 'zod';
+import {
+  webhookDispatchExternalJobRequestSchema,
+  webhookRedeliverExternalJobRequestSchema,
+  type WebhookDispatchExternalJobRequest,
+  type WebhookRedeliverExternalJobRequest,
+} from './webhook-job';
 
 /**
- * External job payload accepted over the Unix-socket IPC boundary (THOTH-059).
+ * External job payload accepted over the Unix-socket IPC boundary (THOTH-059/THOTH-061).
  *
  * This is intentionally NOT the same type as the internal job registry used by the worker for
- * scheduled/maintenance jobs (webhooks, purge, history, ...) — those are wired in-process by
- * `@thoth/jobs` and are never reachable from an external caller. Keeping this schema separate
- * (and, in production, accepting nothing at all) prevents a caller on the socket from choosing
- * an internal job type, its priority, its retry policy or its schedule.
+ * scheduled/maintenance jobs (purge, history, ...) — those are wired in-process by `@thoth/jobs`
+ * and are never reachable from an external caller. `webhook.dispatch`/`webhook.redeliver` (added
+ * in THOTH-061) ARE externally reachable — they're the only two ways `apps/web` can trigger
+ * outbound webhook delivery, replacing every direct `fetch` that used to live in the web
+ * process. Both are strict, discriminated-union-validated schemas defined in `./webhook-job` so
+ * a caller can never smuggle extra fields (priority, dedupeKey, retry policy, ...) that would
+ * influence internal scheduling/execution.
  *
- * For THOTH-059 production builds accept no external job type (the union below only ever
- * validates in a test process). A harmless internal diagnostic job (`test.noop`) is exposed
- * only when `NODE_ENV === 'test'` so integration tests can exercise the full enqueue → run →
- * terminal-log path without a production job primitive. Real producer types (page-change
- * webhooks, etc.) are added in THOTH-061.
+ * A harmless internal diagnostic job (`test.noop`) is exposed only when `NODE_ENV === 'test'` so
+ * integration tests can exercise the full enqueue → run → terminal-log path without depending on
+ * a production job primitive being present.
  */
 
 export const TestNoopJobPayloadSchema = z
@@ -38,18 +45,41 @@ export const TestNoopExternalJobRequestSchema = z
 
 export type TestNoopExternalJobRequest = z.infer<typeof TestNoopExternalJobRequestSchema>;
 
-/** True only inside test runs; gates the only externally-reachable job type for THOTH-059. */
+export {
+  webhookDispatchExternalJobRequestSchema,
+  webhookRedeliverExternalJobRequestSchema,
+  webhookDispatchPayloadV1Schema,
+  webhookRedeliverPayloadV1Schema,
+  webhookActorSchema,
+} from './webhook-job';
+export type {
+  WebhookDispatchExternalJobRequest,
+  WebhookRedeliverExternalJobRequest,
+  WebhookDispatchPayloadV1,
+  WebhookRedeliverPayloadV1,
+  WebhookActor,
+} from './webhook-job';
+
+/** True only inside test runs; gates the only test-only externally-reachable job type. */
 function isTestEnvironment(): boolean {
   return process.env['NODE_ENV'] === 'test';
 }
 
-/**
- * The externally accepted job schema. In non-test environments this never validates any
- * payload (an "empty union" in practice), matching the spec's requirement that production
- * exposes no externally triggerable job type yet.
- */
-export const ExternalJobRequestSchema: z.ZodType<TestNoopExternalJobRequest> = isTestEnvironment()
-  ? TestNoopExternalJobRequestSchema
-  : (z.never() as unknown as z.ZodType<TestNoopExternalJobRequest>);
+const productionExternalJobSchemas = [
+  webhookDispatchExternalJobRequestSchema,
+  webhookRedeliverExternalJobRequestSchema,
+] as const;
 
-export type ExternalJobRequest = TestNoopExternalJobRequest;
+/**
+ * The externally accepted job schema. Production environments accept exactly the two webhook
+ * job types (THOTH-061); test runs additionally accept `test.noop`.
+ */
+export const ExternalJobRequestSchema: z.ZodType<ExternalJobRequest> = isTestEnvironment()
+  ? z.discriminatedUnion('type', [...productionExternalJobSchemas, TestNoopExternalJobRequestSchema])
+  : z.discriminatedUnion('type', productionExternalJobSchemas);
+
+export type ExternalJobRequest =
+  | TestNoopExternalJobRequest
+  | WebhookDispatchExternalJobRequest
+  | WebhookRedeliverExternalJobRequest;
+

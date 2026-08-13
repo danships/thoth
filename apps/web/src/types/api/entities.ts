@@ -138,7 +138,9 @@ export type WebhookApi = z.infer<typeof webhookSchema>;
 
 // API-facing representation of a delivery-attempt history row: never includes the stored
 // `payload` (kept internal for verbatim resend) or the `webhookId`/`appId` FKs (implied by the
-// route path).
+// route path). `status` now spans the in-flight (`pending`/`retrying`) and terminal
+// (`success`/`failed`/`cancelled`) lifecycle (THOTH-061); `lastAttemptAt` is nullable (a fresh
+// `pending` row has made no attempt yet); `nextAttemptAt`/`completedAt` are new.
 export const webhookDeliverySchema = webhookDeliverySchemaEntity
   .pick({
     id: true,
@@ -150,6 +152,8 @@ export const webhookDeliverySchema = webhookDeliverySchemaEntity
     attempts: true,
     createdAt: true,
     lastAttemptAt: true,
+    nextAttemptAt: true,
+    completedAt: true,
   })
   .meta({ id: 'WebhookDelivery' });
 export type WebhookDeliveryApi = z.infer<typeof webhookDeliverySchema>;

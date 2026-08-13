@@ -9,6 +9,7 @@ import { backfillMemberAccess } from './member-access-backfill';
 import { backfillContainerSortOrder } from './container-sort-order-backfill';import { backfillPlatformUsers } from './platform-user-backfill';
 import { backfillWorkspaceQuotaSettings } from './workspace-quota-settings-backfill';
 import { backfillUploadedFileBillingUser } from './uploaded-file-billing-user-backfill';
+import { backfillWebhookDeliveryStatus } from './webhook-delivery-status-backfill';
 
 export const migrations: Migration[] = [
   {
@@ -102,6 +103,14 @@ export const migrations: Migration[] = [
     name: 'uploaded-file-billing-user-backfill',
     run: async (superSave: SuperSave) => {
       await backfillUploadedFileBillingUser(superSave);
+    },
+  },
+  {
+    // THOTH-061: normalizes pre-existing `webhook-delivery` rows onto the expanded
+    // pending/retrying/success/failed/cancelled lifecycle (sourceJobId/nextAttemptAt/completedAt).
+    name: 'webhook-delivery-status-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillWebhookDeliveryStatus(superSave);
     },
   },
 ];

@@ -3,6 +3,7 @@ import { getEnvironment, resetEnvironmentCacheForTests } from './environment';
 
 const REQUIRED_BASE_ENV = {
   NODE_ENV: 'test',
+  DB: 'sqlite://:memory:',
 };
 
 const NUMERIC_KEYS = [

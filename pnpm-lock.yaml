@@ -67,6 +67,9 @@ importers:
 
   apps/jobs:
     dependencies:
+      '@thoth/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@thoth/job-protocol':
         specifier: workspace:*
         version: link:../../packages/job-protocol
@@ -313,6 +316,9 @@ importers:
 
   packages/job-protocol:
     dependencies:
+      '@thoth/database':
+        specifier: workspace:*
+        version: link:../database
       zod:
         specifier: ^4.4.3
         version: 4.4.3
