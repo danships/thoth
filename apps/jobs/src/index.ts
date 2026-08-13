@@ -98,13 +98,21 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  try {
-    await main();
-  } catch (error: unknown) {
-    console.error('Fatal error starting @thoth/jobs', error);
-    process.exit(1);
-  }
+// Deliberately unconditional (no `import.meta.url === file://${process.argv[1]}` / `require.main
+// === module` style guard): this file is only ever run as this process's own entrypoint — direct
+// `node`/`tsx` invocation, or spawned as a standalone child process by
+// `index.integration.test.ts` — never `import`ed by another module for its side effects. A
+// same-module-URL guard like that is also unsound under `pm2-runtime` fork mode specifically:
+// PM2 spawns apps by launching *its own* `ProcessContainerFork.js` as the process entrypoint and
+// then dynamically imports the target script from inside it, so `process.argv[1]` there is
+// PM2's own internal file, not this one — the guard would evaluate to `false` and silently skip
+// `main()` entirely (no socket bind, no readiness signal) while `wait_ready`/`listen_timeout`
+// still let PM2 mark the app "online" once the timeout elapses.
+try {
+  await main();
+} catch (error: unknown) {
+  console.error('Fatal error starting @thoth/jobs', error);
+  process.exit(1);
 }
 
 export { main };
