@@ -1,5 +1,4 @@
-import { getPageRevisionRepository } from '../repositories.js';
-import type { PageRevision } from '../types.js';
+import { getPageRevisionRepository, type PageRevision } from '@thoth/database';
 
 /**
  * Stable `createdAt`-based cursor pagination over `page-revision` rows (THOTH-062). Used by the

@@ -1,4 +1,4 @@
-import { fetchPageRevisionScanBatch } from '@thoth/database';
+import { fetchPageRevisionScanBatch } from './scan-query.js';
 import {
   historyScanPayloadV1Schema,
   historyMaintainDedupeKey,

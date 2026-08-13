@@ -1,5 +1,9 @@
-import { CONSOLIDATION_AGE_MS } from './constants.js';
-import type { PageRevisionKind } from '../schemas/entities/page-revision.js';
+import type { PageRevisionKind } from '@thoth/database/types';
+
+// Contiguous runs of `patch` rows between two baselines that are entirely older than this are
+// eligible for consolidation into a single `consolidated` snapshot. Job-only (THOTH-062): the
+// synchronous save path (`@thoth/database`'s `revision-service`) never consolidates.
+export const CONSOLIDATION_AGE_MS = 24 * 60 * 60 * 1000;
 
 export type ConsolidationCandidateRevision = {
   id: string;

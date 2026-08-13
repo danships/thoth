@@ -7,7 +7,7 @@ const { fetchPageRevisionScanBatchMock } = vi.hoisted(() => ({
   fetchPageRevisionScanBatchMock: vi.fn(),
 }));
 
-vi.mock('@thoth/database', async (importOriginal) => {
+vi.mock('./scan-query.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, fetchPageRevisionScanBatch: fetchPageRevisionScanBatchMock };
 });

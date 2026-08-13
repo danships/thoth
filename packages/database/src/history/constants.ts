@@ -13,10 +13,6 @@ export const COALESCE_WINDOW_MS = 5 * 60_000;
 // forward-replay cost to at most this many patches regardless of total history length.
 export const SNAPSHOT_INTERVAL = 20;
 
-// Contiguous runs of `patch` rows between two baselines that are entirely older than this are
-// eligible for consolidation into a single `consolidated` snapshot.
-export const CONSOLIDATION_AGE_MS = 24 * 60 * 60 * 1000;
-
 // Hard cap on the number of revisions retained per (containerId, target) stream.
 export const MAX_REVISIONS = 500;
 

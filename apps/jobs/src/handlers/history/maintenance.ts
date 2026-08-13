@@ -2,13 +2,12 @@ import {
   getContainerRepository,
   getPageRevisionRepository,
   reconstructAt,
-  selectAllConsolidationRuns,
   COALESCE_WINDOW_MS,
   MAX_REVISIONS,
   type PageRevision,
   type ContentRevisionLike,
-  type ConsolidationCandidateRevision,
 } from '@thoth/database';
+import { selectAllConsolidationRuns, type ConsolidationCandidateRevision } from './consolidate.js';
 
 /**
  * Scheduled page-history maintenance (THOTH-062): consolidation of sealed, aged-out `patch` runs

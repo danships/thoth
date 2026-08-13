@@ -1,8 +1,11 @@
 import { describe, test, expect, beforeAll, afterAll } from 'vitest';
-import { makePatch } from './delta.js';
-import { reconstructAt, type ContentRevisionLike } from './reconstruct.js';
-import { selectConsolidationRun, selectAllConsolidationRuns, type ConsolidationCandidateRevision } from './consolidate.js';
-import { CONSOLIDATION_AGE_MS } from './constants.js';
+import { makePatch, reconstructAt, type ContentRevisionLike } from '@thoth/database';
+import {
+  selectConsolidationRun,
+  selectAllConsolidationRuns,
+  CONSOLIDATION_AGE_MS,
+  type ConsolidationCandidateRevision,
+} from './consolidate.js';
 
 describe('consolidate', () => {
   let now = new Date(0);
