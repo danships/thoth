@@ -65,6 +65,23 @@ export type {
   WebhookActor,
 } from './webhook-job.js';
 
+export {
+  maintenancePurgeWorkspacesPayloadV1Schema,
+  maintenancePurgePagesPayloadV1Schema,
+  maintenancePurgeFilesPayloadV1Schema,
+  maintenancePruneJobsPayloadV1Schema,
+  maintenancePurgeWorkspacesDedupeKey,
+  maintenancePurgePagesDedupeKey,
+  maintenancePurgeFilesDedupeKey,
+  maintenancePruneJobsDedupeKey,
+} from './maintenance-job.js';
+export type {
+  MaintenancePurgeWorkspacesPayloadV1,
+  MaintenancePurgePagesPayloadV1,
+  MaintenancePurgeFilesPayloadV1,
+  MaintenancePruneJobsPayloadV1,
+} from './maintenance-job.js';
+
 export { RetryableJobError } from './registry.js';
 export type {
   JobStatus,

@@ -253,5 +253,20 @@ export class Runner {
       durationMs: this.clock().getTime() - startedAt.getTime(),
       summary,
     });
+
+    // Dedicated error-level alert the first (and, by the queue's state machine, only) time a
+    // job reaches `dead` — `completed -> dead`/`dead -> dead` transitions don't exist
+    // (`LEGAL_TRANSITIONS` in `queue-service.ts`), so this can never fire twice for the same job
+    // record, and a restart/rescan of an already-`dead` row (e.g. by `maintenance.prune-jobs`)
+    // never repeats it.
+    if (status === 'dead') {
+      this.logger.error('job.dead', {
+        jobId: record.id,
+        type: record.type,
+        attempts: record.attempts,
+        maxAttempts: record.maxAttempts,
+        summary,
+      });
+    }
   }
 }

@@ -111,6 +111,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/database/node_modules ./
 COPY --from=builder --chown=nextjs:nodejs /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder --chown=nextjs:nodejs /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=builder --chown=nextjs:nodejs /app/packages/shared/node_modules ./packages/shared/node_modules
+# `@thoth/storage`'s compiled output — `@thoth/jobs` (see apps/jobs/src/storage-context.ts,
+# THOTH-063) imports this package directly for maintenance jobs, so it must be present at
+# runtime alongside the other workspace packages traced above.
+COPY --from=builder --chown=nextjs:nodejs /app/packages/storage/dist ./packages/storage/dist
+COPY --from=builder --chown=nextjs:nodejs /app/packages/storage/package.json ./packages/storage/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/packages/storage/node_modules ./packages/storage/node_modules
 # `@thoth/job-protocol`'s compiled output — required both by `@thoth/jobs` (via its own
 # `node_modules/@thoth/job-protocol` workspace symlink, copied below) and by the health check
 # code traced into the web standalone bundle above.

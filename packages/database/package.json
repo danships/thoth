@@ -25,6 +25,10 @@
       "types": "./dist/utils/slug.d.ts",
       "default": "./dist/utils/slug.js"
     },
+    "./maintenance": {
+      "types": "./dist/services/maintenance/index.d.ts",
+      "default": "./dist/services/maintenance/index.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

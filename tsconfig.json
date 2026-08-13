@@ -12,6 +12,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "types": ["node"],
     "paths": {
       "@/*": ["./apps/web/src/*"],
       "@lib/*": ["./apps/web/src/lib/*"],

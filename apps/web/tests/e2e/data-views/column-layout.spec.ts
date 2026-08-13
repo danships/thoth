@@ -81,6 +81,12 @@ test.describe('Data View column layout', () => {
   });
 
   test('keyboard reorder: focus a handle, move with arrow keys, and drop', async ({ page }) => {
+    // The retry loop below uses `toPass({ timeout: 30_000 })`, which shares the same window as
+    // the suite's default 30s test timeout (see playwright.config.ts). Without extra headroom,
+    // the *test's own* timeout fires before `toPass` gets to actually retry the pick-up/move/drop
+    // sequence, surfacing as a hard "Test timeout of 30000ms exceeded" on every attempt instead of
+    // a genuine assertion failure. Give this test enough time for the full retry budget to run.
+    test.setTimeout(60_000);
     await openColumnLayoutView(page);
 
     const alphaHandle = page.getByTestId(`column-drag-handle-${SEED.columnLayout.dataSource.columns[0]!.id}`);

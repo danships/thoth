@@ -78,6 +78,14 @@ connection string works for a single-SQLite-file deployment):
 | `JOB_SCHEDULER_TICK_MS` | No | `5000` | How often the scheduler ticks to ensure the current interval bucket has been enqueued. |
 | `WEBHOOK_DELIVERY_TIMEOUT_MS` | No | `5000` | Per-attempt network timeout (ms) for outbound webhook delivery fetches (THOTH-061). |
 | `WEBHOOK_DELIVERY_BACKOFF_BASE_MS` | No | `500` | Base delay (ms) for full-jitter exponential backoff between webhook delivery retry attempts (THOTH-061). |
+| `STORAGE_TYPE` | No | `local` | File-storage backend used by the `maintenance.purge-files` job (THOTH-063). Must match `apps/web`'s `STORAGE_TYPE` in any real deployment — both processes act on the same uploaded-file bytes. |
+| `STORAGE_LOCAL_FOLDER` | No | `data/uploads` | Local storage folder used by `maintenance.purge-files`. Must match `apps/web`'s `STORAGE_LOCAL_FOLDER`. |
+| `WORKSPACE_DELETE_GRACE_PERIOD_DAYS` | No | `30` | Grace period read by the scheduled `maintenance.purge-workspaces` job and by `pnpm workspaces:purge`. Must match `apps/web`'s value of the same name. |
+| `PAGE_DELETE_GRACE_PERIOD_DAYS` | No | `30` | Grace period read by the scheduled `maintenance.purge-pages` job and by `pnpm pages:purge`. Must match `apps/web`'s value of the same name. |
+| `FILES_PURGE_GRACE_PERIOD_HOURS` | No | `24` | Grace period read by the scheduled `maintenance.purge-files` job and by `pnpm files:purge`. Must match `apps/web`'s value of the same name. |
+| `MAINTENANCE_PURGE_BATCH_SIZE` | No | `100` | Bounded item count per maintenance handler execution/continuation step (all three purge jobs and their CLI wrappers). |
+| `JOB_COMPLETED_RETENTION_DAYS` | No | `7` | Days a `completed` in-memory job record is retained before `maintenance.prune-jobs` removes it from the queue. |
+| `JOB_DEAD_RETENTION_DAYS` | No | `30` | Days a `dead` in-memory job record is retained before `maintenance.prune-jobs` removes it from the queue — long enough to diagnose a failure before evidence disappears. |
 
 A local MySQL database can be started with Docker Compose:
 
@@ -182,6 +190,11 @@ Run these from the repository root:
 - [Notion → Thoth import script](scripts/notion-import/README.md) — a standalone CLI that syncs
   content from a Notion workspace into a Thoth workspace over the public `/api/v1/*` API. See its
   own README for setup, configuration, and usage.
+- `pnpm workspaces:purge` / `pnpm pages:purge` / `pnpm files:purge` — manual maintenance CLIs
+  (`scripts/purge-deleted-{workspaces,pages,files}.ts`). See
+  [`docs/JOBS_AND_MAINTENANCE.md`](docs/JOBS_AND_MAINTENANCE.md) for the full operations
+  reference: what each command does, its relationship to the scheduled `@thoth/jobs` maintenance
+  handlers, migration ownership, and dead-job diagnosis.
 
 ### Testing
 

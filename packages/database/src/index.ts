@@ -29,6 +29,10 @@ export {
 // Migrations (exposed for the CLI and tests)
 export { migrations, backfillContainerSortOrder } from './migrations/index.js';
 
+// Auth-free maintenance/purge primitives (THOTH-063) — also available via the curated
+// `@thoth/database/maintenance` subpath for consumers that only need this surface.
+export * as maintenance from './services/maintenance/index.js';
+
 // Query helpers (THOTH-042: `addWorkspaceIdToQuery` gates CONTENT; `addUserIdToQuery` is
 // reserved for per-user state such as `ContainerAccess`)
 export { addUserIdToQuery, addWorkspaceIdToQuery } from './helpers.js';
