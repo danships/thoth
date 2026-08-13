@@ -1,4 +1,4 @@
-import { maintainPageHistory } from '@thoth/database';
+import { maintainPageHistory } from './maintenance.js';
 import {
   historyMaintainPayloadV1Schema,
   historyMaintainDedupeKey,
@@ -26,7 +26,7 @@ export type HistoryMaintainResult = {
 };
 
 /**
- * `history.maintain` — thin orchestrator around `@thoth/database`'s `maintainPageHistory`
+ * `history.maintain` — thin orchestrator around this package's own `maintainPageHistory`
  * (THOTH-062). Runs at most one bounded maintenance pass per invocation; if more sealed runs or
  * excess rows remain, enqueues a same-dedupe-key continuation so a huge single page's history
  * never monopolises a worker slot across one execution. A `stale` outcome (a save landed

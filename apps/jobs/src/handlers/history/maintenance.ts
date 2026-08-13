@@ -1,8 +1,14 @@
-import { getContainerRepository, getPageRevisionRepository } from '../repositories.js';
-import type { PageRevision } from '../types.js';
-import { reconstructAt, type ContentRevisionLike } from './reconstruct.js';
-import { selectAllConsolidationRuns, type ConsolidationCandidateRevision } from './consolidate.js';
-import { COALESCE_WINDOW_MS, MAX_REVISIONS } from './constants.js';
+import {
+  getContainerRepository,
+  getPageRevisionRepository,
+  reconstructAt,
+  selectAllConsolidationRuns,
+  COALESCE_WINDOW_MS,
+  MAX_REVISIONS,
+  type PageRevision,
+  type ContentRevisionLike,
+  type ConsolidationCandidateRevision,
+} from '@thoth/database';
 
 /**
  * Scheduled page-history maintenance (THOTH-062): consolidation of sealed, aged-out `patch` runs

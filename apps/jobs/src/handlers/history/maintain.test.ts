@@ -7,7 +7,7 @@ const { maintainPageHistoryMock } = vi.hoisted(() => ({
   maintainPageHistoryMock: vi.fn(),
 }));
 
-vi.mock('@thoth/database', async (importOriginal) => {
+vi.mock('./maintenance.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, maintainPageHistory: maintainPageHistoryMock };
 });

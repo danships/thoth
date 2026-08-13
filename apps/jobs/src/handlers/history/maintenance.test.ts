@@ -2,14 +2,19 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
-import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from '../context.js';
-import { getContainerRepository, getPageRevisionRepository } from '../repositories.js';
-import type { PageContainer } from '../types.js';
-import type { PageRevisionKind } from '../schemas/entities/page-revision.js';
+import {
+  createDatabaseContext,
+  setDatabaseContext,
+  resetDatabaseContext,
+  getContainerRepository,
+  getPageRevisionRepository,
+  reconstructAt,
+  makePatch,
+  COALESCE_WINDOW_MS,
+  MAX_REVISIONS,
+} from '@thoth/database';
+import type { PageContainer, PageRevisionKind } from '@thoth/database/types';
 import { maintainPageHistory } from './maintenance.js';
-import { reconstructAt } from './reconstruct.js';
-import { makePatch } from './delta.js';
-import { COALESCE_WINDOW_MS, MAX_REVISIONS } from './constants.js';
 
 const WORKSPACE_ID = 'workspace-1';
 
