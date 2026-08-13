@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { JobDisposition, JobCoalescePolicy } from '@thoth/job-protocol';
+import { z } from 'zod';
 import { QueueStore } from './queue-store.js';
 import type { JobRecord } from './types.js';
 
@@ -33,6 +34,19 @@ function assertLegalTransition(from: JobRecord['status'], to: JobRecord['status'
     throw new Error(`Illegal job status transition: ${from} -> ${to}`);
   }
 }
+
+/**
+ * Validates `pruneTerminalByPolicy` options before they're used in age comparisons and
+ * `Array.prototype.slice` bounds — a malformed/negative value there could select the wrong
+ * records for deletion. Retention values must be finite and non-negative; `limit`/`offset` must
+ * be non-negative integers.
+ */
+const pruneTerminalByPolicyOptionsSchema = z.object({
+  completedMaxAgeMs: z.number().finite().nonnegative(),
+  deadMaxAgeMs: z.number().finite().nonnegative(),
+  limit: z.number().int().nonnegative(),
+  offset: z.number().int().nonnegative(),
+});
 
 /**
  * Owns all policy/state validation for the in-memory queue (THOTH-059). Only the transitions
@@ -159,7 +173,8 @@ export class QueueService {
     options: { completedMaxAgeMs: number; deadMaxAgeMs: number; limit: number; offset: number },
     now: Date = new Date()
   ): Promise<{ ids: string[]; totalEligible: number }> {
-    return this.serialize(() => this.store.pruneTerminalByPolicy(now, options));
+    const validated = pruneTerminalByPolicyOptionsSchema.parse(options);
+    return this.serialize(() => this.store.pruneTerminalByPolicy(now, validated));
   }
 
   public async hasActiveOfType(type: string): Promise<boolean> {

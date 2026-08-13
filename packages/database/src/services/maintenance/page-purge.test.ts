@@ -165,5 +165,68 @@ describe('page-purge', () => {
       expect(outcome.status).toBe('purged');
       expect(await dataViewRepository.getOneByQuery(dataViewRepository.createQuery().eq('id', view.id))).toBeFalsy();
     });
+
+    test('deletes data-views cascaded from a container root (regression: entity-type gating bug)', async () => {
+      // A container root whose cascaded views (deletedRootId === root.id) must be purged too —
+      // previously the cascaded-data-view query was only run when the root *itself* was a
+      // DataView, silently leaving these rows behind forever.
+      const root = await createPage({ deletedAt: OLD_ISO, lastUpdated: OLD_ISO });
+      await containerRepository.update({ ...root, deletedRootId: root.id });
+
+      const cascadedView = await createDataView({ deletedAt: OLD_ISO, deletedRootId: root.id });
+      await dataViewRepository.update({ ...cascadedView, lastUpdated: OLD_ISO });
+
+      const outcome = await permanentlyDeleteDeletedRoot(root.id, workspaceId, graceThresholdMs);
+      expect(outcome.status).toBe('purged');
+      if (outcome.status !== 'purged') {
+        throw new Error('expected purged');
+      }
+      expect(outcome.deletedViewIds).toEqual([cascadedView.id]);
+      expect(
+        await dataViewRepository.getOneByQuery(dataViewRepository.createQuery().eq('id', cascadedView.id))
+      ).toBeFalsy();
+    });
+
+    test('preserves ContainerAccess for a container that survives the purge race', async () => {
+      // A container whose `deletedAt` gets cleared (restored) between candidate selection and
+      // the per-container delete loop must keep its ContainerAccess row — deleting access rows
+      // eagerly for every candidate up front (before the per-container re-check) would destroy
+      // state for a container that in fact survives.
+      const root = await createPage({ deletedAt: OLD_ISO, lastUpdated: OLD_ISO });
+      await containerRepository.update({ ...root, deletedRootId: root.id });
+
+      const survivor = await createPage({
+        parentId: root.id,
+        deletedAt: OLD_ISO,
+        lastUpdated: OLD_ISO,
+        deletedRootId: root.id,
+      });
+      await containerAccessRepository.create({
+        containerId: survivor.id,
+        parentId: null,
+        workspaceId,
+        userId: 'user-d',
+        lastAccessedAt: OLD_ISO,
+        starred: true,
+        starredAt: OLD_ISO,
+        createdAt: OLD_ISO,
+      } as Parameters<typeof containerAccessRepository.create>[0]);
+
+      // Simulate a concurrent restore of `survivor` right before the delete loop runs by
+      // clearing its `deletedAt` immediately after candidate collection would have happened.
+      await containerRepository.update({ ...survivor, deletedAt: null, deletedRootId: null });
+
+      const outcome = await permanentlyDeleteDeletedRoot(root.id, workspaceId, graceThresholdMs);
+      expect(outcome.status).toBe('purged');
+      if (outcome.status !== 'purged') {
+        throw new Error('expected purged');
+      }
+      expect(outcome.deletedContainerIds).toEqual([root.id]);
+
+      const survivorAccessRows = await containerAccessRepository.getByQuery(
+        containerAccessRepository.createQuery().eq('containerId', survivor.id)
+      );
+      expect(survivorAccessRows).toHaveLength(1);
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import * as entities from '../../entities/index.js';
-import { WORKSPACE_CASCADE_ENTITY_NAMES } from './workspace-cascade.js';
+import { WORKSPACE_CASCADE_ENTITY_NAMES, chunk, IN_QUERY_CHUNK_SIZE } from './workspace-cascade.js';
 
 /**
  * Every entity whose schema embeds `withWorkspaceIdSchema` (a `workspaceId` field) is,
@@ -78,5 +78,27 @@ describe('workspace-cascade entity inventory', () => {
 
   test('the workspace row is deleted last', () => {
     expect(WORKSPACE_CASCADE_ENTITY_NAMES.at(-1)).toBe(entities.WORKSPACE_NAME);
+  });
+});
+
+describe('chunk (SQLite IN-query variable-limit safety)', () => {
+  test('splits a large id list into fixed-size batches', () => {
+    const ids = Array.from({ length: 1201 }, (_, index) => `id-${index}`);
+    const chunks = chunk(ids, IN_QUERY_CHUNK_SIZE);
+
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0]).toHaveLength(IN_QUERY_CHUNK_SIZE);
+    expect(chunks[1]).toHaveLength(IN_QUERY_CHUNK_SIZE);
+    expect(chunks[2]).toHaveLength(1201 - 2 * IN_QUERY_CHUNK_SIZE);
+    expect(chunks.flat()).toEqual(ids);
+  });
+
+  test('returns no batches for an empty list', () => {
+    expect(chunk([], IN_QUERY_CHUNK_SIZE)).toEqual([]);
+  });
+
+  test('returns a single batch when under the size limit', () => {
+    const ids = ['a', 'b', 'c'];
+    expect(chunk(ids, IN_QUERY_CHUNK_SIZE)).toEqual([ids]);
   });
 });

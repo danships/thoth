@@ -3,6 +3,7 @@ import { getLogger } from './logger.js';
 import { resolveJobSocketPath } from './socket/socket-path.js';
 import { QueueService } from './queue/queue-service.js';
 import { setQueueService } from './queue/queue-context.js';
+import { resolveHygieneSweepMaxAgeMs } from './queue/queue-store.js';
 import { createJobRegistry } from './handlers/index.js';
 import { Runner } from './runner/runner.js';
 import { Scheduler, type ScheduleDefinition } from './scheduler/scheduler.js';
@@ -111,9 +112,19 @@ async function main(): Promise<void> {
     wake: () => runner.wake(),
   });
 
+  // The always-on hygiene sweep must never undercut `maintenance.prune-jobs`' longer,
+  // operator-facing retention policy (THOTH-063) — see `resolveHygieneSweepMaxAgeMs`. Without
+  // this, the default 15-minute `JOB_RETENTION_MS` would evict every terminal record long before
+  // the 7-day/30-day `JOB_COMPLETED_RETENTION_DAYS`/`JOB_DEAD_RETENTION_DAYS` policy ever applies.
+  const hygieneSweepMaxAgeMs = resolveHygieneSweepMaxAgeMs({
+    hygieneMaxAgeMs: environment.JOB_RETENTION_MS,
+    completedMaxAgeMs: environment.JOB_COMPLETED_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+    deadMaxAgeMs: environment.JOB_DEAD_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  });
+
   const retentionInterval = setInterval(
     () => {
-      void queueService.sweepRetention(environment.JOB_RETENTION_MS, environment.JOB_RETENTION_MAX).then((evicted) => {
+      void queueService.sweepRetention(hygieneSweepMaxAgeMs, environment.JOB_RETENTION_MAX).then((evicted) => {
         if (evicted.length > 0) {
           logger.info('job.retention.evicted', { count: evicted.length });
         }

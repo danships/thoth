@@ -40,19 +40,27 @@ async function purgeDeletedWorkspaces(): Promise<string> {
   let offset = 0;
 
   // Bounded loop, mirroring the scheduled job's continuation contract: each iteration processes
-  // one `batchSize`-sized page, advances `offset` by however many candidates were seen, and stops
-  // once `offset` reaches the (re-scanned each iteration) total eligible count.
+  // one `batchSize`-sized page. A `purged` workspace is hard-deleted and so leaves the eligible
+  // set on the next iteration's re-scan — the offset must not advance past it, since candidates
+  // that followed it in this page shift down to fill its place. Only a `skipped` (restored/raced)
+  // candidate stays at its original position, so `offset` advances by that count only. The loop
+  // stops once a page comes back smaller than `batchSize`, meaning the eligible set (as of that
+  // scan) has been exhausted.
   for (;;) {
     const batch = await maintenance.selectPurgeableWorkspaces({ graceThresholdMs, nowMs, limit: batchSize, offset });
     if (batch.candidates.length === 0) {
       break;
     }
 
+    let skippedInBatch = 0;
     for (const candidate of batch.candidates as Workspace[]) {
       const outcome = await maintenance.purgeWorkspace(candidate.id, graceThresholdMs, {
         deleteStorageBytes: (storageKey) => storageAdapter.delete(storageKey),
-        onStorageDeleteError: (fileId, storageKey) => {
-          console.error(`Failed to delete storage bytes for file ${fileId} (${storageKey}) during workspace purge`);
+        onStorageDeleteError: (fileId, storageKey, error) => {
+          console.error(
+            `Failed to delete storage bytes for file ${fileId} (${storageKey}) during workspace purge:`,
+            error
+          );
         },
       });
 
@@ -61,11 +69,12 @@ async function purgeDeletedWorkspaces(): Promise<string> {
         console.log(`Purged workspace ${candidate.id} (${candidate.name})`);
       } else {
         skippedCount += 1;
+        skippedInBatch += 1;
       }
     }
 
-    offset += batch.candidates.length;
-    if (offset >= batch.totalEligible) {
+    offset += skippedInBatch;
+    if (batch.candidates.length < batchSize) {
       break;
     }
   }

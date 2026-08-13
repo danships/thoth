@@ -33,12 +33,16 @@ async function purgeDeletedPages(): Promise<string> {
   let skippedCount = 0;
   let offset = 0;
 
+  // See the identical comment in `purge-deleted-workspaces.ts` — the offset only advances by
+  // `skipped` candidates (purged ones leave the eligible set), and the loop stops once a page
+  // comes back smaller than `batchSize`.
   for (;;) {
     const batch = await maintenance.selectPurgeableDeletedRoots({ graceThresholdMs, nowMs, limit: batchSize, offset });
     if (batch.candidates.length === 0) {
       break;
     }
 
+    let skippedInBatch = 0;
     for (const candidate of batch.candidates) {
       const outcome = await maintenance.permanentlyDeleteDeletedRoot(
         candidate.id,
@@ -53,11 +57,12 @@ async function purgeDeletedPages(): Promise<string> {
         );
       } else {
         skippedCount += 1;
+        skippedInBatch += 1;
       }
     }
 
-    offset += batch.candidates.length;
-    if (offset >= batch.totalEligible) {
+    offset += skippedInBatch;
+    if (batch.candidates.length < batchSize) {
       break;
     }
   }

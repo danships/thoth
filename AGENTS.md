@@ -44,12 +44,17 @@ docs/                         # Operator-facing docs (JOBS_AND_MAINTENANCE.md, R
 
 ## Maintenance ownership & scoping (THOTH-063)
 
-- Destructive maintenance (permanently purging soft-deleted workspaces/pages/data-views, orphaned
-  uploaded files, and terminal job-queue rows) has exactly **one** implementation per operation,
-  in `packages/database/src/services/maintenance/`. Both the scheduled `@thoth/jobs` handlers
-  (`apps/jobs/src/handlers/maintenance/`) and the manual `pnpm {workspaces,pages,files}:purge` CLI
-  wrappers (`scripts/purge-*.ts`) call these same primitives — never duplicate purge logic in a
+- Destructive maintenance of persisted content (permanently purging soft-deleted
+  workspaces/pages/data-views and orphaned uploaded files) has exactly **one** implementation per
+  operation, in `packages/database/src/services/maintenance/`. Both the scheduled `@thoth/jobs`
+  handlers (`apps/jobs/src/handlers/maintenance/`) and the manual `pnpm {workspaces,pages,files}:purge`
+  CLI wrappers (`scripts/purge-*.ts`) call these same primitives — never duplicate purge logic in a
   handler or a script.
+- Terminal job-queue rows are a different case: `@thoth/jobs`' queue is fully **in-memory and
+  per-process** (see `apps/jobs/src/queue/queue-store.ts`), not a persisted database table, so
+  `maintenance.prune-jobs` (`apps/jobs/src/handlers/maintenance/prune-jobs.ts`) is owned by the
+  queue service (`apps/jobs/src/queue/queue-service.ts`'s `pruneTerminalByPolicy`), not by
+  `packages/database/src/services/maintenance/`.
 - Content deletion (workspaces, pages, data-views) is always scoped by **workspace/root identity**,
   never by creator `userId` — `userId`/similar attribution fields are metadata, not an access or
   selection gate, matching the content-access rule described in `apps/web/AGENTS.md` and the

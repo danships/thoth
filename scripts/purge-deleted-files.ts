@@ -45,6 +45,10 @@ async function purgeDeletedFiles(): Promise<string> {
   let retryLaterCount = 0;
   let offset = 0;
 
+  // See the identical comment in `purge-deleted-workspaces.ts` — `purged` and `skipped`
+  // (now-in-use) candidates both leave the eligible set on the next iteration's re-scan, so only
+  // `retryLater` (storage delete failed, row deliberately kept) advances the offset. The loop
+  // stops once a page comes back smaller than `batchSize`.
   for (;;) {
     const batch = await maintenance.selectOrphanFileCandidates({
       liveFileIds,
@@ -56,6 +60,7 @@ async function purgeDeletedFiles(): Promise<string> {
       break;
     }
 
+    let retryLaterInBatch = 0;
     for (const candidate of batch.candidates) {
       const outcome = await maintenance.purgeOrphanFile(candidate, (storageKey) => storageAdapter.delete(storageKey));
 
@@ -66,14 +71,15 @@ async function purgeDeletedFiles(): Promise<string> {
         skippedCount += 1;
       } else {
         retryLaterCount += 1;
+        retryLaterInBatch += 1;
         console.error(
           `Failed to delete storage bytes for file ${candidate.id} (${candidate.storageKey}), will retry later`
         );
       }
     }
 
-    offset += batch.candidates.length;
-    if (offset >= batch.totalEligible) {
+    offset += retryLaterInBatch;
+    if (batch.candidates.length < batchSize) {
       break;
     }
   }

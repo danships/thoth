@@ -74,7 +74,7 @@ describe('maintenance.purge-pages handler', () => {
     expect(result).toEqual({ scanned: 2, purged: 2, skipped: 0, hasMoreWork: false });
   });
 
-  test('enqueues a continuation with the advanced offset when more work remains', async () => {
+  test('enqueues a continuation with offset unchanged when the purged candidate leaves the eligible set', async () => {
     selectPurgeableDeletedRootsMock.mockResolvedValue({
       candidates: [{ id: 'root-1', workspaceId: 'ws-1', kind: 'container' }],
       totalEligible: 10,
@@ -91,10 +91,52 @@ describe('maintenance.purge-pages handler', () => {
     expect(context.enqueueChild).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'maintenance.purge-pages',
-        payload: { offset: 4 },
+        payload: { offset: 3 },
         dedupeKey: 'maintenance:purge-pages',
       })
     );
+  });
+
+  test('enqueues a continuation advancing the offset only by skipped candidates, not purged ones', async () => {
+    selectPurgeableDeletedRootsMock.mockResolvedValue({
+      candidates: [
+        { id: 'root-1', workspaceId: 'ws-1', kind: 'container' },
+        { id: 'root-2', workspaceId: 'ws-1', kind: 'data-view' },
+      ],
+      totalEligible: 10,
+    });
+    permanentlyDeleteDeletedRootMock
+      .mockResolvedValueOnce({ status: 'skipped', reason: 'restored-or-missing' })
+      .mockResolvedValueOnce({ status: 'purged', deletedContainerIds: [], deletedViewIds: ['root-2'] });
+
+    const context = makeContext({ offset: 0 });
+    await maintenancePurgePagesJobDefinition.handler(context);
+
+    expect(context.enqueueChild).toHaveBeenCalledWith(expect.objectContaining({ payload: { offset: 1 } }));
+  });
+
+  test('does not treat a fresh, fully-purged batch as reaching the end of a much larger eligible set', async () => {
+    // Regression case: 200 eligible deleted roots, a 100-sized batch fully purged. The next
+    // continuation must still see `hasMoreWork: true` with the offset unchanged (not advanced by
+    // 100, which would incorrectly skip the remaining 100 rows once they shift down to fill the
+    // gap left by this batch).
+    const candidates = Array.from({ length: 100 }, (_, index) => ({
+      id: `root-${index}`,
+      workspaceId: 'ws-1',
+      kind: 'container' as const,
+    }));
+    selectPurgeableDeletedRootsMock.mockResolvedValue({ candidates, totalEligible: 200 });
+    permanentlyDeleteDeletedRootMock.mockResolvedValue({
+      status: 'purged',
+      deletedContainerIds: [],
+      deletedViewIds: [],
+    });
+
+    const context = makeContext({ offset: 0 });
+    const result = (await maintenancePurgePagesJobDefinition.handler(context)) as MaintenancePurgePagesResult;
+
+    expect(result.hasMoreWork).toBe(true);
+    expect(context.enqueueChild).toHaveBeenCalledWith(expect.objectContaining({ payload: { offset: 0 } }));
   });
 
   test('stops before the next candidate once the abort signal fires', async () => {

@@ -73,11 +73,12 @@ export const maintenancePurgePagesJobDefinition: JobDefinition<MaintenancePurgeP
       }
     }
 
-    const processedInThisBatch = purged + skipped;
-    // See the identical comment in `maintenance.purge-workspaces` — the same offset/continuation
-    // contract and rationale applies here.
-    const nextOffset = context.payload.offset + processedInThisBatch;
-    const hasMoreWork = !context.signal.aborted && nextOffset < batch.totalEligible;
+    // See the identical comment in `maintenance.purge-workspaces` for why the offset advances
+    // only by `skipped` (not `purged`) candidates, and why `hasMoreWork` is derived from this
+    // batch's snapshot rather than from `nextOffset` directly.
+    const nextOffset = context.payload.offset + skipped;
+    const hasMoreWork =
+      !context.signal.aborted && context.payload.offset + batch.candidates.length < batch.totalEligible;
 
     if (hasMoreWork) {
       await context.enqueueChild({

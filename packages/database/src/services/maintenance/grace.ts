@@ -10,8 +10,9 @@
 // otherwise past its grace period — protects against a restore (or a fresh upload attach) racing
 // concurrently with a purge scan. SuperSave has no cross-table transaction support, so this is
 // the practical limit of what's achievable without database-level transactions; see
-// `revalidate*ForPurge` below for the immediate-before-delete re-check that narrows the window
-// further.
+// `revalidateWorkspaceForPurge` (`workspace-purge.ts`) and the inline immediate-before-delete
+// re-checks in `permanentlyDeleteDeletedRoot` (`page-purge.ts`) and `purgeOrphanFile`
+// (`file-purge.ts`) for the further narrowing that happens right before a delete.
 export const RACE_SAFETY_MARGIN_MS = 60 * 60 * 1000;
 
 /** True only for a well-formed timestamp at or before `graceThresholdMs` — never for a malformed one. */
@@ -23,7 +24,7 @@ export function isPastGraceThreshold(timestamp: string | null | undefined, grace
   return !Number.isNaN(parsedMs) && parsedMs <= graceThresholdMs;
 }
 
-/** True only for a well-formed timestamp strictly before `nowMs - RACE_SAFETY_MARGIN_MS`. */
+/** True only for a well-formed timestamp at or before `nowMs - RACE_SAFETY_MARGIN_MS`. */
 export function isOutsideRaceSafetyMargin(timestamp: string | null | undefined, nowMs: number): boolean {
   if (!timestamp) {
     return false;

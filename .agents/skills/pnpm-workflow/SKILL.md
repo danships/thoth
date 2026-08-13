@@ -35,7 +35,7 @@ Run all scripts from the repository root (the directory containing `package.json
 | Migrate database | `pnpm db:migrate` | Standalone `@thoth/database` migration CLI — never run automatically by the running app/jobs process |
 | Generate auth schema | `pnpm better-auth:generate` | Regenerate `schema.sql` from auth config |
 | Clear auth | `pnpm scripts:clear-auth` | Dev utility to wipe auth data |
-| Manual maintenance purge | `pnpm workspaces:purge` / `pnpm pages:purge` / `pnpm files:purge` | Thin CLI wrappers over the same `@thoth/database` maintenance primitives the scheduled `@thoth/jobs` handlers use. Require `DB` (and `STORAGE_TYPE`/`STORAGE_LOCAL_FOLDER` for `files:purge`) to already be set — never auto-migrate or guess a default connection string. See `docs/JOBS_AND_MAINTENANCE.md` at the repo root. |
+| Manual maintenance purge | `pnpm workspaces:purge` / `pnpm pages:purge` / `pnpm files:purge` | Thin CLI wrappers over the same `@thoth/database` maintenance primitives the scheduled `@thoth/jobs` handlers use. Require `DB` to already be set — never auto-migrate or guess a default connection string. `files:purge` defaults `STORAGE_TYPE`/`STORAGE_LOCAL_FOLDER` to `local`/`./data/uploads` (same defaults as `apps/web`'s) if unset; set them explicitly for a non-default storage backend. See `docs/JOBS_AND_MAINTENANCE.md` at the repo root. |
 
 ## Quality Gate Workflow
 

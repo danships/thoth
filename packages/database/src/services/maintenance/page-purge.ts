@@ -108,16 +108,18 @@ export async function permanentlyDeleteDeletedRoot(
     return { status: 'skipped', reason: 'restored-or-missing' };
   }
 
-  const cascadedContainers = rootContainer
-    ? await containerRepository.getByQuery(
-        addWorkspaceIdToQuery(containerRepository.createQuery().eq('deletedRootId', rootId), workspaceId)
-      )
-    : [];
-  const cascadedDataViews = rootDataView
-    ? await dataViewRepository.getByQuery(
-        addWorkspaceIdToQuery(dataViewRepository.createQuery().eq('deletedRootId', rootId), workspaceId)
-      )
-    : [];
+  // Queried unconditionally, regardless of the root's own kind: `cascadeSoftDeletePage` assigns
+  // the *root page's* id to every cascaded row's `deletedRootId` — including `DataView` rows
+  // cascaded from a `Container` root, and (symmetrically) any `Container` cascaded from a
+  // `DataView` root. Gating either query on the root's own kind (as the pre-fix version did)
+  // silently skipped the other entity type's cascaded rows forever. Mirrors
+  // `permanentlyDeleteByDeletedRootId` in `apps/web/src/lib/database/soft-delete-service.ts`.
+  const cascadedContainers = await containerRepository.getByQuery(
+    addWorkspaceIdToQuery(containerRepository.createQuery().eq('deletedRootId', rootId), workspaceId)
+  );
+  const cascadedDataViews = await dataViewRepository.getByQuery(
+    addWorkspaceIdToQuery(dataViewRepository.createQuery().eq('deletedRootId', rootId), workspaceId)
+  );
 
   // Defensively require `deletedAt` on every resolved record regardless of what matched above —
   // SuperSave has no transaction support, so a concurrent restore between the fetches above and
@@ -136,15 +138,6 @@ export async function permanentlyDeleteDeletedRoot(
         .map((item) => item.id)
     ),
   ];
-
-  if (deletedContainerIds.length > 0) {
-    const accessRows = await containerAccessRepository.getByQuery(
-      containerAccessRepository.createQuery().in('containerId', deletedContainerIds)
-    );
-    for (const accessRow of accessRows) {
-      await containerAccessRepository.deleteUsingId(accessRow.id);
-    }
-  }
 
   // Re-check `deletedAt` immediately before each delete — the closest available approximation of
   // atomicity absent DB transactions.
@@ -166,6 +159,17 @@ export async function permanentlyDeleteDeletedRoot(
     }
     await containerRepository.deleteUsingId(containerId);
     removedContainerIds.push(containerId);
+
+    // Clean up `ContainerAccess` (starred/last-accessed per-user state) only *after* this
+    // specific container's row is actually gone — deleting it eagerly for every candidate up
+    // front (before the per-container `deletedAt` re-check above) would destroy a restored
+    // container's per-user state even though the container itself survives the race.
+    const accessRows = await containerAccessRepository.getByQuery(
+      containerAccessRepository.createQuery().eq('containerId', containerId)
+    );
+    for (const accessRow of accessRows) {
+      await containerAccessRepository.deleteUsingId(accessRow.id);
+    }
   }
 
   return { status: 'purged', deletedContainerIds: removedContainerIds, deletedViewIds: removedViewIds };

@@ -84,8 +84,8 @@ connection string works for a single-SQLite-file deployment):
 | `PAGE_DELETE_GRACE_PERIOD_DAYS` | No | `30` | Grace period read by the scheduled `maintenance.purge-pages` job and by `pnpm pages:purge`. Must match `apps/web`'s value of the same name. |
 | `FILES_PURGE_GRACE_PERIOD_HOURS` | No | `24` | Grace period read by the scheduled `maintenance.purge-files` job and by `pnpm files:purge`. Must match `apps/web`'s value of the same name. |
 | `MAINTENANCE_PURGE_BATCH_SIZE` | No | `100` | Bounded item count per maintenance handler execution/continuation step (all three purge jobs and their CLI wrappers). |
-| `JOB_COMPLETED_RETENTION_DAYS` | No | `7` | Days a `completed` job row is retained before `maintenance.prune-jobs` deletes it. |
-| `JOB_DEAD_RETENTION_DAYS` | No | `30` | Days a `dead` job row is retained before `maintenance.prune-jobs` deletes it — long enough to diagnose a failure before evidence disappears. |
+| `JOB_COMPLETED_RETENTION_DAYS` | No | `7` | Days a `completed` in-memory job record is retained before `maintenance.prune-jobs` removes it from the queue. |
+| `JOB_DEAD_RETENTION_DAYS` | No | `30` | Days a `dead` in-memory job record is retained before `maintenance.prune-jobs` removes it from the queue — long enough to diagnose a failure before evidence disappears. |
 
 A local MySQL database can be started with Docker Compose:
 

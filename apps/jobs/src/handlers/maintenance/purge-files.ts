@@ -52,6 +52,17 @@ export const maintenancePurgeFilesJobDefinition: JobDefinition<MaintenancePurgeF
     const now = context.now();
     const graceThresholdMs = maintenance.graceThresholdMsFromHours(now.getTime(), environment.FILES_PURGE_GRACE_PERIOD_HOURS);
 
+    if (context.signal.aborted) {
+      return {
+        scanned: 0,
+        purged: 0,
+        skipped: 0,
+        retryLater: 0,
+        danglingUsagesPruned: 0,
+        hasMoreWork: false,
+      };
+    }
+
     const { prunedCount, liveFileIds } = await maintenance.pruneDanglingFileUsages();
 
     const batch = await maintenance.selectOrphanFileCandidates({
@@ -86,13 +97,15 @@ export const maintenancePurgeFilesJobDefinition: JobDefinition<MaintenancePurgeF
       }
     }
 
-    // Files that failed storage deletion (`retryLater`) deliberately still count toward the
-    // offset advance below — the row is left in place, but this run has already attempted (and
-    // logged) it, and the next scheduled occurrence (`offset: 0`) will retry it fresh rather
-    // than this same continuation looping on it immediately.
-    const processedInThisBatch = purged + skipped + retryLater;
-    const nextOffset = context.payload.offset + processedInThisBatch;
-    const hasMoreWork = !context.signal.aborted && nextOffset < batch.totalEligible;
+    // A `purged` file is hard-deleted and a `skipped` (now-in-use) file is no longer orphaned —
+    // both leave the eligible set on the next continuation query. Only `retryLater` (storage
+    // delete failed, DB row deliberately kept) remains at its original position, so only that
+    // count advances the offset. `hasMoreWork` is derived from this batch's snapshot rather than
+    // from `nextOffset` directly, since an all-purged/all-skipped batch would otherwise leave
+    // `nextOffset` unchanged even though more eligible files remain beyond this page.
+    const nextOffset = context.payload.offset + retryLater;
+    const hasMoreWork =
+      !context.signal.aborted && context.payload.offset + batch.candidates.length < batch.totalEligible;
 
     if (hasMoreWork) {
       await context.enqueueChild({

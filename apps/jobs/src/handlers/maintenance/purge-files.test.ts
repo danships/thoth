@@ -120,7 +120,7 @@ describe('maintenance.purge-files handler', () => {
     expect(result.purged).toBe(0);
   });
 
-  test('advances the offset by retryLater + purged + skipped and enqueues a continuation', async () => {
+  test('advances the offset only by retryLater candidates, not purged or skipped ones', async () => {
     selectOrphanFileCandidatesMock.mockResolvedValue({
       candidates: [{ id: 'file-1', storageKey: 'key-1' }],
       totalEligible: 5,
@@ -137,6 +137,53 @@ describe('maintenance.purge-files handler', () => {
         dedupeKey: 'maintenance:purge-files',
       })
     );
+  });
+
+  test('leaves the offset unchanged when the batch is fully purged (purged files leave the eligible set)', async () => {
+    selectOrphanFileCandidatesMock.mockResolvedValue({
+      candidates: [{ id: 'file-1', storageKey: 'key-1' }],
+      totalEligible: 5,
+    });
+    purgeOrphanFileMock.mockResolvedValue({ status: 'purged' });
+
+    const context = makeContext({ offset: 2 });
+    const result = (await maintenancePurgeFilesJobDefinition.handler(context)) as MaintenancePurgeFilesResult;
+
+    expect(result.hasMoreWork).toBe(true);
+    expect(context.enqueueChild).toHaveBeenCalledWith(expect.objectContaining({ payload: { offset: 2 } }));
+  });
+
+  test('leaves the offset unchanged when the batch is fully skipped (now-referenced files leave the eligible set)', async () => {
+    selectOrphanFileCandidatesMock.mockResolvedValue({
+      candidates: [{ id: 'file-1', storageKey: 'key-1' }],
+      totalEligible: 5,
+    });
+    purgeOrphanFileMock.mockResolvedValue({ status: 'skipped', reason: 'now-referenced' });
+
+    const context = makeContext({ offset: 2 });
+    const result = (await maintenancePurgeFilesJobDefinition.handler(context)) as MaintenancePurgeFilesResult;
+
+    expect(result.hasMoreWork).toBe(true);
+    expect(context.enqueueChild).toHaveBeenCalledWith(expect.objectContaining({ payload: { offset: 2 } }));
+  });
+
+  test('returns an empty result and never prunes dangling usages when the signal is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const context = makeContext({ offset: 0 }, { signal: controller.signal });
+    const result = (await maintenancePurgeFilesJobDefinition.handler(context)) as MaintenancePurgeFilesResult;
+
+    expect(pruneDanglingFileUsagesMock).not.toHaveBeenCalled();
+    expect(selectOrphanFileCandidatesMock).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      scanned: 0,
+      purged: 0,
+      skipped: 0,
+      retryLater: 0,
+      danglingUsagesPruned: 0,
+      hasMoreWork: false,
+    });
   });
 
   test('stops before the next candidate once the abort signal fires', async () => {

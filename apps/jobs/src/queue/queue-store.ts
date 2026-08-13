@@ -79,6 +79,12 @@ export class QueueStore {
    * Drops terminal (`completed`/`dead`) records older than `maxAgeMs` or beyond `maxCount`,
    * keeping the most recently completed ones when trimming by count. Never touches
    * `queued`/`running` records.
+   *
+   * Callers (see `resolveHygieneSweepMaxAgeMs` below) must ensure `maxAgeMs` is never shorter
+   * than the operator-configured `JOB_COMPLETED_RETENTION_DAYS`/`JOB_DEAD_RETENTION_DAYS`
+   * horizons `maintenance.prune-jobs` (`pruneTerminalByPolicy` below) applies — otherwise this
+   * always-on hygiene sweep would evict a diagnosable `dead` row (or a `completed` row) long
+   * before that longer, operator-facing policy ever gets a chance to apply to it.
    */
   public sweepRetention(now: Date, maxAgeMs: number, maxCount: number): string[] {
     const evicted: string[] = [];
@@ -125,4 +131,24 @@ export class QueueStore {
 
     return { ids: batch.map((record) => record.id), totalEligible: eligible.length };
   }
+}
+
+/**
+ * Computes the age floor `sweepRetention`'s always-on hygiene sweep must use, given the
+ * configured short hygiene window (`JOB_RETENTION_MS`) and the longer, operator-facing
+ * `maintenance.prune-jobs` retention horizons (`completedMaxAgeMs`/`deadMaxAgeMs`, i.e.
+ * `JOB_COMPLETED_RETENTION_DAYS`/`JOB_DEAD_RETENTION_DAYS` converted to milliseconds).
+ *
+ * `sweepRetention` applies a single age threshold to both `completed` and `dead` records (it
+ * predates the per-status policy), so this returns the *longer* of the two policy horizons —
+ * conservative, but never evicts a record sooner than either policy allows. `JOB_RETENTION_MS`
+ * only takes effect once it exceeds both, letting an operator shrink the hygiene window below
+ * its historical default without ever undercutting the diagnostic retention promise.
+ */
+export function resolveHygieneSweepMaxAgeMs(options: {
+  hygieneMaxAgeMs: number;
+  completedMaxAgeMs: number;
+  deadMaxAgeMs: number;
+}): number {
+  return Math.max(options.hygieneMaxAgeMs, options.completedMaxAgeMs, options.deadMaxAgeMs);
 }

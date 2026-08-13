@@ -78,7 +78,7 @@ describe('maintenance.purge-workspaces handler', () => {
     expect(context.enqueueChild).not.toHaveBeenCalled();
   });
 
-  test('enqueues a continuation with the advanced offset when more work remains', async () => {
+  test('enqueues a continuation with offset unchanged when the whole batch was purged (purged rows leave the eligible set)', async () => {
     selectPurgeableWorkspacesMock.mockResolvedValue({
       candidates: [{ id: 'ws-1' }],
       totalEligible: 5,
@@ -91,10 +91,48 @@ describe('maintenance.purge-workspaces handler', () => {
     expect(context.enqueueChild).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'maintenance.purge-workspaces',
-        payload: { offset: 1 },
+        payload: { offset: 0 },
         dedupeKey: 'maintenance:purge-workspaces',
       })
     );
+  });
+
+  test('enqueues a continuation advancing the offset only by skipped candidates, not purged ones', async () => {
+    selectPurgeableWorkspacesMock.mockResolvedValue({
+      candidates: [{ id: 'ws-1' }, { id: 'ws-2' }, { id: 'ws-3' }],
+      totalEligible: 10,
+    });
+    purgeWorkspaceMock
+      .mockResolvedValueOnce({ status: 'purged', counts: {} })
+      .mockResolvedValueOnce({ status: 'skipped', reason: 'restored' })
+      .mockResolvedValueOnce({ status: 'purged', counts: {} });
+
+    const context = makeContext({ offset: 0 });
+    await maintenancePurgeWorkspacesJobDefinition.handler(context);
+
+    // Only the single skipped candidate remains in the eligible set at its original position —
+    // the two purged ones are gone, so the offset must not skip over unseen rows behind them.
+    expect(context.enqueueChild).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: { offset: 1 },
+      })
+    );
+  });
+
+  test('does not treat a fresh, fully-purged batch as reaching the end of a much larger eligible set', async () => {
+    // Regression case: 200 eligible workspaces, a 100-sized batch fully purged. The next
+    // continuation must still see `hasMoreWork: true` with `offset: 0` (not `offset: 100`,
+    // which would incorrectly skip the remaining 100 rows once they shift down to fill the
+    // gap left by this batch).
+    const candidates = Array.from({ length: 100 }, (_, index) => ({ id: `ws-${index}` }));
+    selectPurgeableWorkspacesMock.mockResolvedValue({ candidates, totalEligible: 200 });
+    purgeWorkspaceMock.mockResolvedValue({ status: 'purged', counts: {} });
+
+    const context = makeContext({ offset: 0 });
+    const result = (await maintenancePurgeWorkspacesJobDefinition.handler(context)) as MaintenancePurgeWorkspacesResult;
+
+    expect(result.hasMoreWork).toBe(true);
+    expect(context.enqueueChild).toHaveBeenCalledWith(expect.objectContaining({ payload: { offset: 0 } }));
   });
 
   test('stops before purging the next candidate once the abort signal fires', async () => {

@@ -84,16 +84,17 @@ export const maintenancePurgeWorkspacesJobDefinition: JobDefinition<MaintenanceP
       }
     }
 
-    const processedInThisBatch = purged + skipped;
-    // `nextOffset` assumes this batch's candidates are gone from the eligible set on the next
-    // continuation query — true for every `purged` one. A `skipped` (revalidation-failed, e.g.
-    // freshly restored) candidate remains eligible and could, in a large-backlog run, be passed
-    // over by this offset advance; it is naturally re-scanned from `offset: 0` on the next
-    // scheduled occurrence, so no candidate is ever permanently missed — only, rarely, deferred
-    // by one interval. Skips are expected to be extremely rare in practice, since every
-    // candidate was already outside the race-safety margin at selection time.
-    const nextOffset = context.payload.offset + processedInThisBatch;
-    const hasMoreWork = !context.signal.aborted && nextOffset < batch.totalEligible;
+    // A `purged` candidate is hard-deleted, so it's gone from the eligible set on the next
+    // continuation query — the offset must NOT advance past it, since every unseen candidate
+    // that followed it in this batch's snapshot shifts down to fill its place. Only a `skipped`
+    // candidate (restored, hard-deleted from under us, or a raced revalidation failure) can
+    // still be present at its original position, so the offset advances only by that count.
+    // `hasMoreWork` is based on this batch's snapshot (`totalEligible`/`candidates.length`)
+    // rather than `nextOffset`, since a fully-purged batch would otherwise leave `nextOffset`
+    // unchanged even though more eligible workspaces remain beyond this page.
+    const nextOffset = context.payload.offset + skipped;
+    const hasMoreWork =
+      !context.signal.aborted && context.payload.offset + batch.candidates.length < batch.totalEligible;
 
     if (hasMoreWork) {
       await context.enqueueChild({

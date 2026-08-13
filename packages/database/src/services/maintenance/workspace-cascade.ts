@@ -17,6 +17,21 @@ import {
 } from '../../repositories.js';
 import * as entities from '../../entities/index.js';
 
+// better-sqlite3 does not chunk `.in(...)` queries internally, and SQLite enforces
+// `SQLITE_LIMIT_VARIABLE_NUMBER` (999 by default on older builds; higher on newer ones, but never
+// guaranteed) on the number of bound parameters per statement. A workspace with a very large
+// number of `App`s or `WorkspaceMember`s could otherwise blow past that limit and fail the whole
+// cascade. Chunk any `.in()` id list to a safe, conservative batch size.
+export const IN_QUERY_CHUNK_SIZE = 500;
+
+export function chunk<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
 /**
  * Ordered inventory of every entity cascade-deleted as part of a workspace purge (THOTH-063).
  *
@@ -121,14 +136,14 @@ export async function cascadeDeleteWorkspace(
   );
   const workspaceMemberIds = workspaceMembers.map((member) => member.id);
   let memberScopedContainers = 0;
-  if (workspaceMemberIds.length > 0) {
+  for (const workspaceMemberIdChunk of chunk(workspaceMemberIds, IN_QUERY_CHUNK_SIZE)) {
     const rows = await memberScopedContainerRepository.getByQuery(
-      memberScopedContainerRepository.createQuery().in('workspaceMemberId', workspaceMemberIds)
+      memberScopedContainerRepository.createQuery().in('workspaceMemberId', workspaceMemberIdChunk)
     );
     for (const row of rows) {
       await memberScopedContainerRepository.deleteUsingId(row.id);
     }
-    memberScopedContainers = rows.length;
+    memberScopedContainers += rows.length;
   }
 
   // app-scoped-container / api-key / webhook-delivery: resolved via this workspace's App ids.
@@ -138,28 +153,28 @@ export async function cascadeDeleteWorkspace(
   let appScopedContainers = 0;
   let apiKeys = 0;
   let webhookDeliveries = 0;
-  if (appIds.length > 0) {
+  for (const appIdChunk of chunk(appIds, IN_QUERY_CHUNK_SIZE)) {
     const appScopedContainerRows = await appScopedContainerRepository.getByQuery(
-      appScopedContainerRepository.createQuery().in('appId', appIds)
+      appScopedContainerRepository.createQuery().in('appId', appIdChunk)
     );
     for (const row of appScopedContainerRows) {
       await appScopedContainerRepository.deleteUsingId(row.id);
     }
-    appScopedContainers = appScopedContainerRows.length;
+    appScopedContainers += appScopedContainerRows.length;
 
-    const apiKeyRows = await apiKeyRepository.getByQuery(apiKeyRepository.createQuery().in('appId', appIds));
+    const apiKeyRows = await apiKeyRepository.getByQuery(apiKeyRepository.createQuery().in('appId', appIdChunk));
     for (const row of apiKeyRows) {
       await apiKeyRepository.deleteUsingId(row.id);
     }
-    apiKeys = apiKeyRows.length;
+    apiKeys += apiKeyRows.length;
 
     const webhookDeliveryRows = await webhookDeliveryRepository.getByQuery(
-      webhookDeliveryRepository.createQuery().in('appId', appIds)
+      webhookDeliveryRepository.createQuery().in('appId', appIdChunk)
     );
     for (const row of webhookDeliveryRows) {
       await webhookDeliveryRepository.deleteUsingId(row.id);
     }
-    webhookDeliveries = webhookDeliveryRows.length;
+    webhookDeliveries += webhookDeliveryRows.length;
   }
 
   // webhook: workspace-scoped directly (denormalised from the parent App).

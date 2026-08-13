@@ -11,7 +11,7 @@
 // environment, matching the THOTH-063 spec. It also never calls `runMigrations()`: schema
 // sync/migration is exclusively the job of `packages/database/src/cli/migrate.ts`, run once
 // before either PM2-managed process starts (see the operations doc,
-// `docs/operations/jobs-and-maintenance.md`). Running one of these commands against a database
+// `docs/JOBS_AND_MAINTENANCE.md`). Running one of these commands against a database
 // that hasn't been migrated yet fails loudly rather than silently targeting an empty schema.
 import 'dotenv/config';
 import { createDatabaseContext, setDatabaseContext } from '@thoth/database';
