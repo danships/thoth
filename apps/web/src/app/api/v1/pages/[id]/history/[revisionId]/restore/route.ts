@@ -5,6 +5,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
+import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
 import { reconstructAt, reconstructValuesAt } from '@thoth/shared';
 import { recordContentRevision, recordValuesRevision } from '@thoth/database';
 import type { PageValue } from '@/types/schemas/entities/container';
@@ -47,6 +48,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
       await recordContentRevision({ page, newContent: restoredContent, author: session.user.id });
 
       scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
+      scheduleNotificationDispatch('page.updated', updatedPage, toWebhookActor(session));
 
       const contentRevisions = await repository.getByQuery(
         repository.createQuery().eq('containerId', params.id).eq('target', 'content').sort('sequence', 'desc').limit(1)
@@ -104,6 +106,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
     }
 
     scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
+    scheduleNotificationDispatch('page.updated', updatedPage, toWebhookActor(session));
 
     const newHeadValuesRevisions = await repository.getByQuery(
       repository.createQuery().eq('containerId', params.id).eq('target', 'values').sort('sequence', 'desc').limit(1)

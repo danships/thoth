@@ -7,6 +7,8 @@ import {
   getDataViewRepository,
   getFileUsageRepository,
   getMemberScopedContainerRepository,
+  getNotificationRepository,
+  getNotificationRuleRepository,
   getPageRevisionRepository,
   getUploadedFileRepository,
   getWebhookDeliveryRepository,
@@ -55,6 +57,8 @@ export const WORKSPACE_CASCADE_ENTITY_NAMES: readonly string[] = [
   entities.API_KEY_NAME,
   entities.WEBHOOK_DELIVERY_NAME,
   entities.WEBHOOK_NAME,
+  entities.NOTIFICATION_NAME,
+  entities.NOTIFICATION_RULE_NAME,
   entities.APP_NAME,
   entities.WORKSPACE_MEMBER_NAME,
   entities.CONTAINER_ACCESS_NAME,
@@ -73,6 +77,8 @@ export type WorkspaceCascadeCounts = {
   apiKeys: number;
   webhookDeliveries: number;
   webhooks: number;
+  notifications: number;
+  notificationRules: number;
   apps: number;
   workspaceMembers: number;
   containerAccess: number;
@@ -118,6 +124,8 @@ export async function cascadeDeleteWorkspace(
   const uploadedFileRepository = await getUploadedFileRepository();
   const webhookRepository = await getWebhookRepository();
   const webhookDeliveryRepository = await getWebhookDeliveryRepository();
+  const notificationRepository = await getNotificationRepository();
+  const notificationRuleRepository = await getNotificationRuleRepository();
   const workspaceMemberRepository = await getWorkspaceMemberRepository();
   const workspaceRepository = await getWorkspaceRepository();
   const workspaceSlugRedirectRepository = await getWorkspaceSlugRedirectRepository();
@@ -181,6 +189,22 @@ export async function cascadeDeleteWorkspace(
   const webhooks = await webhookRepository.getByQuery(webhookRepository.createQuery().eq('workspaceId', workspaceId));
   for (const row of webhooks) {
     await webhookRepository.deleteUsingId(row.id);
+  }
+
+  // notification: workspace-scoped directly.
+  const notifications = await notificationRepository.getByQuery(
+    notificationRepository.createQuery().eq('workspaceId', workspaceId)
+  );
+  for (const row of notifications) {
+    await notificationRepository.deleteUsingId(row.id);
+  }
+
+  // notification-rule: workspace-scoped directly.
+  const notificationRules = await notificationRuleRepository.getByQuery(
+    notificationRuleRepository.createQuery().eq('workspaceId', workspaceId)
+  );
+  for (const row of notificationRules) {
+    await notificationRuleRepository.deleteUsingId(row.id);
   }
 
   // app: workspace-scoped directly.
@@ -259,6 +283,8 @@ export async function cascadeDeleteWorkspace(
     apiKeys,
     webhookDeliveries,
     webhooks: webhooks.length,
+    notifications: notifications.length,
+    notificationRules: notificationRules.length,
     apps: apps.length,
     workspaceMembers: workspaceMembers.length,
     containerAccess: containerAccessRows.length,

@@ -206,3 +206,27 @@ export const platformUserCreateSchema = platformUserSchema.omit({ id: true });
 export type PlatformUser = z.infer<typeof platformUserSchema>;
 export type PlatformUserCreate = z.infer<typeof platformUserCreateSchema>;
 /** End PlatformUser Entity Schema */
+
+/** NotificationRule Entity Schema */
+import { notificationRuleSchema, notificationRuleKindSchema } from './schemas/entities/notification-rule.js';
+export { notificationRuleSchema, notificationRuleKindSchema };
+export type { NotificationRuleKind } from './schemas/entities/notification-rule.js';
+
+export const notificationRuleCreateSchema = notificationRuleSchema.omit({ id: true });
+
+export type NotificationRule = z.infer<typeof notificationRuleSchema>;
+export type NotificationRuleCreate = z.infer<typeof notificationRuleCreateSchema>;
+/** End NotificationRule Entity Schema */
+
+/** Notification Entity Schema */
+import { notificationSchema, notificationDispatchEventSchema } from './schemas/entities/notification.js';
+export { notificationSchema, notificationDispatchEventSchema };
+export type { NotificationDispatchEvent } from './schemas/entities/notification.js';
+export { notificationActorSchema } from './schemas/entities/notification-actor.js';
+export type { NotificationActor } from './schemas/entities/notification-actor.js';
+
+export const notificationCreateSchema = notificationSchema.omit({ id: true });
+
+export type Notification = z.infer<typeof notificationSchema>;
+export type NotificationCreate = z.infer<typeof notificationCreateSchema>;
+/** End Notification Entity Schema */

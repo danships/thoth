@@ -6,6 +6,7 @@ import { modals } from '@mantine/modals';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { SlugAvailabilityIndicator } from '@/components/atoms/slug-availability-indicator';
+import { WorkspaceNotificationSettings } from '@/components/molecules/workspace-notification-settings';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useSlugAvailability } from '@/lib/hooks/api/use-slug-availability';
 import { useStorageUsage } from '@/lib/hooks/api/use-storage-usage';
@@ -157,6 +158,8 @@ export default function WorkspaceSettingsPage() {
           </Text>
         </Stack>
       </Paper>
+
+      <WorkspaceNotificationSettings />
 
       <Paper withBorder p="lg" radius="md">
         <Stack gap="sm">

@@ -22,9 +22,12 @@ loadDotenv({ path: path.resolve(scriptDirectory, '../../.env') });
 
 import type BetterSqlite3 from 'better-sqlite3';
 import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from '@thoth/database/types';
+import type { NotificationCreate, NotificationRuleCreate } from '@thoth/database/types';
 import {
   getContainerRepository,
   getDatabase,
+  getNotificationRepository,
+  getNotificationRuleRepository,
   getWorkspaceMemberRepository,
   getWorkspaceRepository,
 } from '@/lib/database';
@@ -119,6 +122,43 @@ for (const page of samplePages) {
 
   const created = await containerRepository.create(pageData);
   createdPageIdsByName.set(page.name, created.id);
+}
+
+// THOTH-066: seed a workspace-level subscription plus a couple of example inbox items so the
+// notification bell/inbox/settings render with data on a fresh preview environment.
+const notificationRuleRepository = await getNotificationRuleRepository();
+await notificationRuleRepository.create({
+  userId: PREVIEW_USER_ID,
+  workspaceId: workspace.id,
+  containerId: null,
+  kind: 'workspace',
+  createdAt: now,
+  lastUpdated: now,
+} satisfies NotificationRuleCreate);
+
+const welcomePageId = createdPageIdsByName.get('Welcome');
+if (welcomePageId) {
+  const notificationRepository = await getNotificationRepository();
+  const sampleNotifications: { title: string; body: string; readAt: string | null }[] = [
+    { title: 'Someone updated "Welcome"', body: '2 changes in Preview Workspace', readAt: null },
+    { title: 'Someone updated "Welcome"', body: '1 change in Preview Workspace', readAt: now },
+  ];
+  for (const [index, sample] of sampleNotifications.entries()) {
+    await notificationRepository.create({
+      userId: PREVIEW_USER_ID,
+      workspaceId: workspace.id,
+      containerId: welcomePageId,
+      event: 'page.updated',
+      actor: { type: 'user', userId: PREVIEW_USER_ID },
+      title: sample.title,
+      body: sample.body,
+      changeCount: index === 0 ? 2 : 1,
+      sourceJobId: `seed-notification-${index}`,
+      occurredAt: now,
+      createdAt: now,
+      readAt: sample.readAt,
+    } satisfies NotificationCreate);
+  }
 }
 
 database.prepare('INSERT INTO _seed_marker (id) VALUES (1)').run();

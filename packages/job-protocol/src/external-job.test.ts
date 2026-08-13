@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { ExternalJobRequestSchema, TestNoopExternalJobRequestSchema } from './external-job.js';
 import { webhookDispatchExternalJobRequestSchema, webhookRedeliverExternalJobRequestSchema } from './webhook-job.js';
+import { notificationDispatchExternalJobRequestSchema } from './notification-job.js';
 
 // vitest sets NODE_ENV=test, so ExternalJobRequestSchema resolves to the test-only diagnostic
 // schema here. This test asserts that behaviour explicitly rather than relying on it silently.
@@ -183,5 +184,104 @@ describe('webhook.redeliver external schema', () => {
       payload: { deliveryId: 'delivery-1' },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('notification.dispatch external schema', () => {
+  test('accepts a minimal valid payload', () => {
+    const result = notificationDispatchExternalJobRequestSchema.safeParse({
+      type: 'notification.dispatch',
+      payloadVersion: 1,
+      payload: {
+        workspaceId: 'workspace-1',
+        containerId: 'page-1',
+        event: 'page.updated',
+        actor: { type: 'user', userId: 'user-1' },
+        changeCount: 1,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('accepts an App actor', () => {
+    const result = notificationDispatchExternalJobRequestSchema.safeParse({
+      type: 'notification.dispatch',
+      payloadVersion: 1,
+      payload: {
+        workspaceId: 'workspace-1',
+        containerId: 'page-1',
+        event: 'page.created',
+        actor: { type: 'app', appId: 'app-1', userId: 'user-1' },
+        changeCount: 0,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('rejects extra fields on the payload (strict) — no page bodies/values/sessions', () => {
+    const result = notificationDispatchExternalJobRequestSchema.safeParse({
+      type: 'notification.dispatch',
+      payloadVersion: 1,
+      payload: {
+        workspaceId: 'workspace-1',
+        containerId: 'page-1',
+        event: 'page.updated',
+        actor: { type: 'user', userId: 'user-1' },
+        changeCount: 1,
+        occurredAt: new Date().toISOString(),
+        valueChanges: {},
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects a bad actor shape', () => {
+    const result = notificationDispatchExternalJobRequestSchema.safeParse({
+      type: 'notification.dispatch',
+      payloadVersion: 1,
+      payload: {
+        workspaceId: 'workspace-1',
+        containerId: 'page-1',
+        event: 'page.updated',
+        actor: { type: 'bot', userId: 'user-1' },
+        changeCount: 1,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects a negative changeCount', () => {
+    const result = notificationDispatchExternalJobRequestSchema.safeParse({
+      type: 'notification.dispatch',
+      payloadVersion: 1,
+      payload: {
+        workspaceId: 'workspace-1',
+        containerId: 'page-1',
+        event: 'page.updated',
+        actor: { type: 'user', userId: 'user-1' },
+        changeCount: -1,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test('accepts a notification.dispatch job even in test environment (production job type)', () => {
+    const result = ExternalJobRequestSchema.safeParse({
+      type: 'notification.dispatch',
+      payloadVersion: 1,
+      payload: {
+        workspaceId: 'workspace-1',
+        containerId: 'page-1',
+        event: 'page.updated',
+        actor: { type: 'user', userId: 'user-1' },
+        changeCount: 1,
+        occurredAt: new Date().toISOString(),
+      },
+    });
+    expect(result.success).toBe(true);
   });
 });

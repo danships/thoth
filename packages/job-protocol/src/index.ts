@@ -66,6 +66,18 @@ export type {
 } from './webhook-job.js';
 
 export {
+  notificationDispatchExternalJobRequestSchema,
+  notificationDispatchPayloadV1Schema,
+  notificationActorSchema,
+  notificationDispatchEventSchema,
+} from './notification-job.js';
+export type {
+  NotificationDispatchExternalJobRequest,
+  NotificationDispatchPayloadV1,
+  NotificationActor,
+} from './notification-job.js';
+
+export {
   maintenancePurgeWorkspacesPayloadV1Schema,
   maintenancePurgePagesPayloadV1Schema,
   maintenancePurgeFilesPayloadV1Schema,

@@ -43,6 +43,8 @@ export * from './app';
 export * from './api-key';
 export * from './page-apps';
 export * from './webhook';
+export * from './notification';
+export * from './notification-subscription';
 export * from './upload-file';
 export * from './get-page-history';
 export * from './get-page-revision';

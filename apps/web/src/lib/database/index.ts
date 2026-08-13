@@ -18,6 +18,8 @@ import {
   getPageRevisionRepository as getPackagePageRevisionRepository,
   getSettingRepository as getPackageSettingRepository,
   getPlatformUserRepository as getPackagePlatformUserRepository,
+  getNotificationRepository as getPackageNotificationRepository,
+  getNotificationRuleRepository as getPackageNotificationRuleRepository,
 } from '@thoth/database';
 import { getEnvironment } from '../environment';
 
@@ -134,6 +136,16 @@ export async function getSettingRepository() {
 export async function getPlatformUserRepository() {
   await ensureDatabaseContext();
   return getPackagePlatformUserRepository();
+}
+
+export async function getNotificationRepository() {
+  await ensureDatabaseContext();
+  return getPackageNotificationRepository();
+}
+
+export async function getNotificationRuleRepository() {
+  await ensureDatabaseContext();
+  return getPackageNotificationRuleRepository();
 }
 
 /**

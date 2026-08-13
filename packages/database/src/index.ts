@@ -24,6 +24,8 @@ export {
   getPageRevisionRepository,
   getSettingRepository,
   getPlatformUserRepository,
+  getNotificationRuleRepository,
+  getNotificationRepository,
 } from './repositories.js';
 
 // Migrations (exposed for the CLI and tests)
@@ -118,6 +120,21 @@ export {
   buildContentFields,
 } from './history/revision-service.js';
 
+export {
+  canonicalizeNotificationRules,
+  getCanonicalRulesForUser,
+  upsertNotificationRule,
+  deleteNotificationRulesForContainer,
+  resolveRulePrecedence,
+  resolveNotificationRecipients,
+  findNotificationBySourceJobAndRecipient,
+  createNotification,
+  renderActorLabel,
+  renderNotificationTitleBody,
+  deleteNotificationDataForUser,
+} from './notification-service.js';
+export type { RulePrecedenceResult, CreateNotificationInput } from './notification-service.js';
+
 
 // Re-exported (in addition to `@thoth/database/schemas`) so packages using `moduleResolution:
 // Node10` (which cannot resolve the `exports` map's `./schemas` subpath) — e.g.
@@ -149,6 +166,8 @@ export type {
   PageRevision,
   Setting,
   PlatformUser,
+  NotificationRule,
+  Notification,
 } from './types.js';
 // Column/webhook-payload shapes also needed via the Node10-resolvable root entry (see the
 // `pageValueSchema` comment above) — `apps/jobs`' dispatch/deliver handlers import these.
@@ -160,3 +179,13 @@ export type {
   WebhookRawValue,
 } from './schemas/entities/webhook-delivery.js';
 export { TERMINAL_WEBHOOK_DELIVERY_STATUSES } from './schemas/entities/webhook-delivery.js';
+
+// Notification actor/rule-kind schemas also needed via the Node10-resolvable root entry (see
+// the `pageValueSchema` comment above) — `@thoth/job-protocol`'s `notification-job.ts` reuses
+// `notificationActorSchema` verbatim as its `notificationActorSchema` export.
+export { notificationActorSchema } from './schemas/entities/notification-actor.js';
+export type { NotificationActor } from './schemas/entities/notification-actor.js';
+export { notificationRuleKindSchema } from './schemas/entities/notification-rule.js';
+export type { NotificationRuleKind } from './schemas/entities/notification-rule.js';
+export { notificationDispatchEventSchema } from './schemas/entities/notification.js';
+export type { NotificationDispatchEvent } from './schemas/entities/notification.js';

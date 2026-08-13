@@ -14,6 +14,10 @@ import type { OperationRegistry } from './types';
  *   handler returning the raw Markdown body as `text/markdown` (not JSON), so not wrapped by
  *   `apiRoute` and not part of the generated schema. It's the internal rewrite target for the
  *   `.md`-suffixed page detail URL, not a documented API surface of its own.
+ * - `GET /notifications/{id}/open` (`src/app/notifications/[id]/open/route.ts`, THOTH-066): manual
+ *   handler (NOT under `/api`, NOT wrapped by `apiRoute`) that marks an inbox item read and
+ *   303-redirects to the target page. It's an in-app navigation route, not a documented API
+ *   surface of its own.
  * - `/admin/*` (`src/app/api/v1/admin/**`, THOTH-045): platform-administrator-only operational
  *   endpoints (settings, per-user and per-workspace storage quotas). Deliberately excluded from
  *   the public API document — they are an internal administration surface, not part of the
@@ -784,6 +788,89 @@ export const operations = [
     response: api.resendWebhookDeliveryResponseSchema,
     successStatus: 200,
     errorStatuses: [409],
+  },
+  {
+    path: '/notifications',
+    method: 'get',
+    operationId: 'getNotifications',
+    summary: 'List the current user notification inbox',
+    tags: ['Notifications'],
+    auth: 'session',
+    query: api.getNotificationsQuerySchema,
+    response: api.getNotificationsResponseSchema,
+    responseMeta: { pagination: api.getNotificationsPaginationSchema },
+    errorStatuses: [404],
+  },
+  {
+    path: '/notifications/unread-counts',
+    method: 'get',
+    operationId: 'getNotificationUnreadCounts',
+    summary: 'Get unread notification counts for the current user',
+    tags: ['Notifications'],
+    auth: 'session',
+    response: api.getNotificationUnreadCountsResponseSchema,
+  },
+  {
+    path: '/notifications/{id}',
+    method: 'patch',
+    operationId: 'patchNotification',
+    summary: 'Mark a notification read or unread',
+    tags: ['Notifications'],
+    auth: 'session',
+    params: api.patchNotificationParametersSchema,
+    body: api.patchNotificationBodySchema,
+    response: api.patchNotificationResponseSchema,
+    successStatus: 200,
+    errorStatuses: [404],
+  },
+  {
+    path: '/notifications/read-all',
+    method: 'post',
+    operationId: 'postNotificationsReadAll',
+    summary: 'Mark all notifications read for the current user',
+    tags: ['Notifications'],
+    auth: 'session',
+    body: api.notificationsReadAllBodySchema,
+    response: api.notificationsReadAllResponseSchema,
+    successStatus: 200,
+    errorStatuses: [404],
+  },
+  {
+    path: '/notifications/subscriptions',
+    method: 'get',
+    operationId: 'getNotificationSubscriptions',
+    summary: 'List the current user notification subscription rules',
+    tags: ['Notifications'],
+    auth: 'session',
+    query: api.getNotificationSubscriptionsQuerySchema,
+    response: api.getNotificationSubscriptionsResponseSchema,
+    errorStatuses: [404],
+  },
+  {
+    path: '/notifications/subscriptions/workspaces/{workspaceId}',
+    method: 'put',
+    operationId: 'putWorkspaceNotificationSubscription',
+    summary: 'Set the workspace-level notification subscription',
+    tags: ['Notifications'],
+    auth: 'session',
+    params: api.putWorkspaceNotificationSubscriptionParametersSchema,
+    body: api.putWorkspaceNotificationSubscriptionBodySchema,
+    response: api.putWorkspaceNotificationSubscriptionResponseSchema,
+    successStatus: 200,
+    errorStatuses: [404],
+  },
+  {
+    path: '/notifications/subscriptions/pages/{pageId}',
+    method: 'put',
+    operationId: 'putPageNotificationSubscription',
+    summary: 'Set a page-level notification subscription or exclusion',
+    tags: ['Notifications'],
+    auth: 'session',
+    params: api.putPageNotificationSubscriptionParametersSchema,
+    body: api.putPageNotificationSubscriptionBodySchema,
+    response: api.putPageNotificationSubscriptionResponseSchema,
+    successStatus: 200,
+    errorStatuses: [404],
   },
   {
     path: '/platform/capabilities',

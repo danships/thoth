@@ -8,6 +8,8 @@ import {
   getDatabase,
   getDataViewRepository,
   getFileUsageRepository,
+  getNotificationRepository,
+  getNotificationRuleRepository,
   getUploadedFileRepository,
   getWorkspaceMemberRepository,
   getWorkspaceRepository,
@@ -21,6 +23,8 @@ import type {
   DataSourceContainer,
   DataSourceContainerCreate,
   FileUsageCreate,
+  NotificationCreate,
+  NotificationRuleCreate,
   PageContainerCreate,
   UploadedFileCreate,
   WorkspaceCreate,
@@ -1168,6 +1172,75 @@ async function seedAppData() {
   });
 }
 
+// THOTH-066: seed a workspace-level subscription rule plus one unread + one read inbox item for
+// `SEED.user` in `SEED.workspace` (both targeting `SEED.pages.root`). Idempotent: existing rows
+// (by id) are left untouched so re-running the seed against a shared DB never duplicates them.
+async function seedNotifications(): Promise<void> {
+  const now = new Date().toISOString();
+  const earlier = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const uid = SEED.user.id;
+  const wsId = SEED.workspace.id;
+
+  const notificationRuleRepository = await getNotificationRuleRepository();
+  const existingRule = await notificationRuleRepository.getOneByQuery(
+    notificationRuleRepository.createQuery().eq('id', SEED.notifications.workspaceRule.id)
+  );
+  if (!existingRule) {
+    await notificationRuleRepository.create({
+      id: SEED.notifications.workspaceRule.id,
+      userId: uid,
+      workspaceId: wsId,
+      containerId: null,
+      kind: 'workspace',
+      createdAt: now,
+      lastUpdated: now,
+    } as unknown as NotificationRuleCreate);
+  }
+
+  const notificationRepository = await getNotificationRepository();
+  const items = [
+    {
+      id: SEED.notifications.unread.id,
+      title: SEED.notifications.unread.title,
+      body: '2 changes in E2E Workspace',
+      changeCount: 2,
+      occurredAt: now,
+      readAt: null as string | null,
+    },
+    {
+      id: SEED.notifications.read.id,
+      title: SEED.notifications.read.title,
+      body: '1 change in E2E Workspace',
+      changeCount: 1,
+      occurredAt: earlier,
+      readAt: earlier,
+    },
+  ];
+  for (const item of items) {
+    const existing = await notificationRepository.getOneByQuery(
+      notificationRepository.createQuery().eq('id', item.id)
+    );
+    if (existing) {
+      continue;
+    }
+    await notificationRepository.create({
+      id: item.id,
+      userId: uid,
+      workspaceId: wsId,
+      containerId: SEED.pages.root.id,
+      event: 'page.updated',
+      actor: { type: 'user', userId: SEED.secondUser.id },
+      title: item.title,
+      body: item.body,
+      changeCount: item.changeCount,
+      sourceJobId: `seed-${item.id}`,
+      occurredAt: item.occurredAt,
+      createdAt: item.occurredAt,
+      readAt: item.readAt,
+    } as unknown as NotificationCreate);
+  }
+}
+
 // ── Entry point ────────────────────────────────────────────────────────────────
 const superSave = await getDatabase(); // ensures Better Auth tables exist via runMigrations
 await seedAuthTables();
@@ -1180,6 +1253,7 @@ for (const authUser of seededAuthUsers) {
   await registerPlatformUser({ id: authUser.id, name: authUser.name, email: authUser.email });
 }
 await seedAppData();
+await seedNotifications();
 // `seedAppData()` creates parented Container rows (child pages, data-source rows) directly via
 // the repository API, bypassing `POST /pages`'s `sortOrder` assignment (THOTH-036) — so without
 // this, every seeded row would have `sortOrder: null` and collide on the same fractional-index

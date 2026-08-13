@@ -14,12 +14,22 @@ import {
   IconStarFilled,
   IconTrash,
   IconUnlink,
+  IconBell,
+  IconCheck,
 } from '@tabler/icons-react';
 import { usePageApps } from '@/lib/hooks/api/use-page-apps';
+import { useNotificationSubscriptions } from '@/lib/hooks/api/use-notification-subscriptions';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
+import { api } from '@/lib/api/client';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { getAppScopeLabel } from '@/lib/format/app-scope-label';
-import type { ConnectPageAppResponse, ConnectedPageApp, PageAppSummary } from '@/types/api';
+import type {
+  ConnectPageAppResponse,
+  ConnectedPageApp,
+  PageAppSummary,
+  PutPageNotificationSubscriptionBody,
+} from '@/types/api';
 
 // Matches the server's `setPageContentBodySchema` cap (`z.string().max(1_000_000)`) so an
 // oversized file is rejected client-side with a friendly message instead of a 400 round-trip.
@@ -49,6 +59,14 @@ function connectedBadgeLabel(app: ConnectedPageApp): string {
   return getAppScopeLabel(app.scopeType);
 }
 
+const PAGE_NOTIFICATION_OPTIONS: { value: PutPageNotificationSubscriptionBody['kind']; label: string }[] = [
+  { value: 'page', label: 'Subscribe to this page' },
+  { value: 'tree', label: 'Subscribe to this page & sub-pages' },
+  { value: 'exclude_page', label: 'Exclude this page' },
+  { value: 'exclude_tree', label: 'Exclude this page & sub-pages' },
+  { value: 'none', label: 'Clear page rule' },
+];
+
 // The page detail screen's "three dots" menu. Hosts two independent concerns:
 //  - "App connections" (see THOTH-026): a nested submenu listing the Apps that currently have
 //    access to this page ("Connected") plus any other non-workspace-scoped Apps in the
@@ -69,10 +87,24 @@ export function PageDetailMenu({
   onViewHistory,
 }: PageDetailMenuProperties) {
   const { data, isLoading, mutate } = usePageApps(pageId);
+  const workspace = useCurrentWorkspace();
+  const { data: subscriptionsData, mutate: mutateSubscriptions } = useNotificationSubscriptions(workspace.id);
   const { post, delete: remove, inProgress } = useCudApi();
   const { showError, showSuccess } = useNotification();
   const fileInputReference = useRef<HTMLInputElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
+
+  const currentPageRuleKind = subscriptionsData?.subscriptions.find((rule) => rule.containerId === pageId)?.kind;
+
+  const handleSetPageNotification = async (kind: PutPageNotificationSubscriptionBody['kind']) => {
+    try {
+      await api.notifications.setPageSubscription(pageId, kind);
+      showSuccess(kind === 'none' ? 'Cleared page notification rule' : 'Updated page notification rule');
+      await mutateSubscriptions();
+    } catch {
+      showError('Failed to update notification rule');
+    }
+  };
 
   const handleConnect = async (app: PageAppSummary) => {
     try {
@@ -300,6 +332,27 @@ export function PageDetailMenu({
                       {getAppScopeLabel(app.scopeType)}
                     </Badge>
                   </Group>
+                </Menu.Item>
+              ))}
+            </Menu.Sub.Dropdown>
+          </Menu.Sub>
+
+          <Menu.Sub position="right-start">
+            <Menu.Sub.Target>
+              <Menu.Sub.Item leftSection={<IconBell size={14} />}>Notifications</Menu.Sub.Item>
+            </Menu.Sub.Target>
+
+            <Menu.Sub.Dropdown>
+              <Menu.Label>Notify me about this page</Menu.Label>
+              {PAGE_NOTIFICATION_OPTIONS.map((option) => (
+                <Menu.Item
+                  key={option.value}
+                  leftSection={
+                    (currentPageRuleKind ?? 'none') === option.value ? <IconCheck size={14} /> : <Box w={14} />
+                  }
+                  onClick={() => void handleSetPageNotification(option.value)}
+                >
+                  {option.label}
                 </Menu.Item>
               ))}
             </Menu.Sub.Dropdown>

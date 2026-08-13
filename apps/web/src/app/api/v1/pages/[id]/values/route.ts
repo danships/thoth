@@ -5,6 +5,7 @@ import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
+import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { recordValuesRevision } from '@thoth/database';
@@ -136,6 +137,12 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
       updatedPage,
       toWebhookActor(session),
       Object.keys(valueChanges).length > 0 ? { valueChanges } : undefined
+    );
+    scheduleNotificationDispatch(
+      'page.updated',
+      updatedPage,
+      toWebhookActor(session),
+      Math.max(1, Object.keys(valueChanges).length)
     );
   }
 );

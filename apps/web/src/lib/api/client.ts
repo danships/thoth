@@ -40,6 +40,15 @@ import type {
   UpdateWebhookResponse,
   GetWebhookDeliveriesResponse,
   ResendWebhookDeliveryResponse,
+  GetNotificationsResponse,
+  GetNotificationUnreadCountsResponse,
+  PatchNotificationResponse,
+  NotificationsReadAllResponse,
+  GetNotificationSubscriptionsResponse,
+  PutWorkspaceNotificationSubscriptionResponse,
+  PutWorkspaceNotificationSubscriptionBody,
+  PutPageNotificationSubscriptionResponse,
+  PutPageNotificationSubscriptionBody,
   UploadFileResponse,
   GetFileResponse,
   DeleteFileResponse,
@@ -255,6 +264,45 @@ export const api = {
     resendWebhookDelivery: (appId: string, webhookId: string, deliveryId: string) =>
       apiClient.post<DataWrapper<ResendWebhookDeliveryResponse>>(
         `/apps/${appId}/webhooks/${webhookId}/deliveries/${deliveryId}/resend`
+      ),
+  },
+
+  // Personal notification inbox + subscription rules (THOTH-066). Session-only (App API keys
+  // are rejected server-side via `disallowApiKey`).
+  notifications: {
+    list: (parameters?: { workspaceId?: string; unreadOnly?: boolean; cursor?: string; limit?: number }) =>
+      apiClient.get<DataWrapper<GetNotificationsResponse> & { pagination?: { nextCursor: string | null } }>(
+        '/notifications',
+        {
+          params: {
+            ...(parameters?.workspaceId && { workspaceId: parameters.workspaceId }),
+            ...(parameters?.unreadOnly && { unreadOnly: true }),
+            ...(parameters?.cursor && { cursor: parameters.cursor }),
+            ...(parameters?.limit && { limit: parameters.limit }),
+          },
+        }
+      ),
+    unreadCounts: () => apiClient.get<DataWrapper<GetNotificationUnreadCountsResponse>>('/notifications/unread-counts'),
+    markRead: (id: string, read: boolean) =>
+      apiClient.patch<DataWrapper<PatchNotificationResponse>>(`/notifications/${id}`, { read }),
+    readAll: (workspaceId?: string) =>
+      apiClient.post<DataWrapper<NotificationsReadAllResponse>>(
+        '/notifications/read-all',
+        workspaceId ? { workspaceId } : {}
+      ),
+    getSubscriptions: (workspaceId?: string) =>
+      apiClient.get<DataWrapper<GetNotificationSubscriptionsResponse>>('/notifications/subscriptions', {
+        params: { ...(workspaceId && { workspaceId }) },
+      }),
+    setWorkspaceSubscription: (workspaceId: string, kind: PutWorkspaceNotificationSubscriptionBody['kind']) =>
+      apiClient.put<DataWrapper<PutWorkspaceNotificationSubscriptionResponse>>(
+        `/notifications/subscriptions/workspaces/${workspaceId}`,
+        { kind }
+      ),
+    setPageSubscription: (pageId: string, kind: PutPageNotificationSubscriptionBody['kind']) =>
+      apiClient.put<DataWrapper<PutPageNotificationSubscriptionResponse>>(
+        `/notifications/subscriptions/pages/${pageId}`,
+        { kind }
       ),
   },
 };

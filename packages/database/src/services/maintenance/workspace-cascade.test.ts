@@ -24,6 +24,8 @@ const DIRECTLY_WORKSPACE_SCOPED_ENTITY_NAMES: readonly string[] = [
   entities.FILE_USAGE_NAME,
   entities.UPLOADED_FILE_NAME,
   entities.PAGE_REVISION_NAME,
+  entities.NOTIFICATION_NAME,
+  entities.NOTIFICATION_RULE_NAME,
 ];
 
 // Entities scoped *indirectly* — via a parent App/WorkspaceMember id the cascade itself

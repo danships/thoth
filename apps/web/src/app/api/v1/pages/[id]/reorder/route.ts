@@ -6,6 +6,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { computeReorderKey } from '@/lib/database/sort-order-service';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
+import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import type { ReorderPageBody, ReorderPageParameters, ReorderPageResponse } from '@/types/api';
 import { reorderPageBodySchema, reorderPageParametersSchema } from '@/types/api';
@@ -102,6 +103,7 @@ export const POST = apiRoute<ReorderPageResponse, {}, ReorderPageParameters, Reo
     });
 
     scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
+    scheduleNotificationDispatch('page.updated', updatedPage, toWebhookActor(session));
 
     return {
       id: updatedPage.id,

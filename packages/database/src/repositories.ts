@@ -80,3 +80,11 @@ export async function getSettingRepository() {
 export async function getPlatformUserRepository() {
   return getDatabaseContext().getPlatformUserRepository();
 }
+
+export async function getNotificationRuleRepository() {
+  return getDatabaseContext().getNotificationRuleRepository();
+}
+
+export async function getNotificationRepository() {
+  return getDatabaseContext().getNotificationRepository();
+}
