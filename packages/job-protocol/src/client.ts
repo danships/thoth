@@ -6,14 +6,9 @@ import {
   JobRequestEnvelopeSchema,
   type JobRequestEnvelope,
   type JobResponseEnvelope,
-} from './envelope';
-import type { ExternalJobRequest } from './external-job';
-import {
-  DEFAULT_CONNECT_TIMEOUT_MS,
-  DEFAULT_RESPONSE_TIMEOUT_MS,
-  FRAME_DELIMITER,
-  MAX_FRAME_BYTES,
-} from './frame';
+} from './envelope.js';
+import type { ExternalJobRequest } from './external-job.js';
+import { DEFAULT_CONNECT_TIMEOUT_MS, DEFAULT_RESPONSE_TIMEOUT_MS, FRAME_DELIMITER, MAX_FRAME_BYTES } from './frame.js';
 
 /**
  * Client-side transport for the job Unix-socket IPC protocol (THOTH-059).
@@ -60,17 +55,19 @@ function isConnectTimeoutRetryable(): boolean {
   return true;
 }
 
-async function sendEnvelope(
-  envelope: JobRequestEnvelope,
-  options: JobClientOptions
-): Promise<JobResponseEnvelope> {
+async function sendEnvelope(envelope: JobRequestEnvelope, options: JobClientOptions): Promise<JobResponseEnvelope> {
   const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
   const responseTimeoutMs = options.responseTimeoutMs ?? DEFAULT_RESPONSE_TIMEOUT_MS;
 
   return new Promise<JobResponseEnvelope>((resolve, reject) => {
     let settled = false;
+    // `socket` and `connectTimer` are declared with `let` (not `const`) because `cleanup()` can
+    // run via the early abort-check below before their assignment executes, and `const` bindings
+    // are not accessible in that pre-assignment window.
+    // eslint-disable-next-line prefer-const
     let socket: Socket | undefined;
     let responseTimer: ReturnType<typeof setTimeout> | undefined;
+    // eslint-disable-next-line prefer-const
     let connectTimer: ReturnType<typeof setTimeout> | undefined;
     const decoder = new StringDecoder('utf8');
     let buffer = '';
@@ -113,9 +110,7 @@ async function sendEnvelope(
     socket = createConnection({ path: options.socketPath });
 
     connectTimer = setTimeout(() => {
-      settle(
-        new JobClientError('CONNECT_TIMEOUT', 'Timed out connecting to job socket', isConnectTimeoutRetryable())
-      );
+      settle(new JobClientError('CONNECT_TIMEOUT', 'Timed out connecting to job socket', isConnectTimeoutRetryable()));
     }, connectTimeoutMs);
 
     socket.once('connect', () => {
@@ -166,9 +161,7 @@ async function sendEnvelope(
 
     socket.on('error', (error: NodeJS.ErrnoException) => {
       clearTimeout(connectTimer);
-      settle(
-        new JobClientError('CONNECT_FAILED', `Failed to connect to job socket: ${error.message}`, true)
-      );
+      settle(new JobClientError('CONNECT_FAILED', `Failed to connect to job socket: ${error.message}`, true));
     });
 
     socket.on('close', () => {
@@ -180,9 +173,7 @@ async function sendEnvelope(
 }
 
 /** Sends a `ping` request and returns the parsed response envelope. */
-export async function pingJobService(
-  options: JobClientOptions
-): Promise<JobResponseEnvelope> {
+export async function pingJobService(options: JobClientOptions): Promise<JobResponseEnvelope> {
   const envelope = JobRequestEnvelopeSchema.parse({
     version: 1,
     requestId: randomUUID(),
@@ -192,10 +183,7 @@ export async function pingJobService(
 }
 
 /** Sends an `enqueue` request for the given external job and returns the parsed response envelope. */
-export async function enqueueJob(
-  job: ExternalJobRequest,
-  options: JobClientOptions
-): Promise<JobResponseEnvelope> {
+export async function enqueueJob(job: ExternalJobRequest, options: JobClientOptions): Promise<JobResponseEnvelope> {
   const envelope = JobRequestEnvelopeSchema.parse({
     version: 1,
     requestId: randomUUID(),

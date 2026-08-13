@@ -4,7 +4,7 @@ import {
   webhookRedeliverExternalJobRequestSchema,
   type WebhookDispatchExternalJobRequest,
   type WebhookRedeliverExternalJobRequest,
-} from './webhook-job';
+} from './webhook-job.js';
 
 /**
  * External job payload accepted over the Unix-socket IPC boundary (THOTH-059/THOTH-061).
@@ -51,14 +51,14 @@ export {
   webhookDispatchPayloadV1Schema,
   webhookRedeliverPayloadV1Schema,
   webhookActorSchema,
-} from './webhook-job';
+} from './webhook-job.js';
 export type {
   WebhookDispatchExternalJobRequest,
   WebhookRedeliverExternalJobRequest,
   WebhookDispatchPayloadV1,
   WebhookRedeliverPayloadV1,
   WebhookActor,
-} from './webhook-job';
+} from './webhook-job.js';
 
 /** True only inside test runs; gates the only test-only externally-reachable job type. */
 function isTestEnvironment(): boolean {
@@ -79,7 +79,4 @@ export const ExternalJobRequestSchema: z.ZodType<ExternalJobRequest> = isTestEnv
   : z.discriminatedUnion('type', productionExternalJobSchemas);
 
 export type ExternalJobRequest =
-  | TestNoopExternalJobRequest
-  | WebhookDispatchExternalJobRequest
-  | WebhookRedeliverExternalJobRequest;
-
+  TestNoopExternalJobRequest | WebhookDispatchExternalJobRequest | WebhookRedeliverExternalJobRequest;

@@ -14,8 +14,8 @@ import {
   type JobExecutionContext,
   type WebhookDispatchPayloadV1,
 } from '@thoth/job-protocol';
-import { buildPayload, type ValueChangeInput } from './build-payload';
-import { resolveDataSourceParent, resolveWebhooksToNotify } from './resolve-webhooks';
+import { buildPayload, type ValueChangeInput } from './build-payload.js';
+import { resolveDataSourceParent, resolveWebhooksToNotify } from './resolve-webhooks.js';
 
 const TRAILING_DEBOUNCE_MS = 3000;
 const MAX_DEBOUNCE_MS = 15_000;
@@ -163,7 +163,7 @@ export const webhookDispatchJobDefinition: JobDefinition<WebhookDispatchPayloadV
         }
       }
 
-      if (delivery.status === 'success' || delivery.status === 'failed' || delivery.status === 'cancelled') {
+      if (['success', 'failed', 'cancelled'].includes(delivery.status)) {
         // Already terminal (a resumed dispatch found a delivery that already completed) — never
         // send again.
         continue;

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { QueueService } from './queue-service';
+import { QueueService } from './queue-service.js';
 
 describe('QueueService', () => {
   test('creates a new record on first enqueue', async () => {
@@ -69,10 +69,7 @@ describe('QueueService', () => {
   test('claimNextDue orders by priority desc, runAt asc, createdAt asc', async () => {
     const service = new QueueService();
     const now = new Date();
-    const low = await service.enqueue(
-      { type: 'a', payloadVersion: 1, payload: {}, priority: 0, maxAttempts: 1 },
-      now
-    );
+    const low = await service.enqueue({ type: 'a', payloadVersion: 1, payload: {}, priority: 0, maxAttempts: 1 }, now);
     const high = await service.enqueue(
       { type: 'b', payloadVersion: 1, payload: {}, priority: 10, maxAttempts: 1 },
       now
@@ -87,7 +84,14 @@ describe('QueueService', () => {
     const service = new QueueService();
     const now = new Date();
     await service.enqueue(
-      { type: 'a', payloadVersion: 1, payload: {}, priority: 0, maxAttempts: 1, runAt: new Date(now.getTime() + 60_000) },
+      {
+        type: 'a',
+        payloadVersion: 1,
+        payload: {},
+        priority: 0,
+        maxAttempts: 1,
+        runAt: new Date(now.getTime() + 60_000),
+      },
       now
     );
     const claimed = await service.claimNextDue(now);

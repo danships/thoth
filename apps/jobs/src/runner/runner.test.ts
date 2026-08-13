@@ -2,9 +2,9 @@ import { describe, test, expect, vi } from 'vitest';
 import type { Logger } from 'winston';
 import { z } from 'zod';
 import { RetryableJobError } from '@thoth/job-protocol';
-import { QueueService } from '../queue/queue-service';
-import { JobRegistry } from '../handlers/registry';
-import { Runner } from './runner';
+import { QueueService } from '../queue/queue-service.js';
+import { JobRegistry } from '../handlers/registry.js';
+import { Runner } from './runner.js';
 
 function fakeLogger(): Logger {
   return {
@@ -168,7 +168,9 @@ describe('Runner', () => {
     });
 
     runner.start();
-    await waitUntil(() => queueService.get(record.id)?.status !== 'queued' && queueService.get(record.id)?.status !== 'running');
+    await waitUntil(
+      () => queueService.get(record.id)?.status !== 'queued' && queueService.get(record.id)?.status !== 'running'
+    );
     await runner.stop(100);
 
     expect(handler).toHaveBeenCalledTimes(1);

@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities';
-import { filterRuleSchema, sortRuleSchema } from './data-view-query';
+import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities.js';
+import { filterRuleSchema, sortRuleSchema } from './data-view-query.js';
 
-export { filterOperatorSchema, filterRuleSchema, sortDirectionSchema, sortRuleSchema } from './data-view-query';
-export type { FilterOperator, FilterRule, SortDirection, SortRule } from './data-view-query';
+export { filterOperatorSchema, filterRuleSchema, sortDirectionSchema, sortRuleSchema } from './data-view-query.js';
+export type { FilterOperator, FilterRule, SortDirection, SortRule } from './data-view-query.js';
 
 // A single entry in a Data View's persisted column presentation order/visibility (THOTH-052). A
 // discriminated union rather than a magic Name id alongside Data Source column ids, so a

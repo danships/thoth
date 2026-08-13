@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema } from '../utilities';
+import { withIdSchema } from '../utilities.js';
 
 // The credential row. `keyHash` is internal-only and must never be serialized to a client
 // response — see `apiKeyPublicSchema` below, which is what every API response type is built

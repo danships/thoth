@@ -1,9 +1,9 @@
-import { getContainerRepository, getWorkspaceMemberRepository, getWorkspaceRepository } from './repositories';
-import { registerContainerAccessForNewPage } from './container-access-service';
-import { generateUniqueWorkspaceSlug, reserveWorkspaceSlug, WorkspaceSlugConflictError } from './workspace-slug';
-import { slugify } from './utils/slug';
-import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from './schemas/entities/workspace';
-import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from './types';
+import { getContainerRepository, getWorkspaceMemberRepository, getWorkspaceRepository } from './repositories.js';
+import { registerContainerAccessForNewPage } from './container-access-service.js';
+import { generateUniqueWorkspaceSlug, reserveWorkspaceSlug, WorkspaceSlugConflictError } from './workspace-slug.js';
+import { slugify } from './utils/slug.js';
+import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from './schemas/entities/workspace.js';
+import type { PageContainerCreate, WorkspaceCreate, WorkspaceMemberCreate } from './types.js';
 
 type CreateWorkspaceOptions = {
   slug?: string;

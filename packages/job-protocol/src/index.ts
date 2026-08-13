@@ -12,7 +12,7 @@ export {
   JobResponseSuccessSchema,
   JobResponseErrorSchema,
   JobResponseEnvelopeSchema,
-} from './envelope';
+} from './envelope.js';
 export type {
   JobErrorCode,
   EnqueueJobRequestEnvelope,
@@ -22,10 +22,14 @@ export type {
   JobResponseSuccess,
   JobResponseError,
   JobResponseEnvelope,
-} from './envelope';
+} from './envelope.js';
 
-export { ExternalJobRequestSchema, TestNoopExternalJobRequestSchema, TestNoopJobPayloadSchema } from './external-job';
-export type { ExternalJobRequest, TestNoopExternalJobRequest, TestNoopJobPayload } from './external-job';
+export {
+  ExternalJobRequestSchema,
+  TestNoopExternalJobRequestSchema,
+  TestNoopJobPayloadSchema,
+} from './external-job.js';
+export type { ExternalJobRequest, TestNoopExternalJobRequest, TestNoopJobPayload } from './external-job.js';
 
 export {
   webhookDispatchExternalJobRequestSchema,
@@ -33,17 +37,24 @@ export {
   webhookDispatchPayloadV1Schema,
   webhookRedeliverPayloadV1Schema,
   webhookActorSchema,
-} from './webhook-job';
+} from './webhook-job.js';
 export type {
   WebhookDispatchExternalJobRequest,
   WebhookRedeliverExternalJobRequest,
   WebhookDispatchPayloadV1,
   WebhookRedeliverPayloadV1,
   WebhookActor,
-} from './webhook-job';
+} from './webhook-job.js';
 
-export { RetryableJobError } from './registry';
-export type { JobStatus, JobExecutionContext, JobHandler, JobDefinition, JobCoalescePolicy, EnqueueChildFn } from './registry';
+export { RetryableJobError } from './registry.js';
+export type {
+  JobStatus,
+  JobExecutionContext,
+  JobHandler,
+  JobDefinition,
+  JobCoalescePolicy,
+  EnqueueChildFunction,
+} from './registry.js';
 
 export {
   MAX_FRAME_BYTES,
@@ -51,7 +62,7 @@ export {
   DEFAULT_CONNECT_TIMEOUT_MS,
   DEFAULT_READ_TIMEOUT_MS,
   DEFAULT_RESPONSE_TIMEOUT_MS,
-} from './frame';
+} from './frame.js';
 
-export { JobClientError, pingJobService, enqueueJob } from './client';
-export type { JobClientErrorCode, JobClientOptions } from './client';
+export { JobClientError, pingJobService, enqueueJob } from './client.js';
+export type { JobClientErrorCode, JobClientOptions } from './client.js';

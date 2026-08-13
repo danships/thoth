@@ -1,6 +1,6 @@
-import { getAppScopedContainerRepository, getMemberScopedContainerRepository } from './repositories';
-import { resolveContainerDescendants, resolvePageEmbeddedContainerIds } from './app-service';
-import type { App, AppPermission, AppScopeType, WorkspaceMember } from './types';
+import { getAppScopedContainerRepository, getMemberScopedContainerRepository } from './repositories.js';
+import { resolveContainerDescendants, resolvePageEmbeddedContainerIds } from './app-service.js';
+import type { App, AppPermission, AppScopeType, WorkspaceMember } from './types.js';
 
 /**
  * Environment-neutral `AccessGrant` primitives (THOTH-061), moved here from

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema } from '../utilities';
+import { withIdSchema } from '../utilities.js';
 
 // Join row linking a `WorkspaceMember` to a `Container` (page or data source) it is explicitly
 // scoped to. Mirrors `appScopedContainerSchema` — see

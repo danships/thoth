@@ -1,5 +1,5 @@
 import type { Logger } from 'winston';
-import type { QueueService } from '../queue/queue-service';
+import type { QueueService } from '../queue/queue-service.js';
 
 /**
  * Code-owned interval schedule definition (THOTH-059). There is no schedule table — the current

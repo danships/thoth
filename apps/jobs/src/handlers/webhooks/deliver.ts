@@ -8,10 +8,10 @@ import {
   type WebhookDelivery,
 } from '@thoth/database';
 import { RetryableJobError, type JobDefinition, type JobExecutionContext } from '@thoth/job-protocol';
-import { assertPublicHttpsUrl } from './ssrf';
-import { parseRetryAfterMs } from './backoff';
-import { computeBackoffMs } from '../../runner/backoff';
-import { getEnvironment } from '../../environment';
+import { assertPublicHttpsUrl } from './ssrf.js';
+import { parseRetryAfterMs } from './backoff.js';
+import { computeBackoffMs } from '../../runner/backoff.js';
+import { getEnvironment } from '../../environment.js';
 
 const MAX_STORED_ERROR_LENGTH = 500;
 const MAX_DELIVERY_ATTEMPTS = 5;
@@ -74,7 +74,7 @@ export const webhookDeliverJobDefinition: JobDefinition<WebhookDeliverPayload> =
       return { skipped: 'delivery-not-found' };
     }
 
-    if (delivery.status === 'success' || delivery.status === 'failed' || delivery.status === 'cancelled') {
+    if (['success', 'failed', 'cancelled'].includes(delivery.status)) {
       // Already terminal (e.g. a duplicate/replayed child enqueue after a crash) — never send twice.
       return { skipped: 'already-terminal', status: delivery.status };
     }

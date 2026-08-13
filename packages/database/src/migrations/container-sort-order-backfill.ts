@@ -1,7 +1,7 @@
 import type { SuperSave } from 'supersave';
 import { generateNKeysBetween } from 'fractional-indexing';
-import * as entities from '../entities';
-import type { Container } from '../types';
+import * as entities from '../entities/index.js';
+import type { Container } from '../types.js';
 
 /**
  * One-time backfill for THOTH-036 (manual reordering): seeds `Container.sortOrder` for every

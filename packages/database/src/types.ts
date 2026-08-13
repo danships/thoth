@@ -1,24 +1,24 @@
 import { z } from 'zod';
-import { pageContainerSchema, dataSourceContainerSchema } from './schemas/entities/container';
-import { containerAccessSchema } from './schemas/entities/container-access';
-import { workspaceSchema as workspaceSchemaEntity } from './schemas/entities/workspace';
-import { workspaceMemberSchema } from './schemas/entities/workspace-member';
-import { workspaceSlugRedirectSchema } from './schemas/entities/workspace-slug-redirect';
-import { dataViewSchema } from './schemas/entities/data-view';
-import { appSchema } from './schemas/entities/app';
-import { apiKeySchema, apiKeyPublicSchema } from './schemas/entities/api-key';
-import { appScopedContainerSchema } from './schemas/entities/app-scoped-container';
-import { memberScopedContainerSchema } from './schemas/entities/member-scoped-container';
-import { webhookSchema } from './schemas/entities/webhook';
-import { webhookDeliverySchema } from './schemas/entities/webhook-delivery';
-import { uploadedFileSchema } from './schemas/entities/uploaded-file';
-import { fileUsageSchema } from './schemas/entities/file-usage';
-import { pageRevisionSchema } from './schemas/entities/page-revision';
-import { settingSchema } from './schemas/entities/setting';
-import { platformUserSchema } from './schemas/entities/platform-user';
+import { pageContainerSchema, dataSourceContainerSchema } from './schemas/entities/container.js';
+import { containerAccessSchema } from './schemas/entities/container-access.js';
+import { workspaceSchema as workspaceSchemaEntity } from './schemas/entities/workspace.js';
+import { workspaceMemberSchema } from './schemas/entities/workspace-member.js';
+import { workspaceSlugRedirectSchema } from './schemas/entities/workspace-slug-redirect.js';
+import { dataViewSchema } from './schemas/entities/data-view.js';
+import { appSchema } from './schemas/entities/app.js';
+import { apiKeySchema, apiKeyPublicSchema } from './schemas/entities/api-key.js';
+import { appScopedContainerSchema } from './schemas/entities/app-scoped-container.js';
+import { memberScopedContainerSchema } from './schemas/entities/member-scoped-container.js';
+import { webhookSchema } from './schemas/entities/webhook.js';
+import { webhookDeliverySchema } from './schemas/entities/webhook-delivery.js';
+import { uploadedFileSchema } from './schemas/entities/uploaded-file.js';
+import { fileUsageSchema } from './schemas/entities/file-usage.js';
+import { pageRevisionSchema } from './schemas/entities/page-revision.js';
+import { settingSchema } from './schemas/entities/setting.js';
+import { platformUserSchema } from './schemas/entities/platform-user.js';
 
 /** Container Entity Schema */
-export { pageContainerSchema, dataSourceContainerSchema } from './schemas/entities/container';
+export { pageContainerSchema, dataSourceContainerSchema } from './schemas/entities/container.js';
 export const pageContainerCreateSchema = pageContainerSchema.omit({ id: true });
 export type PageContainer = z.infer<typeof pageContainerSchema>;
 export type PageContainerCreate = z.infer<typeof pageContainerCreateSchema>;
@@ -37,7 +37,7 @@ export type ContainerCreate = z.infer<typeof containerCreateSchema>;
 /** End Container Entity Schema */
 
 /** Workspace Entity Schema */
-export { workspaceSchema } from './schemas/entities/workspace';
+export { workspaceSchema } from './schemas/entities/workspace.js';
 
 export const workspaceCreateSchema = workspaceSchemaEntity.omit({ id: true });
 
@@ -46,7 +46,7 @@ export type WorkspaceCreate = z.infer<typeof workspaceCreateSchema>;
 /** End Workspace Entity Schema */
 
 /** DataView Entity Schema */
-export { dataViewSchema } from './schemas/entities/data-view';
+export { dataViewSchema } from './schemas/entities/data-view.js';
 
 export const dataViewCreateSchema = dataViewSchema.omit({ id: true });
 
@@ -55,7 +55,7 @@ export type DataViewCreate = z.infer<typeof dataViewCreateSchema>;
 /** End DataView Entity Schema */
 
 /** ContainerAccess Entity Schema */
-export { containerAccessSchema } from './schemas/entities/container-access';
+export { containerAccessSchema } from './schemas/entities/container-access.js';
 
 export const containerAccessCreateSchema = containerAccessSchema.omit({ id: true });
 
@@ -64,7 +64,7 @@ export type ContainerAccessCreate = z.infer<typeof containerAccessCreateSchema>;
 /** End ContainerAccess Entity Schema */
 
 /** WorkspaceMember Entity Schema */
-export { workspaceMemberSchema } from './schemas/entities/workspace-member';
+export { workspaceMemberSchema } from './schemas/entities/workspace-member.js';
 
 export const workspaceMemberCreateSchema = workspaceMemberSchema.omit({ id: true });
 
@@ -73,7 +73,7 @@ export type WorkspaceMemberCreate = z.infer<typeof workspaceMemberCreateSchema>;
 /** End WorkspaceMember Entity Schema */
 
 /** WorkspaceSlugRedirect Entity Schema */
-export { workspaceSlugRedirectSchema } from './schemas/entities/workspace-slug-redirect';
+export { workspaceSlugRedirectSchema } from './schemas/entities/workspace-slug-redirect.js';
 
 export const workspaceSlugRedirectCreateSchema = workspaceSlugRedirectSchema.omit({ id: true });
 
@@ -82,8 +82,13 @@ export type WorkspaceSlugRedirectCreate = z.infer<typeof workspaceSlugRedirectCr
 /** End WorkspaceSlugRedirect Entity Schema */
 
 /** App Entity Schema */
-export { appSchema, appAttributionModeSchema, appPermissionSchema, appScopeTypeSchema } from './schemas/entities/app';
-export type { AppAttributionMode, AppPermission, AppScopeType } from './schemas/entities/app';
+export {
+  appSchema,
+  appAttributionModeSchema,
+  appPermissionSchema,
+  appScopeTypeSchema,
+} from './schemas/entities/app.js';
+export type { AppAttributionMode, AppPermission, AppScopeType } from './schemas/entities/app.js';
 
 export const appCreateSchema = appSchema.omit({ id: true });
 
@@ -92,7 +97,7 @@ export type AppCreate = z.infer<typeof appCreateSchema>;
 /** End App Entity Schema */
 
 /** ApiKey Entity Schema */
-export { apiKeySchema, apiKeyPublicSchema } from './schemas/entities/api-key';
+export { apiKeySchema, apiKeyPublicSchema } from './schemas/entities/api-key.js';
 
 export const apiKeyCreateSchema = apiKeySchema.omit({ id: true });
 
@@ -102,7 +107,7 @@ export type ApiKeyPublic = z.infer<typeof apiKeyPublicSchema>;
 /** End ApiKey Entity Schema */
 
 /** AppScopedContainer Entity Schema */
-export { appScopedContainerSchema } from './schemas/entities/app-scoped-container';
+export { appScopedContainerSchema } from './schemas/entities/app-scoped-container.js';
 
 export const appScopedContainerCreateSchema = appScopedContainerSchema.omit({ id: true });
 
@@ -111,7 +116,7 @@ export type AppScopedContainerCreate = z.infer<typeof appScopedContainerCreateSc
 /** End AppScopedContainer Entity Schema */
 
 /** MemberScopedContainer Entity Schema */
-export { memberScopedContainerSchema } from './schemas/entities/member-scoped-container';
+export { memberScopedContainerSchema } from './schemas/entities/member-scoped-container.js';
 
 export const memberScopedContainerCreateSchema = memberScopedContainerSchema.omit({ id: true });
 
@@ -120,7 +125,7 @@ export type MemberScopedContainerCreate = z.infer<typeof memberScopedContainerCr
 /** End MemberScopedContainer Entity Schema */
 
 /** Webhook Entity Schema */
-export { webhookSchema, webhookPublicSchema, webhookUrlSchema } from './schemas/entities/webhook';
+export { webhookSchema, webhookPublicSchema, webhookUrlSchema } from './schemas/entities/webhook.js';
 
 export const webhookCreateSchema = webhookSchema.omit({ id: true });
 
@@ -136,13 +141,13 @@ export {
   webhookDeliveryStatusSchema,
   webhookRawValueSchema,
   TERMINAL_WEBHOOK_DELIVERY_STATUSES,
-} from './schemas/entities/webhook-delivery';
+} from './schemas/entities/webhook-delivery.js';
 export type {
   WebhookPayload,
   WebhookDeliveryEvent,
   WebhookDeliveryStatus,
   WebhookRawValue,
-} from './schemas/entities/webhook-delivery';
+} from './schemas/entities/webhook-delivery.js';
 
 export const webhookDeliveryCreateSchema = webhookDeliverySchema.omit({ id: true });
 
@@ -151,7 +156,7 @@ export type WebhookDeliveryCreate = z.infer<typeof webhookDeliveryCreateSchema>;
 /** End WebhookDelivery Entity Schema */
 
 /** UploadedFile Entity Schema */
-export { uploadedFileSchema } from './schemas/entities/uploaded-file';
+export { uploadedFileSchema } from './schemas/entities/uploaded-file.js';
 
 export const uploadedFileCreateSchema = uploadedFileSchema.omit({ id: true });
 
@@ -160,7 +165,7 @@ export type UploadedFileCreate = z.infer<typeof uploadedFileCreateSchema>;
 /** End UploadedFile Entity Schema */
 
 /** FileUsage Entity Schema */
-export { fileUsageSchema } from './schemas/entities/file-usage';
+export { fileUsageSchema } from './schemas/entities/file-usage.js';
 
 export const fileUsageCreateSchema = fileUsageSchema.omit({ id: true });
 
@@ -173,8 +178,8 @@ export {
   pageRevisionSchema,
   pageRevisionKindSchema,
   pageRevisionTargetSchema,
-} from './schemas/entities/page-revision';
-export type { PageRevisionKind, PageRevisionTarget } from './schemas/entities/page-revision';
+} from './schemas/entities/page-revision.js';
+export type { PageRevisionKind, PageRevisionTarget } from './schemas/entities/page-revision.js';
 
 export const pageRevisionCreateSchema = pageRevisionSchema.omit({ id: true });
 
@@ -183,8 +188,8 @@ export type PageRevisionCreate = z.infer<typeof pageRevisionCreateSchema>;
 /** End PageRevision Entity Schema */
 
 /** Setting Entity Schema */
-export { settingSchema, settingScopeSchema } from './schemas/entities/setting';
-export type { SettingScope } from './schemas/entities/setting';
+export { settingSchema, settingScopeSchema } from './schemas/entities/setting.js';
+export type { SettingScope } from './schemas/entities/setting.js';
 
 export const settingCreateSchema = settingSchema.omit({ id: true });
 
@@ -193,8 +198,8 @@ export type SettingCreate = z.infer<typeof settingCreateSchema>;
 /** End Setting Entity Schema */
 
 /** PlatformUser Entity Schema */
-export { platformUserSchema, platformUserRoleSchema } from './schemas/entities/platform-user';
-export type { PlatformUserRole } from './schemas/entities/platform-user';
+export { platformUserSchema, platformUserRoleSchema } from './schemas/entities/platform-user.js';
+export type { PlatformUserRole } from './schemas/entities/platform-user.js';
 
 export const platformUserCreateSchema = platformUserSchema.omit({ id: true });
 

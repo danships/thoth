@@ -1,5 +1,5 @@
-import { getWorkspaceRepository } from './repositories';
-import { isReservedWorkspaceSlug, slugify } from './utils/slug';
+import { getWorkspaceRepository } from './repositories.js';
+import { isReservedWorkspaceSlug, slugify } from './utils/slug.js';
 
 /**
  * Thrown by `reserveWorkspaceSlug` when the requested slug is a reserved word or already taken

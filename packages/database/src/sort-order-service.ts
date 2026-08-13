@@ -1,7 +1,7 @@
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
-import { getContainerRepository } from './repositories';
-import { addWorkspaceIdToQuery } from './helpers';
-import type { Container } from './types';
+import { getContainerRepository } from './repositories.js';
+import { addWorkspaceIdToQuery } from './helpers.js';
+import type { Container } from './types.js';
 
 /**
  * Manual-order comparator for parented listings (child pages, data-source rows, sibling-group

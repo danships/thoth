@@ -1,5 +1,5 @@
 import winston from 'winston';
-import { getEnvironment } from './environment';
+import { getEnvironment } from './environment.js';
 
 /**
  * Logger for `@thoth/jobs`. Mirrors `apps/web/src/lib/logger.ts`'s lazy-init pattern but is

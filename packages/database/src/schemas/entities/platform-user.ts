@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema } from '../utilities';
+import { withIdSchema, withTrackUpdatesSchema } from '../utilities.js';
 
 // The platform-wide role. `platform_admin` grants operational configuration rights only (see
 // THOTH-045) — it is deliberately NOT part of the workspace `AccessGrant` model and confers no

@@ -2,17 +2,17 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
-import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from './context';
-import { getContainerRepository, getDataViewRepository } from './repositories';
-import type { AccessGrant } from './access-grant-service';
-import type { DataSourceContainer, PageContainer } from './types';
+import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from './context.js';
+import { getContainerRepository, getDataViewRepository } from './repositories.js';
+import type { AccessGrant } from './access-grant-service.js';
+import type { DataSourceContainer, PageContainer } from './types.js';
 
 describe('access-grant-service', () => {
   let temporaryDirectory = '';
   let containerRepository: Awaited<ReturnType<typeof getContainerRepository>>;
   let dataViewRepository: Awaited<ReturnType<typeof getDataViewRepository>>;
-  let grantAllowsContainer: (typeof import('./access-grant-service'))['grantAllowsContainer'];
-  let filterContainersByGrant: (typeof import('./access-grant-service'))['filterContainersByGrant'];
+  let grantAllowsContainer: (typeof import('./access-grant-service.js'))['grantAllowsContainer'];
+  let filterContainersByGrant: (typeof import('./access-grant-service.js'))['filterContainersByGrant'];
 
   const workspaceId = 'workspace-1';
 
@@ -27,7 +27,7 @@ describe('access-grant-service', () => {
     // test file's own registration.
     setDatabaseContext(createDatabaseContext({ connectionString: `sqlite://${databaseFile}`, skipSync: false }));
 
-    const accessGrantServiceModule = await import('./access-grant-service');
+    const accessGrantServiceModule = await import('./access-grant-service.js');
 
     containerRepository = await getContainerRepository();
     dataViewRepository = await getDataViewRepository();
@@ -152,7 +152,7 @@ describe('access-grant-service', () => {
       };
 
       const filtered = await filterContainersByGrant(grant, [page, dataSource, unrelatedDataSource]);
-      expect(filtered.map((container) => container.id).sort()).toEqual([dataSource.id, page.id].sort());
+      expect(filtered.map((container) => container.id).toSorted()).toEqual([dataSource.id, page.id].toSorted());
     });
   });
 });

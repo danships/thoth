@@ -1,11 +1,11 @@
-import { getEnvironment } from './environment';
-import { getLogger } from './logger';
-import { resolveJobSocketPath } from './socket/socket-path';
-import { QueueService } from './queue/queue-service';
-import { createJobRegistry } from './handlers/index';
-import { Runner } from './runner/runner';
-import { Scheduler, type ScheduleDefinition } from './scheduler/scheduler';
-import { JobSocketServer } from './socket/server';
+import { getEnvironment } from './environment.js';
+import { getLogger } from './logger.js';
+import { resolveJobSocketPath } from './socket/socket-path.js';
+import { QueueService } from './queue/queue-service.js';
+import { createJobRegistry } from './handlers/index.js';
+import { Runner } from './runner/runner.js';
+import { Scheduler, type ScheduleDefinition } from './scheduler/scheduler.js';
+import { JobSocketServer } from './socket/server.js';
 import { createDatabaseContext, setDatabaseContext } from '@thoth/database';
 
 /**
@@ -51,15 +51,16 @@ async function main(): Promise<void> {
     wake: () => runner.wake(),
   });
 
-  const retentionInterval = setInterval(() => {
-    void queueService
-      .sweepRetention(environment.JOB_RETENTION_MS, environment.JOB_RETENTION_MAX)
-      .then((evicted) => {
+  const retentionInterval = setInterval(
+    () => {
+      void queueService.sweepRetention(environment.JOB_RETENTION_MS, environment.JOB_RETENTION_MAX).then((evicted) => {
         if (evicted.length > 0) {
           logger.info('job.retention.evicted', { count: evicted.length });
         }
       });
-  }, Math.min(environment.JOB_RETENTION_MS, 60_000));
+    },
+    Math.min(environment.JOB_RETENTION_MS, 60_000)
+  );
 
   runner.start();
   scheduler.start();
@@ -97,12 +98,13 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
-if (require.main === module) {
-  main().catch((error: unknown) => {
-    // eslint-disable-next-line no-console
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    await main();
+  } catch (error: unknown) {
     console.error('Fatal error starting @thoth/jobs', error);
     process.exit(1);
-  });
+  }
 }
 
 export { main };

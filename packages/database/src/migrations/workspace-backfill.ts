@@ -1,7 +1,7 @@
 import type { SuperSave } from 'supersave';
-import * as entities from '../entities';
-import { generateUniqueWorkspaceSlug } from '../workspace-slug';
-import type { Workspace, WorkspaceMemberCreate } from '../types';
+import * as entities from '../entities/index.js';
+import { generateUniqueWorkspaceSlug } from '../workspace-slug.js';
+import type { Workspace, WorkspaceMemberCreate } from '../types.js';
 
 /**
  * One-time backfill for existing `Workspace` rows created before multi-workspace support:

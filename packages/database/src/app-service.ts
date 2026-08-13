@@ -5,8 +5,8 @@ import {
   getContainerRepository,
   getDataViewRepository,
   getWorkspaceMemberRepository,
-} from './repositories';
-import type { ApiKey, App, Container } from './types';
+} from './repositories.js';
+import type { ApiKey, App, Container } from './types.js';
 
 // The single place the `"app--"` owner-id prefix convention is constructed/parsed, so it's
 // never hand-typed/duplicated at call sites. See Architecture Decision 1 in the THOTH-026 spec:

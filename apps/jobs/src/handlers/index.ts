@@ -1,6 +1,10 @@
-import { JobRegistry } from './registry';
-import { testNoopJobDefinition } from './noop-handler';
-import { webhookDispatchJobDefinition, webhookDeliverJobDefinition, webhookRedeliverJobDefinition } from './webhooks';
+import { JobRegistry } from './registry.js';
+import { testNoopJobDefinition } from './noop-handler.js';
+import {
+  webhookDispatchJobDefinition,
+  webhookDeliverJobDefinition,
+  webhookRedeliverJobDefinition,
+} from './webhooks/index.js';
 
 /**
  * Builds the internal job registry for this process. The `test.noop` handler is only wired
@@ -9,14 +13,14 @@ import { webhookDispatchJobDefinition, webhookDeliverJobDefinition, webhookRedel
  * test runs — from the socket to a runnable internal job. `webhook.dispatch`/`webhook.deliver`/
  * `webhook.redeliver` are production job types (THOTH-061) registered unconditionally.
  */
-export function createJobRegistry(nodeEnv: string): JobRegistry {
+export function createJobRegistry(nodeEnvironment: string): JobRegistry {
   const registry = new JobRegistry();
 
   registry.register(webhookDispatchJobDefinition);
   registry.register(webhookDeliverJobDefinition);
   registry.register(webhookRedeliverJobDefinition);
 
-  if (nodeEnv === 'test') {
+  if (nodeEnvironment === 'test') {
     registry.register(testNoopJobDefinition);
   }
 

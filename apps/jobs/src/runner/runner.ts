@@ -1,9 +1,9 @@
 import type { Logger } from 'winston';
 import { RetryableJobError, type JobExecutionContext } from '@thoth/job-protocol';
-import type { QueueService } from '../queue/queue-service';
-import type { JobRegistry } from '../handlers/registry';
-import type { JobRecord } from '../queue/types';
-import { computeBackoffMs } from './backoff';
+import type { QueueService } from '../queue/queue-service.js';
+import type { JobRegistry } from '../handlers/registry.js';
+import type { JobRecord } from '../queue/types.js';
+import { computeBackoffMs } from './backoff.js';
 
 export type RunnerOptions = {
   concurrency?: number;

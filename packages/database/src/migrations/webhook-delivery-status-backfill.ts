@@ -1,6 +1,6 @@
 import type { SuperSave } from 'supersave';
-import * as entities from '../entities';
-import type { WebhookDelivery } from '../types';
+import * as entities from '../entities/index.js';
+import type { WebhookDelivery } from '../types.js';
 
 /**
  * One-time backfill for THOTH-061 ("Move webhook delivery to the job service"): normalizes

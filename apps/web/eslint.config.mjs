@@ -5,6 +5,13 @@ const eslintConfig = [
   ...nextConfig,
   eslintPluginUnicorn.configs.recommended,
   {
+    languageOptions: {
+      parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
     rules: {
       'unicorn/no-useless-undefined': 'off',
       'unicorn/no-null': 'off',

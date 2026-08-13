@@ -1,6 +1,6 @@
 import type { SuperSave } from 'supersave';
-import * as entities from '../entities';
-import type { Container, DataView } from '../types';
+import * as entities from '../entities/index.js';
+import type { Container, DataView } from '../types.js';
 
 export async function backfillSoftDeleteFields(superSave: SuperSave): Promise<void> {
   const containerRepository = superSave.getRepository<Container>(entities.CONTAINER_NAME);

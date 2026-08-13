@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { JobDisposition } from './envelope';
+import type { JobDisposition } from './envelope.js';
 
 /**
  * Shared *type* definitions describing the internal job registry shape (THOTH-059).
@@ -11,14 +11,13 @@ import type { JobDisposition } from './envelope';
  * (`external-job.ts`), which intentionally exposes a much smaller, caller-facing schema.
  */
 
-
 export type JobStatus = 'queued' | 'running' | 'completed' | 'dead';
 
 /** Result of asking the runner to enqueue a child job from within a handler (THOTH-061). */
 export type EnqueueChildResult = { jobId: string; disposition: JobDisposition };
 
 /** Enqueues another *internal* job type directly (in-process — never over the IPC socket). */
-export type EnqueueChildFn = (input: {
+export type EnqueueChildFunction = (input: {
   type: string;
   payloadVersion: number;
   payload: unknown;
@@ -36,7 +35,7 @@ export type JobExecutionContext<TPayload> = {
   signal: AbortSignal;
   now: () => Date;
   /** Enqueues a child internal job (e.g. `webhook.dispatch` fanning out to `webhook.deliver`). */
-  enqueueChild: EnqueueChildFn;
+  enqueueChild: EnqueueChildFunction;
 };
 
 /**

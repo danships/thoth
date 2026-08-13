@@ -10,7 +10,7 @@ import {
   type DataSourceContainer,
   type PageContainer,
 } from '@thoth/database';
-import { buildPayload } from './build-payload';
+import { buildPayload } from './build-payload.js';
 
 function makeDataSource(): DataSourceContainer {
   return {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { QueueStore } from './queue-store';
+import { QueueStore } from './queue-store.js';
 
 describe('QueueStore', () => {
   test('selectDue orders by priority desc, runAt asc, createdAt asc and excludes future jobs', () => {

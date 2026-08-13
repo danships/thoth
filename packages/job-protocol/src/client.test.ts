@@ -3,17 +3,17 @@ import { createServer, type Server } from 'node:net';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
-import { JobClientError, enqueueJob, pingJobService } from './client';
-import { JobRequestEnvelopeSchema } from './envelope';
+import { JobClientError, enqueueJob, pingJobService } from './client.js';
+import { JobRequestEnvelopeSchema } from './envelope.js';
 
 describe('job-protocol client', () => {
-  let dir: string;
+  let temporaryDirectory: string;
   let socketPath: string;
   let server: Server;
 
   beforeAll(async () => {
-    dir = await mkdtemp(nodePath.join(tmpdir(), 'thoth-job-protocol-client-test-'));
-    socketPath = nodePath.join(dir, 'jobs.sock');
+    temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-job-protocol-client-test-'));
+    socketPath = nodePath.join(temporaryDirectory, 'jobs.sock');
 
     server = createServer((socket) => {
       let buffer = '';
@@ -26,7 +26,14 @@ describe('job-protocol client', () => {
         const line = buffer.slice(0, newlineIndex);
         const parsed = JobRequestEnvelopeSchema.safeParse(JSON.parse(line));
         if (!parsed.success) {
-          socket.end(JSON.stringify({ version: 1, requestId: 'bad', ok: false, error: { code: 'INVALID_REQUEST', message: 'bad', retryable: false } }) + '\n');
+          socket.end(
+            JSON.stringify({
+              version: 1,
+              requestId: 'bad',
+              ok: false,
+              error: { code: 'INVALID_REQUEST', message: 'bad', retryable: false },
+            }) + '\n'
+          );
           return;
         }
         const request = parsed.data;
@@ -50,7 +57,7 @@ describe('job-protocol client', () => {
 
   afterAll(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    await rm(dir, { recursive: true, force: true });
+    await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
   test('ping succeeds and correlates requestId', async () => {
@@ -59,10 +66,7 @@ describe('job-protocol client', () => {
   });
 
   test('enqueue succeeds and returns jobId/disposition', async () => {
-    const response = await enqueueJob(
-      { type: 'test.noop', payloadVersion: 1, payload: {} },
-      { socketPath }
-    );
+    const response = await enqueueJob({ type: 'test.noop', payloadVersion: 1, payload: {} }, { socketPath });
     expect(response.ok).toBe(true);
     if (response.ok) {
       expect(response.result.jobId).toBe('job-123');
@@ -71,7 +75,9 @@ describe('job-protocol client', () => {
   });
 
   test('rejects with CONNECT_FAILED for a non-existent socket', async () => {
-    await expect(pingJobService({ socketPath: nodePath.join(dir, 'does-not-exist.sock') })).rejects.toMatchObject({
+    await expect(
+      pingJobService({ socketPath: nodePath.join(temporaryDirectory, 'does-not-exist.sock') })
+    ).rejects.toMatchObject({
       code: 'CONNECT_FAILED',
     });
   });
@@ -84,24 +90,24 @@ describe('job-protocol client', () => {
 
   test('reports a retryable CONNECT_FAILED for a missing socket path', async () => {
     await expect(
-      pingJobService({ socketPath: nodePath.join(dir, 'nope.sock'), connectTimeoutMs: 100 })
+      pingJobService({ socketPath: nodePath.join(temporaryDirectory, 'nope.sock'), connectTimeoutMs: 100 })
     ).rejects.toMatchObject({ code: 'CONNECT_FAILED', retryable: true });
   });
 });
 
 describe('job-protocol client error paths requiring dedicated stub servers', () => {
-  let dir: string;
+  let temporaryDirectory: string;
 
   beforeAll(async () => {
-    dir = await mkdtemp(nodePath.join(tmpdir(), 'thoth-job-protocol-client-error-test-'));
+    temporaryDirectory = await mkdtemp(nodePath.join(tmpdir(), 'thoth-job-protocol-client-error-test-'));
   });
 
   afterAll(async () => {
-    await rm(dir, { recursive: true, force: true });
+    await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
   test('reports RESPONSE_TIMEOUT when the server accepts but never responds', async () => {
-    const socketPath = nodePath.join(dir, 'unresponsive.sock');
+    const socketPath = nodePath.join(temporaryDirectory, 'unresponsive.sock');
     const sockets = new Set<import('node:net').Socket>();
     const server = createServer((socket) => {
       // Accept the connection and read the request, but never write a response.
@@ -111,9 +117,10 @@ describe('job-protocol client error paths requiring dedicated stub servers', () 
     await new Promise<void>((resolve) => server.listen(socketPath, resolve));
 
     try {
-      await expect(
-        pingJobService({ socketPath, responseTimeoutMs: 100 })
-      ).rejects.toMatchObject({ code: 'RESPONSE_TIMEOUT', retryable: true });
+      await expect(pingJobService({ socketPath, responseTimeoutMs: 100 })).rejects.toMatchObject({
+        code: 'RESPONSE_TIMEOUT',
+        retryable: true,
+      });
     } finally {
       // The client destroys its end abruptly; explicitly destroy the accepted server-side
       // socket too so `server.close()`'s callback isn't left waiting on a lingering connection.
@@ -125,7 +132,7 @@ describe('job-protocol client error paths requiring dedicated stub servers', () 
   });
 
   test('reports REQUEST_ID_MISMATCH when the response echoes a different requestId', async () => {
-    const socketPath = nodePath.join(dir, 'mismatched.sock');
+    const socketPath = nodePath.join(temporaryDirectory, 'mismatched.sock');
     const server = createServer((socket) => {
       socket.on('data', () => {
         socket.end(

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema } from '../utilities';
+import { withIdSchema } from '../utilities.js';
 
 export const webhookDeliveryEventSchema = z.enum(['page.created', 'page.updated']);
 export type WebhookDeliveryEvent = z.infer<typeof webhookDeliveryEventSchema>;
@@ -10,11 +10,7 @@ export type WebhookDeliveryEvent = z.infer<typeof webhookDeliveryEventSchema>;
 export const webhookDeliveryStatusSchema = z.enum(['pending', 'retrying', 'success', 'failed', 'cancelled']);
 export type WebhookDeliveryStatus = z.infer<typeof webhookDeliveryStatusSchema>;
 
-export const TERMINAL_WEBHOOK_DELIVERY_STATUSES: readonly WebhookDeliveryStatus[] = [
-  'success',
-  'failed',
-  'cancelled',
-];
+export const TERMINAL_WEBHOOK_DELIVERY_STATUSES: readonly WebhookDeliveryStatus[] = ['success', 'failed', 'cancelled'];
 
 // The primitive union stored/emitted for a page's data-source column values in a webhook
 // payload — no internal column/option ids ever appear here (single-select is resolved to its

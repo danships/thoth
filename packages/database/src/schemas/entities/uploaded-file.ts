@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities';
+import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities.js';
 
 // Canonical record of an uploaded blob. `storageKey`/`storageType` are opaque details of
 // wherever `getStorageAdapter()` actually persisted the bytes (see `src/lib/storage`) — never

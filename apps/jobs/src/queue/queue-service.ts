@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { JobDisposition, JobCoalescePolicy } from '@thoth/job-protocol';
-import { QueueStore } from './queue-store';
-import type { JobRecord } from './types';
+import { QueueStore } from './queue-store.js';
+import type { JobRecord } from './types.js';
 
 export type EnqueueInput = {
   type: string;

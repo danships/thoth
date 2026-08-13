@@ -2,7 +2,7 @@
   "name": "@thoth/jobs",
   "version": "0.1.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "main": "./dist/index.js",
   "engines": {
     "node": "24.x"

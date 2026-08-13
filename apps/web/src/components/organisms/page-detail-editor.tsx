@@ -239,7 +239,6 @@ export const PageDetailEditor = React.forwardRef<PageDetailEditorHandle, PageDet
     // Render the editor
     return (
       <div className={styles['editorWrapper'] ?? ''} ref={containerReference} onClickCapture={handleClick}>
-        {/* @ts-expect-error Is an issue with the editor, the typings are not 100% correct */}
         <BlockNoteView editor={editor} theme={colorScheme === 'dark' ? 'dark' : 'light'} onChange={onChange} />
       </div>
     );

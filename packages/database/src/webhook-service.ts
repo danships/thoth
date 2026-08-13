@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { getWebhookDeliveryRepository, getWebhookRepository } from './repositories';
-import type { Webhook, WebhookDelivery, WebhookPayload } from './types';
+import { getWebhookDeliveryRepository, getWebhookRepository } from './repositories.js';
+import type { Webhook, WebhookDelivery, WebhookPayload } from './types.js';
 
 // Cap on how many *terminal* `webhook-delivery` rows are retained per webhook — see
 // `pruneTerminalDeliveries`. Also reused as the `.limit()` on the deliveries-listing route so
@@ -203,7 +203,7 @@ export async function pruneTerminalDeliveries(webhookId: string): Promise<void> 
     webhookDeliveryRepository.createQuery().eq('webhookId', webhookId).sort('createdAt', 'desc')
   );
 
-  const terminal = existing.filter((row) => row.status === 'success' || row.status === 'failed' || row.status === 'cancelled');
+  const terminal = existing.filter((row) => ['success', 'failed', 'cancelled'].includes(row.status));
   const toDelete = terminal.slice(MAX_DELIVERIES_PER_WEBHOOK);
   for (const row of toDelete) {
     await webhookDeliveryRepository.deleteUsingId(row.id);

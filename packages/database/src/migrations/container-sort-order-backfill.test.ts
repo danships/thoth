@@ -2,14 +2,14 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
-import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from '../context';
-import { getContainerRepository, getDatabase } from '../repositories';
-import type { PageContainer } from '../types';
+import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from '../context.js';
+import { getContainerRepository, getDatabase } from '../repositories.js';
+import type { PageContainer } from '../types.js';
 
 describe('container-sort-order-backfill', () => {
   let temporaryDirectory = '';
   let containerRepository: Awaited<ReturnType<typeof getContainerRepository>>;
-  let backfillContainerSortOrder: (typeof import('./container-sort-order-backfill'))['backfillContainerSortOrder'];
+  let backfillContainerSortOrder: (typeof import('./container-sort-order-backfill.js'))['backfillContainerSortOrder'];
 
   const workspaceId = 'workspace-1';
 
@@ -25,7 +25,7 @@ describe('container-sort-order-backfill', () => {
     // this backfill).
     setDatabaseContext(createDatabaseContext({ connectionString: `sqlite://${databaseFile}`, skipSync: false }));
 
-    const backfillModule = await import('./container-sort-order-backfill');
+    const backfillModule = await import('./container-sort-order-backfill.js');
 
     containerRepository = await getContainerRepository();
     backfillContainerSortOrder = backfillModule.backfillContainerSortOrder;
@@ -35,7 +35,6 @@ describe('container-sort-order-backfill', () => {
     resetDatabaseContext();
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
-
 
   async function createTestPage(options: {
     parentId: string | null;

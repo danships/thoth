@@ -1,15 +1,16 @@
 import type { Migration, SuperSave } from 'supersave';
 import type { Database } from 'better-sqlite3';
 import type { Pool } from 'mysql2/promise';
-import { BETTER_AUTH_SQLITE_SQL, BETTER_AUTH_MYSQL_SQL } from './better-auth';
-import { backfillSoftDeleteFields } from './soft-delete-backfill';
-import { backfillWorkspaces } from './workspace-backfill';
-import { backfillWorkspaceStorageQuota } from './workspace-storage-quota-backfill';
-import { backfillMemberAccess } from './member-access-backfill';
-import { backfillContainerSortOrder } from './container-sort-order-backfill';import { backfillPlatformUsers } from './platform-user-backfill';
-import { backfillWorkspaceQuotaSettings } from './workspace-quota-settings-backfill';
-import { backfillUploadedFileBillingUser } from './uploaded-file-billing-user-backfill';
-import { backfillWebhookDeliveryStatus } from './webhook-delivery-status-backfill';
+import { BETTER_AUTH_SQLITE_SQL, BETTER_AUTH_MYSQL_SQL } from './better-auth.js';
+import { backfillSoftDeleteFields } from './soft-delete-backfill.js';
+import { backfillWorkspaces } from './workspace-backfill.js';
+import { backfillWorkspaceStorageQuota } from './workspace-storage-quota-backfill.js';
+import { backfillMemberAccess } from './member-access-backfill.js';
+import { backfillContainerSortOrder } from './container-sort-order-backfill.js';
+import { backfillPlatformUsers } from './platform-user-backfill.js';
+import { backfillWorkspaceQuotaSettings } from './workspace-quota-settings-backfill.js';
+import { backfillUploadedFileBillingUser } from './uploaded-file-billing-user-backfill.js';
+import { backfillWebhookDeliveryStatus } from './webhook-delivery-status-backfill.js';
 
 export const migrations: Migration[] = [
   {
@@ -118,4 +119,4 @@ export const migrations: Migration[] = [
 // Re-exported (in addition to being wired into the `migrations` array above) so the e2e seed
 // script can replicate the same sort-order backfill directly against a fresh, in-memory
 // `SuperSave` instance without running the full migration set.
-export { backfillContainerSortOrder };
+export { backfillContainerSortOrder } from './container-sort-order-backfill.js';

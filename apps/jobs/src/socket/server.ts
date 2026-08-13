@@ -7,11 +7,10 @@ import {
   JobResponseEnvelopeSchema,
   type JobResponseEnvelope,
   type JobCoalescePolicy,
-  MAX_FRAME_BYTES,
 } from '@thoth/job-protocol';
-import type { QueueService } from '../queue/queue-service';
-import type { JobRegistry } from '../handlers/registry';
-import { FrameParser } from './frame-parser';
+import type { QueueService } from '../queue/queue-service.js';
+import type { JobRegistry } from '../handlers/registry.js';
+import { FrameParser } from './frame-parser.js';
 
 export type JobSocketServerOptions = {
   socketPath: string;
@@ -49,9 +48,9 @@ async function probeSocketIsLive(socketPath: string, timeoutMs = 1000): Promise<
  * second worker; a symlink/regular-file/directory/foreign-owned entry is refused outright.
  */
 async function prepareSocketPath(socketPath: string): Promise<void> {
-  const parentDir = nodePath.dirname(socketPath);
-  await mkdir(parentDir, { recursive: true, mode: 0o700 });
-  await chmod(parentDir, 0o700);
+  const parentDirectory = nodePath.dirname(socketPath);
+  await mkdir(parentDirectory, { recursive: true, mode: 0o700 });
+  await chmod(parentDirectory, 0o700);
 
   let stat;
   try {
@@ -181,7 +180,11 @@ export class JobSocketServer {
           version: 1,
           requestId: 'unknown',
           ok: false,
-          error: { code: 'INVALID_REQUEST', message: 'Only a single frame is accepted per connection', retryable: false },
+          error: {
+            code: 'INVALID_REQUEST',
+            message: 'Only a single frame is accepted per connection',
+            retryable: false,
+          },
         });
         return;
       }
@@ -280,7 +283,8 @@ export class JobSocketServer {
       // (see `packages/job-protocol/src/webhook-job.ts`), so this fallback can never be abused
       // to spoof a coalescing key for those types.
       const dedupeKey =
-        derivedDedupeKey ?? ('dedupeKey' in request.job ? (request.job as { dedupeKey?: string }).dedupeKey : undefined);
+        derivedDedupeKey ??
+        ('dedupeKey' in request.job ? (request.job as { dedupeKey?: string }).dedupeKey : undefined);
       const result = await this.options.queueService.enqueue({
         type: request.job.type,
         payloadVersion: request.job.payloadVersion,
@@ -317,4 +321,5 @@ export class JobSocketServer {
 }
 
 /** Exposed for tests that need to assert the frame cap without spinning up a real socket. */
-export { MAX_FRAME_BYTES };
+
+export { MAX_FRAME_BYTES } from '@thoth/job-protocol';

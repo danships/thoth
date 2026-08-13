@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { ExternalJobRequestSchema, TestNoopExternalJobRequestSchema } from './external-job';
-import { webhookDispatchExternalJobRequestSchema, webhookRedeliverExternalJobRequestSchema } from './webhook-job';
+import { ExternalJobRequestSchema, TestNoopExternalJobRequestSchema } from './external-job.js';
+import { webhookDispatchExternalJobRequestSchema, webhookRedeliverExternalJobRequestSchema } from './webhook-job.js';
 
 // vitest sets NODE_ENV=test, so ExternalJobRequestSchema resolves to the test-only diagnostic
 // schema here. This test asserts that behaviour explicitly rather than relying on it silently.
@@ -123,8 +123,8 @@ describe('webhook.dispatch external schema', () => {
 
   test('rejects too many valueChanges entries', () => {
     const valueChanges: Record<string, unknown> = {};
-    for (let i = 0; i < 260; i += 1) {
-      valueChanges[`col-${i}`] = { previous: null, new: { type: 'string', value: 'x' } };
+    for (let index = 0; index < 260; index += 1) {
+      valueChanges[`col-${index}`] = { previous: null, new: { type: 'string', value: 'x' } };
     }
     const result = webhookDispatchExternalJobRequestSchema.safeParse({
       type: 'webhook.dispatch',
