@@ -4,6 +4,7 @@ import {
   createPendingDelivery,
   findDeliveryBySourceJobAndWebhook,
   getContainerRepository,
+  getWebhookDeliveryRepository,
   type PageValue,
 } from '@thoth/database';
 import {
@@ -43,7 +44,8 @@ export function mergeWebhookDispatchPayload(
   existing: WebhookDispatchPayloadV1,
   incoming: WebhookDispatchPayloadV1
 ): WebhookDispatchPayloadV1 {
-  const event = existing.event === 'page.created' || incoming.event === 'page.created' ? 'page.created' : 'page.updated';
+  const event =
+    existing.event === 'page.created' || incoming.event === 'page.created' ? 'page.created' : 'page.updated';
 
   const merged: ValueChangeInput = {};
   const keys = new Set([...Object.keys(existing.valueChanges ?? {}), ...Object.keys(incoming.valueChanges ?? {})]);
@@ -129,9 +131,14 @@ export const webhookDispatchJobDefinition: JobDefinition<WebhookDispatchPayloadV
       let delivery = await findDeliveryBySourceJobAndWebhook(context.jobId, webhook.id);
 
       if (!delivery) {
+        // `buildPayload` needs a `deliveryId` up front, but the repository only assigns the real
+        // id on `create` (it doesn't accept a caller-supplied id) — build with a placeholder,
+        // then correct the stored payload's `deliveryId` to match the row's actual id so the
+        // transmitted/stored payload always correlates with the delivery row (THOTH-061).
+        const placeholderId = randomUUID();
         const builtPayload = await buildPayload(
           payload.event,
-          randomUUID(),
+          placeholderId,
           payload.workspaceId,
           webhook.appId,
           container,
@@ -146,6 +153,14 @@ export const webhookDispatchJobDefinition: JobDefinition<WebhookDispatchPayloadV
           payload: builtPayload,
           sourceJobId: context.jobId,
         });
+
+        if (delivery.payload.deliveryId !== delivery.id) {
+          const webhookDeliveryRepository = await getWebhookDeliveryRepository();
+          delivery = await webhookDeliveryRepository.update({
+            ...delivery,
+            payload: { ...delivery.payload, deliveryId: delivery.id },
+          });
+        }
       }
 
       if (delivery.status === 'success' || delivery.status === 'failed' || delivery.status === 'cancelled') {

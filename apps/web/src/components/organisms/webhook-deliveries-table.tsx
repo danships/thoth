@@ -122,8 +122,14 @@ export function WebhookDeliveriesTable({ deliveries, onResend }: WebhookDeliveri
                       variant="subtle"
                       aria-label="Resend delivery"
                       loading={resendingId === delivery.id}
-                      disabled={isActive}
-                      onClick={() => handleResend(delivery.id)}
+                      data-disabled={isActive}
+                      onClick={(event) => {
+                        if (isActive) {
+                          event.preventDefault();
+                          return;
+                        }
+                        handleResend(delivery.id);
+                      }}
                     >
                       <IconRefresh size={16} />
                     </ActionIcon>

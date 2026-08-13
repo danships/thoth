@@ -5,7 +5,15 @@ import net from 'node:net';
 // don't re-resolve DNS on every single send, while still being re-checked often enough to
 // defend against DNS rebinding (a hostname that later re-resolves to a private IP is caught
 // within this window, not just at webhook-creation time).
-const DNS_CACHE_TTL_MS = 30_000;
+//
+// KNOWN RESIDUAL RISK (accepted for THOTH-061): this guard and the actual `fetch` in
+// `deliver.ts` perform *separate* DNS resolutions. A malicious/compromised DNS answer could in
+// theory return a public address for this check and a private/loopback address moments later
+// for the real connection (classic TOCTOU/DNS-rebinding SSRF). Fully closing that gap requires
+// pinning the resolved address for the connection itself (e.g. a custom `undici` `Agent` with
+// `connect.lookup`) while preserving the original `Host`/SNI — tracked as a follow-up. The TTL
+// below is kept short specifically to minimize this window rather than widen it.
+const DNS_CACHE_TTL_MS = 5_000;
 const dnsSafetyCache = new Map<string, { safeUntil: number; isSafe: boolean }>();
 
 /** Parses a dotted-quad/IPv6 literal and checks it against every reserved/private range we reject. */
@@ -40,6 +48,7 @@ function isPrivateOrLocalIp(address: string): boolean {
   // link-local fe80::/10 (fe80:: through febf::)
   if (/^fe[89ab][0-9a-f]:/.test(normalized)) return true;
   if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true; // unique local fc00::/7
+  if (normalized.startsWith('ff')) return true; // multicast ff00::/8 (incl. ff02::1 all-nodes link-local)
   // IPv4-mapped IPv6 addresses (::ffff:a.b.c.d or the fully-hex ::ffff:7f00:1 form) — unwrap and
   // re-check as IPv4 so a mapped loopback/private address can't slip past the dotted-quad regex.
   const dottedMapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalized);
@@ -106,7 +115,11 @@ export async function assertPublicHttpsUrl(rawUrl: string): Promise<void> {
     throw new Error('url must use the https protocol');
   }
 
-  const hostname = parsed.hostname;
+  // `URL.hostname` keeps the brackets around an IPv6 literal (e.g. `[::1]`) — strip them so the
+  // literal-IP branch in `resolveIsPublicHost` recognises the address instead of falling through
+  // to a DNS lookup that will simply fail.
+  const hostname =
+    parsed.hostname.startsWith('[') && parsed.hostname.endsWith(']') ? parsed.hostname.slice(1, -1) : parsed.hostname;
   const isPublic = await resolveIsPublicHost(hostname);
   if (!isPublic) {
     throw new Error('url resolves to a private, local, or unresolvable address');

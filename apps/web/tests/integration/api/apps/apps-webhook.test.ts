@@ -319,18 +319,17 @@ describe('apps webhooks management API', () => {
           const deliveriesResponse = await client.get(`/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries`);
           const { deliveries } = await getData<{ deliveries: DeliveryApi[] }>(deliveriesResponse);
           deliveryId = deliveries[0]?.id;
-          return deliveries.length;
+          return deliveries[0]?.status;
         },
         { timeout: 10_000 }
       )
-      .toBeGreaterThan(0);
+      .toMatch(/^(pending|retrying)$/);
 
-    // The delivery is very likely still `pending`/`retrying` immediately after being created
-    // (the unreachable URL keeps it non-terminal), so a resend right away should conflict.
+    // The unreachable URL keeps the row non-terminal, so a resend must conflict.
     const resendResponse = await client.post(
       `/api/v1/apps/${app.id}/webhooks/${webhook.id}/deliveries/${deliveryId}/resend`
     );
-    expect([409, 202]).toContain(resendResponse.status);
+    expect(resendResponse.status).toBe(409);
   });
 
   test('a burst of rapid page edits for the same actor coalesces into a single delivery', async () => {

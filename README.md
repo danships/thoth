@@ -68,7 +68,7 @@ connection string works for a single-SQLite-file deployment):
 | Variable | Required? | Default | Description |
 |----------|------------|---------|--------------|
 | `NODE_ENV` | Yes | — | `development`, `production`, or `test`. |
-| `DB` | Yes | — | Database connection string, same value as `apps/web`'s `DB` above. Used to load/update webhook deliveries (`webhook.dispatch`/`webhook.deliver`/`webhook.redeliver`, THOTH-061). Opened with schema sync/migrations disabled — `apps/web` owns migrations. |
+| `DB` | Yes | — | Database connection string, same value as `apps/web`'s `DB` above. |
 | `JOB_SOCKET_PATH` | No | a per-UID private temp path | Absolute path to the Unix domain socket `@thoth/jobs` listens on. Also read directly by `apps/web`'s `/api/health` route (`apps/web/src/lib/jobs/health.ts`) to reach the same socket — set it once and pass it to both processes (PM2/Docker/dev harness/tests all do this already). |
 | `JOB_POLL_INTERVAL_MS` | No | `1000` | How often the runner polls for due jobs when not woken by an enqueue/retry. |
 | `JOB_SHUTDOWN_TIMEOUT_MS` | No | `10000` | How long the process waits for active handlers to finish/abort on SIGTERM/SIGINT before exiting. PM2's `kill_timeout` for `thoth-jobs` (`pm2.config.js`) is deliberately longer than this. |
@@ -95,8 +95,8 @@ harness locally/in tests (`scripts/dev.mjs`, `apps/web/tests/integration/global-
 - **`thoth-web`** — the Next.js app. The only process that binds an HTTP port (`3000` by
   default). Runs with schema sync always disabled (`skipSync: true`).
 - **`thoth-jobs`** (`@thoth/jobs`) — an in-memory job queue/scheduler served over a Unix domain
-  socket (never TCP/HTTP). No database access, no exposed port. Never administered via HTTP/UI
-  by design (see THOTH-060 non-goals).
+  socket (never TCP/HTTP). Opens its own database connection (schema sync/migrations disabled),
+  no exposed port. Never administered via HTTP/UI by design (see THOTH-060 non-goals).
 
 Both are PM2 **fork-mode, single-instance** apps (`instances: 1`) — clustering is not supported:
 the current queue is a single in-process instance, and the web/session/SQLite test topology has
@@ -109,8 +109,8 @@ CLI) must complete **before** PM2 starts either process — see `scripts/start-p
 the sole production/preview entrypoint (`pnpm start`/`pnpm start:production`, and both
 Dockerfiles' `CMD`). PM2 child restarts never re-run migrations. Within PM2, jobs is declared
 first and uses `wait_ready`/`listen_timeout` (jobs signals `process.send('ready')` only after
-DB-free startup — lease recovery, scheduler init, and a secure `0600`-mode Unix socket bind — see
-`apps/jobs/src/index.ts`), but web may start listening before jobs finishes binding; this is
+startup completes — opening its database connection, lease recovery, scheduler init, and a
+secure `0600`-mode Unix socket bind — see `apps/jobs/src/index.ts`), but web may start listening before jobs finishes binding; this is
 safe because `/api/health` stays `503` until jobs responds to a real `ping`.
 
 **Health (`GET /api/health`, public, unauthenticated):** returns `200

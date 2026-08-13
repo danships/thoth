@@ -16,7 +16,11 @@ import { resendWebhookDeliveryParametersSchema } from '@/types/api';
  * disabled/already-active conflicts are checked here (session-only, before any job is
  * enqueued); the jobs process is trusted to reload current webhook state again before actually
  * delivering. A `503` means nothing was accepted (the delivery row keeps its prior state); a
- * `202` guarantees the job service durably acknowledged the request.
+ * `202` guarantees the job service durably acknowledged the request. `delivery` in the response
+ * is the *pre-enqueue* snapshot (the row's state at the moment this route read it) — the actual
+ * reset to `pending` happens asynchronously inside `webhook.redeliver`, after this route has
+ * already responded, so it cannot be reflected here. Callers must poll the deliveries-listing
+ * endpoint to observe the transition.
  */
 export const POST = apiRoute<ResendWebhookDeliveryResponse, undefined, ResendWebhookDeliveryParameters, {}>(
   {

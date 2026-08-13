@@ -24,9 +24,27 @@ export function truncateError(message: string): string {
 }
 
 const RETRYABLE_STATUSES = new Set([408, 425, 429]);
+const MAX_BODY_SNIPPET_BYTES = 2048;
 
 function isRetryableStatus(status: number): boolean {
   return status >= 500 || RETRYABLE_STATUSES.has(status);
+}
+
+/** Reads at most `MAX_BODY_SNIPPET_BYTES` from a response body, never buffering the whole thing. */
+async function readBodySnippet(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return '';
+  }
+  try {
+    const { value } = await reader.read();
+    const chunk = value?.slice(0, MAX_BODY_SNIPPET_BYTES) ?? new Uint8Array();
+    return new TextDecoder().decode(chunk);
+  } catch {
+    return '';
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
 }
 
 /**
@@ -62,9 +80,7 @@ export const webhookDeliverJobDefinition: JobDefinition<WebhookDeliverPayload> =
     }
 
     const webhookRepository = await getWebhookRepository();
-    const webhook = await webhookRepository.getOneByQuery(
-      webhookRepository.createQuery().eq('id', delivery.webhookId)
-    );
+    const webhook = await webhookRepository.getOneByQuery(webhookRepository.createQuery().eq('id', delivery.webhookId));
 
     if (!webhook || !webhook.enabled) {
       await completeDelivery(delivery.id, { status: 'cancelled' });
@@ -83,9 +99,22 @@ async function deliverOnce(
 ): Promise<unknown> {
   const rawBody = JSON.stringify(delivery.payload);
 
+  // The SSRF guard is a terminal check (doc: THOTH-061 spec §38) — run it outside the
+  // retry-wrapped try/catch below so a rejected URL fails immediately instead of consuming all
+  // retry attempts and writing `retrying` state in between.
   try {
     await assertPublicHttpsUrl(url);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'URL rejected by SSRF guard';
+    await completeDelivery(delivery.id, {
+      status: 'failed',
+      httpStatus: null,
+      error: truncateError(message),
+    });
+    return { status: 'failed', httpStatus: null, reason: 'ssrf-rejected' };
+  }
 
+  try {
     const signature = signPayload(secret, rawBody);
     const response = await fetch(url, {
       method: 'POST',
@@ -108,12 +137,12 @@ async function deliverOnce(
       const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'), context.now);
       return retryOrFail(delivery, context, {
         httpStatus: response.status,
-        error: truncateError((await response.text().catch(() => '')) || `Non-2xx response: ${response.status}`),
+        error: truncateError((await readBodySnippet(response)) || `Non-2xx response: ${response.status}`),
         ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
       });
     }
 
-    const bodySnippet = await response.text().catch(() => '');
+    const bodySnippet = await readBodySnippet(response);
     await completeDelivery(delivery.id, {
       status: 'failed',
       httpStatus: response.status,
@@ -138,7 +167,9 @@ async function retryOrFail(
     return { status: 'failed', httpStatus: outcome.httpStatus, exhausted: true };
   }
 
-  const delayMs = outcome.retryAfterMs ?? computeBackoffMs(context.attempt, { baseMs: getEnvironment().WEBHOOK_DELIVERY_BACKOFF_BASE_MS });
+  const delayMs =
+    outcome.retryAfterMs ??
+    computeBackoffMs(context.attempt, { baseMs: getEnvironment().WEBHOOK_DELIVERY_BACKOFF_BASE_MS });
   const nextAttemptAt = new Date(context.now().getTime() + delayMs).toISOString();
   await scheduleDeliveryRetry(delivery.id, { httpStatus: outcome.httpStatus, error: outcome.error, nextAttemptAt });
 
