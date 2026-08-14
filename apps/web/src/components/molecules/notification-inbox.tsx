@@ -112,10 +112,9 @@ export function NotificationInbox({ workspaceId, title = 'Notifications' }: Noti
       </Group>
 
       <Text size="sm" c="dimmed">
-        Notifications are sent according to the rules configured for a workspace, on that
-        workspace&apos;s settings page. You can further tune what you receive for an individual
-        page from the page&apos;s menu, where you can subscribe (or unsubscribe) to that page alone
-        or to it and all of its sub-pages.
+        Notifications are sent according to the rules configured for a workspace, on that workspace&apos;s settings
+        page. You can further tune what you receive for an individual page from the page&apos;s menu, where you can
+        subscribe (or unsubscribe) to that page alone or to it and all of its sub-pages.
       </Text>
 
       {renderList()}
