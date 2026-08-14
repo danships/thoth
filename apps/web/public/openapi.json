@@ -10,6 +10,41 @@
       "url": "/api/v1"
     }
   ],
+  "tags": [
+    {
+      "name": "Apps"
+    },
+    {
+      "name": "Config"
+    },
+    {
+      "name": "Data Sources"
+    },
+    {
+      "name": "Files"
+    },
+    {
+      "name": "Notifications"
+    },
+    {
+      "name": "Pages"
+    },
+    {
+      "name": "Platform"
+    },
+    {
+      "name": "User"
+    },
+    {
+      "name": "Views"
+    },
+    {
+      "name": "Webhooks"
+    },
+    {
+      "name": "Workspaces"
+    }
+  ],
   "paths": {
     "/pages/tree": {
       "get": {

@@ -3,7 +3,12 @@
 import { Alert, Button, Group, Stack, Text } from '@mantine/core';
 import { useEffect, useState } from 'react';
 import { useNotification } from '@/lib/hooks/use-notification';
-import { detectPushSupport, disableBrowserPush, enableBrowserPush } from '@/lib/notifications/push-client';
+import {
+  detectPushSupport,
+  disableBrowserPush,
+  enableBrowserPush,
+  syncBrowserPushRegistration,
+} from '@/lib/notifications/push-client';
 
 /**
  * A small in-inbox card offering to enable browser Web Push (THOTH-071).
@@ -48,6 +53,9 @@ export function EnableBrowserPushCard() {
             : null;
         const existingSubscription = registration ? await registration.pushManager.getSubscription() : null;
         if (existingSubscription && permission === 'granted') {
+          // Re-associate with the server-side row so `disableBrowserPush` can find its id even
+          // if this subscription predates the current tab's local record (THOTH-071 review fix).
+          await syncBrowserPushRegistration();
           if (!cancelled) setState({ status: 'enabled' });
         } else if (!cancelled) {
           setState({ status: 'ready', permission });
@@ -107,13 +115,18 @@ export function EnableBrowserPushCard() {
             onClick={() => {
               void (async () => {
                 setBusy(true);
-                const result = await enableBrowserPush();
-                setBusy(false);
-                if ('id' in result) {
-                  setState({ status: 'enabled' });
-                  showSuccess('Browser notifications enabled on this device');
-                } else {
-                  showError(`Could not enable notifications (${result.skipped})`);
+                try {
+                  const result = await enableBrowserPush();
+                  if ('id' in result) {
+                    setState({ status: 'enabled' });
+                    showSuccess('Browser notifications enabled on this device');
+                  } else {
+                    showError(`Could not enable notifications (${result.skipped})`);
+                  }
+                } catch {
+                  showError('Could not enable notifications');
+                } finally {
+                  setBusy(false);
                 }
               })();
             }}

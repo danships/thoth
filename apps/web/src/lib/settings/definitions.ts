@@ -6,6 +6,9 @@ import {
   quietScheduleSchema,
   mutedUntilSchema,
   DEFAULT_QUIET_SCHEDULE,
+  USER_TIMEZONE_SETTING_KEY,
+  NOTIFICATIONS_QUIET_SCHEDULE_SETTING_KEY,
+  NOTIFICATIONS_MUTED_UNTIL_SETTING_KEY,
 } from '@thoth/database/notifications/mute';
 
 /**
@@ -77,9 +80,9 @@ export const PLATFORM_SETTING_SUBJECT_ID = 'platform';
 
 export const WORKSPACE_CREATION_SELF_SERVICE_KEY = 'workspace.creation.self_service_enabled' satisfies SettingKey;
 export const STORAGE_QUOTA_BYTES_KEY = 'storage.quota_bytes' satisfies SettingKey;
-export const USER_TIMEZONE_KEY = 'timezone' satisfies SettingKey;
-export const NOTIFICATIONS_QUIET_SCHEDULE_KEY = 'notifications.quiet_schedule' satisfies SettingKey;
-export const NOTIFICATIONS_MUTED_UNTIL_KEY = 'notifications.muted_until' satisfies SettingKey;
+export const USER_TIMEZONE_KEY = USER_TIMEZONE_SETTING_KEY satisfies SettingKey;
+export const NOTIFICATIONS_QUIET_SCHEDULE_KEY = NOTIFICATIONS_QUIET_SCHEDULE_SETTING_KEY satisfies SettingKey;
+export const NOTIFICATIONS_MUTED_UNTIL_KEY = NOTIFICATIONS_MUTED_UNTIL_SETTING_KEY satisfies SettingKey;
 
 export function getSettingDefinition<Key extends SettingKey>(key: Key): (typeof SETTING_DEFINITIONS)[Key] {
   return SETTING_DEFINITIONS[key];

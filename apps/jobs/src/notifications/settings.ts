@@ -5,6 +5,9 @@ import {
   ianaTimezoneSchema,
   quietScheduleSchema,
   mutedUntilSchema,
+  USER_TIMEZONE_SETTING_KEY,
+  NOTIFICATIONS_QUIET_SCHEDULE_SETTING_KEY,
+  NOTIFICATIONS_MUTED_UNTIL_SETTING_KEY,
   type NotificationMuteSettings,
   type QuietSchedule,
 } from '@thoth/database';
@@ -16,13 +19,13 @@ import {
  * the value with the shared schemas, and fall back to registered defaults.
  */
 
-// User-scope key names — kept in sync with `apps/web/src/lib/settings/definitions.ts`. There
-// isn't a shared package that owns "setting key strings" today (they're intentionally colocated
-// with the web definitions registry). Duplicating these three constants here is the
-// least-coupling path.
-const USER_TIMEZONE_KEY = 'timezone';
-const NOTIFICATIONS_QUIET_SCHEDULE_KEY = 'notifications.quiet_schedule';
-const NOTIFICATIONS_MUTED_UNTIL_KEY = 'notifications.muted_until';
+// User-scope key names — imported from `@thoth/database/notifications/mute`, the single source
+// of truth for these persisted `Setting` key strings, also used by
+// `apps/web/src/lib/settings/definitions.ts`. Keeping one definition means a rename can never
+// silently desync the two apps' mute evaluation.
+const USER_TIMEZONE_KEY = USER_TIMEZONE_SETTING_KEY;
+const NOTIFICATIONS_QUIET_SCHEDULE_KEY = NOTIFICATIONS_QUIET_SCHEDULE_SETTING_KEY;
+const NOTIFICATIONS_MUTED_UNTIL_KEY = NOTIFICATIONS_MUTED_UNTIL_SETTING_KEY;
 
 function selectCanonical(rows: Setting[]): Setting | undefined {
   if (rows.length === 0) return undefined;

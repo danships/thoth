@@ -7,8 +7,15 @@ import { withIdSchema, withUserIdSchema } from '../utilities.js';
 export const pushSubscriptionSchema = z
   .object({
     // Push endpoint — always https, provider-issued (FCM/Mozilla/Apple/...). Bound length so a
-    // pathological input cannot bloat storage or logs.
-    endpoint: z.url().max(4096),
+    // pathological input cannot bloat storage or logs. Explicitly enforces the `https:` protocol
+    // here (not just "any URL") so the HTTPS invariant is a schema-level guarantee, matching the
+    // delivery-time SSRF/protocol check in `apps/jobs/src/handlers/notifications/deliver.ts`
+    // (which additionally rejects private/loopback/link-local hosts — a check this schema alone
+    // cannot express, since a hostname's resolved address isn't known at validation time).
+    endpoint: z
+      .url()
+      .max(4096)
+      .refine((value) => new URL(value).protocol === 'https:', 'endpoint must use the https protocol'),
     expirationTime: z.number().int().nullable(),
     keys: z
       .object({

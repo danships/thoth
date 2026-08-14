@@ -13,6 +13,7 @@ export type OpenAPIObject = {
     description: string;
   };
   servers: Array<{ url: string }>;
+  tags: Array<{ name: string }>;
   paths: Record<string, Record<string, OpenApiOperationObject>>;
   components: {
     securitySchemes: Record<string, OpenApiSecurityScheme>;
@@ -143,6 +144,11 @@ export function buildOpenApiDocument(): OpenAPIObject {
         'Build-time generated OpenAPI document for the Thoth API. It is assembled from the shared Zod endpoint and entity schemas, then committed to `public/openapi.json` for static serving.',
     },
     servers: [{ url: '/api/v1' }],
+    // Declared from the operations themselves (rather than hand-maintained) so a new tag used
+    // by an operation can never go undeclared, and an unused tag can never linger.
+    tags: [...new Set(operations.flatMap((operation) => operation.tags ?? []))]
+      .toSorted((a, b) => a.localeCompare(b))
+      .map((name) => ({ name })),
     paths,
     components: {
       securitySchemes: {

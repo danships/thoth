@@ -30,6 +30,9 @@ importers:
       pm2:
         specifier: ^7.0.3
         version: 7.0.3(supports-color@10.2.2)
+      web-push:
+        specifier: ^3.6.7
+        version: 3.6.7(supports-color@10.2.2)
     devDependencies:
       '@commitlint/cli':
         specifier: ^21.2.0

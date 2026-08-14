@@ -14,8 +14,9 @@ export type VapidKeys = { publicKey: string; privateKey: string; subject: string
 
 let cached: VapidKeys | undefined;
 
-function resolveDir(dirEnv: string | undefined): string {
-  const candidate = dirEnv && dirEnv.trim().length > 0 ? dirEnv : 'data';
+function resolveDirectory(directoryEnvironment: string | undefined): string {
+  const candidate =
+    directoryEnvironment && directoryEnvironment.trim().length > 0 ? directoryEnvironment : 'data';
   // Prefer an absolute path if provided; else resolve against process cwd. `apps/jobs` and
   // `apps/web` both start from the repo root under PM2, matching `STORAGE_LOCAL_FOLDER`'s
   // convention.
@@ -35,8 +36,8 @@ export function getVapidKeys(): VapidKeys | undefined {
     return cached;
   }
 
-  const dir = resolveDir(environment.WEB_PUSH_VAPID_DIR);
-  const filePath = path.join(dir, VAPID_FILE_NAME);
+  const directory = resolveDirectory(environment.WEB_PUSH_VAPID_DIR);
+  const filePath = path.join(directory, VAPID_FILE_NAME);
   if (!existsSync(filePath)) return undefined;
   try {
     const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as VapidKeys;

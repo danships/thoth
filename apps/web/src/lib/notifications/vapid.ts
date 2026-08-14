@@ -5,11 +5,13 @@ import { getEnvironment } from '@/lib/environment';
 /**
  * Read-only public-VAPID resolver for `apps/web` (THOTH-071). The web process only ever
  * exposes the *public* key (to browsers, so they can register a Push subscription). The
- * private key stays in `apps/jobs`. Reads env → falls back to the shared `<dir>/vapid.json`
- * written by `scripts/ensure-vapid-keys.mjs` at startup.
+ * private key stays in `apps/jobs` — and, unlike an earlier version of this file, is never
+ * parsed into the web process's memory either: the fallback file read below targets the
+ * public-only `vapid-public.json` companion file (written by `scripts/ensure-vapid-keys.mjs`
+ * alongside the full `vapid.json`), not `vapid.json` itself.
  */
 
-const VAPID_FILE_NAME = 'vapid.json';
+const VAPID_PUBLIC_FILE_NAME = 'vapid-public.json';
 
 let cached: { publicKey: string | null } | undefined;
 
@@ -30,7 +32,7 @@ export async function getPublicVapidKey(): Promise<string | null> {
     return cached.publicKey;
   }
   const directory = resolveDirectory(environment.WEB_PUSH_VAPID_DIR);
-  const filePath = path.join(directory, VAPID_FILE_NAME);
+  const filePath = path.join(directory, VAPID_PUBLIC_FILE_NAME);
   if (existsSync(filePath)) {
     try {
       const parsed = JSON.parse(readFileSync(filePath, 'utf8'));

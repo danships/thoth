@@ -1,12 +1,8 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { isNotificationMutedAt } from '@thoth/database';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
-import { getSetting, setSetting, deleteSetting } from '@/lib/settings/service';
-import {
-  NOTIFICATIONS_MUTED_UNTIL_KEY,
-  NOTIFICATIONS_QUIET_SCHEDULE_KEY,
-  USER_TIMEZONE_KEY,
-} from '@/lib/settings/definitions';
+import { setSetting, deleteSetting } from '@/lib/settings/service';
+import { NOTIFICATIONS_MUTED_UNTIL_KEY } from '@/lib/settings/definitions';
+import { loadAndEvaluateNotificationMuteState } from '@/lib/notifications/mute-state';
 import type { NotificationMuteResponse, PostNotificationMuteBody } from '@/types/api';
 import { postNotificationMuteBodySchema } from '@/types/api';
 
@@ -19,20 +15,7 @@ const PRESET_TO_MS: Record<'1h' | '2h' | '1d', number> = {
 const MAX_FUTURE_MS = 365 * 24 * 60 * 60 * 1000;
 
 async function currentState(userId: string): Promise<NotificationMuteResponse> {
-  const [timezone, quietSchedule, mutedUntil] = await Promise.all([
-    getSetting(USER_TIMEZONE_KEY, { scope: 'user', subjectId: userId }),
-    getSetting(NOTIFICATIONS_QUIET_SCHEDULE_KEY, { scope: 'user', subjectId: userId }),
-    getSetting(NOTIFICATIONS_MUTED_UNTIL_KEY, { scope: 'user', subjectId: userId }),
-  ]);
-  let isMutedNow = false;
-  let muteReason: NotificationMuteResponse['muteReason'] = null;
-  try {
-    const evaluation = isNotificationMutedAt({ timezone, quietSchedule, mutedUntil }, new Date());
-    isMutedNow = evaluation.muted;
-    muteReason = evaluation.reason;
-  } catch {
-    // Fail-open.
-  }
+  const { mutedUntil, isMutedNow, muteReason } = await loadAndEvaluateNotificationMuteState(userId);
   return { mutedUntil, isMutedNow, muteReason };
 }
 

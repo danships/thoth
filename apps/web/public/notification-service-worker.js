@@ -37,7 +37,7 @@ function isSafeOpenPath(openPath) {
   if (!openPath.startsWith('/notifications/')) return false;
   try {
     const url = new URL(openPath, self.location.origin);
-    return url.origin === self.location.origin;
+    return url.origin === self.location.origin && url.pathname.startsWith('/notifications/');
   } catch (_error) {
     return false;
   }

@@ -54,13 +54,6 @@ export async function upsertPushSubscriptionByEndpoint(
     const canonical = selectCanonical(rows);
     const now = new Date().toISOString();
 
-    // Remove any duplicate rows created by a prior race so future reads are deterministic.
-    for (const row of rows) {
-      if (canonical && row.id !== canonical.id) {
-        await repository.deleteUsingId(row.id);
-      }
-    }
-
     if (!canonical) {
       return repository.create({
         userId: input.userId,
@@ -74,10 +67,20 @@ export async function upsertPushSubscriptionByEndpoint(
       });
     }
 
-    if (canonical.userId !== input.userId) {
+    if (
+      canonical.userId !== input.userId &&
+      (canonical.keys.p256dh !== input.keys.p256dh || canonical.keys.auth !== input.keys.auth)
+    ) {
       // Cross-account reassignment: keys must match exactly (possession-of-secret gate).
-      if (canonical.keys.p256dh !== input.keys.p256dh || canonical.keys.auth !== input.keys.auth) {
-        throw new Error('push-subscription endpoint belongs to a different account');
+      throw new Error('push-subscription endpoint belongs to a different account');
+    }
+
+    // Remove any duplicate rows created by a prior race so future reads are deterministic. Done
+    // only after the ownership/key gate above so a rejected caller can never mutate another
+    // account's rows.
+    for (const row of rows) {
+      if (row.id !== canonical.id) {
+        await repository.deleteUsingId(row.id);
       }
     }
 

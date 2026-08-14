@@ -10,6 +10,16 @@ import { z } from 'zod';
  * weekday-and-minute windows) is never materialised into UTC intervals.
  */
 
+// The persisted `Setting` key names for the three per-user mute inputs. These identify rows in
+// the shared `Setting` table, so they are a cross-app data contract — declared exactly once
+// here and imported by both `apps/web/src/lib/settings/definitions.ts` (the setting-key
+// registry, which additionally wires per-scope validation/defaults) and
+// `apps/jobs/src/notifications/settings.ts` (the jobs-side reader). Renaming one without the
+// other would silently break mute evaluation on one side.
+export const USER_TIMEZONE_SETTING_KEY = 'timezone';
+export const NOTIFICATIONS_QUIET_SCHEDULE_SETTING_KEY = 'notifications.quiet_schedule';
+export const NOTIFICATIONS_MUTED_UNTIL_SETTING_KEY = 'notifications.muted_until';
+
 // A string is a valid IANA timezone iff `Intl.DateTimeFormat` accepts it without throwing.
 // Node/Chrome both back `Intl` with ICU/tzdata so this is the canonical, dependency-free check.
 export const ianaTimezoneSchema = z

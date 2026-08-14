@@ -6,6 +6,7 @@ import {
   getWorkspaceRepository,
   isNotificationMutedAt,
   listActivePushSubscriptionsForUser,
+  recomputeParentNotificationSummary,
   renderActorLabel,
   renderNotificationTitleBody,
   resolveNotificationRecipients,
@@ -221,7 +222,6 @@ export const notificationDispatchJobDefinition: JobDefinition<NotificationDispat
           await setNotificationPushSummary(notificationRow.id, 'no_devices', 0);
           continue;
         }
-        let queued = 0;
         for (const device of devices) {
           const delivery = await createOrReuseNotificationDelivery({
             notificationId: notificationRow.id,
@@ -233,9 +233,11 @@ export const notificationDispatchJobDefinition: JobDefinition<NotificationDispat
             payload: { deliveryId: delivery.id },
             dedupeKey: `notification-delivery:${delivery.id}`,
           });
-          queued += 1;
         }
-        await setNotificationPushSummary(notificationRow.id, 'queued', queued);
+        // Recompute (rather than blindly overwrite) so a re-dispatch that finds some deliveries
+        // already terminal never regresses `pushSentCount`/`pushFailedCount` or reports a stale
+        // 'queued' disposition — see `recomputeParentNotificationSummary`.
+        await recomputeParentNotificationSummary(notificationRow.id);
       } catch (pushError) {
         logger?.warn('notification.dispatch.push-fanout-failed', {
           userId,

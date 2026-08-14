@@ -35,35 +35,43 @@ describe('resolveVapidSubject', () => {
 });
 
 describe('ensureVapidKeys', () => {
-  let dir = '';
+  let directory = '';
 
   beforeEach(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), 'thoth-vapid-test-'));
+    directory = await mkdtemp(path.join(tmpdir(), 'thoth-vapid-test-'));
   });
   afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true });
   });
 
   test('WEB_PUSH_ENABLED=false is a no-op regardless of file state', async () => {
-    const result = await ensureVapidKeys({ enabled: false, dir, environment: {} });
+    const result = await ensureVapidKeys({ enabled: false, dir: directory, environment: {} });
     expect(result).toEqual({ skipped: true });
-    expect(existsSync(path.join(dir, 'vapid.json'))).toBe(false);
+    expect(existsSync(path.join(directory, 'vapid.json'))).toBe(false);
   });
 
   test('generates + persists + reuses across calls', async () => {
-    const first = await ensureVapidKeys({ enabled: true, dir, environment: {} });
+    const first = await ensureVapidKeys({ enabled: true, dir: directory, environment: {} });
     if ('skipped' in first) throw new Error('did not generate');
     expect(first.source).toBe('generated');
     expect(first.publicKey.length).toBeGreaterThan(10);
     expect(first.privateKey.length).toBeGreaterThan(10);
-    expect(existsSync(path.join(dir, 'vapid.json'))).toBe(true);
+    expect(existsSync(path.join(directory, 'vapid.json'))).toBe(true);
 
-    const persisted = JSON.parse(await readFile(path.join(dir, 'vapid.json'), 'utf8'));
+    const persisted = JSON.parse(await readFile(path.join(directory, 'vapid.json'), 'utf8'));
     expect(persisted.publicKey).toBe(first.publicKey);
     expect(persisted.privateKey).toBe(first.privateKey);
     expect(persisted.subject).toBe(first.subject);
 
-    const second = await ensureVapidKeys({ enabled: true, dir, environment: {} });
+    // Public-only companion file (THOTH-071 review fix): `apps/web` reads this instead of
+    // `vapid.json` so it never has to parse `privateKey` into memory.
+    expect(existsSync(path.join(directory, 'vapid-public.json'))).toBe(true);
+    const persistedPublic = JSON.parse(await readFile(path.join(directory, 'vapid-public.json'), 'utf8'));
+    expect(persistedPublic.publicKey).toBe(first.publicKey);
+    expect(persistedPublic.privateKey).toBeUndefined();
+    expect(persistedPublic.subject).toBe(first.subject);
+
+    const second = await ensureVapidKeys({ enabled: true, dir: directory, environment: {} });
     if ('skipped' in second) throw new Error('did not reuse');
     expect(second.source).toBe('file');
     expect(second.publicKey).toBe(first.publicKey);
@@ -73,7 +81,7 @@ describe('ensureVapidKeys', () => {
   test('explicit env keys win over the persisted file', async () => {
     const result = await ensureVapidKeys({
       enabled: true,
-      dir,
+      dir: directory,
       environment: {
         WEB_PUSH_VAPID_PUBLIC_KEY: 'PUB',
         WEB_PUSH_VAPID_PRIVATE_KEY: 'PRIV',
@@ -85,26 +93,26 @@ describe('ensureVapidKeys', () => {
     expect(result.publicKey).toBe('PUB');
     expect(result.privateKey).toBe('PRIV');
     // Env wins so no file was written.
-    expect(existsSync(path.join(dir, 'vapid.json'))).toBe(false);
+    expect(existsSync(path.join(directory, 'vapid.json'))).toBe(false);
   });
 
   test('half-configured env keys are a fatal error', async () => {
     await expect(
-      ensureVapidKeys({ enabled: true, dir, environment: { WEB_PUSH_VAPID_PUBLIC_KEY: 'PUB' } })
+      ensureVapidKeys({ enabled: true, dir: directory, environment: { WEB_PUSH_VAPID_PUBLIC_KEY: 'PUB' } })
     ).rejects.toThrow(/must be set together/);
     await expect(
-      ensureVapidKeys({ enabled: true, dir, environment: { WEB_PUSH_VAPID_PRIVATE_KEY: 'PRIV' } })
+      ensureVapidKeys({ enabled: true, dir: directory, environment: { WEB_PUSH_VAPID_PRIVATE_KEY: 'PRIV' } })
     ).rejects.toThrow(/must be set together/);
   });
 
   test('malformed file falls through to regeneration', async () => {
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(path.join(dir, 'vapid.json'), 'this is not json');
-    const result = await ensureVapidKeys({ enabled: true, dir, environment: {} });
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(path.join(directory, 'vapid.json'), 'this is not json');
+    const result = await ensureVapidKeys({ enabled: true, dir: directory, environment: {} });
     if ('skipped' in result) throw new Error('should not skip');
     expect(result.source).toBe('generated');
     // The malformed file should now be replaced with a valid one.
-    const parsed = JSON.parse(readFileSync(path.join(dir, 'vapid.json'), 'utf8'));
+    const parsed = JSON.parse(readFileSync(path.join(directory, 'vapid.json'), 'utf8'));
     expect(parsed.publicKey).toBe(result.publicKey);
   });
 });

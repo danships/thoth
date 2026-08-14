@@ -18,6 +18,11 @@ import path from 'node:path';
  */
 
 export const VAPID_FILE_NAME = 'vapid.json';
+// Public-only companion file (THOTH-071 review fix): `apps/web` reads *this* file instead of
+// `vapid.json` so the private key is never parsed into the web process's memory at all — the
+// web process only ever needs the public key to hand to browsers via
+// `GET /notifications/push-config`. Regular file permissions (no 0600) since it holds no secret.
+export const VAPID_PUBLIC_FILE_NAME = 'vapid-public.json';
 
 /**
  * @typedef {Object} EnsureVapidKeysInput
@@ -63,6 +68,26 @@ export function resolveVapidSubject(environment) {
 }
 
 /**
+ * Persist (or refresh) the public-only companion file so `apps/web` never has to parse
+ * `vapid.json`'s `privateKey` field. Same tmp-file + rename protocol as the full record, minus
+ * the restrictive mode (this file holds no secret).
+ * @param {string} dir
+ * @param {{ publicKey: string, subject: string }} publicRecord
+ */
+function persistPublicVapidFile(dir, publicRecord) {
+  const publicFilePath = path.join(dir, VAPID_PUBLIC_FILE_NAME);
+  const tmpPublicPath = path.join(dir, `${VAPID_PUBLIC_FILE_NAME}.tmp-${process.pid}`);
+  try {
+    writeFileSync(tmpPublicPath, JSON.stringify(publicRecord));
+    renameSync(tmpPublicPath, publicFilePath);
+  } catch (error) {
+    throw new Error(
+      `Failed to persist public VAPID key file "${publicFilePath}": ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
  * @param {EnsureVapidKeysInput} input
  * @returns {Promise<EnsureVapidKeysResult | EnsureVapidKeysSkipped>}
  */
@@ -98,6 +123,8 @@ export async function ensureVapidKeys(input) {
         typeof parsed.privateKey === 'string' &&
         typeof parsed.subject === 'string'
       ) {
+        // Backfill the public-only companion file for files persisted before this file existed.
+        persistPublicVapidFile(dir, { publicKey: parsed.publicKey, subject: parsed.subject });
         return {
           publicKey: parsed.publicKey,
           privateKey: parsed.privateKey,
@@ -167,6 +194,8 @@ export async function ensureVapidKeys(input) {
       `Failed to persist VAPID key file "${filePath}": ${error instanceof Error ? error.message : String(error)}`
     );
   }
+
+  persistPublicVapidFile(dir, { publicKey: record.publicKey, subject: record.subject });
 
   return {
     publicKey: record.publicKey,

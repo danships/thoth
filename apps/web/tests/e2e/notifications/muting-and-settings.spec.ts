@@ -25,34 +25,41 @@ test.describe('THOTH-071 user + notification settings', () => {
   });
 
   test('notification settings PATCH updates only quietSchedule', async ({ request }) => {
-    const patch = await request.patch('/api/v1/notifications/settings', {
-      data: {
-        quietSchedule: {
-          enabled: true,
-          windows: [{ day: 5, startMinutes: 22 * 60, endMinutes: 2 * 60 }],
+    const before = await request.get('/api/v1/notifications/settings');
+    expect(before.ok()).toBeTruthy();
+    const beforeBody = await before.json();
+    const previousQuietSchedule = beforeBody.data.quietSchedule;
+
+    try {
+      const patch = await request.patch('/api/v1/notifications/settings', {
+        data: {
+          quietSchedule: {
+            enabled: true,
+            windows: [{ day: 5, startMinutes: 22 * 60, endMinutes: 2 * 60 }],
+          },
         },
-      },
-    });
-    expect(patch.ok()).toBeTruthy();
-    const body = await patch.json();
-    expect(body.data.quietSchedule.enabled).toBe(true);
-    expect(body.data.quietSchedule.windows).toHaveLength(1);
-    // Timezone field is present but NOT settable via this endpoint.
-    expect(typeof body.data.timezone).toBe('string');
+      });
+      expect(patch.ok()).toBeTruthy();
+      const body = await patch.json();
+      expect(body.data.quietSchedule.enabled).toBe(true);
+      expect(body.data.quietSchedule.windows).toHaveLength(1);
+      // Timezone field is present but NOT settable via this endpoint.
+      expect(typeof body.data.timezone).toBe('string');
 
-    // Reject unknown top-level fields via strict schema.
-    const withExtras = await request.patch('/api/v1/notifications/settings', {
-      data: {
-        quietSchedule: { enabled: false, windows: [] },
-        timezone: 'UTC',
-      },
-    });
-    expect(withExtras.status()).toBe(400);
-
-    // Restore.
-    await request.patch('/api/v1/notifications/settings', {
-      data: { quietSchedule: { enabled: false, windows: [] } },
-    });
+      // Reject unknown top-level fields via strict schema.
+      const withExtras = await request.patch('/api/v1/notifications/settings', {
+        data: {
+          quietSchedule: { enabled: false, windows: [] },
+          timezone: 'UTC',
+        },
+      });
+      expect(withExtras.status()).toBe(400);
+    } finally {
+      // Restore whatever quiet schedule existed before this test ran.
+      await request.patch('/api/v1/notifications/settings', {
+        data: { quietSchedule: previousQuietSchedule },
+      });
+    }
   });
 
   test('mute preset then unmute', async ({ request }) => {
@@ -81,9 +88,12 @@ test.describe('THOTH-071 user + notification settings', () => {
     const body = await response.json();
     expect(typeof body.data.enabled).toBe('boolean');
     // publicKey is either null (disabled) or a non-empty string. We don't assert which because
-    // WEB_PUSH_ENABLED may be set in some deployments' `.env.test`.
+    // WEB_PUSH_ENABLED may be set in some deployments' `.env.test` — but if enabled, a usable
+    // config MUST include a public key (the browser card treats `publicKey: null` while
+    // `enabled: true` as disabled, so that combination would mean a broken server config).
     if (body.data.enabled) {
-      expect(typeof body.data.publicKey === 'string' || body.data.publicKey === null).toBe(true);
+      expect(typeof body.data.publicKey).toBe('string');
+      expect(body.data.publicKey.length).toBeGreaterThan(0);
     } else {
       expect(body.data.publicKey).toBeNull();
     }

@@ -16,6 +16,7 @@ import { computeBackoffMs } from '../../runner/backoff.js';
 import { parseRetryAfterMs } from '../webhooks/backoff.js';
 import { getVapidKeys } from '../../notifications/vapid.js';
 import { getLogger } from '../../logger.js';
+import { assertPublicHttpsUrl } from '../webhooks/ssrf.js';
 
 /**
  * `notification.deliver` — internal child job created per-device by the extended
@@ -90,6 +91,30 @@ export const notificationDeliverJobDefinition: JobDefinition<NotificationDeliver
       notificationId: notification.id,
       openPath: `/notifications/${notification.id}/open`,
     });
+
+    // Delivery-time SSRF guard (THOTH-071 review fix): `web-push` hands `subscription.endpoint`
+    // straight to `https.request`, so a stored endpoint resolving to a private/loopback/
+    // link-local address (e.g. cloud metadata) could make this process connect internally.
+    // Reject before ever calling `webpush.sendNotification` — same guard `apps/jobs`'s webhook
+    // delivery already applies to webhook URLs, re-resolved on every attempt (defends against
+    // DNS rebinding, not just a bad value at registration time). A subscription that fails this
+    // can never succeed, so it's a terminal failure, not a retry.
+    try {
+      await assertPublicHttpsUrl(subscription.endpoint);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn('notification.deliver.endpoint-rejected', {
+        deliveryId: delivery.id,
+        pushSubscriptionId: delivery.pushSubscriptionId,
+        // Never log the endpoint itself — only the guard's reason.
+        reason: message,
+      });
+      await completeNotificationDelivery(delivery.id, {
+        status: 'failed',
+        errorCode: sanitizeErrorCode(`endpoint-rejected: ${message}`),
+      });
+      return { status: 'failed', reason: 'endpoint-not-public' };
+    }
 
     try {
       const result = await webpush.sendNotification(

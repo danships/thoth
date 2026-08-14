@@ -13,3 +13,4 @@ export function resolveVapidDirectory(repositoryRoot: string, override: string |
 export function resolveVapidSubject(environment: NodeJS.ProcessEnv): string;
 
 export const VAPID_FILE_NAME: string;
+export const VAPID_PUBLIC_FILE_NAME: string;

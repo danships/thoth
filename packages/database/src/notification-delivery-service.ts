@@ -154,11 +154,18 @@ export async function recomputeParentNotificationSummary(notificationId: string)
 
     const nonSentTerminal = failed + expiredOrCancelled;
 
-    let disposition: NotificationPushDisposition | null = notification.pushDisposition;
+    // Reaching here means at least one delivery row exists for this notification, so push has
+    // definitely been dispatched — `disposition` always reflects the live delivery set from
+    // this point on, never lingering on a prior 'queued' value once deliveries reach terminal
+    // state (and vice versa: a re-dispatch that creates fresh non-terminal deliveries alongside
+    // already-terminal ones goes back to 'queued' rather than keeping a stale 'sent'/'failed').
+    let disposition: NotificationPushDisposition | null;
     if (allTerminal) {
       if (sent > 0 && nonSentTerminal === 0) disposition = 'sent';
       else if (sent > 0 && nonSentTerminal > 0) disposition = 'partial';
       else disposition = 'failed';
+    } else {
+      disposition = 'queued';
     }
     // Only bump counters if changed to avoid write churn.
     const nextPushSentCount = sent;
