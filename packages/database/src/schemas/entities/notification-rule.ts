@@ -24,3 +24,18 @@ export const notificationRuleSchema = z
   .extend(withIdSchema.shape);
 
 export type NotificationRuleSchema = z.infer<typeof notificationRuleSchema>;
+
+/**
+ * Enforces the `kind`/`containerId` invariant documented above: `'workspace'` rules always have
+ * `containerId: null`, every other kind is always scoped to an exact page via a non-null
+ * `containerId`. Not expressed as a `.refine()` on `notificationRuleSchema` itself because a
+ * refined `ZodObject` can no longer be `.omit()`-ed (see `notificationRuleCreateSchema` in
+ * `types.ts`, and Notification's mirror in `notification.ts`) — so this is applied explicitly at
+ * the write boundary (`upsertNotificationRule`) instead of at the schema-definition level.
+ */
+export function isValidNotificationRuleKindContainerCombo(
+  kind: NotificationRuleKind,
+  containerId: string | null
+): boolean {
+  return kind === 'workspace' ? containerId === null : containerId !== null;
+}

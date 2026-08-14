@@ -13549,8 +13549,11 @@
             "in": "query",
             "required": false,
             "schema": {
-              "default": false,
-              "type": "boolean"
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
             }
           },
           {

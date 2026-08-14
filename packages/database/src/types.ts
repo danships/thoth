@@ -16,6 +16,8 @@ import { fileUsageSchema } from './schemas/entities/file-usage.js';
 import { pageRevisionSchema } from './schemas/entities/page-revision.js';
 import { settingSchema } from './schemas/entities/setting.js';
 import { platformUserSchema } from './schemas/entities/platform-user.js';
+import { notificationRuleSchema } from './schemas/entities/notification-rule.js';
+import { notificationSchema } from './schemas/entities/notification.js';
 
 /** Container Entity Schema */
 export { pageContainerSchema, dataSourceContainerSchema } from './schemas/entities/container.js';
@@ -208,8 +210,7 @@ export type PlatformUserCreate = z.infer<typeof platformUserCreateSchema>;
 /** End PlatformUser Entity Schema */
 
 /** NotificationRule Entity Schema */
-import { notificationRuleSchema, notificationRuleKindSchema } from './schemas/entities/notification-rule.js';
-export { notificationRuleSchema, notificationRuleKindSchema };
+export { notificationRuleSchema, notificationRuleKindSchema } from './schemas/entities/notification-rule.js';
 export type { NotificationRuleKind } from './schemas/entities/notification-rule.js';
 
 export const notificationRuleCreateSchema = notificationRuleSchema.omit({ id: true });
@@ -219,8 +220,7 @@ export type NotificationRuleCreate = z.infer<typeof notificationRuleCreateSchema
 /** End NotificationRule Entity Schema */
 
 /** Notification Entity Schema */
-import { notificationSchema, notificationDispatchEventSchema } from './schemas/entities/notification.js';
-export { notificationSchema, notificationDispatchEventSchema };
+export { notificationSchema, notificationDispatchEventSchema } from './schemas/entities/notification.js';
 export type { NotificationDispatchEvent } from './schemas/entities/notification.js';
 export { notificationActorSchema } from './schemas/entities/notification-actor.js';
 export type { NotificationActor } from './schemas/entities/notification-actor.js';

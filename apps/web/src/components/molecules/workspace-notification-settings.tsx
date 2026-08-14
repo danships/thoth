@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Divider, Group, Paper, Select, Stack, Switch, Text, Title } from '@mantine/core';
 import { api } from '@/lib/api/client';
 import { useNotification } from '@/lib/hooks/use-notification';
@@ -29,23 +30,38 @@ export function WorkspaceNotificationSettings() {
   );
   const workspaceSubscribed = workspaceRule?.kind === 'workspace';
 
+  // Serializes writes per control: while a mutation is pending, its control is disabled so a
+  // second, out-of-order write can never clobber the in-flight one's result.
+  const [workspaceMutationPending, setWorkspaceMutationPending] = useState(false);
+  const [pendingPageRuleIds, setPendingPageRuleIds] = useState<ReadonlySet<string>>(new Set());
+
   const handleToggleWorkspace = async (checked: boolean) => {
+    setWorkspaceMutationPending(true);
     try {
       await api.notifications.setWorkspaceSubscription(workspace.id, checked ? 'workspace' : 'none');
       showSuccess(checked ? 'Subscribed to this workspace' : 'Unsubscribed from this workspace');
       await mutate();
     } catch {
       showError('Failed to update workspace subscription');
+    } finally {
+      setWorkspaceMutationPending(false);
     }
   };
 
   const handleChangePageRule = async (pageId: string, kind: PutPageNotificationSubscriptionBody['kind']) => {
+    setPendingPageRuleIds((previous) => new Set(previous).add(pageId));
     try {
       await api.notifications.setPageSubscription(pageId, kind);
       showSuccess('Page rule updated');
       await mutate();
     } catch {
       showError('Failed to update page rule');
+    } finally {
+      setPendingPageRuleIds((previous) => {
+        const next = new Set(previous);
+        next.delete(pageId);
+        return next;
+      });
     }
   };
 
@@ -58,6 +74,7 @@ export function WorkspaceNotificationSettings() {
           label="Notify me about all page changes in this workspace"
           description="You can still exclude specific pages below."
           checked={workspaceSubscribed}
+          disabled={workspaceMutationPending}
           onChange={(event) => void handleToggleWorkspace(event.currentTarget.checked)}
         />
 
@@ -80,6 +97,7 @@ export function WorkspaceNotificationSettings() {
                   data={PAGE_RULE_OPTIONS}
                   value={rule.kind}
                   allowDeselect={false}
+                  disabled={pendingPageRuleIds.has(rule.containerId)}
                   onChange={(value) =>
                     value &&
                     void handleChangePageRule(rule.containerId, value as PutPageNotificationSubscriptionBody['kind'])

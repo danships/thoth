@@ -95,14 +95,21 @@ export function PageDetailMenu({
   const [menuOpened, setMenuOpened] = useState(false);
 
   const currentPageRuleKind = subscriptionsData?.subscriptions.find((rule) => rule.containerId === pageId)?.kind;
+  // Serializes notification-rule writes: while a mutation for this page is pending, the menu
+  // items are disabled so a second, out-of-order click can never clobber the in-flight write's
+  // result.
+  const [pageNotificationMutationPending, setPageNotificationMutationPending] = useState(false);
 
   const handleSetPageNotification = async (kind: PutPageNotificationSubscriptionBody['kind']) => {
+    setPageNotificationMutationPending(true);
     try {
       await api.notifications.setPageSubscription(pageId, kind);
       showSuccess(kind === 'none' ? 'Cleared page notification rule' : 'Updated page notification rule');
       await mutateSubscriptions();
     } catch {
       showError('Failed to update notification rule');
+    } finally {
+      setPageNotificationMutationPending(false);
     }
   };
 
@@ -350,6 +357,7 @@ export function PageDetailMenu({
                   leftSection={
                     (currentPageRuleKind ?? 'none') === option.value ? <IconCheck size={14} /> : <Box w={14} />
                   }
+                  disabled={pageNotificationMutationPending}
                   onClick={() => void handleSetPageNotification(option.value)}
                 >
                   {option.label}

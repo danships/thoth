@@ -12,13 +12,16 @@ type SubscriptionsResponse = {
 test.describe('notification subscriptions', () => {
   test.afterEach(async ({ request }) => {
     // Reset the page rule so re-runs and other specs start from a clean slate.
-    await request.put(`/api/v1/notifications/subscriptions/pages/${SEED.pages.root.id}`, {
+    const pageCleanup = await request.put(`/api/v1/notifications/subscriptions/pages/${SEED.pages.root.id}`, {
       data: { kind: 'none' },
     });
+    expect(pageCleanup.ok()).toBeTruthy();
+
     // Restore the seeded workspace-level subscription.
-    await request.put(`/api/v1/notifications/subscriptions/workspaces/${SEED.workspace.id}`, {
+    const workspaceCleanup = await request.put(`/api/v1/notifications/subscriptions/workspaces/${SEED.workspace.id}`, {
       data: { kind: 'workspace' },
     });
+    expect(workspaceCleanup.ok()).toBeTruthy();
   });
 
   test('toggles the workspace subscription from Workspace Settings', async ({ page, request }) => {
@@ -34,9 +37,7 @@ test.describe('notification subscriptions', () => {
     // Verify the workspace rule was removed server-side.
     await expect
       .poll(async () => {
-        const response = await request.get(
-          `/api/v1/notifications/subscriptions?workspaceId=${SEED.workspace.id}`
-        );
+        const response = await request.get(`/api/v1/notifications/subscriptions?workspaceId=${SEED.workspace.id}`);
         const body = (await response.json()) as SubscriptionsResponse;
         return body.data.subscriptions.some((rule) => rule.containerId === null && rule.kind === 'workspace');
       })
@@ -47,9 +48,7 @@ test.describe('notification subscriptions', () => {
 
     await expect
       .poll(async () => {
-        const response = await request.get(
-          `/api/v1/notifications/subscriptions?workspaceId=${SEED.workspace.id}`
-        );
+        const response = await request.get(`/api/v1/notifications/subscriptions?workspaceId=${SEED.workspace.id}`);
         const body = (await response.json()) as SubscriptionsResponse;
         return body.data.subscriptions.some((rule) => rule.containerId === null && rule.kind === 'workspace');
       })
@@ -65,32 +64,26 @@ test.describe('notification subscriptions', () => {
 
     await expect
       .poll(async () => {
-        const response = await request.get(
-          `/api/v1/notifications/subscriptions?workspaceId=${SEED.workspace.id}`
-        );
+        const response = await request.get(`/api/v1/notifications/subscriptions?workspaceId=${SEED.workspace.id}`);
         const body = (await response.json()) as SubscriptionsResponse;
-        return body.data.subscriptions.some(
-          (rule) => rule.containerId === SEED.pages.root.id && rule.kind === 'page'
-        );
+        return body.data.subscriptions.some((rule) => rule.containerId === SEED.pages.root.id && rule.kind === 'page');
       })
       .toBe(true);
   });
 
   test('sets and clears a page rule via the API', async ({ request }) => {
-    const setResponse = await request.put(
-      `/api/v1/notifications/subscriptions/pages/${SEED.pages.root.id}`,
-      { data: { kind: 'tree' } }
-    );
+    const setResponse = await request.put(`/api/v1/notifications/subscriptions/pages/${SEED.pages.root.id}`, {
+      data: { kind: 'tree' },
+    });
     expect(setResponse.ok()).toBeTruthy();
     const setBody = (await setResponse.json()) as SubscriptionsResponse;
     expect(
       setBody.data.subscriptions.some((rule) => rule.containerId === SEED.pages.root.id && rule.kind === 'tree')
     ).toBe(true);
 
-    const clearResponse = await request.put(
-      `/api/v1/notifications/subscriptions/pages/${SEED.pages.root.id}`,
-      { data: { kind: 'none' } }
-    );
+    const clearResponse = await request.put(`/api/v1/notifications/subscriptions/pages/${SEED.pages.root.id}`, {
+      data: { kind: 'none' },
+    });
     expect(clearResponse.ok()).toBeTruthy();
     const clearBody = (await clearResponse.json()) as SubscriptionsResponse;
     expect(clearBody.data.subscriptions.some((rule) => rule.containerId === SEED.pages.root.id)).toBe(false);

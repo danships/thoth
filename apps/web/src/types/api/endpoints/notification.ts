@@ -28,7 +28,11 @@ export type NotificationResponseData = DataWrapper<NotificationResponse>;
 /** GET /notifications */
 export const getNotificationsQuerySchema = z.object({
   workspaceId: z.string().min(1).optional(),
-  unreadOnly: z.coerce.boolean().optional().default(false),
+  unreadOnly: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true')
+    .default(false),
   cursor: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
 });

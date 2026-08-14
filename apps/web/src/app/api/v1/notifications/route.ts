@@ -2,7 +2,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getNotificationRepository } from '@/lib/database';
 import { addUserIdToQuery } from '@/lib/database/helpers';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
-import { getMemberWorkspaceIds } from '@/lib/notifications/member-workspaces';
+import { getMemberAccessGrantsByWorkspace, notificationAllowedByGrant } from '@/lib/notifications/member-workspaces';
 import {
   compareNotificationsDesc,
   decodeNotificationCursor,
@@ -15,8 +15,14 @@ import { getNotificationsQuerySchema } from '@/types/api';
 
 // Personal inbox listing (THOTH-066). Notifications are PER-USER state, so scoped by
 // `userId` (never workspace-content rules) — but every row is additionally intersected with the
-// caller's *current* memberships so a revoked-membership row never leaks. Ordered
-// `(occurredAt DESC, id DESC)` with a compound base64 cursor.
+// caller's *current* memberships AND their current per-container `AccessGrant` (THOTH-042), so a
+// revoked-membership row, and a row whose target container has since fallen outside a reduced
+// grant, never leak. Ordered `(occurredAt DESC, id DESC)` with a compound base64 cursor.
+//
+// NOTE: `workspaceId`/`userId` are pushed down into the repository query (SuperSave supports
+// `eq` at the query level); `unreadOnly`/cursor/grant filtering stay in application code because
+// SuperSave has no reliable `IS NULL`/keyset-range/async-predicate query support (see
+// `packages/database`'s own documented limitation for nullable-field filters).
 export const GET = apiRoute<GetNotificationsResponse, GetNotificationsQuery, {}, {}>(
   {
     disallowApiKey: true,
@@ -25,13 +31,10 @@ export const GET = apiRoute<GetNotificationsResponse, GetNotificationsQuery, {},
   async ({ query, setResponseMeta }, session) => {
     const notificationRepository = await getNotificationRepository();
 
-    let allowedWorkspaceIds: Set<string> | undefined;
+    const grantsByWorkspaceId = await getMemberAccessGrantsByWorkspace(session.user.id);
     if (query.workspaceId) {
       // Membership check (404 existence-hiding for non-members) before scoping to it.
       await assertWorkspaceAccess(session.user.id, query.workspaceId);
-      allowedWorkspaceIds = new Set([query.workspaceId]);
-    } else {
-      allowedWorkspaceIds = await getMemberWorkspaceIds(session.user.id);
     }
 
     const baseQuery = addUserIdToQuery(notificationRepository.createQuery(), session.user.id);
@@ -42,11 +45,16 @@ export const GET = apiRoute<GetNotificationsResponse, GetNotificationsQuery, {},
 
     const cursor = query.cursor ? decodeNotificationCursor(query.cursor) : undefined;
 
-    const filtered = rows
-      .filter((row) => allowedWorkspaceIds.has(row.workspaceId))
+    const membershipFiltered = rows
+      .filter((row) => grantsByWorkspaceId.has(row.workspaceId))
       .filter((row) => (query.unreadOnly ? row.readAt === null : true))
       .filter((row) => (cursor ? isAfterCursor(row, cursor) : true))
       .toSorted(compareNotificationsDesc);
+
+    const grantAllowed = await Promise.all(
+      membershipFiltered.map((row) => notificationAllowedByGrant(grantsByWorkspaceId, row))
+    );
+    const filtered = membershipFiltered.filter((_row, index) => grantAllowed[index]);
 
     const page = filtered.slice(0, query.limit);
     const hasMore = filtered.length > query.limit;

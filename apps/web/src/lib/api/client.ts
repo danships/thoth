@@ -275,10 +275,10 @@ export const api = {
         '/notifications',
         {
           params: {
-            ...(parameters?.workspaceId && { workspaceId: parameters.workspaceId }),
-            ...(parameters?.unreadOnly && { unreadOnly: true }),
-            ...(parameters?.cursor && { cursor: parameters.cursor }),
-            ...(parameters?.limit && { limit: parameters.limit }),
+            ...(parameters?.workspaceId !== undefined && { workspaceId: parameters.workspaceId }),
+            ...(parameters?.unreadOnly !== undefined && { unreadOnly: parameters.unreadOnly }),
+            ...(parameters?.cursor !== undefined && { cursor: parameters.cursor }),
+            ...(parameters?.limit !== undefined && { limit: parameters.limit }),
           },
         }
       ),

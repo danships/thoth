@@ -41,8 +41,10 @@ export function mergeNotificationDispatchPayload(
   existing: NotificationDispatchPayloadV1,
   incoming: NotificationDispatchPayloadV1
 ): NotificationDispatchPayloadV1 {
-  const event = existing.event === 'page.created' || incoming.event === 'page.created' ? 'page.created' : 'page.updated';
-  const occurredAt = existing.occurredAt > incoming.occurredAt ? existing.occurredAt : incoming.occurredAt;
+  const event =
+    existing.event === 'page.created' || incoming.event === 'page.created' ? 'page.created' : 'page.updated';
+  const occurredAt =
+    Date.parse(existing.occurredAt) > Date.parse(incoming.occurredAt) ? existing.occurredAt : incoming.occurredAt;
 
   return {
     workspaceId: existing.workspaceId,
@@ -66,10 +68,7 @@ export const notificationDispatchCoalescePolicy: JobCoalescePolicy<NotificationD
  * against its new ancestry (THOTH-066 spec, "Moved page → ancestor rebuild"). Stops at the first
  * missing/root parent, or after `MAX_ANCESTOR_WALK` hops as a defensive circuit-breaker.
  */
-async function resolveLiveAncestorIds(
-  workspaceId: string,
-  startParentId: string | null
-): Promise<string[]> {
+async function resolveLiveAncestorIds(workspaceId: string, startParentId: string | null): Promise<string[]> {
   const containerRepository = await getContainerRepository();
   const ancestorIds: string[] = [];
   let currentParentId = startParentId;
@@ -118,7 +117,7 @@ export const notificationDispatchJobDefinition: JobDefinition<NotificationDispat
     );
 
     // Page deleted/moved out of the workspace before dispatch executed — safe no-op.
-    if (!container || container.type !== 'page') {
+    if (!container || container.type !== 'page' || container.deletedAt) {
       return { skipped: 'container-missing-or-not-a-page' };
     }
 

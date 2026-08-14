@@ -5,6 +5,7 @@ import {
 } from './repositories.js';
 import { isAppOwnerId } from './app-service.js';
 import { memberToAccessGrant, grantAllowsContainer } from './access-grant-service.js';
+import { isValidNotificationRuleKindContainerCombo } from './schemas/entities/notification-rule.js';
 import type {
   Container,
   Notification,
@@ -95,6 +96,10 @@ export async function getCanonicalRulesForUser(userId: string, workspaceId: stri
  * containerId)`: reads every row for the key, keeps the canonical one (rewriting its `kind`),
  * and deletes any duplicates in the same operation. Selecting `'none'` deletes every row for
  * the key.
+ *
+ * Throws if `kind`/`containerId` violate the entity invariant (`isValidNotificationRuleKindContainerCombo`
+ * — `'workspace'` requires `containerId: null`, every other persisted kind requires a non-null
+ * `containerId`) before any write happens. `'none'` (delete) has no combo to validate.
  */
 export async function upsertNotificationRule(input: {
   userId: string;
@@ -102,6 +107,12 @@ export async function upsertNotificationRule(input: {
   containerId: string | null;
   kind: NotificationRuleKind | 'none';
 }): Promise<void> {
+  if (input.kind !== 'none' && !isValidNotificationRuleKindContainerCombo(input.kind, input.containerId)) {
+    throw new Error(
+      `Invalid notification-rule combination: kind "${input.kind}" is not valid with containerId ${JSON.stringify(input.containerId)}`
+    );
+  }
+
   const notificationRuleRepository = await getNotificationRuleRepository();
   // SuperSave can't reliably filter `.eq('containerId', null)` at the query level (same
   // documented limitation noted in `workspace-slug.ts` for `deletedAt`/`parentId`), so fetch
@@ -257,12 +268,20 @@ export async function resolveNotificationRecipients(input: {
 
     const rulesForUser = rulesByUserId.get(member.userId) ?? [];
     // Canonicalise per-container in case duplicate rows exist for this user (belt-and-braces —
-    // `upsertNotificationRule` should already prevent this in steady state).
-    const canonicalByContainerId = new Map<string | null, NotificationRule>();
+    // `upsertNotificationRule` should already prevent this in steady state). Reuses the same
+    // `lastUpdated` desc / `id` asc tiebreaker as `getCanonicalRulesForUser` so both read paths
+    // always agree on the winning rule for a given key.
+    const rulesByContainerId = new Map<string | null, NotificationRule[]>();
     for (const rule of rulesForUser) {
-      const existing = canonicalByContainerId.get(rule.containerId);
-      if (!existing || rule.lastUpdated > existing.lastUpdated) {
-        canonicalByContainerId.set(rule.containerId, rule);
+      const bucket = rulesByContainerId.get(rule.containerId) ?? [];
+      bucket.push(rule);
+      rulesByContainerId.set(rule.containerId, bucket);
+    }
+    const canonicalByContainerId = new Map<string | null, NotificationRule>();
+    for (const [containerId, bucket] of rulesByContainerId) {
+      const { canonical } = canonicalizeNotificationRules(bucket);
+      if (canonical) {
+        canonicalByContainerId.set(containerId, canonical);
       }
     }
 
@@ -383,8 +402,7 @@ export function renderNotificationTitleBody(input: {
 }): { title: string; body: string } {
   const action = input.event === 'page.created' ? 'created' : 'updated';
   const title = `${input.actorLabel} ${action} "${input.pageName}"`;
-  const changeSummary =
-    input.changeCount === 1 ? '1 change' : `${input.changeCount} changes`;
+  const changeSummary = input.changeCount === 1 ? '1 change' : `${input.changeCount} changes`;
   const body = `${changeSummary} in ${input.workspaceName}`;
   return { title, body };
 }
@@ -394,7 +412,9 @@ export async function deleteNotificationDataForUser(userId: string): Promise<voi
   const notificationRuleRepository = await getNotificationRuleRepository();
   const notificationRepository = await getNotificationRepository();
 
-  const rules = await notificationRuleRepository.getByQuery(notificationRuleRepository.createQuery().eq('userId', userId));
+  const rules = await notificationRuleRepository.getByQuery(
+    notificationRuleRepository.createQuery().eq('userId', userId)
+  );
   for (const rule of rules) {
     await notificationRuleRepository.deleteUsingId(rule.id);
   }

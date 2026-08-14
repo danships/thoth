@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { apiClient } from '@/lib/api/client';
 import type { GetNotificationsResponse, NotificationResponse } from '@/types/api';
@@ -42,10 +42,26 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [previousBaseKey, setPreviousBaseKey] = useState(baseKey);
+  // Bumped every time `baseKey` changes, following the same "adjust state during render" pattern
+  // as `previousBaseKey` above.
+  const [queryGeneration, setQueryGeneration] = useState(0);
   if (baseKey !== previousBaseKey) {
     setPreviousBaseKey(baseKey);
+    setQueryGeneration((previous) => previous + 1);
     setAccumulated(undefined);
   }
+
+  // Mirrors `queryGeneration` into a ref that's safe to read from an already-in-flight
+  // `loadMore` closure (refs must never be read/written during render itself — only outside it,
+  // e.g. in an effect or an event/async callback — so the mirroring happens in an effect, not
+  // inline). A filter change that lands mid-request (e.g. `workspaceId`/`unreadOnly` changing)
+  // bumps `queryGeneration`, which this effect then reflects into the ref — letting `loadMore`
+  // detect on completion that its page belongs to a since-abandoned query and must be discarded,
+  // rather than merged into the current one (it can contain rows from another workspace).
+  const activeGenerationReference = useRef(queryGeneration);
+  useEffect(() => {
+    activeGenerationReference.current = queryGeneration;
+  }, [queryGeneration]);
 
   const current = accumulated ?? data;
   const items = current?.notifications ?? [];
@@ -66,9 +82,17 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       return;
     }
     setLoadingMore(true);
+    // Capture the generation this request is for so a filter change that lands while the
+    // request is in flight (e.g. `workspaceId`/`unreadOnly` changing) can be detected on
+    // completion — an in-flight page belonging to a since-abandoned query must never be merged
+    // into the current one (it can contain rows from another workspace).
+    const requestedGeneration = activeGenerationReference.current;
     try {
       const nextKey = `${baseKey}&cursor=${encodeURIComponent(nextCursor)}`;
       const nextPage = await fetchNotifications(nextKey);
+      if (requestedGeneration !== activeGenerationReference.current) {
+        return;
+      }
       setAccumulated((previous) => {
         const base = previous ?? data ?? { notifications: [], nextCursor: null };
         return {
