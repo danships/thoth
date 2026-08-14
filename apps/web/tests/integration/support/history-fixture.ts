@@ -127,8 +127,15 @@ export async function waitUntil(predicate: () => Promise<boolean>, timeoutMs = 1
  * `timeoutMs` elapses. Lets integration tests assert on side effects only after the job that
  * produces them has actually finished running, rather than racing a `waitUntil` predicate that
  * may already be true before the job executed.
+ *
+ * `history.maintain` runs at a deliberately low queue priority (background maintenance), while
+ * THOTH-061's `webhook.dispatch`/`webhook.redeliver` and THOTH-066's `notification.dispatch`
+ * are externally-reachable, higher-priority job types that this same shared suite also enqueues
+ * heavily (see `apps/jobs/src/runner/runner.ts`'s priority-ordered `claimNextDue`). With both
+ * producers now competing for the runner's bounded concurrency, a 10s budget is too tight under
+ * CI load and flakes; 20s still leaves headroom under this file's 30s `testTimeout`.
  */
-export async function waitForJobCompletion(jobId: string, timeoutMs = 10_000, intervalMs = 100): Promise<void> {
+export async function waitForJobCompletion(jobId: string, timeoutMs = 20_000, intervalMs = 100): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const response = await getJobStatus(jobId, { socketPath: getJobSocketPath() });

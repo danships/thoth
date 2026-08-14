@@ -114,6 +114,11 @@ export const migrations: Migration[] = [
       await backfillWebhookDeliveryStatus(superSave);
     },
   },
+  // THOTH-066: `notification-rule`/`notification` are brand-new tables with no pre-existing
+  // rows — SuperSave creates them from their entity definitions at migration time (via
+  // `addEntity` in `context.ts`), same as `webhook`/`webhook-delivery` were introduced in
+  // THOTH-061 with no dedicated schema migration (only a later status backfill). No backfill
+  // entry is needed here.
 ];
 
 // Re-exported (in addition to being wired into the `migrations` array above) so the e2e seed

@@ -6,6 +6,7 @@ import {
   webhookRedeliverJobDefinition,
 } from './webhooks/index.js';
 import { historyScanJobDefinition, historyMaintainJobDefinition } from './history/index.js';
+import { notificationDispatchJobDefinition } from './notifications/index.js';
 import {
   maintenancePurgeWorkspacesJobDefinition,
   maintenancePurgePagesJobDefinition,
@@ -25,7 +26,8 @@ import {
  * `maintenance.purge-workspaces`/`maintenance.purge-pages`/`maintenance.purge-files`/
  * `maintenance.prune-jobs` (THOTH-063) are production job types too, and — unlike
  * `history.scan`/`history.maintain` — are **never** reachable externally in any environment;
- * `@thoth/job-protocol`'s `external-job.ts` doesn't reference them at all.
+ * `@thoth/job-protocol`'s `external-job.ts` doesn't reference them at all. `notification.dispatch`
+ * (THOTH-066) is a production job type registered unconditionally, mirroring `webhook.dispatch`.
  */
 export function createJobRegistry(nodeEnvironment: string): JobRegistry {
   const registry = new JobRegistry();
@@ -33,6 +35,7 @@ export function createJobRegistry(nodeEnvironment: string): JobRegistry {
   registry.register(webhookDispatchJobDefinition);
   registry.register(webhookDeliverJobDefinition);
   registry.register(webhookRedeliverJobDefinition);
+  registry.register(notificationDispatchJobDefinition);
   registry.register(historyScanJobDefinition);
   registry.register(historyMaintainJobDefinition);
   registry.register(maintenancePurgeWorkspacesJobDefinition);

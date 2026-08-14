@@ -15,3 +15,5 @@ export { FileUsage, NAME as FILE_USAGE_NAME } from './file-usage.js';
 export { PageRevision, NAME as PAGE_REVISION_NAME } from './page-revision.js';
 export { Setting, NAME as SETTING_NAME } from './setting.js';
 export { PlatformUser, NAME as PLATFORM_USER_NAME } from './platform-user.js';
+export { NotificationRule, NAME as NOTIFICATION_RULE_NAME } from './notification-rule.js';
+export { Notification, NAME as NOTIFICATION_NAME } from './notification.js';

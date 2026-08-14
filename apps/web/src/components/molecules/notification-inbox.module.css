@@ -1,0 +1,8 @@
+.item[data-unread='true'] {
+  border-color: var(--mantine-color-blue-4);
+}
+
+.body {
+  min-width: 0;
+  flex: 1;
+}

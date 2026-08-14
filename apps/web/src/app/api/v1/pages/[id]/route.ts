@@ -8,6 +8,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { getLogger } from '@/lib/logger';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
+import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
 import type {
   DeletePageParameters,
   GetPageDetailsParameters,
@@ -145,6 +146,7 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
     });
 
     scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
+    scheduleNotificationDispatch('page.updated', updatedPage, toWebhookActor(session));
 
     return {
       id: updatedPage.id,

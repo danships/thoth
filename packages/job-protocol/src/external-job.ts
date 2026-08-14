@@ -11,14 +11,21 @@ import {
   type HistoryScanTestJobRequest,
   type HistoryMaintainTestJobRequest,
 } from './history-job.js';
+import {
+  notificationDispatchExternalJobRequestSchema,
+  type NotificationDispatchExternalJobRequest,
+} from './notification-job.js';
 
 /**
- * External job payload accepted over the Unix-socket IPC boundary (THOTH-059/THOTH-061).
+ * External job payload accepted over the Unix-socket IPC boundary (THOTH-059/THOTH-061/THOTH-066).
  *
  * This is intentionally NOT the same type as the internal job registry used by the worker for
  * scheduled/maintenance jobs (purge, history, ...) — those are wired in-process by `@thoth/jobs`
  * and are never reachable from an external caller. `webhook.dispatch`/`webhook.redeliver` (added
- * in THOTH-061) ARE externally reachable — they're the only two ways `apps/web` can trigger
+ * in THOTH-061) and `notification.dispatch` (added in THOTH-066) ARE externally reachable —
+ * they're the only ways `apps/web` can trigger outbound webhook delivery / durable per-user
+ * inbox items, replacing every direct `fetch`/inline write that used to live in the web
+ * process.
  * outbound webhook delivery, replacing every direct `fetch` that used to live in the web
  * process. Both are strict, discriminated-union-validated schemas defined in `./webhook-job` so
  * a caller can never smuggle extra fields (priority, dedupeKey, retry policy, ...) that would
@@ -82,6 +89,18 @@ export type {
   WebhookActor,
 } from './webhook-job.js';
 
+export {
+  notificationDispatchExternalJobRequestSchema,
+  notificationDispatchPayloadV1Schema,
+  notificationActorSchema,
+  notificationDispatchEventSchema,
+} from './notification-job.js';
+export type {
+  NotificationDispatchExternalJobRequest,
+  NotificationDispatchPayloadV1,
+  NotificationActor,
+} from './notification-job.js';
+
 /** True only inside test runs; gates the only test-only externally-reachable job type. */
 function isTestEnvironment(): boolean {
   return process.env['NODE_ENV'] === 'test';
@@ -90,14 +109,15 @@ function isTestEnvironment(): boolean {
 const productionExternalJobSchemas = [
   webhookDispatchExternalJobRequestSchema,
   webhookRedeliverExternalJobRequestSchema,
+  notificationDispatchExternalJobRequestSchema,
 ] as const;
 
 /**
- * The externally accepted job schema. Production environments accept exactly the two webhook
- * job types (THOTH-061); test runs additionally accept `test.noop` plus the internal-only
- * `history.scan`/`history.maintain` types (THOTH-062), so integration/e2e tests can drive real
- * scan/maintenance runs through the actual job service without a production "run maintenance"
- * HTTP endpoint.
+ * The externally accepted job schema. Production environments accept exactly the three
+ * externally-reachable job types (THOTH-061 webhooks + THOTH-066 notifications); test runs
+ * additionally accept `test.noop` plus the internal-only `history.scan`/`history.maintain`
+ * types (THOTH-062), so integration/e2e tests can drive real scan/maintenance runs through the
+ * actual job service without a production "run maintenance" HTTP endpoint.
  */
 export const ExternalJobRequestSchema: z.ZodType<ExternalJobRequest> = isTestEnvironment()
   ? z.discriminatedUnion('type', [
@@ -112,5 +132,6 @@ export type ExternalJobRequest =
   | TestNoopExternalJobRequest
   | WebhookDispatchExternalJobRequest
   | WebhookRedeliverExternalJobRequest
+  | NotificationDispatchExternalJobRequest
   | HistoryScanTestJobRequest
   | HistoryMaintainTestJobRequest;

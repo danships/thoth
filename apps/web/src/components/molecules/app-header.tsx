@@ -1,5 +1,6 @@
 import { Burger, Group, Title } from '@mantine/core';
 import Image from 'next/image';
+import { NotificationBell } from './notification-bell';
 
 type AppHeaderProperties = {
   navbarOpened?: boolean;
@@ -28,6 +29,9 @@ export function AppHeader({ navbarOpened, onToggleNavbar, showBurger = false }: 
         )}
         <Image src="/icons/favicon-32x32.png" width={21} height={21} alt="Thoth Logo" loading="eager" />
         <Title order={5}>Thoth</Title>
+      </Group>
+      <Group>
+        <NotificationBell />
       </Group>
     </Group>
   );

@@ -1,0 +1,20 @@
+.item {
+  padding: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.item[data-unread='true'] {
+  background-color: var(--mantine-color-blue-light);
+}
+
+.itemLink {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.itemLink:hover {
+  text-decoration: none;
+}

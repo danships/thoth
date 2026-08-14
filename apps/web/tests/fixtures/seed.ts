@@ -444,4 +444,20 @@ export const SEED = {
       { kind: 'data' as const, columnId: 'e2e-col-cl-gamma-0-0000-0000-000000000001', visible: false },
     ],
   },
+  // THOTH-066: notification inbox + subscription fixtures for `SEED.user` in `SEED.workspace`.
+  // A canonical workspace-level subscription rule, one unread and one already-read inbox item
+  // (both targeting `SEED.pages.root`), so the bell/inbox/settings render with data.
+  notifications: {
+    workspaceRule: {
+      id: 'e2e-notif-rule-ws-00-0000-0000-000000000001',
+    },
+    unread: {
+      id: 'e2e-notification-un-0-0000-0000-000000000001',
+      title: 'E2E Second Member updated "E2E Root Page"',
+    },
+    read: {
+      id: 'e2e-notification-rd-0-0000-0000-000000000001',
+      title: 'E2E Second Member updated "E2E Root Page" earlier',
+    },
+  },
 } as const;

@@ -17,6 +17,8 @@ import type {
   PageRevision,
   Setting,
   PlatformUser,
+  NotificationRule,
+  Notification,
 } from './types.js';
 import * as entities from './entities/index.js';
 import { migrations } from './migrations/index.js';
@@ -70,6 +72,8 @@ export function createDatabaseContext(options: CreateDatabaseContextOptions) {
     await database.addEntity(entities.PageRevision);
     await database.addEntity(entities.Setting);
     await database.addEntity(entities.PlatformUser);
+    await database.addEntity(entities.NotificationRule);
+    await database.addEntity(entities.Notification);
 
     return database;
   }
@@ -172,6 +176,14 @@ export function createDatabaseContext(options: CreateDatabaseContextOptions) {
     async getPlatformUserRepository() {
       const database = await getDatabase();
       return database.getRepository<PlatformUser>(entities.PLATFORM_USER_NAME);
+    },
+    async getNotificationRuleRepository() {
+      const database = await getDatabase();
+      return database.getRepository<NotificationRule>(entities.NOTIFICATION_RULE_NAME);
+    },
+    async getNotificationRepository() {
+      const database = await getDatabase();
+      return database.getRepository<Notification>(entities.NOTIFICATION_NAME);
     },
   };
 

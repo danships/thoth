@@ -1,7 +1,8 @@
-import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '../../repositories.js';
+import { getContainerAccessRepository, getContainerRepository, getDataViewRepository, getNotificationRepository } from '../../repositories.js';
 import type { Container, DataView } from '../../types.js';
 import { addWorkspaceIdToQuery } from '../../helpers.js';
 import { isOutsideRaceSafetyMargin, isPastGraceThreshold } from './grace.js';
+import { deleteNotificationRulesForContainer } from '../../notification-service.js';
 
 export type DeletedRootKind = 'container' | 'data-view';
 
@@ -90,6 +91,7 @@ export async function permanentlyDeleteDeletedRoot(
   const containerRepository = await getContainerRepository();
   const containerAccessRepository = await getContainerAccessRepository();
   const dataViewRepository = await getDataViewRepository();
+  const notificationRepository = await getNotificationRepository();
 
   const rootContainer = await containerRepository.getOneByQuery(
     addWorkspaceIdToQuery(containerRepository.createQuery().eq('id', rootId), workspaceId)
@@ -169,6 +171,18 @@ export async function permanentlyDeleteDeletedRoot(
     );
     for (const accessRow of accessRows) {
       await containerAccessRepository.deleteUsingId(accessRow.id);
+    }
+
+    // THOTH-066: a hard-deleted page can no longer be subscribed to, and any inbox item
+    // pointing at it becomes unopenable content (the `/notifications/{id}/open` route falls
+    // back to a "no longer available" redirect) — clean up both the same way `ContainerAccess`
+    // is above, only after the container row is actually gone.
+    await deleteNotificationRulesForContainer(containerId);
+    const notificationRows = await notificationRepository.getByQuery(
+      notificationRepository.createQuery().eq('containerId', containerId)
+    );
+    for (const notificationRow of notificationRows) {
+      await notificationRepository.deleteUsingId(notificationRow.id);
     }
   }
 
