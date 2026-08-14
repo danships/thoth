@@ -224,7 +224,9 @@ export function resolveVapidDirectory(repositoryRoot, override) {
  * @param {{ repositoryRoot: string }} input
  */
 export async function ensureAndInjectVapidKeys({ repositoryRoot }) {
-  const enabled = String(process.env.WEB_PUSH_ENABLED ?? '').toLowerCase() === 'true';
+  // WEB_PUSH_ENABLED defaults to true (matching the `bool({ default: true })` envalid schemas
+  // in apps/web and apps/jobs) — only an explicit "false" disables Web Push provisioning.
+  const enabled = String(process.env.WEB_PUSH_ENABLED ?? 'true').toLowerCase() !== 'false';
   const dir = resolveVapidDirectory(repositoryRoot, process.env.WEB_PUSH_VAPID_DIR);
   const result = await ensureVapidKeys({ enabled, dir, environment: process.env });
   if ('skipped' in result) {

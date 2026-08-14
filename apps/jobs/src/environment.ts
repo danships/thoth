@@ -82,7 +82,7 @@ const environmentSchema = {
   // THOTH-071 Web Push delivery. All three VAPID fields resolve to values persisted by
   // `scripts/ensure-vapid-keys.mjs` (see `apps/jobs/src/notifications/vapid.ts`) if unset, so
   // the running process always finds a full pair regardless of how it was provisioned.
-  WEB_PUSH_ENABLED: bool({ default: false }),
+  WEB_PUSH_ENABLED: bool({ default: true }),
   WEB_PUSH_VAPID_PUBLIC_KEY: str({ default: undefined }),
   WEB_PUSH_VAPID_PRIVATE_KEY: str({ default: undefined }),
   WEB_PUSH_VAPID_SUBJECT: str({ default: undefined }),

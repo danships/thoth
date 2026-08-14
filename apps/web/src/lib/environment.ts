@@ -42,7 +42,7 @@ const environmentSchema = {
   // `GET /notifications/push-config` so the client can register a Push subscription with the
   // browser). The private key lives only in `apps/jobs`. Both processes fall back to reading
   // a shared `vapid.json` (see `scripts/ensure-vapid-keys.mjs`) if the env var is unset.
-  WEB_PUSH_ENABLED: bool({ default: false }),
+  WEB_PUSH_ENABLED: bool({ default: true }),
   WEB_PUSH_VAPID_PUBLIC_KEY: str({ default: undefined }),
   WEB_PUSH_VAPID_DIR: str({ default: undefined }),
 } as const;

@@ -1,12 +1,13 @@
 # Browser Web Push (THOTH-071)
 
-Thoth ships a durable, per-user notification inbox by default (THOTH-066). Enabling
-`WEB_PUSH_ENABLED=true` additionally sends the same inbox items as browser Web Push
-notifications to any device the user has explicitly enabled push on.
+Thoth ships a durable, per-user notification inbox by default (THOTH-066). Browser Web Push
+delivery on top of the same inbox is **enabled by default** (`WEB_PUSH_ENABLED` defaults to
+`true`); set `WEB_PUSH_ENABLED=false` to disable it and fall back to inbox-only delivery.
 
 ## Enabling
 
-1. Set `WEB_PUSH_ENABLED=true` in the environment shared by `apps/web` and `apps/jobs`.
+1. Web Push is on by default — no configuration needed. To disable it, set
+   `WEB_PUSH_ENABLED=false` in the environment shared by `apps/web` and `apps/jobs`.
 2. Restart both processes. On first boot with push enabled, Thoth generates a persistent
    VAPID key pair (via `scripts/ensure-vapid-keys.mjs`) and persists it to
    `<WEB_PUSH_VAPID_DIR>/vapid.json` (defaults to `<repo>/data/vapid.json`) with mode `0600`.
