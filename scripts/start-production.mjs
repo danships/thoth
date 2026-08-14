@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
+import { ensureAndInjectVapidKeys } from './ensure-vapid-keys.mjs';
 
 /**
  * Production/preview bootstrap for the combined web+jobs image (THOTH-060).
@@ -96,4 +97,14 @@ function startPm2Runtime() {
 }
 
 runMigrations();
+try {
+  const vapidResult = await ensureAndInjectVapidKeys({ repositoryRoot });
+  if (!('skipped' in vapidResult)) {
+    console.log(`VAPID keys ready (source: ${vapidResult.source})`);
+  }
+} catch (error) {
+  console.error(`VAPID key provisioning failed: ${error instanceof Error ? error.message : error}`);
+  // eslint-disable-next-line unicorn/no-process-exit
+  process.exit(1);
+}
 startPm2Runtime();

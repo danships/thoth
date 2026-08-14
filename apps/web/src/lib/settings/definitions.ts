@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import type { SettingScope } from '@/types/schemas/entities/setting';
 import { DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES } from '@/types/schemas/entities/workspace';
+import {
+  ianaTimezoneSchema,
+  quietScheduleSchema,
+  mutedUntilSchema,
+  DEFAULT_QUIET_SCHEDULE,
+} from '@thoth/database/notifications/mute';
 
 /**
  * The single registry of setting keys (THOTH-045). Each definition declares which scopes the
@@ -40,6 +46,26 @@ export const SETTING_DEFINITIONS = {
       workspace: DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
     },
   },
+  // General cross-workspace user timezone (THOTH-071). IANA identifier; consumed by the
+  // notifications quiet-schedule evaluator and reused as the default timezone across the app.
+  timezone: {
+    scopes: ['user'],
+    schema: ianaTimezoneSchema,
+    defaults: { user: 'UTC' },
+  },
+  // Recurring per-day quiet windows during which the notifications dispatch handler skips
+  // push (inbox item still persists). See `packages/database/src/notifications/mute.ts`.
+  'notifications.quiet_schedule': {
+    scopes: ['user'],
+    schema: quietScheduleSchema,
+    defaults: { user: DEFAULT_QUIET_SCHEDULE },
+  },
+  // Temporary "mute until" instant; `null` means no active mute (THOTH-071).
+  'notifications.muted_until': {
+    scopes: ['user'],
+    schema: mutedUntilSchema,
+    defaults: { user: null },
+  },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof SETTING_DEFINITIONS;
@@ -51,6 +77,9 @@ export const PLATFORM_SETTING_SUBJECT_ID = 'platform';
 
 export const WORKSPACE_CREATION_SELF_SERVICE_KEY = 'workspace.creation.self_service_enabled' satisfies SettingKey;
 export const STORAGE_QUOTA_BYTES_KEY = 'storage.quota_bytes' satisfies SettingKey;
+export const USER_TIMEZONE_KEY = 'timezone' satisfies SettingKey;
+export const NOTIFICATIONS_QUIET_SCHEDULE_KEY = 'notifications.quiet_schedule' satisfies SettingKey;
+export const NOTIFICATIONS_MUTED_UNTIL_KEY = 'notifications.muted_until' satisfies SettingKey;
 
 export function getSettingDefinition<Key extends SettingKey>(key: Key): (typeof SETTING_DEFINITIONS)[Key] {
   return SETTING_DEFINITIONS[key];

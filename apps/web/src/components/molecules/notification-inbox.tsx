@@ -8,6 +8,7 @@ import { useNotifications } from '@/lib/hooks/api/use-notifications';
 import { useNotificationUnreadCounts } from '@/lib/hooks/api/use-notification-unread-counts';
 import type { NotificationResponse } from '@/types/api';
 import classes from './notification-inbox.module.css';
+import { EnableBrowserPushCard } from './enable-browser-push-card';
 
 type NotificationInboxProperties = {
   workspaceId?: string;
@@ -116,6 +117,9 @@ export function NotificationInbox({ workspaceId, title = 'Notifications' }: Noti
         page. You can further tune what you receive for an individual page from the page&apos;s menu, where you can
         subscribe (or unsubscribe) to that page alone or to it and all of its sub-pages.
       </Text>
+
+      {/* THOTH-071: sole call site for the browser permission prompt. */}
+      <EnableBrowserPushCard />
 
       {renderList()}
 

@@ -374,6 +374,12 @@ export async function createNotification(input: CreateNotificationInput): Promis
     occurredAt: input.occurredAt,
     createdAt: new Date().toISOString(),
     readAt: null,
+    // THOTH-071 push-summary fields: `null` disposition until the dispatch handler's push
+    // extension evaluates mute/quiet-schedule and enumerates devices.
+    pushDisposition: null,
+    pushQueuedCount: 0,
+    pushSentCount: 0,
+    pushFailedCount: 0,
   };
   return notificationRepository.create(create);
 }
@@ -407,7 +413,9 @@ export function renderNotificationTitleBody(input: {
   return { title, body };
 }
 
-/** Deletes every rule + inbox item owned by `userId` (used by the account-purge path). */
+/** Deletes every rule + inbox item + push subscription + push delivery row owned by `userId`
+ * (used by the account-purge path; also called on subscription-cleanup during page/workspace
+ * purges via the deliveries-for-subscription helper). */
 export async function deleteNotificationDataForUser(userId: string): Promise<void> {
   const notificationRuleRepository = await getNotificationRuleRepository();
   const notificationRepository = await getNotificationRepository();
@@ -422,5 +430,17 @@ export async function deleteNotificationDataForUser(userId: string): Promise<voi
   const items = await notificationRepository.getByQuery(notificationRepository.createQuery().eq('userId', userId));
   for (const item of items) {
     await notificationRepository.deleteUsingId(item.id);
+  }
+
+  // THOTH-071 additions: push-subscription + notification-delivery rows are per-user state,
+  // cleaned up here so the user-purge path is the single source of truth.
+  const { getPushSubscriptionRepository } = await import('./repositories.js');
+  const { deleteNotificationDeliveriesForSubscriptionIds } = await import('./notification-delivery-service.js');
+  const pushRepository = await getPushSubscriptionRepository();
+  const subscriptions = await pushRepository.getByQuery(pushRepository.createQuery().eq('userId', userId));
+  const subscriptionIds = subscriptions.map((row) => row.id);
+  await deleteNotificationDeliveriesForSubscriptionIds(subscriptionIds);
+  for (const subscription of subscriptions) {
+    await pushRepository.deleteUsingId(subscription.id);
   }
 }

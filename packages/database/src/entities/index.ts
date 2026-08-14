@@ -17,3 +17,5 @@ export { Setting, NAME as SETTING_NAME } from './setting.js';
 export { PlatformUser, NAME as PLATFORM_USER_NAME } from './platform-user.js';
 export { NotificationRule, NAME as NOTIFICATION_RULE_NAME } from './notification-rule.js';
 export { Notification, NAME as NOTIFICATION_NAME } from './notification.js';
+export { PushSubscription, NAME as PUSH_SUBSCRIPTION_NAME } from './push-subscription.js';
+export { NotificationDelivery, NAME as NOTIFICATION_DELIVERY_NAME } from './notification-delivery.js';

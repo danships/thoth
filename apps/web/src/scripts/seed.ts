@@ -157,6 +157,10 @@ if (welcomePageId) {
       occurredAt: now,
       createdAt: now,
       readAt: sample.readAt,
+      pushDisposition: null,
+      pushQueuedCount: 0,
+      pushSentCount: 0,
+      pushFailedCount: 0,
     } satisfies NotificationCreate);
   }
 }

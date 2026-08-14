@@ -1,4 +1,4 @@
-import { cleanEnv, num, str, url } from 'envalid';
+import { cleanEnv, num, str, url, bool } from 'envalid';
 
 const environmentSchema = {
   NODE_ENV: str({ choices: ['development', 'production', 'test'] }),
@@ -38,6 +38,13 @@ const environmentSchema = {
   // for local development. Must stay a runtime-only server var (never `NEXT_PUBLIC_*`), since
   // the same built Docker image is deployed at several different URLs.
   APP_URL: url({ default: undefined }),
+  // THOTH-071 Web Push. `apps/web` only ever needs the *public* VAPID key (returned by
+  // `GET /notifications/push-config` so the client can register a Push subscription with the
+  // browser). The private key lives only in `apps/jobs`. Both processes fall back to reading
+  // a shared `vapid.json` (see `scripts/ensure-vapid-keys.mjs`) if the env var is unset.
+  WEB_PUSH_ENABLED: bool({ default: false }),
+  WEB_PUSH_VAPID_PUBLIC_KEY: str({ default: undefined }),
+  WEB_PUSH_VAPID_DIR: str({ default: undefined }),
 } as const;
 
 // `JOB_SOCKET_PATH` (THOTH-059/THOTH-060) is intentionally NOT part of this schema: it is read
