@@ -6762,6 +6762,303 @@
         ]
       }
     },
+    "/views/{id}/duplicate": {
+      "post": {
+        "operationId": "duplicateDataView",
+        "summary": "Duplicate a data view",
+        "tags": [
+          "Views"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerApiKey": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "lastUpdated": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "dataSourceId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "filters": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "operator": {
+                                "type": "string",
+                                "enum": [
+                                  "equals",
+                                  "notEquals",
+                                  "contains",
+                                  "notContains",
+                                  "gt",
+                                  "gte",
+                                  "lt",
+                                  "lte",
+                                  "isEmpty",
+                                  "isNotEmpty",
+                                  "hasAnyOf",
+                                  "hasAllOf"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "operator"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "sorts": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "columnId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "direction": {
+                                "type": "string",
+                                "enum": [
+                                  "asc",
+                                  "desc"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "columnId",
+                              "direction"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "columns": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "columnLayout": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "name"
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "data"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "lastUpdated",
+                        "createdAt",
+                        "dataSourceId",
+                        "filters",
+                        "sorts",
+                        "columns",
+                        "columnLayout"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pageId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "pageId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/workspaces/deleted": {
       "get": {
         "operationId": "getDeletedWorkspaces",
