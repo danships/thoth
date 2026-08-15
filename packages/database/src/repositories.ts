@@ -88,3 +88,11 @@ export async function getNotificationRuleRepository() {
 export async function getNotificationRepository() {
   return getDatabaseContext().getNotificationRepository();
 }
+
+export async function getPushSubscriptionRepository() {
+  return getDatabaseContext().getPushSubscriptionRepository();
+}
+
+export async function getNotificationDeliveryRepository() {
+  return getDatabaseContext().getNotificationDeliveryRepository();
+}

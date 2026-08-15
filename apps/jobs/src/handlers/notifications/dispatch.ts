@@ -1,11 +1,16 @@
 import {
   createNotification,
+  createOrReuseNotificationDelivery,
   findNotificationBySourceJobAndRecipient,
   getContainerRepository,
   getWorkspaceRepository,
+  isNotificationMutedAt,
+  listActivePushSubscriptionsForUser,
+  recomputeParentNotificationSummary,
   renderActorLabel,
   renderNotificationTitleBody,
   resolveNotificationRecipients,
+  setNotificationPushSummary,
 } from '@thoth/database';
 import {
   notificationDispatchPayloadV1Schema,
@@ -14,6 +19,9 @@ import {
   type JobExecutionContext,
   type NotificationDispatchPayloadV1,
 } from '@thoth/job-protocol';
+import { getEnvironment } from '../../environment.js';
+import { getLogger } from '../../logger.js';
+import { readNotificationMuteSettingsForUser } from '../../notifications/settings.js';
 
 const TRAILING_DEBOUNCE_MS = 30_000;
 const MAX_DEBOUNCE_MS = 300_000;
@@ -156,32 +164,90 @@ export const notificationDispatchJobDefinition: JobDefinition<NotificationDispat
     });
 
     let created = 0;
+    // Read env once, but never fail dispatch (or a test) because of an incomplete env — the
+    // handler must remain functional as a THOTH-066 inbox creator even if push env vars are
+    // missing/invalid.
+    let pushEnabled = false;
+    try {
+      pushEnabled = getEnvironment().WEB_PUSH_ENABLED;
+    } catch {
+      pushEnabled = false;
+    }
+    const logger = pushEnabled ? getLogger() : undefined;
     for (const userId of recipients) {
       // Crash-recovery: a repeated dispatch (e.g. after a jobs-process restart mid-fan-out)
       // must find the already-created inbox item for this (sourceJobId, userId) pair before
       // creating a new one, never duplicating it (mirrors `findDeliveryBySourceJobAndWebhook`).
       const existing = await findNotificationBySourceJobAndRecipient(context.jobId, userId);
-      if (existing) {
-        continue;
-      }
+      const notificationRow =
+        existing ??
+        (await createNotification({
+          userId,
+          workspaceId: payload.workspaceId,
+          containerId: container.id,
+          event: payload.event,
+          actor: payload.actor,
+          title,
+          body,
+          changeCount: payload.changeCount,
+          sourceJobId: context.jobId,
+          occurredAt: payload.occurredAt,
+        }));
+      if (!existing) created += 1;
 
-      await createNotification({
-        userId,
-        workspaceId: payload.workspaceId,
-        containerId: container.id,
-        event: payload.event,
-        actor: payload.actor,
-        title,
-        body,
-        changeCount: payload.changeCount,
-        sourceJobId: context.jobId,
-        occurredAt: payload.occurredAt,
-      });
-      created += 1;
+      // --- THOTH-071 push extension. Wrapped in try/catch so a push-side failure NEVER
+      //     rolls back the already-created inbox item (which was the entire THOTH-066
+      //     durability contract). ---
+      if (!pushEnabled) continue;
+      try {
+        let muted = false;
+        try {
+          const settings = await readNotificationMuteSettingsForUser(userId);
+          const evaluation = isNotificationMutedAt(settings, new Date());
+          muted = evaluation.muted;
+        } catch (evaluationError) {
+          // Fail-open-to-push: malformed persisted settings → push proceeds.
+          logger?.warn('notification.dispatch.mute-eval-failed', {
+            userId,
+            notificationId: notificationRow.id,
+            error: evaluationError instanceof Error ? evaluationError.message : String(evaluationError),
+          });
+        }
+        if (muted) {
+          await setNotificationPushSummary(notificationRow.id, 'muted', 0);
+          continue;
+        }
+        const devices = await listActivePushSubscriptionsForUser(userId);
+        if (devices.length === 0) {
+          await setNotificationPushSummary(notificationRow.id, 'no_devices', 0);
+          continue;
+        }
+        for (const device of devices) {
+          const delivery = await createOrReuseNotificationDelivery({
+            notificationId: notificationRow.id,
+            pushSubscriptionId: device.id,
+          });
+          await context.enqueueChild({
+            type: 'notification.deliver',
+            payloadVersion: 1,
+            payload: { deliveryId: delivery.id },
+            dedupeKey: `notification-delivery:${delivery.id}`,
+          });
+        }
+        // Recompute (rather than blindly overwrite) so a re-dispatch that finds some deliveries
+        // already terminal never regresses `pushSentCount`/`pushFailedCount` or reports a stale
+        // 'queued' disposition — see `recomputeParentNotificationSummary`.
+        await recomputeParentNotificationSummary(notificationRow.id);
+      } catch (pushError) {
+        logger?.warn('notification.dispatch.push-fanout-failed', {
+          userId,
+          notificationId: notificationRow.id,
+          error: pushError instanceof Error ? pushError.message : String(pushError),
+        });
+      }
     }
 
-    // --- THOTH-071 extension seam: mute/quiet-schedule evaluation, push-subscription lookup,
-    // `notification-delivery` row creation, and `notification.deliver` child enqueue go here. ---
+    // --- End THOTH-071 push extension. ---
 
     return { recipients: recipients.length, created };
   },

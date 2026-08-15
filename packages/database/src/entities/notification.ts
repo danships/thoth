@@ -17,6 +17,7 @@ export const Notification: EntityDefinition = {
     readAt: 'string',
     occurredAt: 'string',
     createdAt: 'string',
+    pushDisposition: 'string',
     id: 'string',
   },
 };

@@ -195,6 +195,22 @@ export async function cascadeDeleteWorkspace(
   const notifications = await notificationRepository.getByQuery(
     notificationRepository.createQuery().eq('workspaceId', workspaceId)
   );
+  // THOTH-071: also purge any push-delivery rows referencing these notifications so the
+  // notification-delivery table doesn't accumulate orphans (its rows aren't workspace-scoped
+  // directly — they belong to a per-user push-subscription, so this workspace-cascade is the
+  // only spot that can safely delete them for a purged workspace's inbox items).
+  if (notifications.length > 0) {
+    const { getNotificationDeliveryRepository } = await import('../../repositories.js');
+    const deliveryRepository = await getNotificationDeliveryRepository();
+    for (const notification of notifications) {
+      const deliveryRows = await deliveryRepository.getByQuery(
+        deliveryRepository.createQuery().eq('notificationId', notification.id)
+      );
+      for (const row of deliveryRows) {
+        await deliveryRepository.deleteUsingId(row.id);
+      }
+    }
+  }
   for (const row of notifications) {
     await notificationRepository.deleteUsingId(row.id);
   }

@@ -102,6 +102,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/jobs/node_modules ./apps/job
 # PM2 process file and the migration-then-`pm2-runtime` bootstrap entrypoint (THOTH-060).
 COPY --from=builder --chown=nextjs:nodejs /app/pm2.config.js ./pm2.config.js
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/start-production.mjs ./scripts/start-production.mjs
+# `ensure-vapid-keys.mjs` (THOTH-071) is imported by `start-production.mjs` to generate/persist
+# VAPID keys for Web Push before PM2 starts; it must be copied alongside the entrypoint or
+# startup fails with ERR_MODULE_NOT_FOUND.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/ensure-vapid-keys.mjs ./scripts/ensure-vapid-keys.mjs
 # .next/standalone already contains server.js and a trimmed node_modules tree.
 # Turbopack's file tracing can pull in source/config artefacts; delete them here.
 RUN rm -rf apps/web/src apps/web/tests apps/web/scripts \

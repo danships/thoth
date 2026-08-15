@@ -19,6 +19,8 @@ import type {
   PlatformUser,
   NotificationRule,
   Notification,
+  PushSubscription,
+  NotificationDelivery,
 } from './types.js';
 import * as entities from './entities/index.js';
 import { migrations } from './migrations/index.js';
@@ -74,6 +76,8 @@ export function createDatabaseContext(options: CreateDatabaseContextOptions) {
     await database.addEntity(entities.PlatformUser);
     await database.addEntity(entities.NotificationRule);
     await database.addEntity(entities.Notification);
+    await database.addEntity(entities.PushSubscription);
+    await database.addEntity(entities.NotificationDelivery);
 
     return database;
   }
@@ -184,6 +188,14 @@ export function createDatabaseContext(options: CreateDatabaseContextOptions) {
     async getNotificationRepository() {
       const database = await getDatabase();
       return database.getRepository<Notification>(entities.NOTIFICATION_NAME);
+    },
+    async getPushSubscriptionRepository() {
+      const database = await getDatabase();
+      return database.getRepository<PushSubscription>(entities.PUSH_SUBSCRIPTION_NAME);
+    },
+    async getNotificationDeliveryRepository() {
+      const database = await getDatabase();
+      return database.getRepository<NotificationDelivery>(entities.NOTIFICATION_DELIVERY_NAME);
     },
   };
 

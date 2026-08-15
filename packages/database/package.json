@@ -29,6 +29,10 @@
       "types": "./dist/services/maintenance/index.d.ts",
       "default": "./dist/services/maintenance/index.js"
     },
+    "./notifications/mute": {
+      "types": "./dist/notifications/mute.d.ts",
+      "default": "./dist/notifications/mute.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

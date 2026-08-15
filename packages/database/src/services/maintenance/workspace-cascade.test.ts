@@ -39,7 +39,15 @@ const INDIRECTLY_WORKSPACE_SCOPED_ENTITY_NAMES: readonly string[] = [
 
 // Entities deliberately NOT workspace-scoped (per-user/global state or the Workspace row
 // itself) — never expected to appear in the cascade's dependent-entity steps.
-const NOT_WORKSPACE_SCOPED_ENTITY_NAMES: readonly string[] = [entities.WORKSPACE_NAME, entities.SETTING_NAME, entities.PLATFORM_USER_NAME];
+// `push-subscription`/`notification-delivery` (THOTH-071) are per-user state, cleaned up by
+// the user-scoped purge cascade rather than the workspace one.
+const NOT_WORKSPACE_SCOPED_ENTITY_NAMES: readonly string[] = [
+  entities.WORKSPACE_NAME,
+  entities.SETTING_NAME,
+  entities.PLATFORM_USER_NAME,
+  entities.PUSH_SUBSCRIPTION_NAME,
+  entities.NOTIFICATION_DELIVERY_NAME,
+];
 
 describe('workspace-cascade entity inventory', () => {
   test('every registered entity is accounted for exactly once (workspace-cascade completeness)', () => {

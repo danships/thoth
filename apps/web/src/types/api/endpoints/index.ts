@@ -55,3 +55,5 @@ export * from './platform-capabilities';
 export * from './admin-settings';
 export * from './admin-users';
 export * from './admin-workspaces';
+export * from './notifications/push';
+export * from './user/settings';

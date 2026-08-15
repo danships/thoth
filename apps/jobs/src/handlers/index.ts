@@ -6,7 +6,7 @@ import {
   webhookRedeliverJobDefinition,
 } from './webhooks/index.js';
 import { historyScanJobDefinition, historyMaintainJobDefinition } from './history/index.js';
-import { notificationDispatchJobDefinition } from './notifications/index.js';
+import { notificationDispatchJobDefinition, notificationDeliverJobDefinition } from './notifications/index.js';
 import {
   maintenancePurgeWorkspacesJobDefinition,
   maintenancePurgePagesJobDefinition,
@@ -36,6 +36,7 @@ export function createJobRegistry(nodeEnvironment: string): JobRegistry {
   registry.register(webhookDeliverJobDefinition);
   registry.register(webhookRedeliverJobDefinition);
   registry.register(notificationDispatchJobDefinition);
+  registry.register(notificationDeliverJobDefinition);
   registry.register(historyScanJobDefinition);
   registry.register(historyMaintainJobDefinition);
   registry.register(maintenancePurgeWorkspacesJobDefinition);

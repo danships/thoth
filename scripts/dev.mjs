@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { ensureAndInjectVapidKeys } from './ensure-vapid-keys.mjs';
 
 /**
  * Full-stack development harness (THOTH-060). Orchestrates, in order:
@@ -74,6 +75,17 @@ async function waitForJobsReady(socketPath) {
 async function main() {
   console.log('[dev] Running database migrations...');
   run('pnpm', ['run', 'db:migrate']);
+
+  try {
+    const vapidResult = await ensureAndInjectVapidKeys({ repositoryRoot });
+    if (!('skipped' in vapidResult)) {
+      console.log(`[dev] VAPID keys ready (source: ${vapidResult.source})`);
+    }
+  } catch (error) {
+    console.error(`[dev] VAPID key provisioning failed: ${error instanceof Error ? error.message : error}`);
+    // eslint-disable-next-line unicorn/no-process-exit
+    process.exit(1);
+  }
 
   const socketDirectory = process.env.JOB_SOCKET_PATH ? undefined : await mkdtemp(path.join(tmpdir(), 'thoth-dev-'));
   // Respects an already-set `JOB_SOCKET_PATH` (e.g. `.env.test`, used by the e2e harness so

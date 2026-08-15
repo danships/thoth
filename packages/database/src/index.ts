@@ -26,6 +26,8 @@ export {
   getPlatformUserRepository,
   getNotificationRuleRepository,
   getNotificationRepository,
+  getPushSubscriptionRepository,
+  getNotificationDeliveryRepository,
 } from './repositories.js';
 
 // Migrations (exposed for the CLI and tests)
@@ -135,6 +137,45 @@ export {
 } from './notification-service.js';
 export type { RulePrecedenceResult, CreateNotificationInput } from './notification-service.js';
 
+// THOTH-071: push-subscription upsert/list/disable, notification-delivery lifecycle, and the
+// pure `isNotificationMutedAt` evaluator shared with `apps/jobs`.
+export {
+  upsertPushSubscriptionByEndpoint,
+  disablePushSubscriptionForUser,
+  disablePushSubscriptionById,
+  listActivePushSubscriptionsForUser,
+  deletePushSubscriptionsForUser,
+} from './push-subscription-service.js';
+export type { UpsertPushSubscriptionInput } from './push-subscription-service.js';
+export {
+  createOrReuseNotificationDelivery,
+  completeNotificationDelivery,
+  recordNotificationDeliveryAttempt,
+  cancelSiblingDeliveriesForSubscription,
+  recomputeParentNotificationSummary,
+  setNotificationPushSummary,
+  deleteNotificationDeliveriesForSubscriptionIds,
+} from './notification-delivery-service.js';
+export type { CompleteNotificationDeliveryInput } from './notification-delivery-service.js';
+export {
+  isNotificationMutedAt,
+  ianaTimezoneSchema,
+  quietScheduleSchema,
+  quietScheduleWindowSchema,
+  mutedUntilSchema,
+  DEFAULT_QUIET_SCHEDULE,
+  USER_TIMEZONE_SETTING_KEY,
+  NOTIFICATIONS_QUIET_SCHEDULE_SETTING_KEY,
+  NOTIFICATIONS_MUTED_UNTIL_SETTING_KEY,
+} from './notifications/mute.js';
+export type {
+  QuietSchedule,
+  QuietScheduleWindow,
+  MutedUntil,
+  NotificationMuteSettings,
+  MuteEvaluation,
+} from './notifications/mute.js';
+
 
 // Re-exported (in addition to `@thoth/database/schemas`) so packages using `moduleResolution:
 // Node10` (which cannot resolve the `exports` map's `./schemas` subpath) — e.g.
@@ -168,7 +209,23 @@ export type {
   PlatformUser,
   NotificationRule,
   Notification,
+  PushSubscription,
+  NotificationDelivery,
 } from './types.js';
+// Push-related schema types (THOTH-071) — root re-exports for Node10-resolvable consumers.
+export {
+  pushSubscriptionSchema,
+} from './schemas/entities/push-subscription.js';
+export {
+  notificationDeliverySchema,
+  notificationDeliveryStatusSchema,
+  TERMINAL_NOTIFICATION_DELIVERY_STATUSES,
+} from './schemas/entities/notification-delivery.js';
+export type { NotificationDeliveryStatus } from './schemas/entities/notification-delivery.js';
+export {
+  notificationPushDispositionSchema,
+} from './schemas/entities/notification.js';
+export type { NotificationPushDisposition } from './schemas/entities/notification.js';
 // Column/webhook-payload shapes also needed via the Node10-resolvable root entry (see the
 // `pageValueSchema` comment above) — `apps/jobs`' dispatch/deliver handlers import these.
 export type { Column } from './schemas/entities/container.js';

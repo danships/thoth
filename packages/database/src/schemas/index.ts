@@ -19,4 +19,6 @@ export * from './entities/webhook.js';
 export * from './entities/workspace-member.js';
 export * from './entities/workspace-slug-redirect.js';
 export * from './entities/workspace.js';
+export * from './entities/push-subscription.js';
+export * from './entities/notification-delivery.js';
 export * from './utilities.js';

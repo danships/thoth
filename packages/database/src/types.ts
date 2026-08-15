@@ -18,6 +18,8 @@ import { settingSchema } from './schemas/entities/setting.js';
 import { platformUserSchema } from './schemas/entities/platform-user.js';
 import { notificationRuleSchema } from './schemas/entities/notification-rule.js';
 import { notificationSchema } from './schemas/entities/notification.js';
+import { pushSubscriptionSchema } from './schemas/entities/push-subscription.js';
+import { notificationDeliverySchema } from './schemas/entities/notification-delivery.js';
 
 /** Container Entity Schema */
 export { pageContainerSchema, dataSourceContainerSchema } from './schemas/entities/container.js';
@@ -230,3 +232,22 @@ export const notificationCreateSchema = notificationSchema.omit({ id: true });
 export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationCreate = z.infer<typeof notificationCreateSchema>;
 /** End Notification Entity Schema */
+
+/** PushSubscription Entity Schema (THOTH-071) */
+export { pushSubscriptionSchema } from './schemas/entities/push-subscription.js';
+export const pushSubscriptionCreateSchema = pushSubscriptionSchema.omit({ id: true });
+export type PushSubscription = z.infer<typeof pushSubscriptionSchema>;
+export type PushSubscriptionCreate = z.infer<typeof pushSubscriptionCreateSchema>;
+/** End PushSubscription Entity Schema */
+
+/** NotificationDelivery Entity Schema (THOTH-071) */
+export {
+  notificationDeliverySchema,
+  notificationDeliveryStatusSchema,
+  TERMINAL_NOTIFICATION_DELIVERY_STATUSES,
+} from './schemas/entities/notification-delivery.js';
+export type { NotificationDeliveryStatus } from './schemas/entities/notification-delivery.js';
+export const notificationDeliveryCreateSchema = notificationDeliverySchema.omit({ id: true });
+export type NotificationDelivery = z.infer<typeof notificationDeliverySchema>;
+export type NotificationDeliveryCreate = z.infer<typeof notificationDeliveryCreateSchema>;
+/** End NotificationDelivery Entity Schema */

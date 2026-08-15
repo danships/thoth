@@ -1,4 +1,4 @@
-import { cleanEnv, makeValidator, str, EnvError } from 'envalid';
+import { cleanEnv, makeValidator, str, bool, EnvError } from 'envalid';
 
 /**
  * Environment validation for `@thoth/jobs` (THOTH-059, extended THOTH-061).
@@ -79,6 +79,17 @@ const environmentSchema = {
   // month by default).
   JOB_COMPLETED_RETENTION_DAYS: positiveInt({ default: 7 }),
   JOB_DEAD_RETENTION_DAYS: positiveInt({ default: 30 }),
+  // THOTH-071 Web Push delivery. All three VAPID fields resolve to values persisted by
+  // `scripts/ensure-vapid-keys.mjs` (see `apps/jobs/src/notifications/vapid.ts`) if unset, so
+  // the running process always finds a full pair regardless of how it was provisioned.
+  WEB_PUSH_ENABLED: bool({ default: true }),
+  WEB_PUSH_VAPID_PUBLIC_KEY: str({ default: undefined }),
+  WEB_PUSH_VAPID_PRIVATE_KEY: str({ default: undefined }),
+  WEB_PUSH_VAPID_SUBJECT: str({ default: undefined }),
+  WEB_PUSH_VAPID_DIR: str({ default: undefined }),
+  WEB_PUSH_DELIVERY_TIMEOUT_MS: positiveInt({ default: 10_000 }),
+  WEB_PUSH_DELIVERY_BACKOFF_BASE_MS: positiveInt({ default: 1000 }),
+  WEB_PUSH_DELIVERY_TTL_SECONDS: positiveInt({ default: 86_400 }),
 };
 
 export type JobsEnvironment = ReturnType<typeof cleanEnv<typeof environmentSchema>>;

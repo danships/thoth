@@ -49,6 +49,17 @@ import type {
   PutWorkspaceNotificationSubscriptionBody,
   PutPageNotificationSubscriptionResponse,
   PutPageNotificationSubscriptionBody,
+  GetPushConfigResponse,
+  RegisterPushSubscriptionBody,
+  RegisterPushSubscriptionResponse,
+  DeletePushSubscriptionResponse,
+  NotificationSettingsResponse,
+  PatchNotificationSettingsBody,
+  PostNotificationMuteBody,
+  NotificationMuteResponse,
+  GetUserSettingsResponse,
+  PatchUserSettingsBody,
+  PatchUserSettingsResponse,
   UploadFileResponse,
   GetFileResponse,
   DeleteFileResponse,
@@ -304,6 +315,23 @@ export const api = {
         `/notifications/subscriptions/pages/${pageId}`,
         { kind }
       ),
+    // THOTH-071 additions: push config/registration, notification settings, mute presets.
+    getPushConfig: () => apiClient.get<DataWrapper<GetPushConfigResponse>>('/notifications/push-config'),
+    registerPushSubscription: (body: RegisterPushSubscriptionBody) =>
+      apiClient.post<DataWrapper<RegisterPushSubscriptionResponse>>('/notifications/push-subscriptions', body),
+    deletePushSubscription: (id: string) =>
+      apiClient.delete<DataWrapper<DeletePushSubscriptionResponse>>(`/notifications/push-subscriptions/${id}`),
+    getSettings: () => apiClient.get<DataWrapper<NotificationSettingsResponse>>('/notifications/settings'),
+    patchSettings: (body: PatchNotificationSettingsBody) =>
+      apiClient.patch<DataWrapper<NotificationSettingsResponse>>('/notifications/settings', body),
+    mute: (body: PostNotificationMuteBody) =>
+      apiClient.post<DataWrapper<NotificationMuteResponse>>('/notifications/mute', body),
+    unmute: () => apiClient.delete<DataWrapper<NotificationMuteResponse>>('/notifications/mute'),
+  },
+  user: {
+    getSettings: () => apiClient.get<DataWrapper<GetUserSettingsResponse>>('/user/settings'),
+    patchSettings: (body: PatchUserSettingsBody) =>
+      apiClient.patch<DataWrapper<PatchUserSettingsResponse>>('/user/settings', body),
   },
 };
 
