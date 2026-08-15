@@ -2,6 +2,7 @@
 
 import { Anchor, Badge, Box, Button, Group, Paper, Stack, Switch, Text, Title } from '@mantine/core';
 import { useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { useNotifications } from '@/lib/hooks/api/use-notifications';
@@ -101,6 +102,9 @@ export function NotificationInbox({ workspaceId, title = 'Notifications' }: Noti
       <Group justify="space-between" align="center">
         <Title order={2}>{title}</Title>
         <Group gap="sm">
+          <Anchor component={Link} href="/notifications/settings" size="sm">
+            Notification settings
+          </Anchor>
           <Switch
             label="Unread only"
             checked={unreadOnly}

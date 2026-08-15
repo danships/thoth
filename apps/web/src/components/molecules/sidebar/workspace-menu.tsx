@@ -2,6 +2,7 @@
 
 import { ActionIcon, Avatar, Group, Loader, Menu, Text } from '@mantine/core';
 import {
+  IconBellCog,
   IconChevronDown,
   IconKey,
   IconLayoutGrid,
@@ -103,6 +104,9 @@ export function WorkspaceMenu() {
           </Menu.Item>
           <Menu.Item component={Link} href="/workspaces" leftSection={<IconLayoutGrid size={16} />}>
             Manage workspaces
+          </Menu.Item>
+          <Menu.Item component={Link} href="/notifications/settings" leftSection={<IconBellCog size={16} />}>
+            Notification settings
           </Menu.Item>
 
           <Menu.Divider />
