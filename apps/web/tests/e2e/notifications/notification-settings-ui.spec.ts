@@ -93,6 +93,28 @@ test.describe('THOTH-072 notification settings UI', () => {
     }
   });
 
+  test('a custom mute-until expiration works from the settings screen', async ({ page, request }) => {
+    try {
+      await page.goto('/notifications/settings');
+      await expect(page.getByRole('heading', { name: 'Notification settings' })).toBeVisible();
+
+      const customUntil = new Date(Date.now() + 3 * 60 * 60 * 1000);
+      // `datetime-local` input value format: "YYYY-MM-DDTHH:mm".
+      const customUntilValue = `${customUntil.getFullYear()}-${String(customUntil.getMonth() + 1).padStart(2, '0')}-${String(
+        customUntil.getDate()
+      ).padStart(2, '0')}T${String(customUntil.getHours()).padStart(2, '0')}:${String(customUntil.getMinutes()).padStart(2, '0')}`;
+
+      await page.getByLabel('Mute until').fill(customUntilValue);
+      await page.getByRole('button', { name: 'Mute until this time' }).click();
+      await expect(page.getByText(/^Muted until /)).toBeVisible();
+
+      await page.getByRole('button', { name: 'Unmute' }).click();
+      await expect(page.getByText('Not currently muted.')).toBeVisible();
+    } finally {
+      await request.delete('/api/v1/notifications/mute');
+    }
+  });
+
   test('the notification inbox links to the settings screen', async ({ page }) => {
     await page.goto('/notifications');
     await page.getByRole('link', { name: 'Notification settings' }).click();

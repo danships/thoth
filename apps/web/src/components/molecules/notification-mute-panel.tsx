@@ -77,7 +77,13 @@ export function NotificationMutePanel({
               {muteReason === 'quiet_schedule' && <Badge ml="xs">Quiet schedule</Badge>}
             </Text>
             {muteReason === 'temporary_mute' && (
-              <Button size="xs" variant="subtle" loading={busyAction === 'unmute'} onClick={() => void handleUnmute()}>
+              <Button
+                size="xs"
+                variant="subtle"
+                loading={busyAction === 'unmute'}
+                disabled={busyAction !== null && busyAction !== 'unmute'}
+                onClick={() => void handleUnmute()}
+              >
                 Unmute
               </Button>
             )}
@@ -96,6 +102,7 @@ export function NotificationMutePanel({
             size="xs"
             variant="light"
             loading={busyAction === preset.value}
+            disabled={busyAction !== null && busyAction !== preset.value}
             onClick={() => void runMute({ preset: preset.value }, preset.value)}
           >
             {preset.label}
@@ -114,7 +121,7 @@ export function NotificationMutePanel({
         <Button
           size="xs"
           variant="default"
-          disabled={!customUntil}
+          disabled={!customUntil || (busyAction !== null && busyAction !== 'custom')}
           loading={busyAction === 'custom'}
           onClick={() => void handleCustomUntil()}
         >

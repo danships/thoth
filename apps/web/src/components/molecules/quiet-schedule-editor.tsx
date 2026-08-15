@@ -2,6 +2,7 @@
 
 import { ActionIcon, Button, Group, Select, Stack, Switch, Text, TextInput } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
+import { z } from 'zod';
 import type { QuietSchedule, QuietScheduleWindow } from '@thoth/database/notifications/mute';
 
 const DAY_OPTIONS = [
@@ -25,17 +26,20 @@ function minutesToTimeValue(minutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
+// Validates & transforms an `<input type="time">` value ("HH:mm") into minutes-since-midnight.
+const timeValueSchema = z
+  .string()
+  .regex(/^\d{1,2}:\d{2}$/)
+  .transform((value) => {
+    const [hoursString, minsString] = value.split(':');
+    return { hours: Number.parseInt(hoursString!, 10), mins: Number.parseInt(minsString!, 10) };
+  })
+  .refine(({ hours, mins }) => hours <= 23 && mins <= 59)
+  .transform(({ hours, mins }) => hours * 60 + mins);
+
 function timeValueToMinutes(value: string): number | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
-  if (!match) {
-    return null;
-  }
-  const hours = Number.parseInt(match[1]!, 10);
-  const mins = Number.parseInt(match[2]!, 10);
-  if (hours > 23 || mins > 59) {
-    return null;
-  }
-  return hours * 60 + mins;
+  const result = timeValueSchema.safeParse(value);
+  return result.success ? result.data : null;
 }
 
 type QuietScheduleEditorProperties = {
@@ -83,6 +87,7 @@ export function QuietScheduleEditor({ value, onChange, disabled = false }: Quiet
           <Group key={index} align="flex-end" wrap="wrap">
             <Select
               label={index === 0 ? 'Day' : undefined}
+              aria-label={index === 0 ? undefined : `Day for quiet window ${index + 1}`}
               data={DAY_OPTIONS}
               value={String(window.day)}
               disabled={disabled}
@@ -95,6 +100,7 @@ export function QuietScheduleEditor({ value, onChange, disabled = false }: Quiet
             />
             <TextInput
               label={index === 0 ? 'From' : undefined}
+              aria-label={index === 0 ? undefined : `From time for quiet window ${index + 1}`}
               type="time"
               value={minutesToTimeValue(window.startMinutes)}
               disabled={disabled}
@@ -108,6 +114,7 @@ export function QuietScheduleEditor({ value, onChange, disabled = false }: Quiet
             />
             <TextInput
               label={index === 0 ? 'Until' : undefined}
+              aria-label={index === 0 ? undefined : `Until time for quiet window ${index + 1}`}
               type="time"
               value={minutesToTimeValue(window.endMinutes)}
               disabled={disabled}
