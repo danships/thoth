@@ -43,11 +43,13 @@ test.describe('workspace menu', () => {
     await page.getByRole('button', { name: 'Create workspace' }).click();
 
     // Creating navigates into the new workspace's Pages view, which forwards on to its seeded
-    // Welcome page (`/[slug]/pages/[welcomeId]`), so tolerate the trailing page id. This may be
-    // the first navigation to a lazily-compiled page-detail route under `next dev`/Turbopack, so
-    // use the same generous timeout as the settings navigation above.
+    // Welcome page (`/[slug]/pages/[welcomeId]`), so tolerate the trailing page id. This chains
+    // two lazily-compiled routes under `next dev`/Turbopack (the bare `/pages` redirector, then
+    // the page-detail route it forwards to), so give the heading assertion extra headroom beyond
+    // the single-route timeout used for the settings navigation above — under CI load this
+    // double compile can outlast 15s even though the URL itself resolves quickly.
     await expect(page).toHaveURL(/\/[^/]+\/pages(\/|$)/, { timeout: 15_000 });
-    await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible({ timeout: 30_000 });
 
     // The new workspace is now current, and the original seeded one is listed as switchable.
     await page.getByRole('button', { name: 'Workspace menu' }).click();
