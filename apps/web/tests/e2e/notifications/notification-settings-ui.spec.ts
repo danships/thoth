@@ -22,7 +22,7 @@ test.describe('THOTH-072 notification settings UI', () => {
       await page.goto('/notifications/settings');
       await expect(page.getByRole('heading', { name: 'Notification settings' })).toBeVisible();
 
-      const timezoneSelect = page.getByLabel('Timezone', { exact: true });
+      const timezoneSelect = page.getByRole('combobox', { name: 'Timezone', exact: true });
       await timezoneSelect.click();
       await timezoneSelect.fill('Europe/Amsterdam');
       await page.getByRole('option', { name: 'Europe/Amsterdam' }).click();
@@ -31,7 +31,7 @@ test.describe('THOTH-072 notification settings UI', () => {
       await expect(page.getByText('Timezone updated')).toBeVisible();
 
       await page.reload();
-      await expect(page.getByLabel('Timezone', { exact: true })).toHaveValue('Europe/Amsterdam');
+      await expect(page.getByRole('combobox', { name: 'Timezone', exact: true })).toHaveValue('Europe/Amsterdam');
     } finally {
       await request.patch('/api/v1/user/settings', { data: { timezone: previousTimezone } });
     }
@@ -49,7 +49,7 @@ test.describe('THOTH-072 notification settings UI', () => {
       await page.getByRole('switch', { name: 'Enable quiet schedule' }).click();
       await page.getByRole('button', { name: 'Add quiet window' }).click();
 
-      const dayField = page.getByLabel('Day');
+      const dayField = page.getByRole('combobox', { name: 'Day' });
       await dayField.click();
       await page.getByRole('option', { name: 'Friday' }).click();
 
@@ -63,7 +63,7 @@ test.describe('THOTH-072 notification settings UI', () => {
 
       await page.reload();
       await expect(page.getByRole('switch', { name: 'Enable quiet schedule' })).toBeChecked();
-      await expect(page.getByLabel('Day')).toHaveValue('Friday');
+      await expect(page.getByRole('combobox', { name: 'Day' })).toHaveValue('Friday');
       await expect(page.getByLabel('From')).toHaveValue('22:00');
       await expect(page.getByLabel('Until')).toHaveValue('02:00');
 
