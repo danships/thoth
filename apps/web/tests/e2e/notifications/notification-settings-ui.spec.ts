@@ -53,9 +53,9 @@ test.describe('THOTH-072 notification settings UI', () => {
       await dayField.click();
       await page.getByRole('option', { name: 'Friday' }).click();
 
-      const fromField = page.getByLabel('From');
+      const fromField = page.getByLabel('From', { exact: true });
       await fromField.fill('22:00');
-      const untilField = page.getByLabel('Until');
+      const untilField = page.getByLabel('Until', { exact: true });
       await untilField.fill('02:00');
 
       await page.getByRole('button', { name: 'Save quiet schedule' }).click();
@@ -64,8 +64,8 @@ test.describe('THOTH-072 notification settings UI', () => {
       await page.reload();
       await expect(page.getByRole('switch', { name: 'Enable quiet schedule' })).toBeChecked();
       await expect(page.getByRole('combobox', { name: 'Day' })).toHaveValue('Friday');
-      await expect(page.getByLabel('From')).toHaveValue('22:00');
-      await expect(page.getByLabel('Until')).toHaveValue('02:00');
+      await expect(page.getByLabel('From', { exact: true })).toHaveValue('22:00');
+      await expect(page.getByLabel('Until', { exact: true })).toHaveValue('02:00');
 
       // Remove the window and save again.
       await page.getByRole('button', { name: 'Remove quiet window' }).click();
