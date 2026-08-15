@@ -167,7 +167,7 @@ export default function PageDetailsPage() {
     const observer = new ResizeObserver(updateOverflow);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [pageDetails?.views, hasSubpages]);
+  }, [pageDetails?.views, hasSubpages, selectedView]);
 
   const updateContent = useCallback(
     async (content: string) => {
@@ -375,21 +375,21 @@ export default function PageDetailsPage() {
               <Group justify="space-between" align="center" wrap="wrap" gap="xs" className={styles['tabsHeader'] ?? ''}>
                 <Tabs.List ref={tabsListReference} className={styles['tabsList'] ?? ''}>
                   {pageDetails.views?.map((view) => (
-                    <Tabs.Tab
-                      key={view.id}
-                      value={view.id}
-                      rightSection={
-                        selectedView === view.id ? (
-                          <ViewTabActionsMenu
-                            viewName={view.name}
-                            duplicating={duplicatingViewId === view.id}
-                            onDuplicate={() => handleDuplicateView(view)}
-                          />
-                        ) : undefined
-                      }
-                    >
-                      {view.name}
-                    </Tabs.Tab>
+                    // Rendered as a Box wrapping the tab and (when selected) its actions menu as
+                    // siblings, rather than nesting the menu's button inside `Tabs.Tab`'s
+                    // `rightSection` — `Tabs.Tab` itself renders a `<button>`, and nesting another
+                    // interactive control inside it is invalid HTML that assistive technology can
+                    // misannounce or omit (see ViewTabActionsMenu).
+                    <Box key={view.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      <Tabs.Tab value={view.id}>{view.name}</Tabs.Tab>
+                      {selectedView === view.id && (
+                        <ViewTabActionsMenu
+                          viewName={view.name}
+                          duplicating={duplicatingViewId === view.id}
+                          onDuplicate={() => handleDuplicateView(view)}
+                        />
+                      )}
+                    </Box>
                   ))}
                   {hasSubpages && <Tabs.Tab value={SUBPAGES_TAB_VALUE}>Sub Pages</Tabs.Tab>}
                   <Tabs.Tab value="contents">Contents</Tabs.Tab>

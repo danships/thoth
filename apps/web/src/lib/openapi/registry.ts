@@ -422,7 +422,7 @@ export const operations = [
     params: api.duplicateViewParametersSchema,
     body: api.duplicateViewBodySchema,
     response: api.duplicateViewResponseSchema,
-    successStatus: 201,
+    successStatus: 200,
     errorStatuses: [404],
   },
   {

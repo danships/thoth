@@ -6778,8 +6778,8 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Created",
+          "200": {
+            "description": "Successful response",
             "content": {
               "application/json": {
                 "schema": {
