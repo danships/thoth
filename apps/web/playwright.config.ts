@@ -23,6 +23,12 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /global\.setup\.ts/,
+      // The setup test does more than a typical spec: it seeds the database, signs in via a
+      // real HTTP round-trip, and then warms up Turbopack's on-demand compilation for two
+      // sidebar/page routes (see the comment in global.setup.ts). That cold compile alone can
+      // take longer than the default 30s spec timeout on slower/CI runners, so give this
+      // project a larger budget rather than racing the warmup against the default timeout.
+      timeout: 120_000,
     },
     {
       name: 'chromium',
