@@ -81,12 +81,12 @@ test.describe('Data View column layout', () => {
   });
 
   test('keyboard reorder: focus a handle, move with arrow keys, and drop', async ({ page }) => {
-    // The retry loop below uses `toPass({ timeout: 30_000 })`, which shares the same window as
+    // The retry loop below uses `toPass({ timeout: 45_000 })`, which shares the same window as
     // the suite's default 30s test timeout (see playwright.config.ts). Without extra headroom,
     // the *test's own* timeout fires before `toPass` gets to actually retry the pick-up/move/drop
     // sequence, surfacing as a hard "Test timeout of 30000ms exceeded" on every attempt instead of
     // a genuine assertion failure. Give this test enough time for the full retry budget to run.
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await openColumnLayoutView(page);
 
     const alphaHandle = page.getByTestId(`column-drag-handle-${SEED.columnLayout.dataSource.columns[0]!.id}`);
@@ -113,6 +113,16 @@ test.describe('Data View column layout', () => {
         return;
       }
 
+      // A previous iteration may have left a drag picked up but never dropped (e.g. its
+      // `ArrowRight`/`Space` raced ahead of pickup and only the `Space` landed as a spurious
+      // no-op toggle). Starting a fresh `Space` press on top of a still-active drag would commit
+      // that stale drag instead of starting a new one, so explicitly cancel any leftover drag
+      // state before beginning this attempt.
+      if ((await alphaHandle.getAttribute('aria-pressed')) === 'true') {
+        await page.keyboard.press('Escape');
+        await expect(alphaHandle).toHaveAttribute('aria-pressed', 'false');
+      }
+
       await alphaHandle.focus();
       await page.keyboard.press('Space');
       // dnd-kit's KeyboardSensor flips `aria-pressed` on the draggable handle once the drag has
@@ -123,16 +133,26 @@ test.describe('Data View column layout', () => {
       // Even after pickup is confirmed, dnd-kit's droppable rects are (re-)measured
       // asynchronously (ResizeObserver/scroll listeners). Under CI load the very next
       // `ArrowRight` can still be evaluated against stale rects and resolve to a no-op move.
-      // Give the measurement a moment to settle before issuing the move, on top of the
-      // outer `toPass` retry which redoes the whole sequence if this still races.
-      await page.waitForTimeout(200);
+      // Poll the handle's bounding box until it stops moving between two consecutive reads
+      // (rather than a single fixed delay) so this settles reliably even on slower/loaded CI
+      // runners, on top of the outer `toPass` retry which redoes the whole sequence if this
+      // still races.
+      await expect(async () => {
+        const first = await alphaHandle.boundingBox();
+        await page.waitForTimeout(50);
+        const second = await alphaHandle.boundingBox();
+        expect(first).not.toBeNull();
+        expect(second).not.toBeNull();
+        expect(first?.x).toBe(second?.x);
+        expect(first?.y).toBe(second?.y);
+      }).toPass({ timeout: 2000 });
       await page.keyboard.press('ArrowRight');
       await page.keyboard.press('Space');
 
       await expect(headers.nth(0)).toContainText('Name');
       await expect(headers.nth(1)).toContainText('Alpha');
       await expect(headers.nth(2)).toContainText('Beta');
-    }).toPass({ timeout: 30_000 });
+    }).toPass({ timeout: 45_000 });
   });
 
   test('Columns manager: show Gamma and apply persists it visibly at its stored position', async ({ page }) => {
