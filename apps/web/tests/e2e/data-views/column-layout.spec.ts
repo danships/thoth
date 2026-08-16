@@ -210,6 +210,96 @@ test.describe('Data View column layout', () => {
     await expect(row.getByRole('link', { name: 'OPEN' })).toBeVisible();
   });
 
+  test('Hide column action: hides Alpha, persists across reload, and can be re-shown via the manager', async ({
+    page,
+  }) => {
+    await openColumnLayoutView(page);
+
+    await page.getByRole('button', { name: 'Alpha column actions' }).click();
+    const [patchResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/v1/views/${SEED.columnLayout.dataView.id}`) &&
+          response.request().method() === 'PATCH'
+      ),
+      page.getByTestId('column-action-hide').click(),
+    ]);
+    expect(patchResponse.ok()).toBe(true);
+
+    await expect(async () => {
+      const headers = headerOrder(page);
+      await expect(headers).toHaveCount(2);
+      await expect(page.getByRole('columnheader', { name: /Alpha/ })).toHaveCount(0);
+    }).toPass({ timeout: 10_000 });
+
+    // A lightweight undo toast follows a successful hide (THOTH-074) — confirm it appears, but
+    // don't use it (this test verifies the persisted-hide + manager-reshow path instead; the
+    // separate assertion below covers Undo itself).
+    await expect(page.getByText('Hid column "Alpha"')).toBeVisible();
+
+    // Reload to confirm the hide was actually persisted, not just reflected optimistically.
+    await page.reload();
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 });
+    const headers = headerOrder(page);
+    await expect(headers).toHaveCount(2);
+    await expect(page.getByRole('columnheader', { name: /Alpha/ })).toHaveCount(0);
+
+    // Re-show Alpha via the Columns manager (its checkbox reflects the persisted hidden state).
+    await page.getByTestId('open-column-manager').click();
+    const alphaId = SEED.columnLayout.dataSource.columns[0]!.id;
+    await expect(page.getByTestId(`column-manager-visible-${alphaId}`)).not.toBeChecked();
+    await page.getByTestId(`column-manager-visible-${alphaId}`).click();
+    const [reshowResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/v1/views/${SEED.columnLayout.dataView.id}`) &&
+          response.request().method() === 'PATCH'
+      ),
+      page.getByTestId('column-manager-apply').click(),
+    ]);
+    expect(reshowResponse.ok()).toBe(true);
+
+    await expect(async () => {
+      const reshownHeaders = headerOrder(page);
+      await expect(reshownHeaders).toHaveCount(3);
+      await expect(page.getByRole('columnheader', { name: /Alpha/ })).toBeVisible();
+    }).toPass({ timeout: 10_000 });
+  });
+
+  test('Hide column action: Undo re-shows the column without opening the manager', async ({ page }) => {
+    await openColumnLayoutView(page);
+
+    await page.getByRole('button', { name: 'Alpha column actions' }).click();
+    const [patchResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/v1/views/${SEED.columnLayout.dataView.id}`) &&
+          response.request().method() === 'PATCH'
+      ),
+      page.getByTestId('column-action-hide').click(),
+    ]);
+    expect(patchResponse.ok()).toBe(true);
+    await expect(async () => {
+      await expect(headerOrder(page)).toHaveCount(2);
+    }).toPass({ timeout: 10_000 });
+
+    const [undoResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/v1/views/${SEED.columnLayout.dataView.id}`) &&
+          response.request().method() === 'PATCH'
+      ),
+      page.getByRole('button', { name: 'Undo' }).click(),
+    ]);
+    expect(undoResponse.ok()).toBe(true);
+
+    await expect(async () => {
+      const headers = headerOrder(page);
+      await expect(headers).toHaveCount(3);
+      await expect(page.getByRole('columnheader', { name: /Alpha/ })).toBeVisible();
+    }).toPass({ timeout: 10_000 });
+  });
+
   test('concurrent edit: a stale drag is rejected with a conflict notification and reverted', async ({ page }) => {
     await openColumnLayoutView(page);
 
