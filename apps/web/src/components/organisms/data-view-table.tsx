@@ -198,6 +198,18 @@ export function DataViewTable({
     }
   }, [view.lastUpdated]);
 
+  // The optimistic-concurrency token to send as `expectedLastUpdated` on the *next*
+  // `persistColumnLayout` call. Kept separate from `view.lastUpdated` (and updated synchronously
+  // in `persistColumnLayout` on success, not just via the effect above) because `onViewChange?.()`
+  // only *starts* the parent's revalidation — it doesn't await it — so `view.lastUpdated` can
+  // still be stale for a render or two afterwards. Without this, a second layout mutation fired
+  // right after a successful one (e.g. THOTH-074's Hide-column "Undo" toast, clickable the moment
+  // the hide's save resolves) would send a now-stale token and spuriously 409.
+  const expectedLastUpdatedReference = useRef(view.lastUpdated);
+  useEffect(() => {
+    expectedLastUpdatedReference.current = view.lastUpdated;
+  }, [view.lastUpdated]);
+
   const {
     createColumn,
     updateColumn,
@@ -210,7 +222,7 @@ export function DataViewTable({
   const { updateValue, inProgress: valueUpdateInProgress } = usePageValueUpdate({ mutatePages });
   const { updatePage, inProgress: pageUpdateInProgress } = useUpdatePage({ mutatePages });
   const { createOption } = useCreateSingleSelectOption(dataSourceId);
-  const { showError } = useNotification();
+  const { showError, showUndo } = useNotification();
   const { updateDataView, inProgress: viewUpdateInProgress } = useUpdateDataView(view.id);
   const { reorderPage } = useReorderPage();
   const { mutate: mutateGlobal } = useSWRConfig();
@@ -229,6 +241,15 @@ export function DataViewTable({
   const effectiveLayout = pendingLayout ?? layout;
   const visibleDataCount = effectiveLayout.visible.filter((item) => item.kind === 'data').length;
   const nameVisible = effectiveLayout.visible.some((item) => item.kind === 'name');
+
+  // Kept in sync via effect (not a plain during-render assignment — banned by the
+  // `react-hooks/refs` rule) so the "Undo" action inside the Hide-column toast (THOTH-074)
+  // always maps its column back onto the *current* layout, even if the toast is clicked several
+  // renders after the hide happened.
+  const effectiveLayoutReference = useRef(effectiveLayout);
+  useEffect(() => {
+    effectiveLayoutReference.current = effectiveLayout;
+  }, [effectiveLayout]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -269,7 +290,9 @@ export function DataViewTable({
     });
   };
 
-  const persistColumnLayout = async (reorderedFull: ResolvedColumnLayoutItem[]) => {
+  // Returns whether the save succeeded (THOTH-074) so callers that want to react only on success —
+  // e.g. showing an "Undo" toast after a Hide action — don't have to duplicate the rollback logic.
+  const persistColumnLayout = async (reorderedFull: ResolvedColumnLayoutItem[]): Promise<boolean> => {
     const previous = effectiveLayout;
     const reorderedVisible = reorderedFull.filter((item) => item.visible);
     setPendingLayout({ all: reorderedFull, visible: reorderedVisible });
@@ -277,12 +300,14 @@ export function DataViewTable({
     try {
       const result = await updateDataView({
         columnLayout: toViewColumnLayoutItems(reorderedFull),
-        expectedLastUpdated: view.lastUpdated,
+        expectedLastUpdated: expectedLastUpdatedReference.current,
       });
       if (!result) {
         throw new Error('Failed to save column layout');
       }
+      expectedLastUpdatedReference.current = result.lastUpdated;
       onViewChange?.();
+      return true;
     } catch (saveError) {
       setPendingLayout(previous);
       if (axios.isAxiosError(saveError) && saveError.response?.status === 409) {
@@ -291,6 +316,7 @@ export function DataViewTable({
       } else {
         showError(saveError instanceof Error ? saveError.message : 'Failed to save column layout');
       }
+      return false;
     } finally {
       setColumnLayoutSaving(false);
     }
@@ -472,6 +498,29 @@ export function DataViewTable({
     });
   };
 
+  // Flips a single data column's `visible` flag and reuses `persistColumnLayout` — the same
+  // optimistic-apply/409-rollback path the Column Manager's Apply and header drag already use —
+  // scoped to just the one column (THOTH-074). `effectiveLayoutReference` (not `effectiveLayout`
+  // directly) is used so `handleShowColumn`, invoked later from the Undo toast, always maps onto
+  // the layout as of whenever Undo is actually clicked rather than the one captured at hide-time.
+  const handleHideColumn = (column: Column) => {
+    const updated = effectiveLayoutReference.current.all.map((item) =>
+      item.kind === 'data' && item.column.id === column.id ? { ...item, visible: false } : item
+    );
+    void persistColumnLayout(updated).then((succeeded) => {
+      if (succeeded) {
+        showUndo(`Hid column "${column.name}"`, () => handleShowColumn(column));
+      }
+    });
+  };
+
+  const handleShowColumn = (column: Column) => {
+    const updated = effectiveLayoutReference.current.all.map((item) =>
+      item.kind === 'data' && item.column.id === column.id ? { ...item, visible: true } : item
+    );
+    void persistColumnLayout(updated);
+  };
+
   const handleNewPageKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       void onPageCreate(newPageName);
@@ -590,7 +639,9 @@ export function DataViewTable({
                           <ColumnHeaderActions
                             label={item.column.name}
                             onEdit={() => handleEditColumn(item.column)}
+                            onHide={() => handleHideColumn(item.column)}
                             onDelete={() => handleDeleteColumn(item.column)}
+                            disabled={columnLayoutSaving}
                           />
                         }
                       />
