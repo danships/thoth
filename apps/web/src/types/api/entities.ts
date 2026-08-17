@@ -21,6 +21,8 @@ export const pageSchema = pageContainerSchema
     cover: true,
     parentId: true,
     sortOrder: true,
+    isPrivate: true,
+    privateRootId: true,
   })
   .extend({
     // `Container.sortOrder` stays optional at the entity-schema level (so pre-existing

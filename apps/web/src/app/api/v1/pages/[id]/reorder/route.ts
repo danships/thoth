@@ -54,6 +54,8 @@ export const POST = apiRoute<ReorderPageResponse, {}, ReorderPageParameters, Reo
         cover: page.cover ?? null,
         parentId: page.parentId || null,
         sortOrder: page.sortOrder ?? null,
+        isPrivate: page.isPrivate,
+        privateRootId: page.privateRootId ?? null,
         createdAt: page.createdAt,
         lastUpdated: page.lastUpdated,
       } satisfies ReorderPageResponse;
@@ -112,6 +114,8 @@ export const POST = apiRoute<ReorderPageResponse, {}, ReorderPageParameters, Reo
       cover: 'cover' in updatedPage ? (updatedPage.cover ?? null) : null,
       parentId: updatedPage.parentId || null,
       sortOrder: updatedPage.sortOrder ?? null,
+      isPrivate: updatedPage.isPrivate,
+      privateRootId: updatedPage.privateRootId ?? null,
       createdAt: updatedPage.createdAt,
       lastUpdated: updatedPage.lastUpdated,
     } satisfies ReorderPageResponse;

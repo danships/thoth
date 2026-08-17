@@ -88,6 +88,8 @@ export async function createWorkspaceForUser(
       content: buildWelcomeMarkdown(workspace.name, workspace.slug),
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
     };
 
     const createdPage = await containerRepository.create(pageData);

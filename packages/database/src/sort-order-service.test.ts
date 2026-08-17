@@ -56,6 +56,8 @@ describe('sort-order-service', () => {
       createdAt: now,
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
       sortOrder: options.sortOrder ?? null,
     } as Parameters<typeof containerRepository.create>[0]);
     return created as PageContainer;

@@ -1,6 +1,7 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerAccessRepository, getContainerRepository, getDataViewRepository } from '@/lib/database';
 import { cascadeSoftDeletePage } from '@/lib/database/soft-delete-service';
+import { cascadeSetPagePrivate } from '@/lib/database/page-visibility-service';
 import { addUserIdToQuery, addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { pageColumnRetriever } from '@/lib/database/retrievers/page-column-retriever';
@@ -88,6 +89,8 @@ export const GET = apiRoute<GetPageDetailsResponse, GetPageDetailsQuery, GetPage
         createdAt: page.createdAt,
         parentId: page.parentId || null,
         sortOrder: page.sortOrder ?? null,
+        isPrivate: page.isPrivate,
+        privateRootId: page.privateRootId ?? null,
       },
       starred: containerAccess?.starred ?? false,
       hasChildren: Boolean(childPage),
@@ -139,24 +142,49 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
       filteredBody.cover = body.cover;
     }
 
-    const updatedPage = await containerRepository.update({
-      ...existingPage,
+    let affectedPageCount: number | undefined;
+    let updatedPage = existingPage;
+
+    if (body.isPrivate !== undefined && body.isPrivate !== existingPage.isPrivate) {
+      const result = await cascadeSetPagePrivate(existingPage, body.isPrivate, session.user.id);
+      affectedPageCount = result.affectedPageCount;
+
+      const logger = await getLogger();
+      logger.info('page.private.set', {
+        actorUserId: session.user.id,
+        pageId: existingPage.id,
+        workspaceId: existingPage.workspaceId,
+        isPrivate: body.isPrivate,
+        affectedPageCount,
+      });
+
+      // `cascadeSetPagePrivate` persists the root's own isPrivate/privateRootId internally —
+      // re-fetch so the name/emoji/cover merge and final `update()` call below don't stomp on
+      // that write with a stale `existingPage` snapshot.
+      updatedPage = await pageRetriever.retrievePage(params.id, session.user.id);
+    }
+
+    const finalPage = await containerRepository.update({
+      ...updatedPage,
       ...filteredBody,
       lastUpdated: new Date().toISOString(),
     });
 
-    scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
-    scheduleNotificationDispatch('page.updated', updatedPage, toWebhookActor(session));
+    scheduleNotifyPageChange('page.updated', finalPage, toWebhookActor(session));
+    scheduleNotificationDispatch('page.updated', finalPage, toWebhookActor(session));
 
     return {
-      id: updatedPage.id,
-      name: updatedPage.name,
-      emoji: 'emoji' in updatedPage ? updatedPage.emoji : null,
-      cover: 'cover' in updatedPage ? (updatedPage.cover ?? null) : null,
-      lastUpdated: updatedPage.lastUpdated,
-      createdAt: updatedPage.createdAt,
-      parentId: updatedPage.parentId || null,
-      sortOrder: updatedPage.sortOrder ?? null,
+      id: finalPage.id,
+      name: finalPage.name,
+      emoji: 'emoji' in finalPage ? finalPage.emoji : null,
+      cover: 'cover' in finalPage ? (finalPage.cover ?? null) : null,
+      lastUpdated: finalPage.lastUpdated,
+      createdAt: finalPage.createdAt,
+      parentId: finalPage.parentId || null,
+      sortOrder: finalPage.sortOrder ?? null,
+      isPrivate: finalPage.isPrivate,
+      privateRootId: finalPage.privateRootId ?? null,
+      ...(affectedPageCount !== undefined && { affectedPageCount }),
     } satisfies UpdatePageResponse;
   }
 );

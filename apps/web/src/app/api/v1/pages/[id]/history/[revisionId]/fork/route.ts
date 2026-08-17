@@ -127,22 +127,35 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
       createdAt: now,
       deletedAt: null,
       deletedRootId: null,
+      // The fork inherits the source page's private state (THOTH-077), but since it's a
+      // brand-new `Container` row it becomes its *own* privacy root rather than copying the
+      // source's `privateRootId` verbatim — that pointer would otherwise dangle (it'd reference
+      // the source's cascade, not this new row's).
+      isPrivate: sourcePage.isPrivate,
+      privateRootId: null,
     };
     const createdPage = (await containerRepository.create(newPageData)) as PageContainer;
 
-    await registerContainerAccessForNewPage(createdPage, session.user.id);
+    const finalPage = createdPage.isPrivate
+      ? ((await containerRepository.update({
+          ...createdPage,
+          privateRootId: createdPage.id,
+        })) as PageContainer)
+      : createdPage;
+
+    await registerContainerAccessForNewPage(finalPage, session.user.id);
 
     // The forked page starts its own fresh history at sequence 1 (a single baseline snapshot of
     // the forked content) — never shares/continues the source page's revision stream.
-    await createContentBaseline({ page: createdPage, content: reconstructedContent, author: session.user.id });
+    await createContentBaseline({ page: finalPage, content: reconstructedContent, author: session.user.id });
 
-    scheduleNotifyPageChange('page.created', createdPage, toWebhookActor(session));
-    scheduleNotificationDispatch('page.created', createdPage, toWebhookActor(session));
+    scheduleNotifyPageChange('page.created', finalPage, toWebhookActor(session));
+    scheduleNotificationDispatch('page.created', finalPage, toWebhookActor(session));
 
     return {
-      id: createdPage.id,
-      name: createdPage.name,
-      parentId: createdPage.parentId || null,
+      id: finalPage.id,
+      name: finalPage.name,
+      parentId: finalPage.parentId || null,
       createdAt: createdPage.createdAt,
       lastUpdated: createdPage.lastUpdated,
     };

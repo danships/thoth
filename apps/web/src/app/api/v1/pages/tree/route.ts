@@ -255,6 +255,8 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
               createdAt: child.createdAt,
               parentId: child.parentId || null,
               sortOrder: child.sortOrder ?? null,
+              isPrivate: child.isPrivate,
+              privateRootId: child.privateRootId ?? null,
             },
           }));
 
@@ -289,6 +291,8 @@ export const GET = apiRoute<GetPagesTreeResponse, GetPagesTreeQueryVariables, {}
             createdAt: container.createdAt,
             parentId: container.parentId || null,
             sortOrder: container.sortOrder ?? null,
+            isPrivate: container.isPrivate,
+            privateRootId: container.privateRootId ?? null,
           },
           children,
           ...(hasMoreChildren && { hasMoreChildren }),

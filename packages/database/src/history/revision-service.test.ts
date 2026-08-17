@@ -49,6 +49,8 @@ describe('revision-service', () => {
       createdAt: new Date().toISOString(),
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
     };
     const created = await containerRepository.create(pageData);
     return created as PageContainer;

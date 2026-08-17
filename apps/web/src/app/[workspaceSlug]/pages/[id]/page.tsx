@@ -14,6 +14,7 @@ import {
   Tabs,
   Text,
   Title,
+  Tooltip,
 } from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ import { mutate as mutateGlobal } from 'swr';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
 import { api } from '@/lib/api/client';
 import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
-import { IconDots, IconPlus } from '@tabler/icons-react';
+import { IconDots, IconLock, IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
 import { DataViewRender } from '@/components/organisms/data-view-render';
 import { ViewTabActionsMenu } from '@/components/molecules/view-tab-actions-menu';
@@ -283,6 +284,18 @@ export default function PageDetailsPage() {
     }
   }, [pageDetails, pageId, toggleFavorite, showError]);
 
+  const handleTogglePrivate = useCallback(async () => {
+    if (!pageDetails || !pageId) {
+      return;
+    }
+
+    try {
+      await updatePage(pageId, { isPrivate: !pageDetails.page.isPrivate });
+    } catch {
+      showError('Failed to update page privacy');
+    }
+  }, [pageDetails, pageId, updatePage, showError]);
+
   const handleMoveToTrash = useCallback(async () => {
     try {
       await api.pages.remove(pageId);
@@ -338,14 +351,21 @@ export default function PageDetailsPage() {
             >
               {pageDetails?.page.name ?? <Loader />}
             </Title>
+            {pageDetails.page.isPrivate && (
+              <Tooltip label="Private — hidden from Recent and Search">
+                <IconLock size={18} color="var(--mantine-color-dimmed)" aria-label="Private page" />
+              </Tooltip>
+            )}
           </Group>
           <Group justify="flex-end">
             <PageDetailMenu
               pageId={pageId}
               hasContent={Boolean(pageDetails.content)}
               starred={pageDetails.starred}
+              isPrivate={pageDetails.page.isPrivate}
               isTogglingFavorite={isTogglingFavorite}
               onToggleFavorite={handleToggleFavorite}
+              onTogglePrivate={handleTogglePrivate}
               onImportMarkdown={handleImportMarkdown}
               onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
               onMoveToTrash={handleMoveToTrash}

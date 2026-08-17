@@ -17,5 +17,7 @@ export const Container: EntityDefinition = {
     deletedAt: 'string',
     deletedRootId: 'string',
     sortOrder: 'string',
+    isPrivate: 'boolean',
+    privateRootId: 'string',
   },
 };

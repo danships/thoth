@@ -80,6 +80,8 @@ export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsPa
           createdAt: currentContainer.createdAt,
           lastUpdated: currentContainer.lastUpdated,
           sortOrder: currentContainer.sortOrder ?? null,
+          isPrivate: currentContainer.isPrivate,
+          privateRootId: currentContainer.privateRootId ?? null,
         });
 
         // Pages nest directly via parentId.

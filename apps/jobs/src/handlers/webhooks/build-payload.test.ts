@@ -24,6 +24,8 @@ function makeDataSource(): DataSourceContainer {
     lastUpdated: new Date().toISOString(),
     deletedAt: null,
     deletedRootId: null,
+    isPrivate: false,
+    privateRootId: null,
     columns: [{ id: 'col-file', name: 'Attachment', type: 'file' }],
   };
 }
@@ -42,6 +44,8 @@ function makePage(values: PageContainer['values']): PageContainer {
     createdAt: new Date().toISOString(),
     deletedAt: null,
     deletedRootId: null,
+    isPrivate: false,
+    privateRootId: null,
   };
 }
 
