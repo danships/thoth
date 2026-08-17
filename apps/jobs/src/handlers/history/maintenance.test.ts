@@ -50,6 +50,8 @@ describe('maintenance', () => {
       createdAt: now,
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
       ...overrides,
     };
     const created = await containerRepository.create(pageData);

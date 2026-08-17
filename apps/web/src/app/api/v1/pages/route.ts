@@ -11,6 +11,7 @@ import {
   memberToAccessGrant,
 } from '@/lib/auth/access-grant';
 import { getMinSiblingSortOrder, sortByManualOrder } from '@/lib/database/sort-order-service';
+import { excludePrivateContainers } from '@/lib/database/page-visibility-service';
 import { generateKeyBetween } from 'fractional-indexing';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
@@ -131,6 +132,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
               emoji: page.emoji || null,
               parentId: page.parentId || null,
               sortOrder: page.sortOrder ?? null,
+              isPrivate: page.isPrivate,
+              privateRootId: page.privateRootId ?? null,
               createdAt: page.createdAt,
               lastUpdated: page.lastUpdated,
             },
@@ -178,6 +181,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
             emoji: page.emoji || null,
             parentId: page.parentId || null,
             sortOrder: page.sortOrder ?? null,
+            isPrivate: page.isPrivate,
+            privateRootId: page.privateRootId ?? null,
             createdAt: page.createdAt,
             lastUpdated: page.lastUpdated,
           },
@@ -245,6 +250,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
               emoji: container.emoji || null,
               parentId: container.parentId || null,
               sortOrder: container.sortOrder ?? null,
+              isPrivate: container.isPrivate,
+              privateRootId: container.privateRootId ?? null,
               createdAt: container.createdAt,
               lastUpdated: container.lastUpdated,
             },
@@ -286,9 +293,11 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
             .eq('type', 'page')
             .in('id', containerIds)
         );
+        // THOTH-077: Recent (unlike Favorites and the plain tree) additionally excludes
+        // `isPrivate` pages — an ambient-discovery-only exclusion, not an access-control one.
         const scopedContainers = await filterContainersByGrantForSession(
           session,
-          fetchedContainers.filter((container) => !container.deletedAt)
+          excludePrivateContainers(fetchedContainers.filter((container) => !container.deletedAt))
         );
         for (const container of scopedContainers) {
           containersById.set(container.id, container);
@@ -310,6 +319,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
               emoji: container.emoji || null,
               parentId: container.parentId || null,
               sortOrder: container.sortOrder ?? null,
+              isPrivate: container.isPrivate,
+              privateRootId: container.privateRootId ?? null,
               createdAt: container.createdAt,
               lastUpdated: container.lastUpdated,
             },
@@ -350,6 +361,8 @@ export const GET = apiRoute<GetPagesResponse, GetPagesQuery, {}, {}>(
           emoji: page.emoji || null,
           parentId: page.parentId || null,
           sortOrder: page.sortOrder ?? null,
+          isPrivate: page.isPrivate,
+          privateRootId: page.privateRootId ?? null,
           createdAt: page.createdAt,
           lastUpdated: page.lastUpdated,
         },
@@ -442,6 +455,8 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       deletedAt: null,
       deletedRootId: null,
       sortOrder,
+      isPrivate: false,
+      privateRootId: null,
     };
 
     const createdPage = await containerRepository.create(pageData);
@@ -461,6 +476,8 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
       cover: 'cover' in createdPage ? (createdPage.cover ?? null) : null,
       parentId: createdPage.parentId || null,
       sortOrder: createdPage.sortOrder ?? null,
+      isPrivate: createdPage.isPrivate,
+      privateRootId: createdPage.privateRootId ?? null,
       createdAt: createdPage.createdAt,
       lastUpdated: createdPage.lastUpdated,
     };

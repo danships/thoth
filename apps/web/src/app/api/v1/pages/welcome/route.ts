@@ -83,6 +83,8 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
           emoji: existingRootPage.emoji || null,
           parentId: existingRootPage.parentId || null,
           sortOrder: existingRootPage.sortOrder ?? null,
+          isPrivate: existingRootPage.isPrivate,
+          privateRootId: existingRootPage.privateRootId ?? null,
           createdAt: existingRootPage.createdAt,
           lastUpdated: existingRootPage.lastUpdated,
         };
@@ -104,6 +106,8 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
         parentId: null,
         deletedAt: null,
         deletedRootId: null,
+        isPrivate: false,
+        privateRootId: null,
       };
 
       const createdPage = await containerRepository.create(pageData);
@@ -118,6 +122,8 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
         emoji: 'emoji' in createdPage ? createdPage.emoji : null,
         parentId: createdPage.parentId || null,
         sortOrder: 'sortOrder' in createdPage ? (createdPage.sortOrder ?? null) : null,
+        isPrivate: createdPage.isPrivate,
+        privateRootId: createdPage.privateRootId ?? null,
         createdAt: createdPage.createdAt,
         lastUpdated: createdPage.lastUpdated,
       };

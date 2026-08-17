@@ -371,10 +371,12 @@ async function seedAppData() {
   }
 
   async function upsertPage(
-    data: Omit<PageContainerCreate, 'deletedAt' | 'deletedRootId'> & {
+    data: Omit<PageContainerCreate, 'deletedAt' | 'deletedRootId' | 'isPrivate' | 'privateRootId'> & {
       id: string;
       deletedAt?: string | null;
       deletedRootId?: string | null;
+      isPrivate?: boolean;
+      privateRootId?: string | null;
     },
     options?: { lastAccessedAt?: string }
   ) {
@@ -382,6 +384,8 @@ async function seedAppData() {
       ...data,
       deletedAt: data.deletedAt ?? null,
       deletedRootId: data.deletedRootId ?? null,
+      isPrivate: data.isPrivate ?? false,
+      privateRootId: data.privateRootId ?? null,
     } satisfies PageContainerCreate & { id: string };
     const existing = await containerRepository.getOneByQuery(containerRepository.createQuery().eq('id', data.id));
     await (existing
@@ -1104,6 +1108,41 @@ async function seedAppData() {
     { lastAccessedAt: new Date(Date.parse(now) - 1_000_000).toISOString() }
   );
 
+  // ── Private page test fixtures (THOTH-077) ───────────────────────────────────
+  // A dedicated root page (plus a child), seeded not-private-by-default, used to exercise
+  // marking/unmarking a page private from the page detail menu, the cascade to its child, and
+  // the resulting exclusion from the sidebar Recent list. Seeded with a deliberately old
+  // `lastUpdated` so it doesn't shift the root-list pagination tests' expected ordering
+  // (same rationale as `favoriteToggle` above).
+  await upsertPage(
+    {
+      id: SEED.pages.privateToggle.id,
+      name: SEED.pages.privateToggle.name,
+      emoji: '🔒',
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: null,
+      createdAt: now,
+      lastUpdated: new Date(Date.parse(now) - 900_000).toISOString(),
+    },
+    { lastAccessedAt: new Date(Date.parse(now) - 900_000).toISOString() }
+  );
+  await upsertPage(
+    {
+      id: SEED.pages.privateToggleChild.id,
+      name: SEED.pages.privateToggleChild.name,
+      emoji: null,
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: SEED.pages.privateToggle.id,
+      createdAt: now,
+      lastUpdated: new Date(Date.parse(now) - 900_000).toISOString(),
+    },
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
+
   // A pool of unstarred root pages the favorites-overflow e2e spec stars/unstars on demand
   // (via the API) to exceed FAVORITES_MAX_LIMIT and verify the "may be more" indicator,
   // without permanently seeding starred state that would break the "no favorites" test.
@@ -1217,9 +1256,7 @@ async function seedNotifications(): Promise<void> {
     },
   ];
   for (const item of items) {
-    const existing = await notificationRepository.getOneByQuery(
-      notificationRepository.createQuery().eq('id', item.id)
-    );
+    const existing = await notificationRepository.getOneByQuery(notificationRepository.createQuery().eq('id', item.id));
     if (existing) {
       continue;
     }

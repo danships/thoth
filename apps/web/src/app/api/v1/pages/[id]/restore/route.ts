@@ -43,6 +43,8 @@ export const POST = apiRoute<RestorePageResponse, undefined, RestorePageParamete
       cover: restored.cover ?? null,
       parentId: restored.parentId || null,
       sortOrder: restored.sortOrder ?? null,
+      isPrivate: restored.isPrivate,
+      privateRootId: restored.privateRootId ?? null,
       createdAt: restored.createdAt,
       lastUpdated: restored.lastUpdated,
     };

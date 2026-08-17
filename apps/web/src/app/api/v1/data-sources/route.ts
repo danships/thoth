@@ -81,6 +81,8 @@ export const POST = apiRoute<CreateDataSourceResponse, {}, {}, CreateDataSourceB
       columns: body.columns?.map((column) => ({ id: randomUUID(), ...column })) ?? [],
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
     };
 
     const createdDataSource = await containerRepository.create(dataSourceData);

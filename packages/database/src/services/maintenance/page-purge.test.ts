@@ -53,6 +53,8 @@ describe('page-purge', () => {
       createdAt: now,
       deletedAt: options.deletedAt ?? null,
       deletedRootId: options.deletedRootId ?? null,
+      isPrivate: false,
+      privateRootId: null,
       sortOrder: null,
       values: {},
       views: [],

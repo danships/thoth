@@ -101,10 +101,62 @@ describe('page history API', () => {
     const detailResponse = await client.get(`/api/v1/pages/${pageEntity.id}/history/${latestRevisionId}`);
     expect(detailResponse.ok).toBe(true);
 
-    const restoreResponse = await client.post(
-      `/api/v1/pages/${pageEntity.id}/history/${latestRevisionId}/restore`,
-      {}
-    );
+    const restoreResponse = await client.post(`/api/v1/pages/${pageEntity.id}/history/${latestRevisionId}/restore`, {});
     expect(restoreResponse.ok).toBe(true);
+  });
+
+  test('forking a public page into a private parent inherits the destination privacy root (THOTH-077)', async () => {
+    const client = await getOwner();
+
+    // A private parent (its own privacy root) — any fork placed under it must join its cascade
+    // rather than staying public and leaking into Recent from inside a private subtree.
+    const privateParentResponse = await client.post('/api/v1/pages', {
+      name: 'THOTH-077 Fork Private Parent',
+      emoji: null,
+      parentId: null,
+      workspaceId: SEED.workspace.id,
+    });
+    expect(privateParentResponse.ok).toBe(true);
+    const privateParent = await getData<PageApi>(privateParentResponse);
+
+    const markPrivateResponse = await client.patch(`/api/v1/pages/${privateParent.id}`, { isPrivate: true });
+    expect(markPrivateResponse.ok).toBe(true);
+
+    // A public source page, saved once so it has a revision to fork from.
+    const sourceResponse = await client.post('/api/v1/pages', {
+      name: 'THOTH-077 Fork Source',
+      emoji: null,
+      parentId: null,
+      workspaceId: SEED.workspace.id,
+    });
+    expect(sourceResponse.ok).toBe(true);
+    const sourcePage = await getData<PageApi>(sourceResponse);
+
+    const contentSave = await client.post(`/api/v1/pages/${sourcePage.id}/content`, { content: 'Fork me' });
+    expect(contentSave.ok).toBe(true);
+
+    const historyResponse = await client.get(`/api/v1/pages/${sourcePage.id}/history`, {
+      params: { target: 'content' },
+    });
+    expect(historyResponse.ok).toBe(true);
+    const history = await getData<{ revisions: Array<{ id: string }> }>(historyResponse);
+    const revisionId = history.revisions[0]!.id;
+
+    const forkResponse = await client.post(`/api/v1/pages/${sourcePage.id}/history/${revisionId}/fork`, {
+      parentId: privateParent.id,
+    });
+    expect(forkResponse.ok).toBe(true);
+    const forkedPage = await getData<PageApi>(forkResponse);
+
+    const forkedDetailsResponse = await client.get(`/api/v1/pages/${forkedPage.id}`);
+    expect(forkedDetailsResponse.ok).toBe(true);
+    const forkedDetails = await getData<{ page: { isPrivate: boolean; privateRootId: string | null } }>(
+      forkedDetailsResponse
+    );
+
+    // Inherits privacy from the destination parent, and joins *its* cascade rather than
+    // becoming a dangling root of its own.
+    expect(forkedDetails.page.isPrivate).toBe(true);
+    expect(forkedDetails.page.privateRootId).toBe(privateParent.id);
   });
 });

@@ -125,6 +125,15 @@ export const containerSchema = z
     name: z.string().min(1),
     deletedAt: z.string().nullable(),
     deletedRootId: z.string().nullable(),
+    // Ambient-discovery-only privacy flag (THOTH-077): excludes a page (and, via cascade, its
+    // descendants) from the sidebar Recent list and any future page search. Deliberately not an
+    // access-control mechanism — a private page is still fully readable/writable via the tree,
+    // a direct link, or Favorites through the existing `AccessGrant` checks. Mirrors the
+    // `deletedAt`/`deletedRootId` soft-delete pair: `isPrivate` is the per-row flag, and
+    // `privateRootId` (a soft pointer to another `Container.id`, not a SuperSave `relations`
+    // entry) identifies which page in the cascade is the actual root that was marked private.
+    isPrivate: z.boolean().default(false),
+    privateRootId: z.string().nullable(),
     // Opaque, lexicographically-sortable key (see `fractional-indexing`) driving manual
     // ordering within a sibling group (`workspaceId` + `parentId`, `parentId !== null` only —
     // root-level pages are never manually ordered and keep `sortOrder: null`, see THOTH-036).

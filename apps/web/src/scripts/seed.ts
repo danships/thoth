@@ -118,6 +118,8 @@ for (const page of samplePages) {
     parentId,
     deletedAt: null,
     deletedRootId: null,
+    isPrivate: false,
+    privateRootId: null,
   };
 
   const created = await containerRepository.create(pageData);

@@ -11,6 +11,7 @@ import { backfillPlatformUsers } from './platform-user-backfill.js';
 import { backfillWorkspaceQuotaSettings } from './workspace-quota-settings-backfill.js';
 import { backfillUploadedFileBillingUser } from './uploaded-file-billing-user-backfill.js';
 import { backfillWebhookDeliveryStatus } from './webhook-delivery-status-backfill.js';
+import { backfillIsPrivateFields } from './is-private-backfill.js';
 
 export const migrations: Migration[] = [
   {
@@ -119,6 +120,14 @@ export const migrations: Migration[] = [
   // `addEntity` in `context.ts`), same as `webhook`/`webhook-delivery` were introduced in
   // THOTH-061 with no dedicated schema migration (only a later status backfill). No backfill
   // entry is needed here.
+  {
+    // Engine-agnostic backfill of `isPrivate`/`privateRootId` on pre-existing `Container` rows
+    // for THOTH-077 ("Ability to hide page from recent list").
+    name: 'is-private-backfill',
+    run: async (superSave: SuperSave) => {
+      await backfillIsPrivateFields(superSave);
+    },
+  },
 ];
 
 // Re-exported (in addition to being wired into the `migrations` array above) so the e2e seed

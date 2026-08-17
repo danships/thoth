@@ -53,6 +53,8 @@ describe('container-sort-order-backfill', () => {
       createdAt: options.lastUpdated,
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
       ...(options.sortOrder === undefined ? {} : { sortOrder: options.sortOrder }),
     } as Parameters<typeof containerRepository.create>[0]);
     return created as PageContainer;

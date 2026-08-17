@@ -114,6 +114,27 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
     }
 
     const now = new Date().toISOString();
+    // THOTH-077: privacy must follow the *destination* subtree, not just the source page's own
+    // state — otherwise a public source forked into a private parent's cascade would create a
+    // public escape hatch out of that subtree (visible in Recent despite living under a private
+    // ancestor), and a private source forked into a public (or no) parent would carry a
+    // `privateRootId` that dangles once reassigned below. When `body.parentId` overrides the
+    // destination, the new parent's own effective privacy state wins outright; only when the
+    // fork stays alongside the source (no override) does the source's own `isPrivate` apply.
+    let isPrivate = sourcePage.isPrivate;
+    // Set only when the destination itself supplies the privacy root to inherit from (i.e. the
+    // new parent is private) — left `null` otherwise so the fork becomes its own root below when
+    // it's independently private with no live private ancestor to attach to.
+    let inheritedPrivateRootId: string | null = null;
+    if (newParentContainer) {
+      if (newParentContainer.isPrivate) {
+        isPrivate = true;
+        inheritedPrivateRootId = newParentContainer.privateRootId ?? newParentContainer.id;
+      } else {
+        isPrivate = false;
+      }
+    }
+
     const newPageData = {
       name: body?.name ?? `${sourcePage.name} (copy)`,
       emoji: sourcePage.emoji ?? null,
@@ -127,22 +148,37 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
       createdAt: now,
       deletedAt: null,
       deletedRootId: null,
+      isPrivate,
+      privateRootId: inheritedPrivateRootId,
     };
     const createdPage = (await containerRepository.create(newPageData)) as PageContainer;
 
-    await registerContainerAccessForNewPage(createdPage, session.user.id);
+    // A brand-new `Container` row with no destination-supplied privacy root (i.e. private only
+    // because the source itself was private, with no live private ancestor at the destination)
+    // becomes its *own* privacy root rather than copying the source's `privateRootId` verbatim —
+    // that pointer would otherwise dangle (it'd reference the source's cascade, not this new
+    // row's).
+    const finalPage =
+      createdPage.isPrivate && !createdPage.privateRootId
+        ? ((await containerRepository.update({
+            ...createdPage,
+            privateRootId: createdPage.id,
+          })) as PageContainer)
+        : createdPage;
+
+    await registerContainerAccessForNewPage(finalPage, session.user.id);
 
     // The forked page starts its own fresh history at sequence 1 (a single baseline snapshot of
     // the forked content) — never shares/continues the source page's revision stream.
-    await createContentBaseline({ page: createdPage, content: reconstructedContent, author: session.user.id });
+    await createContentBaseline({ page: finalPage, content: reconstructedContent, author: session.user.id });
 
-    scheduleNotifyPageChange('page.created', createdPage, toWebhookActor(session));
-    scheduleNotificationDispatch('page.created', createdPage, toWebhookActor(session));
+    scheduleNotifyPageChange('page.created', finalPage, toWebhookActor(session));
+    scheduleNotificationDispatch('page.created', finalPage, toWebhookActor(session));
 
     return {
-      id: createdPage.id,
-      name: createdPage.name,
-      parentId: createdPage.parentId || null,
+      id: finalPage.id,
+      name: finalPage.name,
+      parentId: finalPage.parentId || null,
       createdAt: createdPage.createdAt,
       lastUpdated: createdPage.lastUpdated,
     };

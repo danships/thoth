@@ -146,6 +146,8 @@ describe('workspace-purge', () => {
         createdAt: now,
         deletedAt: null,
         deletedRootId: null,
+        isPrivate: false,
+        privateRootId: null,
         sortOrder: null,
         values: {},
         views: [],

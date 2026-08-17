@@ -14,6 +14,7 @@ import {
   Tabs,
   Text,
   Title,
+  Tooltip,
 } from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,7 +23,7 @@ import { mutate as mutateGlobal } from 'swr';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
 import { api } from '@/lib/api/client';
 import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
-import { IconDots, IconPlus } from '@tabler/icons-react';
+import { IconDots, IconLock, IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
 import { DataViewRender } from '@/components/organisms/data-view-render';
 import { ViewTabActionsMenu } from '@/components/molecules/view-tab-actions-menu';
@@ -283,6 +284,25 @@ export default function PageDetailsPage() {
     }
   }, [pageDetails, pageId, toggleFavorite, showError]);
 
+  // A page only owns its own privacy state when it isn't a cascaded descendant of a different
+  // ancestor's private root (`privateRootId` unset, or pointing at itself). An inherited-private
+  // descendant remains reachable by direct URL/breadcrumb/Favorites, but the server rejects
+  // clearing `isPrivate` on it directly (THOTH-077) — the caller must un-mark the actual root
+  // instead, so the toggle is disabled for it rather than firing a request doomed to fail.
+  const ownsPrivacyState = !pageDetails?.page.privateRootId || pageDetails.page.privateRootId === pageId;
+
+  const handleTogglePrivate = useCallback(async () => {
+    if (!pageDetails || !pageId || !ownsPrivacyState) {
+      return;
+    }
+
+    try {
+      await updatePage(pageId, { isPrivate: !pageDetails.page.isPrivate });
+    } catch {
+      showError('Failed to update page privacy');
+    }
+  }, [pageDetails, pageId, ownsPrivacyState, updatePage, showError]);
+
   const handleMoveToTrash = useCallback(async () => {
     try {
       await api.pages.remove(pageId);
@@ -338,14 +358,22 @@ export default function PageDetailsPage() {
             >
               {pageDetails?.page.name ?? <Loader />}
             </Title>
+            {pageDetails.page.isPrivate && (
+              <Tooltip label="Private — hidden from Recent and Search">
+                <IconLock size={18} color="var(--mantine-color-dimmed)" aria-label="Private page" />
+              </Tooltip>
+            )}
           </Group>
           <Group justify="flex-end">
             <PageDetailMenu
               pageId={pageId}
               hasContent={Boolean(pageDetails.content)}
               starred={pageDetails.starred}
+              isPrivate={pageDetails.page.isPrivate}
+              ownsPrivacyState={ownsPrivacyState}
               isTogglingFavorite={isTogglingFavorite}
               onToggleFavorite={handleToggleFavorite}
+              onTogglePrivate={handleTogglePrivate}
               onImportMarkdown={handleImportMarkdown}
               onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
               onMoveToTrash={handleMoveToTrash}

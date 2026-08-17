@@ -128,6 +128,18 @@ export const SEED = {
       name: 'E2E Favorite Toggle Page',
     },
     favoritesOverflowSeed,
+    // A dedicated root page (plus a child), seeded not-private-by-default, used to exercise
+    // marking/unmarking a page private from the page detail menu and verifying the cascade to
+    // its child and the resulting exclusion from the sidebar Recent list. Kept separate from
+    // `root`/`child` so toggling privacy here never affects other specs.
+    privateToggle: {
+      id: 'e2e-page-priv-tog-0-0000-0000-000000000001',
+      name: 'E2E Private Toggle Page',
+    },
+    privateToggleChild: {
+      id: 'e2e-page-priv-tog-c-0000-0000-000000000001',
+      name: 'E2E Private Toggle Child Page',
+    },
   },
   dataSource: {
     id: 'e2e-datasource-00-0000-0000-000000000001',

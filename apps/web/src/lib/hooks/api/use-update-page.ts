@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
+import { mutate as globalMutate } from 'swr';
 import { useCudApi } from '@/lib/hooks/use-cud-api';
 import {
+  GET_PAGES_ENDPOINT,
   UPDATE_PAGE_ENDPOINT,
   type GetPagesResponse,
   type GetPageDetailsResponse,
@@ -42,6 +44,9 @@ export function useUpdatePage({ mutatePages, mutatePageDetails }: UseUpdatePageO
               if (updates.cover !== undefined) {
                 updatedPage.cover = updates.cover;
               }
+              if (updates.isPrivate !== undefined) {
+                updatedPage.isPrivate = updates.isPrivate;
+              }
               return { ...pageItem, page: updatedPage };
             }),
           { revalidate: false }
@@ -59,11 +64,21 @@ export function useUpdatePage({ mutatePages, mutatePageDetails }: UseUpdatePageO
                 ...(updates.name !== undefined && { name: updates.name.trim() }),
                 ...(updates.emoji !== undefined && { emoji: updates.emoji }),
                 ...(updates.cover !== undefined && { cover: updates.cover }),
+                ...(updates.isPrivate !== undefined && { isPrivate: updates.isPrivate }),
               },
             };
           },
           { revalidate: false }
         );
+      }
+
+      // Marking/un-marking a page private doesn't affect name/emoji/cover, but does affect
+      // whether it shows up in the sidebar's Recent list — the existing `mutatePages`/
+      // `mutatePageDetails` callbacks above never touch that independent cache, so revalidate
+      // it explicitly here, matched by key prefix (workspace-scoped, like
+      // `useToggleFavorite`'s equivalent revalidation of Favorites).
+      if (updates.isPrivate !== undefined) {
+        void globalMutate((key) => typeof key === 'string' && key.startsWith(`${GET_PAGES_ENDPOINT}?recent=true`));
       }
     },
     [patch, mutatePages, mutatePageDetails]

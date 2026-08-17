@@ -54,6 +54,8 @@ describe('access-grant-service', () => {
       createdAt: now,
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
       sortOrder: null,
       columns: [],
     } as Parameters<typeof containerRepository.create>[0]);
@@ -74,6 +76,8 @@ describe('access-grant-service', () => {
       createdAt: now,
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
       sortOrder: null,
       values: {},
       views: options.views ?? [],
@@ -94,6 +98,8 @@ describe('access-grant-service', () => {
       columnLayout: null,
       deletedAt: null,
       deletedRootId: null,
+      isPrivate: false,
+      privateRootId: null,
       createdAt: now,
       lastUpdated: now,
     } as Parameters<typeof dataViewRepository.create>[0]);
