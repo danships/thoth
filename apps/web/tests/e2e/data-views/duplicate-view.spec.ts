@@ -1,6 +1,18 @@
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
+test.afterEach(async ({ page }) => {
+  // Soft-delete any view duplicated during the test. Without this, the "(copy)" view persists
+  // in the shared seeded workspace for the rest of the run (single-worker, one seeded DB), and
+  // Playwright's default (non-exact) `getByRole(..., { name: SEED.dataView.name })` substring
+  // matching used by other specs then resolves to both the original tab/link AND this leftover
+  // "{name} (copy)" one, causing unrelated strict-mode-violation failures elsewhere.
+  const duplicatedId = new URL(page.url()).searchParams.get('v');
+  if (duplicatedId && duplicatedId !== SEED.dataView.id) {
+    await page.request.delete(`/api/v1/views/${duplicatedId}`);
+  }
+});
+
 test('duplicating the open view creates a new tab named "{name} (copy)" and selects it', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
