@@ -18,6 +18,8 @@ import type {
   RestoreDataSourceResponse,
   RestorePageResponse,
   RestoreViewResponse,
+  DuplicateViewBody,
+  DuplicateViewResponse,
   ReorderPageBody,
   ReorderPageResponse,
   UpdateWorkspaceBody,
@@ -181,6 +183,8 @@ export const api = {
   views: {
     remove: (id: string) => apiClient.delete(`/views/${id}`),
     restore: (id: string) => apiClient.post<DataWrapper<RestoreViewResponse>>(`/views/${id}/restore`),
+    duplicate: (id: string, body: DuplicateViewBody) =>
+      apiClient.post<DataWrapper<DuplicateViewResponse>>(`/views/${id}/duplicate`, body),
   },
 
   dataSources: {

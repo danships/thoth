@@ -24,6 +24,7 @@ export * from './create-single-select-option';
 export * from './restore-data-source';
 export * from './restore-page';
 export * from './restore-view';
+export * from './duplicate-view';
 export * from './delete-data-source-column';
 export * from './update-page-values';
 export * from './update-page';

@@ -1,6 +1,20 @@
 'use client';
 
-import { Alert, Box, Button, Container, Group, Loader, Modal, Stack, Tabs, Text, Title } from '@mantine/core';
+import {
+  ActionIcon,
+  Alert,
+  Box,
+  Button,
+  Container,
+  Group,
+  Loader,
+  Menu,
+  Modal,
+  Stack,
+  Tabs,
+  Text,
+  Title,
+} from '@mantine/core';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDisclosure } from '@mantine/hooks';
@@ -8,9 +22,10 @@ import { mutate as mutateGlobal } from 'swr';
 import { usePageDetails } from '@/lib/hooks/api/use-page-details';
 import { api } from '@/lib/api/client';
 import { PageFieldsEditor } from '@/components/organisms/page-fields-editor';
-import { IconPlus } from '@tabler/icons-react';
+import { IconDots, IconPlus } from '@tabler/icons-react';
 import { ViewCreator } from '@/components/organisms/view-creator';
 import { DataViewRender } from '@/components/organisms/data-view-render';
+import { ViewTabActionsMenu } from '@/components/molecules/view-tab-actions-menu';
 import { GetDataViewsResponse } from '@/types/api';
 import { useSearchParams } from 'next/navigation';
 import { useUpdatePage } from '@/lib/hooks/api/use-update-page';
@@ -80,8 +95,14 @@ export default function PageDetailsPage() {
 
   const [showCreateViewForm, setShowCreateViewForm] = useState(false);
   const [historyDrawerOpened, { open: openHistoryDrawer, close: closeHistoryDrawer }] = useDisclosure(false);
+  const [duplicatingViewId, setDuplicatingViewId] = useState<string | null>(null);
+  // Whether the tab list is currently overflowing its container — drives the visibility of the
+  // compact overflow menu next to "Add View" (there's no built-in Mantine `Tabs` overflow
+  // affordance, and the list otherwise just scrolls horizontally with no visible indicator).
+  const [tabsOverflowing, setTabsOverflowing] = useState(false);
   const titleReference = useRef<HTMLHeadingElement>(null);
   const editorReference = useRef<PageDetailEditorHandle>(null);
+  const tabsListReference = useRef<HTMLDivElement>(null);
 
   const { showError } = useNotification();
   const { updatePage } = useUpdatePage({ mutatePageDetails: mutate });
@@ -129,6 +150,25 @@ export default function PageDetailsPage() {
     }
   }, [pageDetails?.page.name]);
 
+  // Tracks whether the tab list is wider than its visible container so the overflow menu can
+  // be shown/hidden accordingly. Re-measured via `ResizeObserver` (rather than only on mount) so
+  // it stays correct as views are added, duplicated, or deleted, and on viewport resize.
+  useEffect(() => {
+    const element = tabsListReference.current;
+    if (!element) {
+      return;
+    }
+
+    const updateOverflow = () => {
+      setTabsOverflowing(element.scrollWidth > element.clientWidth + 1);
+    };
+
+    updateOverflow();
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [pageDetails?.views, hasSubpages, selectedView]);
+
   const updateContent = useCallback(
     async (content: string) => {
       if (!pageId) {
@@ -168,6 +208,28 @@ export default function PageDetailsPage() {
       router.replace(`?v=${view.id}`);
     },
     [mutate, router]
+  );
+
+  const handleDuplicateView = useCallback(
+    async (view: GetDataViewsResponse[number]) => {
+      // Guard against a rapid double-click firing a second request while the first is still
+      // in flight — the `ActionIcon`'s `loading` state is only a visual cue, not a hard block.
+      if (duplicatingViewId) {
+        return;
+      }
+
+      setDuplicatingViewId(view.id);
+      try {
+        const duplicated = await api.views.duplicate(view.id, { pageId });
+        await mutate();
+        router.replace(`?v=${duplicated.data.data.id}`);
+      } catch {
+        showError(`Failed to duplicate "${view.name}"`);
+      } finally {
+        setDuplicatingViewId(null);
+      }
+    },
+    [pageId, mutate, router, showError, duplicatingViewId]
   );
 
   const handleTitleBlur = useCallback(
@@ -311,23 +373,53 @@ export default function PageDetailsPage() {
                   drop to its own line below the tab list on narrow viewports instead of
                   squeezing/overlapping the tabs or shrinking them to fit beside it. */}
               <Group justify="space-between" align="center" wrap="wrap" gap="xs" className={styles['tabsHeader'] ?? ''}>
-                <Tabs.List className={styles['tabsList'] ?? ''}>
+                <Tabs.List ref={tabsListReference} className={styles['tabsList'] ?? ''}>
                   {pageDetails.views?.map((view) => (
-                    <Tabs.Tab key={view.id} value={view.id}>
-                      {view.name}
-                    </Tabs.Tab>
+                    // Rendered as a Box wrapping the tab and (when selected) its actions menu as
+                    // siblings, rather than nesting the menu's button inside `Tabs.Tab`'s
+                    // `rightSection` — `Tabs.Tab` itself renders a `<button>`, and nesting another
+                    // interactive control inside it is invalid HTML that assistive technology can
+                    // misannounce or omit (see ViewTabActionsMenu).
+                    <Box key={view.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      <Tabs.Tab value={view.id}>{view.name}</Tabs.Tab>
+                      {selectedView === view.id && (
+                        <ViewTabActionsMenu
+                          viewName={view.name}
+                          duplicating={duplicatingViewId === view.id}
+                          onDuplicate={() => handleDuplicateView(view)}
+                        />
+                      )}
+                    </Box>
                   ))}
                   {hasSubpages && <Tabs.Tab value={SUBPAGES_TAB_VALUE}>Sub Pages</Tabs.Tab>}
                   <Tabs.Tab value="contents">Contents</Tabs.Tab>
                 </Tabs.List>
-                <Button
-                  size="xs"
-                  variant="default"
-                  onClick={() => setShowCreateViewForm(true)}
-                  leftSection={<IconPlus />}
-                >
-                  Add View
-                </Button>
+                <Group gap={4} wrap="nowrap">
+                  {tabsOverflowing && pageDetails.views && pageDetails.views.length > 0 && (
+                    <Menu shadow="md" width={220} position="bottom-end">
+                      <Menu.Target>
+                        <ActionIcon variant="default" size="lg" aria-label="More views">
+                          <IconDots size={16} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        {pageDetails.views.map((view) => (
+                          <Menu.Item key={view.id} onClick={() => router.replace(`?v=${view.id}`)}>
+                            {view.name}
+                          </Menu.Item>
+                        ))}
+                      </Menu.Dropdown>
+                    </Menu>
+                  )}
+                  <Button
+                    size="xs"
+                    variant="default"
+                    onClick={() => setShowCreateViewForm(true)}
+                    leftSection={<IconPlus />}
+                  >
+                    Add View
+                  </Button>
+                </Group>
               </Group>
               <Tabs.Panel value="contents" className={styles['tabsPanel'] ?? ''}>
                 <PageDetailEditor
