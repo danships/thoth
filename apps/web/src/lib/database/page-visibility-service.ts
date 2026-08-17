@@ -1,6 +1,6 @@
 import { getContainerRepository } from './index';
 import { collectDescendantPageIds } from './soft-delete-service';
-import { addUserIdToQuery, addWorkspaceIdToQuery } from './helpers';
+import { addWorkspaceIdToQuery } from './helpers';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { getLogger } from '@/lib/logger';
 import type { PageContainer } from '@thoth/database/types';
@@ -42,8 +42,7 @@ export function excludePrivateContainers<T extends { isPrivate?: boolean }>(cont
  */
 export async function cascadeSetPagePrivate(
   page: PageContainer,
-  isPrivate: boolean,
-  userId: string
+  isPrivate: boolean
 ): Promise<{ affectedPageCount: number }> {
   if (!isPrivate && page.privateRootId && page.privateRootId !== page.id) {
     throw new BadRequestError(
@@ -59,7 +58,7 @@ export async function cascadeSetPagePrivate(
   const descendants =
     descendantIds.length > 0
       ? await containerRepository.getByQuery(
-          addWorkspaceIdToQuery(addUserIdToQuery(containerRepository.createQuery(), userId), page.workspaceId)
+          addWorkspaceIdToQuery(containerRepository.createQuery(), page.workspaceId)
             .eq('type', 'page')
             .in('id', descendantIds)
         )

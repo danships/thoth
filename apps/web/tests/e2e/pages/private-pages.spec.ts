@@ -26,7 +26,10 @@ test.describe('page privacy toggle (THOTH-077)', () => {
     await expect(page.getByRole('heading', { name: 'Make page & sub-pages private' })).toBeVisible();
     const [response] = await Promise.all([
       page.waitForResponse(
-        (response) => response.url().includes(`/pages/${SEED.pages.privateToggle.id}`) && response.ok()
+        (response) =>
+          response.request().method() === 'PATCH' &&
+          response.url().includes(`/pages/${SEED.pages.privateToggle.id}`) &&
+          response.ok()
       ),
       page.getByRole('button', { name: 'Make private' }).click(),
     ]);
@@ -47,13 +50,17 @@ test.describe('page privacy toggle (THOTH-077)', () => {
     await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.privateToggle.id}`);
 
     await page.getByRole('button', { name: 'Page menu' }).click();
+    await page.getByRole('menuitem', { name: 'Make page & sub-pages private' }).click();
+    await expect(page.getByRole('heading', { name: 'Make page & sub-pages private' })).toBeVisible();
     await Promise.all([
       page.waitForResponse(
-        (response) => response.url().includes(`/pages/${SEED.pages.privateToggle.id}`) && response.ok()
+        (response) =>
+          response.request().method() === 'PATCH' &&
+          response.url().includes(`/pages/${SEED.pages.privateToggle.id}`) &&
+          response.ok()
       ),
-      page.getByRole('menuitem', { name: 'Make page & sub-pages private' }).click(),
+      page.getByRole('button', { name: 'Make private' }).click(),
     ]);
-    await page.getByRole('button', { name: 'Make private' }).click();
     await expect(page.getByLabel('Private page')).toBeVisible();
 
     await page.getByRole('button', { name: 'Page menu' }).click();
@@ -61,7 +68,10 @@ test.describe('page privacy toggle (THOTH-077)', () => {
     await expect(page.getByRole('heading', { name: 'Remove from private' })).toBeVisible();
     await Promise.all([
       page.waitForResponse(
-        (response) => response.url().includes(`/pages/${SEED.pages.privateToggle.id}`) && response.ok()
+        (response) =>
+          response.request().method() === 'PATCH' &&
+          response.url().includes(`/pages/${SEED.pages.privateToggle.id}`) &&
+          response.ok()
       ),
       page.getByRole('button', { name: 'Remove from private', exact: true }).click(),
     ]);

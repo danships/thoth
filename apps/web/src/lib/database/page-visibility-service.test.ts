@@ -44,6 +44,7 @@ describe('page-visibility-service', () => {
     parentId?: string | null;
     isPrivate?: boolean;
     privateRootId?: string | null;
+    userId?: string;
   }): Promise<PageContainer> {
     counter += 1;
     const now = new Date(Date.now() + counter).toISOString();
@@ -52,7 +53,7 @@ describe('page-visibility-service', () => {
       type: 'page' as const,
       parentId: options.parentId ?? null,
       workspaceId,
-      userId,
+      userId: options.userId ?? userId,
       emoji: null,
       lastUpdated: now,
       createdAt: now,
@@ -86,7 +87,7 @@ describe('page-visibility-service', () => {
       const child = await createPage({ parentId: root.id });
       const grandchild = await createPage({ parentId: child.id });
 
-      const result = await cascadeSetPagePrivate(root, true, userId);
+      const result = await cascadeSetPagePrivate(root, true);
       expect(result.affectedPageCount).toBe(3);
 
       const refetchedRoot = await refetch(root.id);
@@ -108,7 +109,7 @@ describe('page-visibility-service', () => {
       await containerRepository.update({ ...independentChild, privateRootId: independentChild.id });
       const refetchedIndependentChild = await refetch(independentChild.id);
 
-      const result = await cascadeSetPagePrivate(root, true, userId);
+      const result = await cascadeSetPagePrivate(root, true);
       // Only the root itself is affected; the independently-private descendant is skipped.
       expect(result.affectedPageCount).toBe(1);
 
@@ -121,13 +122,13 @@ describe('page-visibility-service', () => {
     test('un-marking a root clears only its own cascaded descendants and leaves unrelated private pages untouched', async () => {
       const root = await createPage({});
       const child = await createPage({ parentId: root.id });
-      await cascadeSetPagePrivate(root, true, userId);
+      await cascadeSetPagePrivate(root, true);
 
       // An unrelated private page elsewhere in the tree, marked independently (its own root).
       const unrelatedRoot = await createPage({});
-      await cascadeSetPagePrivate(unrelatedRoot, true, userId);
+      await cascadeSetPagePrivate(unrelatedRoot, true);
 
-      const result = await cascadeSetPagePrivate(await refetch(root.id), false, userId);
+      const result = await cascadeSetPagePrivate(await refetch(root.id), false);
       expect(result.affectedPageCount).toBe(2);
 
       const refetchedRoot = await refetch(root.id);
@@ -142,13 +143,27 @@ describe('page-visibility-service', () => {
       expect(refetchedUnrelated.privateRootId).toBe(unrelatedRoot.id);
     });
 
+    test('marking a root private cascades to descendants owned by other workspace members', async () => {
+      const root = await createPage({});
+      // A descendant created by a different user in the same workspace — the cascade query is
+      // scoped by workspaceId only (never userId, THOTH-042/077), so it must still be included.
+      const otherUsersChild = await createPage({ parentId: root.id, userId: 'user-2' });
+
+      const result = await cascadeSetPagePrivate(root, true);
+      expect(result.affectedPageCount).toBe(2);
+
+      const refetchedChild = await refetch(otherUsersChild.id);
+      expect(refetchedChild.isPrivate).toBe(true);
+      expect(refetchedChild.privateRootId).toBe(root.id);
+    });
+
     test('attempting to un-mark a non-root cascaded descendant throws BadRequestError', async () => {
       const root = await createPage({});
       const child = await createPage({ parentId: root.id });
-      await cascadeSetPagePrivate(root, true, userId);
+      await cascadeSetPagePrivate(root, true);
 
       const refetchedChild = await refetch(child.id);
-      await expect(cascadeSetPagePrivate(refetchedChild, false, userId)).rejects.toThrow(BadRequestError);
+      await expect(cascadeSetPagePrivate(refetchedChild, false)).rejects.toThrow(BadRequestError);
 
       // State is unchanged after the rejected attempt.
       const afterAttempt = await refetch(child.id);

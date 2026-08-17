@@ -146,7 +146,7 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
     let updatedPage = existingPage;
 
     if (body.isPrivate !== undefined && body.isPrivate !== existingPage.isPrivate) {
-      const result = await cascadeSetPagePrivate(existingPage, body.isPrivate, session.user.id);
+      const result = await cascadeSetPagePrivate(existingPage, body.isPrivate);
       affectedPageCount = result.affectedPageCount;
 
       const logger = await getLogger();

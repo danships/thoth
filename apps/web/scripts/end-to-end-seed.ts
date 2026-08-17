@@ -1128,17 +1128,20 @@ async function seedAppData() {
     },
     { lastAccessedAt: new Date(Date.parse(now) - 900_000).toISOString() }
   );
-  await upsertPage({
-    id: SEED.pages.privateToggleChild.id,
-    name: SEED.pages.privateToggleChild.name,
-    emoji: null,
-    type: 'page',
-    userId: uid,
-    workspaceId: wsId,
-    parentId: SEED.pages.privateToggle.id,
-    createdAt: now,
-    lastUpdated: new Date(Date.parse(now) - 900_000).toISOString(),
-  });
+  await upsertPage(
+    {
+      id: SEED.pages.privateToggleChild.id,
+      name: SEED.pages.privateToggleChild.name,
+      emoji: null,
+      type: 'page',
+      userId: uid,
+      workspaceId: wsId,
+      parentId: SEED.pages.privateToggle.id,
+      createdAt: now,
+      lastUpdated: new Date(Date.parse(now) - 900_000).toISOString(),
+    },
+    { lastAccessedAt: OLD_ACCESS_TIMESTAMP }
+  );
 
   // A pool of unstarred root pages the favorites-overflow e2e spec stars/unstars on demand
   // (via the API) to exceed FAVORITES_MAX_LIMIT and verify the "may be more" indicator,
@@ -1253,9 +1256,7 @@ async function seedNotifications(): Promise<void> {
     },
   ];
   for (const item of items) {
-    const existing = await notificationRepository.getOneByQuery(
-      notificationRepository.createQuery().eq('id', item.id)
-    );
+    const existing = await notificationRepository.getOneByQuery(notificationRepository.createQuery().eq('id', item.id));
     if (existing) {
       continue;
     }

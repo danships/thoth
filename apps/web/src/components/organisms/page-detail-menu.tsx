@@ -42,6 +42,12 @@ type PageDetailMenuProperties = {
   hasContent: boolean;
   starred: boolean;
   isPrivate: boolean;
+  // Whether this page owns its private state directly (i.e. is not a cascaded descendant of a
+  // different ancestor's private root). Inherited-private pages remain reachable by direct
+  // URL/breadcrumb/Favorites, but the server rejects clearing `isPrivate` on them directly
+  // (THOTH-077) — the toggle is disabled and shown as informational instead of firing a request
+  // doomed to fail.
+  ownsPrivacyState: boolean;
   isTogglingFavorite?: boolean;
   onToggleFavorite: () => void | Promise<void>;
   onTogglePrivate: () => void | Promise<void>;
@@ -61,6 +67,16 @@ function connectedBadgeLabel(app: ConnectedPageApp): string {
     return 'Inherited';
   }
   return getAppScopeLabel(app.scopeType);
+}
+
+// The "make private"/"remove from private" menu item's label: an inherited-private page (a
+// cascaded descendant of a different ancestor's private root) shows an informational state
+// instead of an action, since the server rejects clearing `isPrivate` directly on it.
+function privacyToggleLabel(isPrivate: boolean, ownsPrivacyState: boolean): string {
+  if (isPrivate && !ownsPrivacyState) {
+    return 'Private (inherited from a parent page)';
+  }
+  return isPrivate ? 'Remove from private' : 'Make page & sub-pages private';
 }
 
 const PAGE_NOTIFICATION_OPTIONS: { value: PutPageNotificationSubscriptionBody['kind']; label: string }[] = [
@@ -84,6 +100,7 @@ export function PageDetailMenu({
   hasContent,
   starred,
   isPrivate,
+  ownsPrivacyState,
   isTogglingFavorite,
   onToggleFavorite,
   onTogglePrivate,
@@ -167,6 +184,10 @@ export function PageDetailMenu({
   };
 
   const handleTogglePrivate = () => {
+    if (isPrivate && !ownsPrivacyState) {
+      return;
+    }
+
     setMenuOpened(false);
     modals.openConfirmModal({
       title: isPrivate ? 'Remove from private' : 'Make page & sub-pages private',
@@ -282,9 +303,10 @@ export function PageDetailMenu({
           <Menu.Item
             leftSection={isPrivate ? <IconLockOpen size={14} /> : <IconLock size={14} />}
             onClick={handleTogglePrivate}
+            disabled={isPrivate && !ownsPrivacyState}
             data-testid="page-private-toggle-button"
           >
-            {isPrivate ? 'Remove from private' : 'Make page & sub-pages private'}
+            {privacyToggleLabel(isPrivate, ownsPrivacyState)}
           </Menu.Item>
 
           <Menu.Item leftSection={<IconFilePlus size={14} />} onClick={onAddChildPage}>
