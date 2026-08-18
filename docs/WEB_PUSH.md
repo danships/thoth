@@ -4,6 +4,15 @@ Thoth ships a durable, per-user notification inbox by default (THOTH-066). Brows
 delivery on top of the same inbox is **enabled by default** (`WEB_PUSH_ENABLED` defaults to
 `true`); set `WEB_PUSH_ENABLED=false` to disable it and fall back to inbox-only delivery.
 
+## Subscription ancestry
+
+`tree` subscriptions follow a changed page's live ancestor graph when dispatch runs. In addition
+to direct `parentId` parents, this includes the pages hosting an embedded data source: a row is
+parented to its data source, and the data source is bridged back to every live host through
+`page.views -> dataView.dataSourceId` (THOTH-080). This keeps host-page subtree subscriptions in
+sync with the same embedded-row access model; schema-only data-source changes still do not create
+notifications.
+
 ## Enabling
 
 1. Web Push is on by default — no configuration needed. To disable it, set

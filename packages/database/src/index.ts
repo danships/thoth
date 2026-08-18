@@ -50,6 +50,8 @@ export {
   verifyApiKey,
   resolveContainerDescendants,
   resolvePageEmbeddedContainerIds,
+  resolveHostPageIdsForDataSource,
+  resolveLiveAncestorIdsBridgingDataSources,
   syncAppWorkspaceMembership,
 } from './app-service.js';
 export {

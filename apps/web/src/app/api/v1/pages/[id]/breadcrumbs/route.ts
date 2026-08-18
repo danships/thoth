@@ -1,8 +1,8 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerRepository, getDataViewRepository } from '@/lib/database';
-import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
+import { getContainerRepository } from '@/lib/database';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { resolveHostPageIdsForDataSource } from '@thoth/database';
 import type { Container, PageContainer } from '@thoth/database/types';
 import type { GetPageBreadcrumbsParameters, GetPageBreadcrumbsResponse, Page } from '@/types/api';
 import { getPageBreadcrumbsParametersSchema } from '@/types/api';
@@ -16,33 +16,13 @@ import { getPageBreadcrumbsParametersSchema } from '@/types/api';
  * past the data source and up to that page (and its own ancestors).
  */
 async function findHostPageForDataSource(dataSourceId: string, workspaceId: string): Promise<PageContainer | null> {
-  const dataViewRepository = await getDataViewRepository();
-  // Pattern C: anchored on the already-authorised starting page's own workspace, not the caller
-  // (THOTH-042).
-  const dataViews = await dataViewRepository.getByQuery(
-    addWorkspaceIdToQuery(dataViewRepository.createQuery().eq('dataSourceId', dataSourceId), workspaceId)
-  );
-  const activeDataViews = dataViews.filter((dataView) => !dataView.deletedAt);
-
-  if (activeDataViews.length === 0) {
-    return null;
-  }
-
-  const dataViewIds = new Set(activeDataViews.map((dataView) => dataView.id));
-
+  const [hostPageId] = await resolveHostPageIdsForDataSource(dataSourceId, workspaceId);
+  if (!hostPageId) return null;
   const containerRepository = await getContainerRepository();
-  const pages = await containerRepository.getByQuery(
-    addWorkspaceIdToQuery(containerRepository.createQuery().eq('type', 'page'), workspaceId)
+  const hostPage = await containerRepository.getOneByQuery(
+    containerRepository.createQuery().eq('id', hostPageId).eq('workspaceId', workspaceId)
   );
-
-  const hostPage = pages.find(
-    (candidate): candidate is PageContainer =>
-      candidate.type === 'page' &&
-      !candidate.deletedAt &&
-      (candidate.views ?? []).some((viewId) => dataViewIds.has(viewId))
-  );
-
-  return hostPage ?? null;
+  return hostPage?.type === 'page' && !hostPage.deletedAt ? hostPage : null;
 }
 
 export const GET = apiRoute<GetPageBreadcrumbsResponse, {}, GetPageBreadcrumbsParameters>(

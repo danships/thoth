@@ -11,8 +11,10 @@ import {
   getWorkspaceMemberRepository,
   getNotificationRepository,
   getNotificationRuleRepository,
+  getDataViewRepository,
   upsertNotificationRule,
   type PageContainer,
+  type DataSourceContainer,
   type WorkspaceMember,
 } from '@thoth/database';
 import type { JobExecutionContext, NotificationDispatchPayloadV1 } from '@thoth/job-protocol';
@@ -90,6 +92,7 @@ describe('notificationDispatchJobDefinition handler', () => {
   let workspaceMemberRepository: Awaited<ReturnType<typeof getWorkspaceMemberRepository>>;
   let notificationRepository: Awaited<ReturnType<typeof getNotificationRepository>>;
   let notificationRuleRepository: Awaited<ReturnType<typeof getNotificationRuleRepository>>;
+  let dataViewRepository: Awaited<ReturnType<typeof getDataViewRepository>>;
 
   const workspaceId = 'workspace-1';
 
@@ -103,6 +106,7 @@ describe('notificationDispatchJobDefinition handler', () => {
     workspaceMemberRepository = await getWorkspaceMemberRepository();
     notificationRepository = await getNotificationRepository();
     notificationRuleRepository = await getNotificationRuleRepository();
+    dataViewRepository = await getDataViewRepository();
 
     await workspaceRepository.create({
       id: workspaceId,
@@ -122,6 +126,9 @@ describe('notificationDispatchJobDefinition handler', () => {
   });
 
   beforeEach(async () => {
+    for (const row of await dataViewRepository.getByQuery(dataViewRepository.createQuery())) {
+      await dataViewRepository.deleteUsingId(row.id);
+    }
     for (const row of await containerRepository.getByQuery(containerRepository.createQuery())) {
       await containerRepository.deleteUsingId(row.id);
     }
@@ -168,6 +175,24 @@ describe('notificationDispatchJobDefinition handler', () => {
     } as Parameters<typeof workspaceMemberRepository.create>[0]);
   }
 
+  async function createDataSource(id = 'data-source'): Promise<DataSourceContainer> {
+    const now = new Date().toISOString();
+    return containerRepository.create({
+      id, name: 'Data source', type: 'data-source', parentId: null, workspaceId, userId: 'author-1', emoji: null,
+      columns: [], lastUpdated: now, createdAt: now, deletedAt: null, deletedRootId: null, sortOrder: null,
+      isPrivate: false, privateRootId: null,
+    } as Parameters<typeof containerRepository.create>[0]) as unknown as Promise<DataSourceContainer>;
+  }
+
+  async function embedDataSource(host: PageContainer, dataSourceId: string): Promise<void> {
+    const now = new Date().toISOString();
+    const dataView = await dataViewRepository.create({
+      workspaceId, dataSourceId, name: 'Embedded view', userId: 'author-1', columns: [], filters: [], sorts: [], columnLayout: null,
+      lastUpdated: now, createdAt: now, deletedAt: null, deletedRootId: null, isPrivate: false, privateRootId: null,
+    } as Parameters<typeof dataViewRepository.create>[0]);
+    await containerRepository.update({ ...host, views: [...(host.views ?? []), dataView.id] });
+  }
+
   test('is a no-op when the container is missing', async () => {
     const payload: NotificationDispatchPayloadV1 = {
       workspaceId,
@@ -202,6 +227,38 @@ describe('notificationDispatchJobDefinition handler', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.containerId).toBe('page-1');
     expect(rows[0]?.changeCount).toBe(2);
+  });
+
+  test('notifies a tree subscriber when an embedded data-source row changes', async () => {
+    const host = await createPage({ id: 'host-page' });
+    const dataSource = await createDataSource();
+    await embedDataSource(host, dataSource.id);
+    await createPage({ id: 'row-page', parentId: dataSource.id });
+    await createMember('recipient-a');
+    await upsertNotificationRule({ userId: 'recipient-a', workspaceId, containerId: host.id, kind: 'tree' });
+
+    const result = await notificationDispatchJobDefinition.handler(makeContext({
+      workspaceId, containerId: 'row-page', event: 'page.updated', actor: { type: 'app', appId: 'app-1', userId: 'author-1' },
+      changeCount: 1, occurredAt: new Date().toISOString(),
+    }));
+
+    expect(result).toEqual({ recipients: 1, created: 1 });
+    await expect(notificationRepository.getByQuery(notificationRepository.createQuery().eq('containerId', 'row-page'))).resolves.toHaveLength(1);
+  });
+
+  test('an exclude_tree rule on the embedded host suppresses the row notification', async () => {
+    const host = await createPage({ id: 'host-page' });
+    const dataSource = await createDataSource();
+    await embedDataSource(host, dataSource.id);
+    await createPage({ id: 'row-page', parentId: dataSource.id });
+    await createMember('recipient-a');
+    await upsertNotificationRule({ userId: 'recipient-a', workspaceId, containerId: host.id, kind: 'exclude_tree' });
+    await upsertNotificationRule({ userId: 'recipient-a', workspaceId, containerId: null, kind: 'workspace' });
+
+    await expect(notificationDispatchJobDefinition.handler(makeContext({
+      workspaceId, containerId: 'row-page', event: 'page.updated', actor: { type: 'user', userId: 'author-1' },
+      changeCount: 1, occurredAt: new Date().toISOString(),
+    }))).resolves.toEqual({ recipients: 0 });
   });
 
   test('never creates an item for the acting human (own-change suppression)', async () => {
