@@ -235,7 +235,7 @@ export function PageHistoryDrawer({ pageId, opened, onClose, mutatePageDetails }
             <MarkdownDiffView before={revision.content} after={revision.currentContent} />
           )}
           {selectedRevisionId && revision && revision.target === 'values' && (
-            <ValuesDiffView before={revision.values} after={revision.currentValues} />
+            <ValuesDiffView before={revision.values} after={revision.currentValues} columns={revision.columns} />
           )}
         </Box>
 

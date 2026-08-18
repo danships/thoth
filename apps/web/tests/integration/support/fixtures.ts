@@ -27,6 +27,7 @@ export {
   agePageHistoryFixture,
   readPageHistoryFixture,
   enqueueHistoryMaintain,
+  recordValuesRevisionFixture,
   waitUntil,
   waitForJobCompletion,
 } from './history-fixture';

@@ -25,6 +25,11 @@ export const getPageRevisionResponseSchema = z.discriminatedUnion('target', [
     sequence: z.number().int(),
     values: z.record(z.string(), pageValueSchema),
     currentValues: z.record(z.string(), pageValueSchema),
+    // Current (not historical) id -> name pairs for every column still on the parent Data
+    // Source, so the client can label the diff table without a second round-trip. Columns
+    // removed from the Data Source since the revision are simply absent here; the client falls
+    // back to displaying the raw id.
+    columns: z.array(z.object({ id: z.string(), name: z.string() })),
   }),
 ]);
 export type GetPageRevisionResponse = z.infer<typeof getPageRevisionResponseSchema>;

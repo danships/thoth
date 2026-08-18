@@ -114,6 +114,83 @@ async function waitForConsolidation(
 // drawer's timeline + diff view, and the restore/fork actions. Each test creates its own fresh
 // page via the API so the seeded, shared pages used by other specs are never mutated.
 test.describe('page history', () => {
+  // THOTH-075: the "Column" cell in the values diff table must show the column's display name,
+  // not its raw id — and fall back to the id + a visible "(deleted)" remark once the column no
+  // longer exists on the Data Source.
+  test('shows the column name (not its id) in the values diff table', async ({ page, request }) => {
+    const noteColumn = SEED.dataSource.columns[0]!;
+
+    const pageResponse = await request.post('/api/v1/pages', {
+      data: { name: 'E2E History Column Name Page', emoji: null, parentId: SEED.dataSource.id, workspaceId: SEED.workspace.id },
+    });
+    expect(pageResponse.ok()).toBeTruthy();
+    const pageEntity = await getData<PageApi>(pageResponse);
+
+    const valuesResponse = await request.patch(`/api/v1/pages/${pageEntity.id}/values`, {
+      data: { [noteColumn.id]: { type: 'string', value: 'Done' } },
+    });
+    expect(valuesResponse.ok()).toBeTruthy();
+
+    await page.goto(`/${SEED.workspace.slug}/pages/${pageEntity.id}`);
+    await openHistoryDrawer(page);
+    await expect(page.getByRole('heading', { name: 'Page history' })).toBeVisible();
+
+    const rows = page.locator('[class*="revisionRow"]');
+    await expect(rows.first()).toBeVisible();
+    await rows.first().click();
+
+    const table = page.getByRole('table');
+    await expect(table).toBeVisible();
+    await expect(table.getByRole('cell', { name: noteColumn.name, exact: true })).toBeVisible();
+    await expect(table.getByRole('cell', { name: noteColumn.id, exact: true })).toHaveCount(0);
+  });
+
+  test('shows the raw column id with a "(deleted)" remark once the column is removed from the Data Source', async ({
+    page,
+    request,
+  }) => {
+    // A dedicated Data Source + column (rather than the shared `SEED.dataSource`) so deleting the
+    // column here can't affect other specs relying on the seeded columns still existing.
+    const dataSourceResponse = await request.post('/api/v1/data-sources', {
+      data: { name: 'E2E History Deleted Column Data Source', workspaceId: SEED.workspace.id },
+    });
+    expect(dataSourceResponse.ok()).toBeTruthy();
+    const dataSource = await getData<{ id: string }>(dataSourceResponse);
+
+    const columnResponse = await request.post(`/api/v1/data-sources/${dataSource.id}/columns`, {
+      data: { name: 'Soon Deleted', type: 'string' },
+    });
+    expect(columnResponse.ok()).toBeTruthy();
+    const column = await getData<{ id: string; name: string }>(columnResponse);
+
+    const pageResponse = await request.post('/api/v1/pages', {
+      data: { name: 'E2E History Deleted Column Page', emoji: null, parentId: dataSource.id, workspaceId: SEED.workspace.id },
+    });
+    expect(pageResponse.ok()).toBeTruthy();
+    const pageEntity = await getData<PageApi>(pageResponse);
+
+    const valuesResponse = await request.patch(`/api/v1/pages/${pageEntity.id}/values`, {
+      data: { [column.id]: { type: 'string', value: 'Before delete' } },
+    });
+    expect(valuesResponse.ok()).toBeTruthy();
+
+    const deleteColumnResponse = await request.delete(`/api/v1/data-sources/${dataSource.id}/columns/${column.id}`);
+    expect(deleteColumnResponse.ok()).toBeTruthy();
+
+    await page.goto(`/${SEED.workspace.slug}/pages/${pageEntity.id}`);
+    await openHistoryDrawer(page);
+    await expect(page.getByRole('heading', { name: 'Page history' })).toBeVisible();
+
+    const rows = page.locator('[class*="revisionRow"]');
+    await expect(rows.first()).toBeVisible();
+    await rows.first().click();
+
+    const table = page.getByRole('table');
+    await expect(table).toBeVisible();
+    await expect(table.getByText(column.id)).toBeVisible();
+    await expect(table.getByText('(deleted)')).toBeVisible();
+  });
+
   test('records a revision on content save and shows it in the history drawer', async ({ page, request }) => {
     const pageId = await createPage(request, 'E2E History Page');
 
