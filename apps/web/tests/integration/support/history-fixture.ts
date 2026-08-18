@@ -15,6 +15,8 @@ import {
   resetDatabaseContext,
   getContainerRepository,
   getPageRevisionRepository,
+  recordValuesRevision,
+  type PageValue,
 } from '@thoth/database';
 
 function getIntegrationDatabaseUrl(): string {
@@ -100,6 +102,21 @@ export async function readPageHistoryFixture(
       kind: revision.kind,
       consolidated: revision.consolidated,
     }));
+  });
+}
+
+/**
+ * Records a `target: 'values'` page-revision row for `containerId` directly via
+ * `@thoth/database`'s `recordValuesRevision` (bypassing the `/values` PATCH route's
+ * data-source-column validation) — used by THOTH-075's "no parent Data Source" test case, since
+ * the real HTTP route rejects setting values on a page with no Data Source parent.
+ */
+export async function recordValuesRevisionFixture(containerId: string, changed: Record<string, PageValue>): Promise<void> {
+  await withFixtureDatabaseContext(async () => {
+    const containerRepository = await getContainerRepository();
+    const page = await containerRepository.getOneByQuery(containerRepository.createQuery().eq('id', containerId));
+    if (!page || page.type !== 'page') throw new Error(`recordValuesRevisionFixture: page ${containerId} not found`);
+    await recordValuesRevision({ page, changed, author: page.userId });
   });
 }
 

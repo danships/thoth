@@ -7,6 +7,7 @@ import {
   agePageHistoryFixture,
   readPageHistoryFixture,
   enqueueHistoryMaintain,
+  recordValuesRevisionFixture,
   waitForJobCompletion,
 } from '../../support/fixtures';
 
@@ -43,6 +44,71 @@ describe('page history API', () => {
     expect(history.revisions.length).toBe(1);
     expect(history.revisions[0]?.target).toBe('values');
     expect(history.revisions[0]?.changedColumns).toContain(noteColumn.id);
+  });
+
+  test('history revision detail returns column id/name metadata for a values revision (THOTH-075)', async () => {
+    const client = await getOwner();
+    const noteColumn = SEED.dataSource.columns[0]!;
+
+    const pageResponse = await client.post('/api/v1/pages', {
+      name: 'E2E History Column Labels Page',
+      emoji: null,
+      parentId: SEED.dataSource.id,
+      workspaceId: SEED.workspace.id,
+    });
+    expect(pageResponse.ok).toBe(true);
+    const pageEntity = await getData<PageApi>(pageResponse);
+
+    const valuesResponse = await client.patch(`/api/v1/pages/${pageEntity.id}/values`, {
+      [noteColumn.id]: { type: 'string', value: 'Done' },
+    });
+    expect(valuesResponse.ok).toBe(true);
+
+    const historyResponse = await client.get(`/api/v1/pages/${pageEntity.id}/history`, {
+      params: { target: 'values' },
+    });
+    expect(historyResponse.ok).toBe(true);
+    const history = await getData<{ revisions: Array<{ id: string; target: string }> }>(historyResponse);
+    const revisionId = history.revisions[0]!.id;
+
+    const detailResponse = await client.get(`/api/v1/pages/${pageEntity.id}/history/${revisionId}`);
+    expect(detailResponse.ok).toBe(true);
+    const detail = await getData<{ target: string; columns: Array<{ id: string; name: string }> }>(detailResponse);
+    expect(detail.target).toBe('values');
+    expect(detail.columns).toEqual(
+      expect.arrayContaining(SEED.dataSource.columns.map((column) => ({ id: column.id, name: column.name })))
+    );
+  });
+
+  test('history revision detail returns an empty columns array for a plain page with no parent data source (THOTH-075)', async () => {
+    const client = await getOwner();
+
+    const pageResponse = await client.post('/api/v1/pages', {
+      name: 'E2E History Plain Page Column Labels',
+      emoji: null,
+      parentId: null,
+      workspaceId: SEED.workspace.id,
+    });
+    expect(pageResponse.ok).toBe(true);
+    const pageEntity = await getData<PageApi>(pageResponse);
+
+    // The `/values` PATCH route rejects a page with no Data Source parent (`BadRequestError`),
+    // so the `target: 'values'` revision needed for this "no parent Data Source" case is
+    // recorded directly via the fixture helper instead of going through the HTTP route.
+    await recordValuesRevisionFixture(pageEntity.id, { arbitraryColumnId: { type: 'string', value: 'Done' } });
+
+    const historyResponse = await client.get(`/api/v1/pages/${pageEntity.id}/history`, {
+      params: { target: 'values' },
+    });
+    expect(historyResponse.ok).toBe(true);
+    const history = await getData<{ revisions: Array<{ id: string; target: string }> }>(historyResponse);
+    const revisionId = history.revisions[0]!.id;
+
+    const detailResponse = await client.get(`/api/v1/pages/${pageEntity.id}/history/${revisionId}`);
+    expect(detailResponse.ok).toBe(true);
+    const detail = await getData<{ target: string; columns: Array<{ id: string; name: string }> }>(detailResponse);
+    expect(detail.target).toBe('values');
+    expect(detail.columns).toEqual([]);
   });
 
   test('records content immediately, then scheduled history.maintain consolidates a fixture-aged sealed run', async () => {

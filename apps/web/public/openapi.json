@@ -4268,13 +4268,33 @@
                                   }
                                 ]
                               }
+                            },
+                            "columns": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              }
                             }
                           },
                           "required": [
                             "target",
                             "sequence",
                             "values",
-                            "currentValues"
+                            "currentValues",
+                            "columns"
                           ],
                           "additionalProperties": false
                         }

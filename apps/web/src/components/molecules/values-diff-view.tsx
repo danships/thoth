@@ -2,14 +2,19 @@
 
 import { Table, Text } from '@mantine/core';
 import type { PageValue } from '@/types/schemas/entities/container';
+import { columnLabel } from './values-diff-view.helpers';
+
+type ColumnMetadata = { id: string; name: string };
 
 type ValuesDiffViewProperties = {
   before: Record<string, PageValue>;
   after: Record<string, PageValue>;
+  columns: ColumnMetadata[];
 };
 
 // Renders a value's underlying primitive as plain text; `multi-select` values are option ids
-// joined for display since the drawer has no column metadata to resolve labels against.
+// joined for display since the drawer has no column metadata to resolve *option* labels
+// against (the top-level "Column" header cell itself is resolved separately, via `columns`).
 function formatValue(value: PageValue | undefined): string {
   if (!value) {
     return '—';
@@ -31,8 +36,9 @@ function formatValue(value: PageValue | undefined): string {
 // Per-column before/after table for a `target='values'` revision. `before` is the reconstructed
 // values state at the chosen revision; `after` is the page's current values — only the columns
 // present in either side are shown (columns untouched since are omitted for brevity).
-export function ValuesDiffView({ before, after }: ValuesDiffViewProperties) {
+export function ValuesDiffView({ before, after, columns }: ValuesDiffViewProperties) {
   const columnIds = [...new Set([...Object.keys(before), ...Object.keys(after)])].toSorted();
+  const nameById = new Map(columns.map((column) => [column.id, column.name] as const));
 
   if (columnIds.length === 0) {
     return (
@@ -52,13 +58,24 @@ export function ValuesDiffView({ before, after }: ValuesDiffViewProperties) {
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
-        {columnIds.map((columnId) => (
-          <Table.Tr key={columnId}>
-            <Table.Td>{columnId}</Table.Td>
-            <Table.Td>{formatValue(before[columnId])}</Table.Td>
-            <Table.Td>{formatValue(after[columnId])}</Table.Td>
-          </Table.Tr>
-        ))}
+        {columnIds.map((columnId) => {
+          const label = columnLabel(columnId, nameById);
+          return (
+            <Table.Tr key={columnId}>
+              <Table.Td>
+                {label.deleted ? (
+                  <Text span c="dimmed" fs="italic">
+                    {label.text} (deleted)
+                  </Text>
+                ) : (
+                  label.text
+                )}
+              </Table.Td>
+              <Table.Td>{formatValue(before[columnId])}</Table.Td>
+              <Table.Td>{formatValue(after[columnId])}</Table.Td>
+            </Table.Tr>
+          );
+        })}
       </Table.Tbody>
     </Table>
   );
