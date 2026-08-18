@@ -243,11 +243,13 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
 
   // Filterable columns (THOTH-037/THOTH-078): real Data Source columns plus the two system
   // pseudo-columns — unlike `sortableColumns`, `name` itself is intentionally excluded (filtering
-  // on name is out of scope, THOTH-065).
+  // on name is out of scope, THOTH-065). System pseudo-columns are appended *after* the real
+  // columns so "Add filter" still defaults to the first real column (preserving prior behaviour
+  // for existing filter flows, which assume a filterable, `contains`-capable default column).
   const filterableColumns = useMemo<Column[]>(
     () => [
-      ...SYSTEM_PSEUDO_COLUMNS.map((pseudo) => ({ id: pseudo.id, name: pseudo.name, type: 'string' as const })),
       ...columns,
+      ...SYSTEM_PSEUDO_COLUMNS.map((pseudo) => ({ id: pseudo.id, name: pseudo.name, type: 'string' as const })),
     ],
     [columns]
   );
