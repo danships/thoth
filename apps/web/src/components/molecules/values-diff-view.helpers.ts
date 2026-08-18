@@ -8,5 +8,5 @@ export type ColumnLabel = { text: string; deleted: boolean };
 // rather than silently displaying a bare id that looks like a real name.
 export function columnLabel(columnId: string, nameById: Map<string, string>): ColumnLabel {
   const name = nameById.get(columnId);
-  return name ? { text: name, deleted: false } : { text: columnId, deleted: true };
+  return name === undefined ? { text: columnId, deleted: true } : { text: name, deleted: false };
 }

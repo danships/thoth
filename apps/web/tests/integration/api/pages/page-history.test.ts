@@ -10,6 +10,7 @@ import {
   recordValuesRevisionFixture,
   waitForJobCompletion,
 } from '../../support/fixtures';
+import { getPageRevisionResponseSchema } from '@/types/api/endpoints/get-page-revision';
 
 type PageApi = { id: string };
 
@@ -73,8 +74,10 @@ describe('page history API', () => {
 
     const detailResponse = await client.get(`/api/v1/pages/${pageEntity.id}/history/${revisionId}`);
     expect(detailResponse.ok).toBe(true);
-    const detail = await getData<{ target: string; columns: Array<{ id: string; name: string }> }>(detailResponse);
-    expect(detail.target).toBe('values');
+    const detail = getPageRevisionResponseSchema.parse(await getData(detailResponse));
+    if (detail.target !== 'values') {
+      throw new Error('Expected a values-target revision detail');
+    }
     expect(detail.columns).toEqual(
       expect.arrayContaining(SEED.dataSource.columns.map((column) => ({ id: column.id, name: column.name })))
     );
@@ -106,8 +109,10 @@ describe('page history API', () => {
 
     const detailResponse = await client.get(`/api/v1/pages/${pageEntity.id}/history/${revisionId}`);
     expect(detailResponse.ok).toBe(true);
-    const detail = await getData<{ target: string; columns: Array<{ id: string; name: string }> }>(detailResponse);
-    expect(detail.target).toBe('values');
+    const detail = getPageRevisionResponseSchema.parse(await getData(detailResponse));
+    if (detail.target !== 'values') {
+      throw new Error('Expected a values-target revision detail');
+    }
     expect(detail.columns).toEqual([]);
   });
 

@@ -20,4 +20,9 @@ describe('columnLabel', () => {
   test('falls back to the raw id when there are no columns at all', () => {
     expect(columnLabel('col-1', new Map())).toEqual({ text: 'col-1', deleted: true });
   });
+
+  test('treats an empty column name as present, not deleted', () => {
+    const nameById = new Map([['col-1', '']]);
+    expect(columnLabel('col-1', nameById)).toEqual({ text: '', deleted: false });
+  });
 });

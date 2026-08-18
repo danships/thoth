@@ -2,9 +2,12 @@
 
 import { Table, Text } from '@mantine/core';
 import type { PageValue } from '@/types/schemas/entities/container';
+import type { GetPageRevisionResponse } from '@/types/api/endpoints/get-page-revision';
 import { columnLabel } from './values-diff-view.helpers';
 
-type ColumnMetadata = { id: string; name: string };
+// Derived from the endpoint's own `target: 'values'` response shape (rather than redeclared)
+// so this component's contract can never drift from `getPageRevisionResponseSchema`.
+type ColumnMetadata = Extract<GetPageRevisionResponse, { target: 'values' }>['columns'][number];
 
 type ValuesDiffViewProperties = {
   before: Record<string, PageValue>;

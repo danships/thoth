@@ -58,6 +58,10 @@ export const GET = apiRoute<GetPageRevisionResponse, undefined, GetPageRevisionP
     if (page.parentId) {
       try {
         const dataSource = await dataSourceRetriever.retrieveDataSource(page.parentId, session.user.id);
+        // Content access (workspace membership + grant) must be re-checked against the parent
+        // Data Source itself — it is a separate content row, not covered by the child page's
+        // grant, and an App session's scope may differ between the two (THOTH-042).
+        await assertGrantAllowsContainerForSession(session, dataSource);
         columns = dataSource.columns.map((column) => ({ id: column.id, name: column.name }));
       } catch (error) {
         if (!(error instanceof NotFoundError)) {
