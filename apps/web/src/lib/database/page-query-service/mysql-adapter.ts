@@ -40,6 +40,20 @@ export function createMysqlAdapter(): PageQueryEngineAdapter {
       return value;
     },
 
+    buildBooleanEquals(path: string, value: boolean): SqlFragment {
+      // `JSON_UNQUOTE(JSON_EXTRACT(...))` always yields the strings `'true'`/`'false'` for a JSON
+      // boolean (never a numeric/native boolean type), and `NULL` when the column was never set.
+      // Comparing that string against a bound numeric/boolean parameter is unreliable — MySQL
+      // coerces a non-numeric string operand to `0`, so both `'true'` and `'false'` would equal
+      // `0` and neither would equal `1`. Comparing string-to-string instead (and defaulting a
+      // missing value to `'false'`, matching the checkbox's unchecked-by-default UI
+      // representation) sidesteps both problems.
+      return {
+        sql: "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(contents, ?)), 'false') = ?",
+        params: [path, value ? 'true' : 'false'],
+      };
+    },
+
     buildHasAnyOf(path: string, ids: unknown[]): SqlFragment {
       if (ids.length === 0) {
         return { sql: '0 = 1', params: [] };

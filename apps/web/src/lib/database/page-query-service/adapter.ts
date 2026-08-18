@@ -37,6 +37,18 @@ export type PageQueryEngineAdapter = {
    * (e.g. SQLite can't bind raw JS booleans). */
   normalizeFilterValue(value: unknown): unknown;
 
+  /** Builds a fragment that's true when the boolean column at `path` effectively equals `value`,
+   * treating a missing/`NULL` value (checkbox never touched) the same as `false` — matching the
+   * UI's unchecked-by-default representation instead of excluding those rows from every boolean
+   * filter. Also the building block for `notEquals` on boolean columns (see `query-builder.ts`),
+   * which simply wraps this in `NOT (...)`. Each engine encodes
+   * booleans differently once extracted from JSON (SQLite: integers `1`/`0`; MySQL/MariaDB:
+   * `JSON_UNQUOTE` always yields the strings `'true'`/`'false'`, never a numeric/boolean type —
+   * comparing that string against a numeric/boolean bound parameter is unreliable since MySQL
+   * coerces non-numeric strings to `0`), so the encoding of both the extraction default and
+   * `value` must stay engine-specific here rather than shared in `query-builder.ts`. */
+  buildBooleanEquals(path: string, value: boolean): SqlFragment;
+
   /** Builds the `hasAnyOf` filter fragment: true if the JSON array at `path` contains any of
    * `ids`. */
   buildHasAnyOf(path: string, ids: unknown[]): SqlFragment;
