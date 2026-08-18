@@ -14,7 +14,15 @@ import {
   TextInput,
 } from '@mantine/core';
 import { IconArrowsSort, IconFilter, IconPlus, IconX } from '@tabler/icons-react';
-import { NAME_SORT_COLUMN_ID, OPERATORS_BY_COLUMN_TYPE } from '@/types/schemas/entities/data-view-query';
+import {
+  NAME_SORT_COLUMN_ID,
+  OPERATORS_BY_COLUMN_TYPE,
+  SYSTEM_COLUMN_DEFINITIONS,
+  SYSTEM_COLUMN_IDS,
+  SYSTEM_COLUMN_OPERATORS,
+  type SystemColumnId,
+} from '@/types/schemas/entities/data-view-query';
+import { toInputValue, toIsoFromInput } from '@/lib/data-source/date-format';
 import type { Column } from '@/types/schemas/entities/container';
 import type { FilterOperator, FilterRule, SortDirection, SortRule } from '@/types/schemas/entities/data-view-query';
 
@@ -39,6 +47,20 @@ const OPERATOR_LABELS: Record<FilterOperator, string> = {
 const VALUELESS_OPERATORS = new Set<FilterOperator>(['isEmpty', 'isNotEmpty']);
 const MULTI_VALUE_OPERATORS = new Set<FilterOperator>(['hasAnyOf', 'hasAllOf']);
 
+function isSystemColumnId(columnId: string): columnId is SystemColumnId {
+  return (SYSTEM_COLUMN_IDS as readonly string[]).includes(columnId);
+}
+
+// Pseudo-`Column`-like entries for the two built-in system columns (THOTH-078) — deliberately
+// *not* shaped as `Column`'s `date` variant, since that requires per-column `mode`/`displayFormat`
+// configurability that these fixed fields don't have. Used only to drive the Filter/Sort bar's
+// dropdown label + id; `FilterValueInput` below renders a dedicated date/time picker for these
+// rather than reusing the `date` column type's value input branch.
+const SYSTEM_PSEUDO_COLUMNS: { id: SystemColumnId; name: string }[] = SYSTEM_COLUMN_IDS.map((id) => ({
+  id,
+  name: SYSTEM_COLUMN_DEFINITIONS[id].name,
+}));
+
 type FilterSortBarProperties = {
   columns: Column[];
   filters: FilterRule[];
@@ -47,7 +69,10 @@ type FilterSortBarProperties = {
   inProgress: boolean;
 };
 
-function defaultOperatorFor(column: Column | undefined): FilterOperator {
+function defaultOperatorFor(columnId: string | undefined, column: Column | undefined): FilterOperator {
+  if (columnId && isSystemColumnId(columnId)) {
+    return SYSTEM_COLUMN_OPERATORS[0] ?? 'equals';
+  }
   return (column ? OPERATORS_BY_COLUMN_TYPE[column.type][0] : 'equals') as FilterOperator;
 }
 
@@ -73,14 +98,35 @@ function defaultValueForOperator(operator: FilterOperator, columnType?: Column['
 
 function FilterValueInput({
   column,
+  systemColumnId,
   rule,
   onChange,
 }: {
   column: Column | undefined;
+  systemColumnId: SystemColumnId | undefined;
   rule: FilterRule;
   onChange: (value: FilterRule['value']) => void;
 }) {
-  if (!column || VALUELESS_OPERATORS.has(rule.operator)) {
+  if (VALUELESS_OPERATORS.has(rule.operator)) {
+    return null;
+  }
+
+  // `createdAt`/`lastUpdated` (THOTH-078) are fixed `Container` attributes, not a `date` Column
+  // (which requires per-column `mode`/`displayFormat` these fields don't have) — a dedicated
+  // date/time picker rather than reusing `EditableDateCell`'s `Column`-driven rendering path.
+  if (systemColumnId) {
+    const isoValue = typeof rule.value === 'string' ? rule.value : '';
+    return (
+      <input
+        type="datetime-local"
+        value={isoValue ? toInputValue(isoValue, 'datetime') : ''}
+        onChange={(event) => onChange(toIsoFromInput(event.target.value, 'datetime'))}
+        style={{ height: 30, fontSize: 'var(--mantine-font-size-xs)' }}
+      />
+    );
+  }
+
+  if (!column) {
     return null;
   }
 
@@ -183,24 +229,42 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
   // never appears in `columns`, but is always sortable (unlike filtering, which stays scoped to
   // real columns). Modeled as a pseudo `Column` matching `stringColumnSchema`'s shape so it slots
   // into the same sort `Select` as real columns; listed first since it's the one column every
-  // view always has.
+  // view always has. `createdAt`/`lastUpdated` (THOTH-078) are likewise fixed `Container`
+  // attributes, listed right after Name, and — unlike `name` — also filterable (see
+  // `filterableColumns` below).
   const sortableColumns = useMemo<Column[]>(
     () => [
       { id: NAME_SORT_COLUMN_ID, name: 'Name', type: 'string' },
+      ...SYSTEM_PSEUDO_COLUMNS.map((pseudo) => ({ id: pseudo.id, name: pseudo.name, type: 'string' as const })),
       ...columns.filter((column) => column.type !== 'file'),
     ],
     [columns]
   );
 
+  // Filterable columns (THOTH-037/THOTH-078): real Data Source columns plus the two system
+  // pseudo-columns — unlike `sortableColumns`, `name` itself is intentionally excluded (filtering
+  // on name is out of scope, THOTH-065).
+  const filterableColumns = useMemo<Column[]>(
+    () => [
+      ...SYSTEM_PSEUDO_COLUMNS.map((pseudo) => ({ id: pseudo.id, name: pseudo.name, type: 'string' as const })),
+      ...columns,
+    ],
+    [columns]
+  );
+
   const handleAddFilter = () => {
-    const firstColumn = columns[0];
+    const firstColumn = filterableColumns[0];
     if (!firstColumn) {
       return;
     }
-    const operator = defaultOperatorFor(firstColumn);
+    const operator = defaultOperatorFor(firstColumn.id, isSystemColumnId(firstColumn.id) ? undefined : firstColumn);
     setFilterDraft([
       ...filterDraft,
-      { columnId: firstColumn.id, operator, value: defaultValueForOperator(operator, firstColumn.type) },
+      {
+        columnId: firstColumn.id,
+        operator,
+        value: defaultValueForOperator(operator, isSystemColumnId(firstColumn.id) ? undefined : firstColumn.type),
+      },
     ]);
   };
 
@@ -229,13 +293,23 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
   };
 
   const handleColumnChange = (index: number, columnId: string) => {
+    if (isSystemColumnId(columnId)) {
+      const operator = defaultOperatorFor(columnId, undefined);
+      updateFilter(index, { columnId, operator, value: defaultValueForOperator(operator, undefined) });
+      return;
+    }
     const column = columnsById.get(columnId);
-    const operator = defaultOperatorFor(column);
+    const operator = defaultOperatorFor(columnId, column);
     updateFilter(index, { columnId, operator, value: defaultValueForOperator(operator, column?.type) });
   };
 
   const handleOperatorChange = (index: number, operator: FilterOperator) => {
-    const column = columnsById.get(filterDraft[index]?.columnId ?? '');
+    const currentColumnId = filterDraft[index]?.columnId ?? '';
+    if (isSystemColumnId(currentColumnId)) {
+      updateFilter(index, { operator, value: defaultValueForOperator(operator, undefined) });
+      return;
+    }
+    const column = columnsById.get(currentColumnId);
     updateFilter(index, { operator, value: defaultValueForOperator(operator, column?.type) });
   };
 
@@ -276,13 +350,19 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
         <Popover.Dropdown style={{ maxWidth: 'calc(100vw - 2rem)' }}>
           <Stack gap="xs" miw={0} w={320} maw="100%">
             {filterDraft.map((rule, index) => {
-              const column = columnsById.get(rule.columnId);
-              const operators = column ? (OPERATORS_BY_COLUMN_TYPE[column.type] as FilterOperator[]) : [];
+              const systemColumnId = isSystemColumnId(rule.columnId) ? rule.columnId : undefined;
+              const column = systemColumnId ? undefined : columnsById.get(rule.columnId);
+              let operators: FilterOperator[] = [];
+              if (systemColumnId) {
+                operators = [...SYSTEM_COLUMN_OPERATORS];
+              } else if (column) {
+                operators = OPERATORS_BY_COLUMN_TYPE[column.type] as FilterOperator[];
+              }
               return (
                 <Group key={index} gap="xs" wrap="wrap" data-testid="filter-rule-row">
                   <Select
                     comboboxProps={{ transitionProps: { duration: 0 }, withinPortal: false }}
-                    data={columns.map((col) => ({ value: col.id, label: col.name }))}
+                    data={filterableColumns.map((col) => ({ value: col.id, label: col.name }))}
                     value={rule.columnId}
                     onChange={(value) => value && handleColumnChange(index, value)}
                     size="xs"
@@ -298,7 +378,12 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
                     miw={100}
                     style={{ flex: '1 1 100px' }}
                   />
-                  <FilterValueInput column={column} rule={rule} onChange={(value) => updateFilter(index, { value })} />
+                  <FilterValueInput
+                    column={column}
+                    systemColumnId={systemColumnId}
+                    rule={rule}
+                    onChange={(value) => updateFilter(index, { value })}
+                  />
                   <ActionIcon
                     variant="subtle"
                     color="red"
@@ -316,7 +401,7 @@ export function FilterSortBar({ columns, filters, sorts, onApply, inProgress }: 
                 variant="subtle"
                 leftSection={<IconPlus size={14} />}
                 onClick={handleAddFilter}
-                disabled={columns.length === 0}
+                disabled={filterableColumns.length === 0}
               >
                 Add filter
               </Button>

@@ -1,10 +1,20 @@
 import { getAdapter } from './adapter';
-import { buildFilterFragment, buildNameSortExpression, buildSortExpression } from './query-builder';
+import {
+  buildFilterFragment,
+  buildNameSortExpression,
+  buildSortExpression,
+  buildSystemColumnFilterFragment,
+  buildSystemColumnSortExpression,
+} from './query-builder';
 import { dropStaleRules } from './validation';
 import type { ExecutePageQueryOptions, ExecutePageQueryResult, SqlFragment } from './types';
 import type { PageContainer } from '@thoth/database/types';
 import { BadRequestError } from '../../errors/bad-request-error';
-import { NAME_SORT_COLUMN_ID } from '@/types/schemas/entities/data-view-query';
+import { NAME_SORT_COLUMN_ID, SYSTEM_COLUMN_IDS, type SystemColumnId } from '@/types/schemas/entities/data-view-query';
+
+function isSystemColumnId(columnId: string): columnId is SystemColumnId {
+  return (SYSTEM_COLUMN_IDS as readonly string[]).includes(columnId);
+}
 
 export { assertValidFilterSortRules } from './validation';
 export type { PageQueryCursor, ExecutePageQueryOptions, ExecutePageQueryResult } from './types';
@@ -43,6 +53,12 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
   const whereParameters: unknown[] = [options.parentId];
 
   for (const filter of filters) {
+    if (isSystemColumnId(filter.columnId)) {
+      const fragment = buildSystemColumnFilterFragment(filter.columnId, filter);
+      whereClauses.push(fragment.sql);
+      whereParameters.push(...fragment.params);
+      continue;
+    }
     const column = columnsById.get(filter.columnId);
     if (!column) {
       continue;
@@ -70,6 +86,19 @@ export async function executePageQuery(options: ExecutePageQueryOptions): Promis
         ...expression,
         direction: sort.direction,
         valueOf: (page) => page.name,
+      });
+      continue;
+    }
+    // `createdAt`/`lastUpdated` sort on fixed `Container` attributes (THOTH-078) rather than a
+    // dynamic Data Source column — both already exist directly on `PageContainer`, so `valueOf`
+    // reads them straight off the row, same as `name` above.
+    if (isSystemColumnId(sort.columnId)) {
+      const systemColumnId = sort.columnId;
+      const expression = buildSystemColumnSortExpression(systemColumnId);
+      sortExpressions.push({
+        ...expression,
+        direction: sort.direction,
+        valueOf: (page) => page[systemColumnId],
       });
       continue;
     }

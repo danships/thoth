@@ -1,9 +1,14 @@
 import { z } from 'zod';
 import { withIdSchema, withTrackUpdatesSchema, withUserIdSchema, withWorkspaceIdSchema } from '../utilities.js';
-import { filterRuleSchema, sortRuleSchema } from './data-view-query.js';
+import { filterRuleSchema, sortRuleSchema, SYSTEM_COLUMN_IDS } from './data-view-query.js';
 
 export { filterOperatorSchema, filterRuleSchema, sortDirectionSchema, sortRuleSchema } from './data-view-query.js';
 export type { FilterOperator, FilterRule, SortDirection, SortRule } from './data-view-query.js';
+
+// The persisted `columnId` for a `kind: 'system'` layout entry (THOTH-078) — one of the fixed
+// `Container` attributes exposed as a built-in table column (`createdAt`/`lastUpdated`), not an
+// arbitrary string, so a corrupt/hand-crafted layout can't reference a nonexistent system column.
+const systemColumnIdSchema = z.enum(SYSTEM_COLUMN_IDS);
 
 // A single entry in a Data View's persisted column presentation order/visibility (THOTH-052). A
 // discriminated union rather than a magic Name id alongside Data Source column ids, so a
@@ -11,10 +16,13 @@ export type { FilterOperator, FilterRule, SortDirection, SortRule } from './data
 // collide with — or be confused for — it. `kind: 'data'` entries reference an embedded
 // `Column.id` on the view's Data Source; `kind: 'name'` represents the page's built-in
 // `Container.name` field, which every Data View implicitly has and which has no `Column` of its
-// own to reference.
+// own to reference. `kind: 'system'` (THOTH-078) follows the identical rationale for
+// `createdAt`/`lastUpdated`: fixed `Container` attributes with no `Column` of their own on the
+// Data Source, so they can't collide with `kind: 'data'` entries either.
 export const viewColumnLayoutItemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('name'), visible: z.boolean() }),
   z.object({ kind: z.literal('data'), columnId: z.string().min(1), visible: z.boolean() }),
+  z.object({ kind: z.literal('system'), columnId: systemColumnIdSchema, visible: z.boolean() }),
 ]);
 export type ViewColumnLayoutItem = z.infer<typeof viewColumnLayoutItemSchema>;
 

@@ -173,4 +173,58 @@ test.describe('Data View filter/sort configuration', () => {
     await expectRowVisible(page, 'Banana');
     await expectRowAbsent(page, 'Apple');
   });
+
+  // THOTH-078: `createdAt`/`lastUpdated` are selectable, filterable pseudo-columns in the
+  // Filter bar even though they aren't real Data Source `Column`s.
+  test('Created/Last updated are selectable in the filter column dropdown and accept a gte filter', async ({
+    page,
+  }) => {
+    await openFilterSortView(page);
+
+    await page.getByTestId('filter-sort-bar-filter-button').click();
+    await page.getByRole('button', { name: 'Add filter' }).click();
+
+    const filterRow = page.getByTestId('filter-rule-row').first();
+    await expect(filterRow).toBeVisible();
+
+    await comboboxes(filterRow).nth(0).click();
+    await expect(page.getByRole('option', { name: 'Created', exact: true })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Last updated', exact: true })).toBeVisible();
+    await page.getByRole('option', { name: 'Created', exact: true }).click();
+
+    // Only the six comparison operators are offered for system columns (no contains/isEmpty).
+    await comboboxes(filterRow).nth(1).click();
+    await expect(page.getByRole('option', { name: 'contains', exact: true })).toHaveCount(0);
+    await page.getByRole('option', { name: '>=', exact: true }).click();
+
+    // Every seeded row was created at once, well after this fixed threshold.
+    await filterRow.locator('input[type="datetime-local"]').fill('2000-01-01T00:00');
+
+    await page.getByTestId('apply-filters').click();
+
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 });
+    for (const row of SEED.filterSort.rows) {
+      await expectRowVisible(page, row.name);
+    }
+  });
+
+  test('sorting by Last updated does not error and every row is still shown', async ({ page }) => {
+    await openFilterSortView(page);
+
+    await page.getByTestId('filter-sort-bar-sort-button').click();
+    await page.getByRole('button', { name: 'Add sort' }).click();
+
+    const sortRow = page.getByTestId('sort-rule-row').first();
+    await comboboxes(sortRow).nth(0).click();
+    await page.getByRole('option', { name: 'Last updated', exact: true }).click();
+    await comboboxes(sortRow).nth(1).click();
+    await page.getByRole('option', { name: 'Descending', exact: true }).click();
+
+    await page.getByTestId('apply-sorts').click();
+
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 });
+    for (const row of SEED.filterSort.rows) {
+      await expectRowVisible(page, row.name);
+    }
+  });
 });
