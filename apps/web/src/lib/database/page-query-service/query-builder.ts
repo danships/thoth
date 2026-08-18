@@ -37,9 +37,19 @@ export function buildFilterFragment(adapter: PageQueryEngineAdapter, column: Col
       return { sql: `(${extract} IS NOT NULL AND ${extract} != '')`, params: [path, path] };
     }
     case 'equals': {
+      // Boolean columns need engine-specific NULL/type handling (a never-touched checkbox should
+      // filter the same as an explicit `false` — see `buildBooleanEquals`), so they don't go
+      // through the generic `extract = ?` comparison used by every other column type.
+      if (column.type === 'boolean') {
+        return adapter.buildBooleanEquals(path, filter.value === true);
+      }
       return { sql: `${extract}${collate} = ?`, params: [path, value] };
     }
     case 'notEquals': {
+      if (column.type === 'boolean') {
+        const equalsFragment = adapter.buildBooleanEquals(path, filter.value === true);
+        return { sql: `NOT (${equalsFragment.sql})`, params: equalsFragment.params };
+      }
       return { sql: `(${extract} IS NULL OR ${extract}${collate} != ?)`, params: [path, path, value] };
     }
     case 'contains': {

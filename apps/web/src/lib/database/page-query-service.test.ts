@@ -168,6 +168,64 @@ describe('page-query-service', () => {
     expect(!lteResult.pages.some((page) => page.id === old.id)).toBeTruthy();
   });
 
+  test('treats a never-set boolean column as false for both equals and notEquals', async () => {
+    const neverSet = await createTestPage({ title: { type: 'string', value: 'Boolean never set' } });
+    const isTrue = await createTestPage({
+      title: { type: 'string', value: 'Boolean true' },
+      active: { type: 'boolean', value: true },
+    });
+    const checkedThenUnchecked = await createTestPage({
+      title: { type: 'string', value: 'Boolean checked then unchecked' },
+      active: { type: 'boolean', value: true },
+    });
+    await containerRepository.update({
+      ...checkedThenUnchecked,
+      values: { ...checkedThenUnchecked.values, active: { type: 'boolean', value: false } },
+    });
+
+    const equalsFalse = await executePageQuery({
+      parentId: dataSourceId,
+      columns,
+      filters: [{ columnId: 'active', operator: 'equals', value: false }],
+      sorts: [],
+      limit: 50,
+    });
+    const equalsFalseIds = new Set(equalsFalse.pages.map((page) => page.id));
+    expect(equalsFalseIds.has(neverSet.id)).toBeTruthy();
+    expect(equalsFalseIds.has(checkedThenUnchecked.id)).toBeTruthy();
+    expect(equalsFalseIds.has(isTrue.id)).toBeFalsy();
+
+    const equalsTrue = await executePageQuery({
+      parentId: dataSourceId,
+      columns,
+      filters: [{ columnId: 'active', operator: 'equals', value: true }],
+      sorts: [],
+      limit: 50,
+    });
+    const equalsTrueIds = new Set(equalsTrue.pages.map((page) => page.id));
+    expect(equalsTrueIds).toEqual(new Set([isTrue.id]));
+
+    const notEqualsTrue = await executePageQuery({
+      parentId: dataSourceId,
+      columns,
+      filters: [{ columnId: 'active', operator: 'notEquals', value: true }],
+      sorts: [],
+      limit: 50,
+    });
+    const notEqualsTrueIds = new Set(notEqualsTrue.pages.map((page) => page.id));
+    expect(notEqualsTrueIds).toEqual(equalsFalseIds);
+
+    const notEqualsFalse = await executePageQuery({
+      parentId: dataSourceId,
+      columns,
+      filters: [{ columnId: 'active', operator: 'notEquals', value: false }],
+      sorts: [],
+      limit: 50,
+    });
+    const notEqualsFalseIds = new Set(notEqualsFalse.pages.map((page) => page.id));
+    expect(notEqualsFalseIds).toEqual(equalsTrueIds);
+  });
+
   test('treats a never-set column as empty but not non-empty', async () => {
     const noAge = await createTestPage({ title: { type: 'string', value: 'No age set' } });
 

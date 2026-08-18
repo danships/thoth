@@ -43,6 +43,13 @@ export function createSqliteAdapter(): PageQueryEngineAdapter {
       return typeof value === 'boolean' ? (value ? 1 : 0) : value;
     },
 
+    buildBooleanEquals(path: string, value: boolean): SqlFragment {
+      // `json_extract` returns `NULL` when the column was never set (no key in `values`) —
+      // `COALESCE(..., 0)` treats that the same as an explicit `false`, matching the checkbox's
+      // unchecked-by-default UI representation instead of excluding those rows entirely.
+      return { sql: 'COALESCE(json_extract(contents, ?), 0) = ?', params: [path, value ? 1 : 0] };
+    },
+
     buildHasAnyOf(path: string, ids: unknown[]): SqlFragment {
       if (ids.length === 0) {
         return { sql: '0 = 1', params: [] };
