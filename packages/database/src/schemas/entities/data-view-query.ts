@@ -49,7 +49,47 @@ export type SortRule = z.infer<typeof sortRuleSchema>;
 // built-in Name header's drag-and-drop id (THOTH-052, see `layoutItemId` in `data-view-table.tsx`)
 // since a real column id can never literally be `'name'` (column ids are always `randomUUID()`).
 // Filtering on name is out of scope for THOTH-065 — only sorting.
+//
+// `name` is one of three sentinel "fixed `Container` attribute" ids (THOTH-078 adds the other
+// two, `createdAt`/`lastUpdated` below) — a reader looking for how a non-Data-Source-column
+// field is threaded through filtering/sorting should start here.
 export const NAME_SORT_COLUMN_ID = 'name';
+
+// Sentinel `columnId`s for filtering/sorting on a page's own `createdAt`/`lastUpdated`
+// (THOTH-078) — real, indexed columns on the underlying `container` table (see
+// `Container.filterSortFields`), populated automatically by SuperSave on insert/update, not
+// dynamic Data Source columns. Unlike `NAME_SORT_COLUMN_ID`, these are usable for both
+// filtering and sorting, and are also rendered as literal table columns (`kind: 'system'` in
+// `viewColumnLayoutItemSchema`) since — unlike `name` — they have no dedicated table column of
+// their own already.
+export const CREATED_AT_COLUMN_ID = 'createdAt';
+export const LAST_UPDATED_COLUMN_ID = 'lastUpdated';
+export const SYSTEM_COLUMN_IDS = [CREATED_AT_COLUMN_ID, LAST_UPDATED_COLUMN_ID] as const;
+export type SystemColumnId = (typeof SYSTEM_COLUMN_IDS)[number];
+
+// Shared label source for the two system columns — read by both server validation (error
+// messages) and client UI (column headers, Column Manager, Filter/Sort bar) so the display name
+// isn't hardcoded in more than one place.
+export const SYSTEM_COLUMN_DEFINITIONS: Record<SystemColumnId, { name: string }> = {
+  [CREATED_AT_COLUMN_ID]: { name: 'Created' },
+  [LAST_UPDATED_COLUMN_ID]: { name: 'Last updated' },
+};
+
+// Operators valid for a system column (THOTH-078): `createdAt`/`lastUpdated` are always-populated
+// UTC ISO-8601 timestamps, never strings to substring-match or optional fields — `contains`/
+// `notContains`/`hasAnyOf`/`hasAllOf` don't apply, and `isEmpty`/`isNotEmpty` are meaningless
+// (the field is never null) so are intentionally excluded rather than silently always-true/false.
+export const SYSTEM_COLUMN_OPERATORS: readonly FilterOperator[] = ['equals', 'notEquals', 'gt', 'gte', 'lt', 'lte'];
+
+// A system column (`createdAt`/`lastUpdated`) filter's `value` is compared directly against a
+// UTC ISO-8601 `Container` timestamp column in raw SQL (see `buildSystemColumnFilterFragment`),
+// so — unlike a Data Source column, whose `value` type is checked against the column's own
+// `type` at the DB adapter layer — it must be validated here: `filterRuleSchema.value` is a broad
+// union (string | number | boolean | string[]) to accommodate every column type, but only a
+// well-formed ISO timestamp string is ever a meaningful `createdAt`/`lastUpdated` comparand.
+export function isIsoTimestampString(value: unknown): value is string {
+  return typeof value === 'string' && z.iso.datetime({ offset: true }).safeParse(value).success;
+}
 
 // Every operator valid for a given column `type`. Enforced both by `page-query-service.ts`
 // (silently-skip semantics for stale filter/sort rules, per THOTH-037's Edge Cases) and by the

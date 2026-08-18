@@ -4,6 +4,7 @@ import type { SqlFragment } from './types';
 import type { Column } from '@/types/schemas/entities/container';
 import { BadRequestError } from '../../errors/bad-request-error';
 import type { FilterRule } from '@/types/schemas/entities/data-view-query';
+import type { SystemColumnId } from '@/types/schemas/entities/data-view-query';
 
 /** Builds the WHERE-clause SQL fragment for a single filter rule against `column`, delegating
  * every engine-specific dialect difference (JSON extraction, array length, collation, `hasAnyOf`/
@@ -103,4 +104,46 @@ export function buildSortExpression(adapter: PageQueryEngineAdapter, column: Col
  * query. Always string-collated the same way an ordinary `string` column's sort is. */
 export function buildNameSortExpression(adapter: PageQueryEngineAdapter): SqlFragment {
   return { sql: `name${adapter.stringCollation()}`, params: [] };
+}
+
+/** Builds the WHERE-clause SQL fragment for a filter rule against a system column
+ * (`createdAt`/`lastUpdated`, THOTH-078) — a fixed `Container` attribute, not a dynamic Data
+ * Source column. Like `buildNameSortExpression`, this reads the real, indexed table column
+ * directly (see `Container.filterSortFields`) rather than `json_extract`-ing into `contents`.
+ * Values are UTC ISO-8601 strings that sort/compare correctly with plain lexicographic
+ * comparison, so no collation or type cast is needed (unlike `buildFilterFragment`'s string
+ * columns). Only `SYSTEM_COLUMN_OPERATORS` are ever passed in here — validated upstream by
+ * `assertValidFilterSortRules`/`dropStaleRules`. */
+export function buildSystemColumnFilterFragment(systemColumnId: SystemColumnId, filter: FilterRule): SqlFragment {
+  const value = filter.value;
+  switch (filter.operator) {
+    case 'equals': {
+      return { sql: `${systemColumnId} = ?`, params: [value] };
+    }
+    case 'notEquals': {
+      return { sql: `(${systemColumnId} IS NULL OR ${systemColumnId} != ?)`, params: [value] };
+    }
+    case 'gt': {
+      return { sql: `${systemColumnId} > ?`, params: [value] };
+    }
+    case 'gte': {
+      return { sql: `${systemColumnId} >= ?`, params: [value] };
+    }
+    case 'lt': {
+      return { sql: `${systemColumnId} < ?`, params: [value] };
+    }
+    case 'lte': {
+      return { sql: `${systemColumnId} <= ?`, params: [value] };
+    }
+    default: {
+      throw new BadRequestError(`Unsupported filter operator for system column: ${filter.operator as string}`);
+    }
+  }
+}
+
+/** Builds the ORDER-BY expression for sorting by a system column (`createdAt`/`lastUpdated`,
+ * THOTH-078). No collation, unlike `buildNameSortExpression`'s string collation — timestamps
+ * aren't case-sensitive text. */
+export function buildSystemColumnSortExpression(systemColumnId: SystemColumnId): SqlFragment {
+  return { sql: systemColumnId, params: [] };
 }

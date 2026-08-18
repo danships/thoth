@@ -59,7 +59,7 @@ export function NewPageRow({
             />
           </Table.Td>
         ) : (
-          <Table.Td key={item.column.id ?? index} />
+          <Table.Td key={item.kind === 'data' ? item.column.id : (item.columnId ?? index)} />
         )
       )}
       {/* Fixed trailing action-gutter cell — never part of `columnLayout`. */}

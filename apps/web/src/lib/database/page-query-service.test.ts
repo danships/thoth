@@ -4,7 +4,11 @@ import { createTestDatabaseFile } from '../../../tests/helpers/create-test-datab
 
 import type { Column } from '@/types/schemas/entities/container';
 import type { PageContainer } from '@thoth/database/types';
-import { NAME_SORT_COLUMN_ID } from '@/types/schemas/entities/data-view-query';
+import {
+  CREATED_AT_COLUMN_ID,
+  LAST_UPDATED_COLUMN_ID,
+  NAME_SORT_COLUMN_ID,
+} from '@/types/schemas/entities/data-view-query';
 import type { FilterRule, SortRule } from '@/types/schemas/entities/data-view-query';
 
 describe('page-query-service', () => {
@@ -347,6 +351,113 @@ describe('page-query-service', () => {
     expect(() =>
       assertValidFilterSortRules(columns, [], [{ columnId: NAME_SORT_COLUMN_ID, direction: 'asc' }])
     ).not.toThrow();
+  });
+
+  test('filters and sorts by the system createdAt/lastUpdated columns (THOTH-078)', async () => {
+    const parentId = 'system-column-data-source';
+    const older = await createTestPage({ title: { type: 'string', value: 'Older' } });
+    await containerRepository.update({
+      ...older,
+      parentId,
+      createdAt: '2020-01-01T00:00:00.000Z',
+      lastUpdated: '2020-06-01T00:00:00.000Z',
+    });
+    const newer = await createTestPage({ title: { type: 'string', value: 'Newer' } });
+    await containerRepository.update({
+      ...newer,
+      parentId,
+      createdAt: '2022-01-01T00:00:00.000Z',
+      lastUpdated: '2022-06-01T00:00:00.000Z',
+    });
+
+    const ascByCreatedAt = await executePageQuery({
+      parentId,
+      columns,
+      filters: [],
+      sorts: [{ columnId: CREATED_AT_COLUMN_ID, direction: 'asc' }],
+      limit: 50,
+    });
+    expect(ascByCreatedAt.pages.map((page) => page.values?.['title']?.value)).toEqual(['Older', 'Newer']);
+
+    const descByLastUpdated = await executePageQuery({
+      parentId,
+      columns,
+      filters: [],
+      sorts: [{ columnId: LAST_UPDATED_COLUMN_ID, direction: 'desc' }],
+      limit: 50,
+    });
+    expect(descByLastUpdated.pages.map((page) => page.values?.['title']?.value)).toEqual(['Newer', 'Older']);
+
+    const gtFilter = await executePageQuery({
+      parentId,
+      columns,
+      filters: [{ columnId: CREATED_AT_COLUMN_ID, operator: 'gt', value: '2021-01-01T00:00:00.000Z' }],
+      sorts: [],
+      limit: 50,
+    });
+    expect(gtFilter.pages.map((page) => page.values?.['title']?.value)).toEqual(['Newer']);
+
+    const lteFilter = await executePageQuery({
+      parentId,
+      columns,
+      filters: [{ columnId: LAST_UPDATED_COLUMN_ID, operator: 'lte', value: '2020-06-01T00:00:00.000Z' }],
+      sorts: [],
+      limit: 50,
+    });
+    expect(lteFilter.pages.map((page) => page.values?.['title']?.value)).toEqual(['Older']);
+  });
+
+  test('walks cursor pagination across a createdAt sort without duplicates or skips (THOTH-078)', async () => {
+    const parentId = 'system-column-cursor-ds';
+    const timestamps = [
+      '2020-01-01T00:00:00.000Z',
+      '2020-02-01T00:00:00.000Z',
+      '2020-03-01T00:00:00.000Z',
+      '2020-04-01T00:00:00.000Z',
+      '2020-05-01T00:00:00.000Z',
+    ];
+    for (const [index, createdAt] of timestamps.entries()) {
+      const page = await createTestPage({ title: { type: 'string', value: `Page ${index}` } });
+      await containerRepository.update({ ...page, parentId, createdAt });
+    }
+
+    const seen: string[] = [];
+    let cursor: Awaited<ReturnType<typeof executePageQuery>>['nextCursor'] = undefined as unknown as null;
+    let iterations = 0;
+    do {
+      const result = await executePageQuery({
+        parentId,
+        columns,
+        filters: [],
+        sorts: [{ columnId: CREATED_AT_COLUMN_ID, direction: 'asc' }],
+        limit: 2,
+        ...(cursor ? { cursor } : {}),
+      });
+      for (const page of result.pages) {
+        seen.push(page.values?.['title']?.value as string);
+      }
+      cursor = result.nextCursor;
+      iterations += 1;
+    } while (cursor && iterations < 10);
+
+    expect(seen).toEqual(['Page 0', 'Page 1', 'Page 2', 'Page 3', 'Page 4']);
+    expect(new Set(seen).size).toBe(5);
+  });
+
+  test('accepts createdAt/lastUpdated filter/sort rules and rejects an invalid operator against them', () => {
+    expect(() =>
+      assertValidFilterSortRules(
+        columns,
+        [{ columnId: CREATED_AT_COLUMN_ID, operator: 'gt', value: '2020-01-01T00:00:00.000Z' }],
+        [{ columnId: LAST_UPDATED_COLUMN_ID, direction: 'desc' }]
+      )
+    ).not.toThrow();
+    expect(() =>
+      assertValidFilterSortRules(columns, [{ columnId: CREATED_AT_COLUMN_ID, operator: 'contains', value: 'x' }], [])
+    ).toThrow();
+    expect(() =>
+      assertValidFilterSortRules(columns, [{ columnId: LAST_UPDATED_COLUMN_ID, operator: 'isEmpty' }], [])
+    ).toThrow();
   });
 
   test('walks cursor pagination without duplicates or skips', async () => {

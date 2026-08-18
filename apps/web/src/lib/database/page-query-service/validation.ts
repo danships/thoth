@@ -1,23 +1,43 @@
 import { BadRequestError } from '../../errors/bad-request-error';
 import type { Column } from '@/types/schemas/entities/container';
 import {
+  isIsoTimestampString,
   NAME_SORT_COLUMN_ID,
   OPERATORS_BY_COLUMN_TYPE,
+  SYSTEM_COLUMN_IDS,
+  SYSTEM_COLUMN_OPERATORS,
   VALUELESS_OPERATORS,
   type FilterRule,
   type SortRule,
+  type SystemColumnId,
 } from '@/types/schemas/entities/data-view-query';
+
+function isSystemColumnId(columnId: string): columnId is SystemColumnId {
+  return (SYSTEM_COLUMN_IDS as readonly string[]).includes(columnId);
+}
 
 /**
  * Validates that every filter/sort rule's `columnId` exists in `columns` and, for filters, that
  * `operator` is valid for that column's `type`. Throws `BadRequestError` — used by route
  * handlers validating a client-supplied `PATCH /views/:id` body or inline `GET /pages` override,
  * where an invalid rule should fail loudly (400) rather than be silently dropped.
+ *
+ * `createdAt`/`lastUpdated` (THOTH-078) are fixed `Container` attributes, not Data Source
+ * columns, so they're validated against `SYSTEM_COLUMN_OPERATORS` instead of `columns`.
  */
 export function assertValidFilterSortRules(columns: Column[], filters: FilterRule[], sorts: SortRule[]): void {
   const columnsById = new Map(columns.map((column) => [column.id, column]));
 
   for (const filter of filters) {
+    if (isSystemColumnId(filter.columnId)) {
+      if (!SYSTEM_COLUMN_OPERATORS.includes(filter.operator)) {
+        throw new BadRequestError(`Operator "${filter.operator}" is not valid for column "${filter.columnId}"`);
+      }
+      if (!isIsoTimestampString(filter.value)) {
+        throw new BadRequestError(`Filter on column "${filter.columnId}" requires a valid ISO timestamp value`);
+      }
+      continue;
+    }
     const column = columnsById.get(filter.columnId);
     if (!column) {
       throw new BadRequestError(`Unknown columnId in filter: ${filter.columnId}`);
@@ -34,9 +54,9 @@ export function assertValidFilterSortRules(columns: Column[], filters: FilterRul
   }
 
   for (const sort of sorts) {
-    // `NAME_SORT_COLUMN_ID` sorts on the page's own `name` attribute (THOTH-065), not a Data
-    // Source column, so it's always valid regardless of `columns`.
-    if (sort.columnId !== NAME_SORT_COLUMN_ID && !columnsById.has(sort.columnId)) {
+    // `NAME_SORT_COLUMN_ID`/system column ids sort on a fixed `Container` attribute (THOTH-065/
+    // THOTH-078), not a Data Source column, so they're always valid regardless of `columns`.
+    if (sort.columnId !== NAME_SORT_COLUMN_ID && !isSystemColumnId(sort.columnId) && !columnsById.has(sort.columnId)) {
       throw new BadRequestError(`Unknown columnId in sort: ${sort.columnId}`);
     }
   }
@@ -58,6 +78,18 @@ export function dropStaleRules(
   const validFilters: FilterRule[] = [];
   const droppedFilters: FilterRule[] = [];
   for (const filter of filters) {
+    // System-column rules (THOTH-078) are never stale — the field always exists on every
+    // `Container` — but an invalid operator or malformed persisted timestamp value (e.g. after
+    // a hand-crafted persisted rule) still degrades to "ignored", mirroring the type-mismatch
+    // case for a real column below.
+    if (isSystemColumnId(filter.columnId)) {
+      if (SYSTEM_COLUMN_OPERATORS.includes(filter.operator) && isIsoTimestampString(filter.value)) {
+        validFilters.push(filter);
+      } else {
+        droppedFilters.push(filter);
+      }
+      continue;
+    }
     const column = columnsById.get(filter.columnId);
     if (column && OPERATORS_BY_COLUMN_TYPE[column.type].includes(filter.operator)) {
       validFilters.push(filter);
@@ -69,7 +101,7 @@ export function dropStaleRules(
   const validSorts: SortRule[] = [];
   const droppedSorts: SortRule[] = [];
   for (const sort of sorts) {
-    if (sort.columnId === NAME_SORT_COLUMN_ID || columnsById.has(sort.columnId)) {
+    if (sort.columnId === NAME_SORT_COLUMN_ID || isSystemColumnId(sort.columnId) || columnsById.has(sort.columnId)) {
       validSorts.push(sort);
     } else {
       droppedSorts.push(sort);

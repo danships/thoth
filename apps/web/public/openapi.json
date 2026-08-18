@@ -5691,6 +5691,31 @@
                                       "visible"
                                     ],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "system"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "enum": [
+                                          "createdAt",
+                                          "lastUpdated"
+                                        ]
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -5990,6 +6015,31 @@
                                       "visible"
                                     ],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "system"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "enum": [
+                                          "createdAt",
+                                          "lastUpdated"
+                                        ]
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -6256,6 +6306,31 @@
                                       "visible"
                                     ],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "system"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "enum": [
+                                          "createdAt",
+                                          "lastUpdated"
+                                        ]
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -6487,6 +6562,30 @@
                                 "columnId": {
                                   "type": "string",
                                   "minLength": 1
+                                },
+                                "visible": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "columnId",
+                                "visible"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "const": "system"
+                                },
+                                "columnId": {
+                                  "type": "string",
+                                  "enum": [
+                                    "createdAt",
+                                    "lastUpdated"
+                                  ]
                                 },
                                 "visible": {
                                   "type": "boolean"
@@ -6784,6 +6883,31 @@
                                       "visible"
                                     ],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "system"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "enum": [
+                                          "createdAt",
+                                          "lastUpdated"
+                                        ]
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -7061,6 +7185,31 @@
                                       "columnId": {
                                         "type": "string",
                                         "minLength": 1
+                                      },
+                                      "visible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "columnId",
+                                      "visible"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "system"
+                                      },
+                                      "columnId": {
+                                        "type": "string",
+                                        "enum": [
+                                          "createdAt",
+                                          "lastUpdated"
+                                        ]
                                       },
                                       "visible": {
                                         "type": "boolean"
@@ -16351,6 +16500,31 @@
                         "columnId": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "visible": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "columnId",
+                        "visible"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "system"
+                        },
+                        "columnId": {
+                          "type": "string",
+                          "enum": [
+                            "createdAt",
+                            "lastUpdated"
+                          ]
                         },
                         "visible": {
                           "type": "boolean"

@@ -21,6 +21,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { markDragEnded } from '@/lib/dnd/suppress-click-after-drag';
 import { resolveDataViewColumnLayout, type ResolvedColumnLayout } from '@/lib/data-view/column-layout';
+import { SYSTEM_COLUMN_DEFINITIONS } from '@/types/schemas/entities/data-view-query';
 import type { Column } from '@/types/schemas/entities/container';
 import type { ViewColumnLayoutItem } from '@/types/schemas/entities/data-view';
 
@@ -31,19 +32,27 @@ type ManagerItem = {
 };
 
 function toManagerItems(layout: ResolvedColumnLayout['all']): ManagerItem[] {
-  return layout.map((item) =>
-    item.kind === 'name'
-      ? { id: 'name', label: 'Name', visible: item.visible }
-      : { id: item.column.id, label: item.column.name, visible: item.visible }
-  );
+  return layout.map((item) => {
+    if (item.kind === 'name') {
+      return { id: 'name', label: 'Name', visible: item.visible };
+    }
+    if (item.kind === 'system') {
+      return { id: item.columnId, label: SYSTEM_COLUMN_DEFINITIONS[item.columnId].name, visible: item.visible };
+    }
+    return { id: item.column.id, label: item.column.name, visible: item.visible };
+  });
 }
 
 function toLayoutItems(items: ManagerItem[]): ViewColumnLayoutItem[] {
-  return items.map((item) =>
-    item.id === 'name'
-      ? { kind: 'name', visible: item.visible }
-      : { kind: 'data', columnId: item.id, visible: item.visible }
-  );
+  return items.map((item) => {
+    if (item.id === 'name') {
+      return { kind: 'name', visible: item.visible };
+    }
+    if (item.id === 'createdAt' || item.id === 'lastUpdated') {
+      return { kind: 'system', columnId: item.id, visible: item.visible };
+    }
+    return { kind: 'data', columnId: item.id, visible: item.visible };
+  });
 }
 
 type SortableManagerRowProperties = {

@@ -50,6 +50,7 @@ import type { Column } from '@/types/schemas/entities/container';
 import type { SelectColor } from '@/types/schemas/entities/container';
 import type { ViewColumnLayoutItem } from '@/types/schemas/entities/data-view';
 import type { FilterRule, SortRule } from '@/types/schemas/entities/data-view-query';
+import { SYSTEM_COLUMN_DEFINITIONS } from '@/types/schemas/entities/data-view-query';
 import {
   GET_PAGES_ENDPOINT,
   type CreateDataSourceColumnBody,
@@ -106,7 +107,13 @@ function computeReorder(sourcePages: GetPagesResponse | undefined, activeId: str
 }
 
 function layoutItemId(item: ResolvedColumnLayoutItem): string {
-  return item.kind === 'name' ? 'name' : item.column.id;
+  if (item.kind === 'name') {
+    return 'name';
+  }
+  if (item.kind === 'system') {
+    return item.columnId;
+  }
+  return item.column.id;
 }
 
 // Moves `activeId` next to `overId` within the *complete* layout (including hidden items),
@@ -239,7 +246,9 @@ export function DataViewTable({
   const legacyPagesKey = `${GET_PAGES_ENDPOINT}?dataSourceId=${dataSourceId}&includeValues=true`;
 
   const effectiveLayout = pendingLayout ?? layout;
-  const visibleDataCount = effectiveLayout.visible.filter((item) => item.kind === 'data').length;
+  const visibleDataCount = effectiveLayout.visible.filter(
+    (item) => item.kind === 'data' || item.kind === 'system'
+  ).length;
   const nameVisible = effectiveLayout.visible.some((item) => item.kind === 'name');
 
   // Kept in sync via effect (not a plain during-render assignment — banned by the
@@ -627,6 +636,16 @@ export function DataViewTable({
                         id="name"
                         label="Name"
                         style={visibleDataCount > 0 ? { width: '30%', maxWidth: 260 } : undefined}
+                        disabled={columnLayoutSaving}
+                      />
+                    ) : item.kind === 'system' ? (
+                      // Read-only (THOTH-078) — no `ColumnHeaderActions`: hiding happens only via
+                      // the Column Manager's visibility toggle, same as how Name has no header
+                      // actions either.
+                      <SortableDataViewColumnHeader
+                        key={item.columnId}
+                        id={item.columnId}
+                        label={SYSTEM_COLUMN_DEFINITIONS[item.columnId].name}
                         disabled={columnLayoutSaving}
                       />
                     ) : (

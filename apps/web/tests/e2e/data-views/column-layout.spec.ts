@@ -351,4 +351,51 @@ test.describe('Data View column layout', () => {
     await expect(headers.nth(1)).toContainText('Name');
     await expect(headers.nth(2)).toContainText('Beta');
   });
+
+  // THOTH-078: `createdAt`/`lastUpdated` are built-in, read-only system columns available
+  // through the same Columns manager, hidden by default on any pre-existing view.
+  test.describe('system columns (createdAt/lastUpdated)', () => {
+    test('are listed in the Columns manager, hidden by default', async ({ page }) => {
+      await openColumnLayoutView(page);
+
+      await page.getByTestId('open-column-manager').click();
+      await expect(page.getByTestId('column-manager-visible-createdAt')).not.toBeChecked();
+      await expect(page.getByTestId('column-manager-visible-lastUpdated')).not.toBeChecked();
+      await expect(page.getByTestId('column-manager-row-createdAt')).toContainText('Created');
+      await expect(page.getByTestId('column-manager-row-lastUpdated')).toContainText('Last updated');
+    });
+
+    test('toggling Created visible renders a read-only, formatted-date column with no header actions', async ({
+      page,
+    }) => {
+      await openColumnLayoutView(page);
+
+      await page.getByTestId('open-column-manager').click();
+      await page.getByTestId('column-manager-visible-createdAt').click();
+      const [patchResponse] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().includes(`/api/v1/views/${SEED.columnLayout.dataView.id}`) &&
+            response.request().method() === 'PATCH'
+        ),
+        page.getByTestId('column-manager-apply').click(),
+      ]);
+      expect(patchResponse.ok()).toBe(true);
+
+      await expect(page.getByTestId('column-header-createdAt')).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByTestId('column-header-createdAt')).toContainText('Created');
+      // Read-only: no per-header actions menu, unlike a real Data Source column (e.g. "Alpha
+      // column actions").
+      await expect(page.getByRole('button', { name: 'Created column actions' })).toHaveCount(0);
+
+      // Row cells render a formatted date/time (`DD MMM YYYY HH:mm`), never a bare ISO string.
+      const row = page.getByRole('row').filter({ hasText: SEED.columnLayout.rows[0]!.name });
+      await expect(row.getByText(/\d{2} \w{3} \d{4} \d{2}:\d{2}/)).toBeVisible();
+
+      // Reload to confirm the visibility toggle was actually persisted.
+      await page.reload();
+      await expect(page.getByRole('table')).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByTestId('column-header-createdAt')).toBeVisible();
+    });
+  });
 });

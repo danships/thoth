@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from 'vitest';
-import { getBaseUrl, getOwnerClient, SEED, createAnonymousClient } from '../../support/fixtures';
+import { getBaseUrl, getData, getOwnerClient, SEED, createAnonymousClient } from '../../support/fixtures';
 import type { ApiClient } from '../../support/fixtures';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -772,5 +772,193 @@ describe('Data View filter/sort API', () => {
       });
       expect(response.status).toBe(400);
     });
+  });
+
+  // ── System columns: createdAt/lastUpdated (THOTH-078) ──────────────────────
+
+  describe('system columns (createdAt/lastUpdated)', () => {
+    test('filtering by createdAt gt an old threshold matches every seeded row', async () => {
+      const client = await getOwnerClient(getBaseUrl());
+      const result = await queryView(client, {
+        filters: [{ columnId: 'createdAt', operator: 'gt', value: '2000-01-01T00:00:00.000Z' }],
+      });
+      expect(pageIds(result).length).toBe(fs.rows.length);
+    });
+
+    test('filtering by lastUpdated lt an old threshold matches nothing', async () => {
+      const client = await getOwnerClient(getBaseUrl());
+      const result = await queryView(client, {
+        filters: [{ columnId: 'lastUpdated', operator: 'lt', value: '2000-01-01T00:00:00.000Z' }],
+      });
+      expect(pageIds(result).length).toBe(0);
+    });
+
+    test('sorting by createdAt does not error and returns every seeded row', async () => {
+      const client = await getOwnerClient(getBaseUrl());
+      const result = await queryView(client, {
+        sorts: [{ columnId: 'createdAt', direction: 'desc' }],
+      });
+      expect(pageIds(result).length).toBe(fs.rows.length);
+    });
+
+    test('PATCH /views/:id accepts filters/sorts referencing createdAt/lastUpdated', async () => {
+      const client = await getOwnerClient(getBaseUrl());
+      const response = await client.patch(`/api/v1/views/${VIEW_ID}`, {
+        filters: [{ columnId: 'createdAt', operator: 'gte', value: '2000-01-01T00:00:00.000Z' }],
+        sorts: [{ columnId: 'lastUpdated', direction: 'asc' }],
+      });
+      expect(response.status).toBe(200);
+      const view = await getData<{ filters: unknown[]; sorts: unknown[] }>(response);
+      expect(view.filters).toEqual([{ columnId: 'createdAt', operator: 'gte', value: '2000-01-01T00:00:00.000Z' }]);
+      expect(view.sorts).toEqual([{ columnId: 'lastUpdated', direction: 'asc' }]);
+    });
+
+    test('an invalid operator against a system column returns 400 via PATCH /views/:id', async () => {
+      const client = await getOwnerClient(getBaseUrl());
+      const response = await client.patch(`/api/v1/views/${VIEW_ID}`, {
+        filters: [{ columnId: 'createdAt', operator: 'contains', value: 'x' }],
+      });
+      expect(response.status).toBe(400);
+    });
+
+    test('an invalid operator against a system column returns 400 via inline GET /pages filter', async () => {
+      const client = await getOwnerClient(getBaseUrl());
+      const response = await client.get('/api/v1/pages', {
+        params: {
+          viewId: VIEW_ID,
+          filters: JSON.stringify([{ columnId: 'lastUpdated', operator: 'isEmpty' }]),
+        },
+      });
+      expect(response.status).toBe(400);
+    });
+
+    test("createdAt/lastUpdated appear as hidden system columns in a fresh view's columnLayout", async () => {
+      const client = await getOwnerClient(getBaseUrl());
+      const response = await client.get(`/api/v1/views/${VIEW_ID}`);
+      expect(response.status).toBe(200);
+      const view = await getData<{ columnLayout: { kind: string; columnId?: string; visible: boolean }[] | null }>(
+        response
+      );
+      // `columnLayout` may be `null` (never explicitly saved) — either way, once resolved
+      // client-side via `resolveDataViewColumnLayout`, both system columns are present, hidden.
+      // Here we only assert that if a layout has been persisted (by an earlier test in this
+      // file that calls `PATCH .../columnLayout`), it never already contains a visible-by-default
+      // system column entry that wasn't explicitly requested.
+      if (view.columnLayout) {
+        for (const item of view.columnLayout) {
+          if (item.kind === 'system') {
+            expect(['createdAt', 'lastUpdated']).toContain(item.columnId);
+          }
+        }
+      }
+    });
+  });
+});
+
+// ── Deterministic ordering with distinct timestamps ─────────────────────────
+//
+// `SEED.filterSort`'s rows are all seeded in one batch and share the same `createdAt`/
+// `lastUpdated` (see `scripts/end-to-end-seed.ts`), so they can't assert a specific sort order.
+// This self-contained suite creates its own workspace/data source/view/pages sequentially via
+// the API (each `POST /api/v1/pages` call stamps its own `createdAt`), giving genuinely distinct,
+// strictly-increasing timestamps to assert against.
+
+async function createWorkspace(client: ApiClient, name: string) {
+  const response = await client.post('/api/v1/workspaces', { name });
+  expect(response.ok).toBe(true);
+  return getData<{ id: string }>(response);
+}
+
+async function createTimestampedPage(
+  client: ApiClient,
+  data: { name: string; workspaceId?: string; parentId?: string | null }
+) {
+  const response = await client.post('/api/v1/pages', {
+    emoji: null,
+    parentId: data.parentId ?? null,
+    ...data,
+  });
+  expect(response.ok).toBe(true);
+  return getData<{ id: string; createdAt: string }>(response);
+}
+
+// Sleeps past `createdAt`'s storage resolution (millisecond, per `Date.toISOString()`) so a
+// creation immediately following a fast prior `POST /api/v1/pages` never ties on the same
+// timestamp — a tie would fall through to `id asc` as the query's tiebreaker (see
+// `executePageQuery`), and UUID order doesn't reflect creation order, making the assertions
+// below flaky.
+async function waitPastTimestampResolution(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 5));
+}
+
+async function createDataSource(client: ApiClient, workspaceId: string, name: string) {
+  const response = await client.post('/api/v1/data-sources', {
+    workspaceId,
+    name,
+    columns: [{ name: 'Title', type: 'string' }],
+  });
+  expect(response.ok).toBe(true);
+  return getData<{ id: string }>(response);
+}
+
+async function createTimestampView(
+  client: ApiClient,
+  data: { name: string; workspaceId: string; dataSourceId: string; pageId: string }
+) {
+  const response = await client.post('/api/v1/views', data);
+  expect(response.ok).toBe(true);
+  return getData<{ id: string }>(response);
+}
+
+describe('system column sort ordering with distinct timestamps (THOTH-078)', () => {
+  test('sorts rows by createdAt ascending/descending in genuine creation order', async () => {
+    const client = await getOwnerClient(getBaseUrl());
+    const unique = Date.now();
+    const workspace = await createWorkspace(client, `THOTH-078 System Columns ${unique}`);
+    const hostPage = await createTimestampedPage(client, { name: `Host ${unique}`, workspaceId: workspace.id });
+    const dataSource = await createDataSource(client, workspace.id, `Data Source ${unique}`);
+    const view = await createTimestampView(client, {
+      name: `View ${unique}`,
+      workspaceId: workspace.id,
+      dataSourceId: dataSource.id,
+      pageId: hostPage.id,
+    });
+
+    const first = await createTimestampedPage(client, {
+      name: 'First',
+      parentId: dataSource.id,
+      workspaceId: workspace.id,
+    });
+    await waitPastTimestampResolution();
+    const second = await createTimestampedPage(client, {
+      name: 'Second',
+      parentId: dataSource.id,
+      workspaceId: workspace.id,
+    });
+    await waitPastTimestampResolution();
+    const third = await createTimestampedPage(client, {
+      name: 'Third',
+      parentId: dataSource.id,
+      workspaceId: workspace.id,
+    });
+
+    // Guard the test's own premise: if these ever tie, the assertions below would be
+    // meaningless regardless of the sort implementation's correctness.
+    expect(first.createdAt < second.createdAt).toBe(true);
+    expect(second.createdAt < third.createdAt).toBe(true);
+
+    const ascResponse = await client.get('/api/v1/pages', {
+      params: { viewId: view.id, sorts: JSON.stringify([{ columnId: 'createdAt', direction: 'asc' }]) },
+    });
+    expect(ascResponse.status).toBe(200);
+    const ascResult = await ascResponse.json<PaginatedResponse>();
+    expect(ascResult.data.map((entry) => entry.page.id)).toEqual([first.id, second.id, third.id]);
+
+    const descResponse = await client.get('/api/v1/pages', {
+      params: { viewId: view.id, sorts: JSON.stringify([{ columnId: 'lastUpdated', direction: 'desc' }]) },
+    });
+    expect(descResponse.status).toBe(200);
+    const descResult = await descResponse.json<PaginatedResponse>();
+    expect(descResult.data.map((entry) => entry.page.id)).toEqual([third.id, second.id, first.id]);
   });
 });
