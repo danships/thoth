@@ -22,9 +22,34 @@ import {
   SYSTEM_COLUMN_OPERATORS,
   type SystemColumnId,
 } from '@/types/schemas/entities/data-view-query';
-import { toInputValue, toIsoFromInput } from '@/lib/data-source/date-format';
 import type { Column } from '@/types/schemas/entities/container';
 import type { FilterOperator, FilterRule, SortDirection, SortRule } from '@/types/schemas/entities/data-view-query';
+
+// Millisecond-precision counterparts to `@/lib/data-source/date-format`'s `toInputValue`/
+// `toIsoFromInput` (which are minute-precision for `datetime` mode, matching `date` Column
+// display presets) — used only for the `createdAt`/`lastUpdated` system-column filter input,
+// whose stored value is a full-precision `Date.toISOString()` timestamp (see `FilterValueInput`
+// below for the full rationale).
+function toSystemColumnInputValue(iso: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}`;
+}
+
+function fromSystemColumnInputValue(inputValue: string): string {
+  if (!inputValue) return '';
+  const date = new Date(inputValue);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString();
+}
 
 // Human-readable labels for every operator supported by `OPERATORS_BY_COLUMN_TYPE` (see
 // `page-query-service.ts`). Kept here rather than in the schema module since it's presentation
@@ -114,13 +139,22 @@ function FilterValueInput({
   // `createdAt`/`lastUpdated` (THOTH-078) are fixed `Container` attributes, not a `date` Column
   // (which requires per-column `mode`/`displayFormat` these fields don't have) — a dedicated
   // date/time picker rather than reusing `EditableDateCell`'s `Column`-driven rendering path.
+  //
+  // Unlike a `date` Column's `datetime` mode (which is minute-precision by design, matching its
+  // `DATETIME_PRESETS` display formats), `createdAt`/`lastUpdated` are stored with millisecond
+  // precision (`Date.toISOString()`). `toInputValue`/`toIsoFromInput`'s `datetime` mode truncates
+  // to `YYYY-MM-DDTHH:mm`, which would silently drop seconds/milliseconds from an `equals`/
+  // `notEquals` filter's value, making it unable to ever match. Render/parse with full
+  // second+millisecond precision here instead, with a matching `step` so the native picker
+  // exposes that precision.
   if (systemColumnId) {
     const isoValue = typeof rule.value === 'string' ? rule.value : '';
     return (
       <input
         type="datetime-local"
-        value={isoValue ? toInputValue(isoValue, 'datetime') : ''}
-        onChange={(event) => onChange(toIsoFromInput(event.target.value, 'datetime'))}
+        step="0.001"
+        value={isoValue ? toSystemColumnInputValue(isoValue) : ''}
+        onChange={(event) => onChange(fromSystemColumnInputValue(event.target.value))}
         style={{ height: 30, fontSize: 'var(--mantine-font-size-xs)' }}
       />
     );

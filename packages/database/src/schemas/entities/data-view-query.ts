@@ -81,6 +81,16 @@ export const SYSTEM_COLUMN_DEFINITIONS: Record<SystemColumnId, { name: string }>
 // (the field is never null) so are intentionally excluded rather than silently always-true/false.
 export const SYSTEM_COLUMN_OPERATORS: readonly FilterOperator[] = ['equals', 'notEquals', 'gt', 'gte', 'lt', 'lte'];
 
+// A system column (`createdAt`/`lastUpdated`) filter's `value` is compared directly against a
+// UTC ISO-8601 `Container` timestamp column in raw SQL (see `buildSystemColumnFilterFragment`),
+// so — unlike a Data Source column, whose `value` type is checked against the column's own
+// `type` at the DB adapter layer — it must be validated here: `filterRuleSchema.value` is a broad
+// union (string | number | boolean | string[]) to accommodate every column type, but only a
+// well-formed ISO timestamp string is ever a meaningful `createdAt`/`lastUpdated` comparand.
+export function isIsoTimestampString(value: unknown): value is string {
+  return typeof value === 'string' && z.iso.datetime({ offset: true }).safeParse(value).success;
+}
+
 // Every operator valid for a given column `type`. Enforced both by `page-query-service.ts`
 // (silently-skip semantics for stale filter/sort rules, per THOTH-037's Edge Cases) and by the
 // API route handlers (which instead throw `BadRequestError` for the *same* invalid combinations

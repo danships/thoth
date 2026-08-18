@@ -809,9 +809,7 @@ describe('Data View filter/sort API', () => {
       });
       expect(response.status).toBe(200);
       const view = await getData<{ filters: unknown[]; sorts: unknown[] }>(response);
-      expect(view.filters).toEqual([
-        { columnId: 'createdAt', operator: 'gte', value: '2000-01-01T00:00:00.000Z' },
-      ]);
+      expect(view.filters).toEqual([{ columnId: 'createdAt', operator: 'gte', value: '2000-01-01T00:00:00.000Z' }]);
       expect(view.sorts).toEqual([{ columnId: 'lastUpdated', direction: 'asc' }]);
     });
 
@@ -834,7 +832,7 @@ describe('Data View filter/sort API', () => {
       expect(response.status).toBe(400);
     });
 
-    test('createdAt/lastUpdated appear as hidden system columns in a fresh view\'s columnLayout', async () => {
+    test("createdAt/lastUpdated appear as hidden system columns in a fresh view's columnLayout", async () => {
       const client = await getOwnerClient(getBaseUrl());
       const response = await client.get(`/api/v1/views/${VIEW_ID}`);
       expect(response.status).toBe(200);
@@ -884,6 +882,15 @@ async function createTimestampedPage(
   return getData<{ id: string; createdAt: string }>(response);
 }
 
+// Sleeps past `createdAt`'s storage resolution (millisecond, per `Date.toISOString()`) so a
+// creation immediately following a fast prior `POST /api/v1/pages` never ties on the same
+// timestamp — a tie would fall through to `id asc` as the query's tiebreaker (see
+// `executePageQuery`), and UUID order doesn't reflect creation order, making the assertions
+// below flaky.
+async function waitPastTimestampResolution(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 5));
+}
+
 async function createDataSource(client: ApiClient, workspaceId: string, name: string) {
   const response = await client.post('/api/v1/data-sources', {
     workspaceId,
@@ -922,16 +929,23 @@ describe('system column sort ordering with distinct timestamps (THOTH-078)', () 
       parentId: dataSource.id,
       workspaceId: workspace.id,
     });
+    await waitPastTimestampResolution();
     const second = await createTimestampedPage(client, {
       name: 'Second',
       parentId: dataSource.id,
       workspaceId: workspace.id,
     });
+    await waitPastTimestampResolution();
     const third = await createTimestampedPage(client, {
       name: 'Third',
       parentId: dataSource.id,
       workspaceId: workspace.id,
     });
+
+    // Guard the test's own premise: if these ever tie, the assertions below would be
+    // meaningless regardless of the sort implementation's correctness.
+    expect(first.createdAt < second.createdAt).toBe(true);
+    expect(second.createdAt < third.createdAt).toBe(true);
 
     const ascResponse = await client.get('/api/v1/pages', {
       params: { viewId: view.id, sorts: JSON.stringify([{ columnId: 'createdAt', direction: 'asc' }]) },

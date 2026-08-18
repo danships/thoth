@@ -1,6 +1,7 @@
 import { BadRequestError } from '../../errors/bad-request-error';
 import type { Column } from '@/types/schemas/entities/container';
 import {
+  isIsoTimestampString,
   NAME_SORT_COLUMN_ID,
   OPERATORS_BY_COLUMN_TYPE,
   SYSTEM_COLUMN_IDS,
@@ -32,8 +33,8 @@ export function assertValidFilterSortRules(columns: Column[], filters: FilterRul
       if (!SYSTEM_COLUMN_OPERATORS.includes(filter.operator)) {
         throw new BadRequestError(`Operator "${filter.operator}" is not valid for column "${filter.columnId}"`);
       }
-      if (filter.value === undefined) {
-        throw new BadRequestError(`Filter on column "${filter.columnId}" requires a value`);
+      if (!isIsoTimestampString(filter.value)) {
+        throw new BadRequestError(`Filter on column "${filter.columnId}" requires a valid ISO timestamp value`);
       }
       continue;
     }
@@ -78,10 +79,11 @@ export function dropStaleRules(
   const droppedFilters: FilterRule[] = [];
   for (const filter of filters) {
     // System-column rules (THOTH-078) are never stale — the field always exists on every
-    // `Container` — but an invalid operator (e.g. after a hand-crafted persisted rule) still
-    // degrades to "ignored", mirroring the type-mismatch case for a real column below.
+    // `Container` — but an invalid operator or malformed persisted timestamp value (e.g. after
+    // a hand-crafted persisted rule) still degrades to "ignored", mirroring the type-mismatch
+    // case for a real column below.
     if (isSystemColumnId(filter.columnId)) {
-      if (SYSTEM_COLUMN_OPERATORS.includes(filter.operator)) {
+      if (SYSTEM_COLUMN_OPERATORS.includes(filter.operator) && isIsoTimestampString(filter.value)) {
         validFilters.push(filter);
       } else {
         droppedFilters.push(filter);
