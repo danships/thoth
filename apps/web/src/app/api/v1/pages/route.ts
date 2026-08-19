@@ -10,7 +10,7 @@ import {
   filterContainersByGrantForSession,
   memberToAccessGrant,
 } from '@/lib/auth/access-grant';
-import { getMinSiblingSortOrder, sortByManualOrder } from '@/lib/database/sort-order-service';
+import { getMaxSiblingSortOrder, getMinSiblingSortOrder, sortByManualOrder } from '@/lib/database/sort-order-service';
 import { excludePrivateContainers } from '@/lib/database/page-visibility-service';
 import { generateKeyBetween } from 'fractional-indexing';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
@@ -388,6 +388,7 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
 
     let workspaceId: string;
     let parentId: string | null = null;
+    let parentType: 'page' | 'data-source' | null = null;
 
     if (body.parentId) {
       // Derive the workspace from the parent entity rather than trusting a client-supplied
@@ -416,6 +417,7 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
 
       workspaceId = parentContainer.workspaceId;
       parentId = body.parentId;
+      parentType = parentContainer.type;
     } else {
       // Root-level page: no existing entity to derive the workspace from — enforce write
       // permission against the caller's own workspace-level grant instead (THOTH-042), so a
@@ -433,11 +435,14 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
     }
 
     // Only parented pages (child pages, data-source rows) are manually ordered (THOTH-036) —
-    // root pages (`parentId === null`) keep `sortOrder: null`. New parented pages always land
-    // at the top of their sibling group, so the most recently added row is immediately visible
-    // without scrolling.
+    // root pages (`parentId === null`) keep `sortOrder: null`. Nested child pages prepend so
+    // they are immediately visible, while data-source rows append to match the table's bottom
+    // "New page name" input.
     let sortOrder: string | null = null;
-    if (parentId) {
+    if (parentId && parentType === 'data-source') {
+      const maxSiblingSortOrder = await getMaxSiblingSortOrder(workspaceId, parentId);
+      sortOrder = generateKeyBetween(maxSiblingSortOrder, null);
+    } else if (parentId) {
       const minSiblingSortOrder = await getMinSiblingSortOrder(workspaceId, parentId);
       sortOrder = generateKeyBetween(null, minSiblingSortOrder);
     }

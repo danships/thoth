@@ -44,26 +44,27 @@ export function sortByManualOrder<T extends { id: string; sortOrder?: string | n
 
 /**
  * Returns the lexicographically-largest `sortOrder` key currently in use within a sibling
- * group (`workspaceId` + `parentId`), or `null` if the group is empty. Used as the shared
- * "max sibling key" helper reused by the reorder rebalance path (THOTH-036).
+ * group (`workspaceId` + `parentId`), or `null` if the group is empty. Used to mint an
+ * end-of-list key for pages parented to a data source (`generateKeyBetween(max, null)`).
+ *
+ * Computed in application code (fetch + `sortByManualOrder`) rather than a DB-level
+ * `sort('sortOrder', 'desc')`, because SuperSave's SQLite adapter sorts text columns with
+ * `COLLATE NOCASE`, which disagrees with `fractional-indexing`'s case-sensitive byte ordering.
  */
 export async function getMaxSiblingSortOrder(workspaceId: string, parentId: string): Promise<string | null> {
   const containerRepository = await getContainerRepository();
-  const lastSibling = await containerRepository.getOneByQuery(
-    addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId)
-      .eq('parentId', parentId)
-      .sort('sortOrder', 'desc')
-      .limit(1)
+  const siblings = await containerRepository.getByQuery(
+    addWorkspaceIdToQuery(containerRepository.createQuery(), workspaceId).eq('parentId', parentId)
   );
-
-  return lastSibling?.sortOrder ?? null;
+  const orderedWithKeys = sortByManualOrder(siblings).filter((sibling) => sibling.sortOrder != null);
+  return orderedWithKeys.at(-1)?.sortOrder ?? null;
 }
 
 /**
  * Returns the `sortOrder` of the sibling that currently sorts first (per `sortByManualOrder`)
  * within a sibling group (`workspaceId` + `parentId`), or `null` if the group is empty. Used to
- * mint a start-of-list key for newly created pages (`generateKeyBetween(null, min)`) — new
- * pages are added to the top of their sibling group, not the bottom.
+ * mint a start-of-list key for pages parented to another page (`generateKeyBetween(null, min)`).
+ * Data-source rows instead use `getMaxSiblingSortOrder` to append at the bottom.
  *
  * Computed in application code (fetch + `sortByManualOrder`) rather than a DB-level
  * `sort('sortOrder', 'asc')`, because SuperSave's SQLite adapter sorts text columns with
