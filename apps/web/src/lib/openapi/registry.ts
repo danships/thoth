@@ -145,6 +145,7 @@ export const operations = [
     params: api.movePageParametersSchema,
     body: api.movePageBodySchema,
     response: api.movePageResponseSchema,
+    successStatus: 200,
     errorStatuses: [400, 403, 404, 409],
   },
   {

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api/client';
 import type { Page } from '@/types/api';
 
-type Props = {
+type PageParentActionModalProperties = {
   action: 'copy' | 'move';
   source: Page;
   opened: boolean;
@@ -15,7 +15,13 @@ type Props = {
 };
 type Choice = { id: string | null; name: string; path?: string[]; isPrivate?: boolean };
 
-export function PageParentActionModal({ action, source, opened, onClose, onCompleted }: Props) {
+export function PageParentActionModal({
+  action,
+  source,
+  opened,
+  onClose,
+  onCompleted,
+}: PageParentActionModalProperties) {
   const combobox = useCombobox();
   const [query, setQuery] = useState('');
   const [choices, setChoices] = useState<Choice[]>([]);
@@ -23,12 +29,15 @@ export function PageParentActionModal({ action, source, opened, onClose, onCompl
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => {
-    if (!opened) return;
-    setQuery('');
-    setSelected(null);
-    setError('');
-  }, [opened]);
+  const [wasOpened, setWasOpened] = useState(opened);
+  if (opened !== wasOpened) {
+    setWasOpened(opened);
+    if (opened) {
+      setQuery('');
+      setSelected(null);
+      setError('');
+    }
+  }
   useEffect(() => {
     if (!opened) return;
     const timer = setTimeout(() => {
@@ -84,8 +93,8 @@ export function PageParentActionModal({ action, source, opened, onClose, onCompl
           : await api.pages.move(source.id, { parentId: selected.id, expectedParentId: source.parentId });
       onCompleted(response.data.data.page);
       onClose();
-    } catch (caught: unknown) {
-      const status = (caught as { response?: { status?: number } }).response?.status;
+    } catch (error_: unknown) {
+      const status = (error_ as { response?: { status?: number } }).response?.status;
       setError(
         status === 409
           ? 'This page was moved elsewhere. Close and try again.'
@@ -106,7 +115,7 @@ export function PageParentActionModal({ action, source, opened, onClose, onCompl
     >
       <Text size="sm" mb="sm">
         {action === 'copy'
-          ? 'Copies this page’s content only. The copy follows its destination privacy.'
+          ? 'Creates a copy under the selected parent. The copy follows its destination privacy.'
           : 'Moving carries this page and its sub-pages.'}
       </Text>
       <Combobox
@@ -133,15 +142,13 @@ export function PageParentActionModal({ action, source, opened, onClose, onCompl
         </Combobox.Target>
         <Combobox.Dropdown>
           <Combobox.Options>
-            {loading ? (
+            {loading && (
               <Combobox.Empty>
                 <Loader size="xs" />
               </Combobox.Empty>
-            ) : options.length ? (
-              options
-            ) : (
-              <Combobox.Empty>No matching pages</Combobox.Empty>
             )}
+            {!loading && options.length > 0 && options}
+            {!loading && options.length === 0 && <Combobox.Empty>No matching pages</Combobox.Empty>}
           </Combobox.Options>
         </Combobox.Dropdown>
       </Combobox>

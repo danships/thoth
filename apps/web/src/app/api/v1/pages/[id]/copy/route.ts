@@ -49,7 +49,8 @@ export const POST = apiRoute<CopyPageResponse, {}, CopyPageParameters, CopyPageB
     try {
       await syncFileUsageForPage(copied.id, session, extractFileIdsFromContent(copied.content ?? ''));
     } catch {
-      (await getLogger()).warn('page.copy.sync-file-usage-failed', { pageId: copied.id });
+      const logger = await getLogger();
+      logger.warn('page.copy.sync-file-usage-failed', { pageId: copied.id });
     }
     scheduleNotifyPageChange('page.created', copied, toWebhookActor(session));
     scheduleNotificationDispatch('page.created', copied, toWebhookActor(session));

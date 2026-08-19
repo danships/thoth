@@ -59,13 +59,19 @@ export async function touchContainerAccess(page: NewPageForAccess, userId: strin
   });
 }
 
+/** Number of `ContainerAccess` rows updated concurrently by {@link syncContainerAccessParent}. */
+const CONTAINER_ACCESS_SYNC_BATCH_SIZE = 25;
+
 /** Keeps denormalised parent snapshots correct for every user after a page move. */
 export async function syncContainerAccessParent(
   page: Pick<NewPageForAccess, 'id' | 'parentId' | 'workspaceId'>
 ): Promise<void> {
   const repository = await getContainerAccessRepository();
   const rows = await repository.getByQuery(repository.createQuery().eq('containerId', page.id));
-  await Promise.all(
-    rows.map((row) => repository.update({ ...row, parentId: page.parentId ?? null, workspaceId: page.workspaceId }))
-  );
+  for (let index = 0; index < rows.length; index += CONTAINER_ACCESS_SYNC_BATCH_SIZE) {
+    const batch = rows.slice(index, index + CONTAINER_ACCESS_SYNC_BATCH_SIZE);
+    await Promise.all(
+      batch.map((row) => repository.update({ ...row, parentId: page.parentId ?? null, workspaceId: page.workspaceId }))
+    );
+  }
 }

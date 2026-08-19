@@ -33,9 +33,8 @@ export const POST = apiRoute<MovePageResponse, {}, MovePageParameters, MovePageB
     const now = new Date().toISOString();
     let moved: PageContainer = source;
     if (source.parentId !== body.parentId) {
-      const updated = await (
-        await getContainerRepository()
-      ).update({
+      const repository = await getContainerRepository();
+      const updated = await repository.update({
         ...source,
         parentId: body.parentId,
         sortOrder: await destinationSortOrder(source.workspaceId, body.parentId),

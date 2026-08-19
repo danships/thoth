@@ -32,13 +32,15 @@ export const GET = apiRoute<
     const grant = session.appContext?.accessGrant ?? (await memberToAccessGrant(member));
     assertGrantAllowsWrite(grant);
     const repository = await getContainerRepository();
-    const pages = await filterContainersByGrantForSession(
-      session,
-      await repository.getByQuery(
-        addWorkspaceIdToQuery(repository.createQuery().eq('type', 'page'), source.workspaceId)
-      )
-    );
-    const available = pages.filter((page): page is PageContainer => page.type === 'page' && !page.deletedAt);
+    const needle = (query.query ?? '').trim().toLocaleLowerCase();
+    const baseQuery = addWorkspaceIdToQuery(repository.createQuery().eq('type', 'page'), source.workspaceId);
+    // Push the name match down to the database so a large workspace doesn't need every page
+    // pulled into memory on each keystroke of the parent picker. `deletedAt` still has to be
+    // filtered in application code afterwards (SuperSave can't reliably filter `.eq('deletedAt',
+    // null)` at the query level, same documented limitation noted in workspace-slug.ts).
+    if (needle) baseQuery.like('name', `*${needle}*`);
+    const matched = await filterContainersByGrantForSession(session, await repository.getByQuery(baseQuery));
+    const available = matched.filter((page): page is PageContainer => page.type === 'page' && !page.deletedAt);
     const excluded = new Set<string>();
     if (query.action === 'move') {
       excluded.add(source.id);
@@ -46,42 +48,59 @@ export const GET = apiRoute<
       for (const id of await collectDescendantPageIds(source.id, source.workspaceId)) excluded.add(id);
     }
     const byId = new Map(available.map((page) => [page.id, page]));
-    const needle = (query.query ?? '').trim().toLocaleLowerCase();
     const rank = (name: string) => {
       const value = name.toLocaleLowerCase();
       if (value === needle) return 0;
       if (value.startsWith(needle)) return 1;
       return 2;
     };
-    const options = available
+    const ranked = available
       .filter((page) => !excluded.has(page.id) && (!needle || page.name.toLocaleLowerCase().includes(needle)))
-      .sort(
+      .toSorted(
         (a, b) =>
           rank(a.name) - rank(b.name) ||
           a.name.localeCompare(b.name, undefined, { sensitivity: 'accent' }) ||
           a.id.localeCompare(b.id)
       )
-      .slice(0, query.limit)
-      .map((page) => {
-        const ancestorNames: string[] = [];
-        let parentId = page.parentId;
-        const seen = new Set<string>();
-        while (parentId && !seen.has(parentId)) {
-          seen.add(parentId);
-          const parent = byId.get(parentId);
-          if (!parent) break;
-          ancestorNames.unshift(parent.name);
-          parentId = parent.parentId;
-        }
-        return {
-          id: page.id,
-          name: page.name,
-          emoji: page.emoji ?? null,
-          parentId: page.parentId ?? null,
-          isPrivate: page.isPrivate,
-          ancestorNames,
-        };
-      });
+      .slice(0, query.limit);
+    // Build the ancestor map from only the matched pages plus whatever ancestors they need,
+    // instead of every page in the workspace: walk each page's parent chain, fetching any
+    // ancestor not already present in `byId` a level at a time.
+    let frontier = ranked
+      .map((page) => page.parentId)
+      .filter((parentId): parentId is string => parentId != null)
+      .filter((parentId) => !byId.has(parentId));
+    while (frontier.length > 0) {
+      const uniqueIds = [...new Set(frontier)];
+      const ancestors = await repository.getByIds(uniqueIds);
+      for (const ancestor of ancestors) {
+        if (ancestor.type === 'page') byId.set(ancestor.id, ancestor);
+      }
+      frontier = ancestors
+        .map((ancestor) => (ancestor.type === 'page' ? ancestor.parentId : null))
+        .filter((parentId): parentId is string => parentId != null)
+        .filter((parentId) => !byId.has(parentId));
+    }
+    const options = ranked.map((page) => {
+      const ancestorNames: string[] = [];
+      let parentId = page.parentId;
+      const seen = new Set<string>();
+      while (parentId && !seen.has(parentId)) {
+        seen.add(parentId);
+        const parent = byId.get(parentId);
+        if (!parent) break;
+        ancestorNames.unshift(parent.name);
+        parentId = parent.parentId;
+      }
+      return {
+        id: page.id,
+        name: page.name,
+        emoji: page.emoji ?? null,
+        parentId: page.parentId ?? null,
+        isPrivate: page.isPrivate,
+        ancestorNames,
+      };
+    });
     return { rootAllowed: grant.scopeType === 'workspace', options };
   }
 );
