@@ -2,20 +2,20 @@ import { type Page } from '@playwright/test';
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
+async function expectWideTabsRegion(page: Page) {
+  const navigation = await page.getByRole('navigation').boundingBox();
+  expect(navigation).not.toBeNull();
+
+  const width = await page
+    .getByTestId('page-tabs-region')
+    .evaluate((element) => element.getBoundingClientRect().width);
+  const expectedWidth = page.viewportSize()!.width - navigation!.width;
+
+  expect(width).toBeCloseTo(expectedWidth, 0);
+}
+
 test.describe('data view page width', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
-
-  async function expectWideTabsRegion(page: Page) {
-    const navigation = await page.getByRole('navigation').boundingBox();
-    expect(navigation).not.toBeNull();
-
-    const width = await page
-      .getByTestId('page-tabs-region')
-      .evaluate((element) => element.getBoundingClientRect().width);
-    const expectedWidth = page.viewportSize()!.width - navigation!.width;
-
-    expect(width).toBeCloseTo(expectedWidth, 0);
-  }
 
   test('keeps the whole tabs region wide on every tab of a page with a DataView', async ({ page }) => {
     await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
@@ -29,7 +29,7 @@ test.describe('data view page width', () => {
     await expectWideTabsRegion(page);
 
     await page.getByRole('tab', { name: SEED.dataView.name }).click();
-    await expect(page).toHaveURL(new RegExp(`\\?v=${SEED.dataView.id}$`));
+    await expect(page).toHaveURL(new RegExp(String.raw`\?v=${SEED.dataView.id}$`));
     await expectWideTabsRegion(page);
   });
 
