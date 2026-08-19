@@ -119,8 +119,12 @@ describe('notification-service', () => {
         decision: 'accepted', sourceContainerId: 'host-page',
       });
       expect(resolveRulePrecedence(pageId, ancestors, [
-        { containerId: 'root-page', kind: 'workspace' } as NotificationRule,
+        { containerId: null, kind: 'workspace' } as NotificationRule,
         { containerId: 'host-page', kind: 'exclude_tree' } as NotificationRule,
+      ])).toEqual({ decision: 'excluded' });
+      expect(resolveRulePrecedence(pageId, ancestors, [
+        { containerId: 'host-page', kind: 'exclude_tree' } as NotificationRule,
+        { containerId: null, kind: 'workspace' } as NotificationRule,
       ])).toEqual({ decision: 'excluded' });
     });
 
