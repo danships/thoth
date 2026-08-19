@@ -1,6 +1,16 @@
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
+async function expectPageToBeLastDataRow(page: import('@playwright/test').Page, pageName: string) {
+  const tableRows = page.getByRole('table').getByRole('row');
+  const newPageRow = tableRows.filter({ has: page.getByPlaceholder('New page name') });
+  const pageRow = tableRows.filter({ hasText: pageName });
+
+  await expect(pageRow).toHaveCount(1);
+  await expect(newPageRow).toHaveCount(1);
+  expect(await pageRow.evaluate((row) => row.nextElementSibling === row.parentElement?.lastElementChild)).toBe(true);
+}
+
 test('seeded data view tab renders the DataViewTable', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.dataSourceHost.id}`);
   await page.getByRole('tab', { name: SEED.dataView.name }).click();
@@ -43,6 +53,7 @@ test('can create a new page from the "New page name" row using the Add page butt
   await page.getByRole('button', { name: 'Add page' }).click();
 
   await expect(page.getByText(pageName)).toBeVisible({ timeout: 10_000 });
+  await expectPageToBeLastDataRow(page, pageName);
 });
 
 test.describe('on mobile viewports', () => {
@@ -62,5 +73,6 @@ test.describe('on mobile viewports', () => {
     await addButton.click();
 
     await expect(page.getByText(pageName)).toBeVisible({ timeout: 10_000 });
+    await expectPageToBeLastDataRow(page, pageName);
   });
 });

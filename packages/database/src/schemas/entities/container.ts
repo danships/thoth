@@ -139,7 +139,7 @@ export const containerSchema = z
     // root-level pages are never manually ordered and keep `sortOrder: null`, see THOTH-036).
     // Optional (defaults to `null`/absent) so pre-existing create/seed call sites across the
     // codebase don't all need updating; every *new* parented page is assigned one explicitly in
-    // `POST /pages`.
+    // `POST /pages` (nested pages prepend; data-source rows append).
     sortOrder: z.string().nullable().optional(),
   })
   .extend(withTrackUpdatesSchema.shape)

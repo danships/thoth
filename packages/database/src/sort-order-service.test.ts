@@ -2,6 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
+import { generateKeyBetween } from 'fractional-indexing';
 import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from './context.js';
 import { getContainerRepository } from './repositories.js';
 import type { PageContainer } from './types.js';
@@ -77,6 +78,19 @@ describe('sort-order-service', () => {
 
       const result = await getMaxSiblingSortOrder(workspaceId, group);
       expect(result).toBe('a2');
+    });
+
+    test('supports minting an end-of-list key after every keyed sibling', async () => {
+      const group = 'append-group';
+      await createTestPage({ parentId: group, sortOrder: 'Zz' });
+      await createTestPage({ parentId: group, sortOrder: 'a0' });
+
+      const maxSiblingSortOrder = await getMaxSiblingSortOrder(workspaceId, group);
+      const appendedKey = generateKeyBetween(maxSiblingSortOrder, null);
+
+      expect(maxSiblingSortOrder).toBe('a0');
+      expect(appendedKey > 'Zz').toBe(true);
+      expect(appendedKey > 'a0').toBe(true);
     });
   });
 

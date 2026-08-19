@@ -19,8 +19,18 @@ async function getChildren(client: ApiClient, parentId: string) {
   return data.map((entry) => entry.page);
 }
 
+async function createDataSource(client: ApiClient, workspaceId: string, name: string) {
+  const response = await client.post('/api/v1/data-sources', {
+    workspaceId,
+    name,
+    columns: [{ name: 'Title', type: 'string' }],
+  });
+  expect(response.ok).toBe(true);
+  return getData<{ id: string }>(response);
+}
+
 describe('page reorder API', () => {
-  test('new child pages are prepended in reverse creation order, and a reorder moves a page within its sibling group', async () => {
+  test('new nested child pages are prepended in reverse creation order, and a reorder moves a page within its sibling group', async () => {
     const owner = await getOwner();
     const unique = Date.now();
     const parent = await createPage(owner, { name: `Reorder Parent ${unique}`, workspaceId: SEED.workspace.id });
@@ -29,9 +39,8 @@ describe('page reorder API', () => {
     const second = await createPage(owner, { name: 'Second', parentId: parent.id });
     const third = await createPage(owner, { name: 'Third', parentId: parent.id });
 
-    // New parented pages always land at the top of their sibling group — each subsequent
-    // creation's sortOrder sorts before the previous one's, so the *last* created page has the
-    // *smallest* sortOrder.
+    // Nested child pages land at the top of their sibling group — each subsequent creation's
+    // sortOrder sorts before the previous one's, so the *last* created page has the smallest key.
     expect(first.sortOrder).not.toBeNull();
     expect(second.sortOrder).not.toBeNull();
     expect(third.sortOrder).not.toBeNull();
@@ -53,6 +62,25 @@ describe('page reorder API', () => {
 
     const afterReorder = await getChildren(owner, parent.id);
     expect(afterReorder.map((page) => page.id)).toEqual([first.id, third.id, second.id]);
+  });
+
+  test('new data-source rows append in creation order', async () => {
+    const owner = await getOwner();
+    const unique = Date.now();
+    const dataSource = await createDataSource(owner, SEED.workspace.id, `Append rows ${unique}`);
+
+    const first = await createPage(owner, { name: 'First', parentId: dataSource.id });
+    const second = await createPage(owner, { name: 'Second', parentId: dataSource.id });
+    const third = await createPage(owner, { name: 'Third', parentId: dataSource.id });
+
+    expect(first.sortOrder).not.toBeNull();
+    expect(second.sortOrder).not.toBeNull();
+    expect(third.sortOrder).not.toBeNull();
+    expect((first.sortOrder ?? '') < (second.sortOrder ?? '')).toBe(true);
+    expect((second.sortOrder ?? '') < (third.sortOrder ?? '')).toBe(true);
+
+    const order = await getChildren(owner, dataSource.id);
+    expect(order.map((page) => page.id)).toEqual([first.id, second.id, third.id]);
   });
 
   test('rejects an anchor from a different sibling group', async () => {
