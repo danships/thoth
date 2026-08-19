@@ -9,6 +9,24 @@
   border-radius: 4px;
 }
 
+.viewsContainer {
+  transition:
+    max-width 150ms ease,
+    width 150ms ease;
+}
+
+/* A page with views makes this Container fluid. Break it out of the reading-width Container
+   while retaining the AppShell's desktop navbar offset, so its content reaches the whole main
+   area instead of extending underneath the navigation. */
+.viewsContainer[data-fluid] {
+  width: calc(100vw - var(--app-shell-navbar-offset, 0px));
+  max-width: calc(100vw - var(--app-shell-navbar-offset, 0px));
+  margin-left: calc(50% - (100vw - var(--app-shell-navbar-offset, 0px)) / 2);
+  margin-right: 0;
+  padding-left: var(--mantine-spacing-md);
+  padding-right: var(--mantine-spacing-md);
+}
+
 .tabsWrapper {
   display: flex;
   flex-direction: column;

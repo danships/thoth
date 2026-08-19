@@ -79,6 +79,9 @@ export default function PageDetailsPage() {
   const { data: breadcrumbs, isLoading: isLoadingBreadcrumbs } = usePageBreadcrumbs(pageId);
 
   const hasSubpages = pageDetails?.hasChildren ?? false;
+  // Keep the tabs region wide for every tab on pages that own a DataView, rather than tying
+  // the layout to whichever tab happens to be selected.
+  const pageHasViews = (pageDetails?.views?.length ?? 0) > 0;
 
   // The selected view (if any) is appended to the page name in the document title (THOTH-046)
   // — "Contents" and "Sub Pages" are the two built-in tabs, everything else is a named
@@ -389,92 +392,106 @@ export default function PageDetailsPage() {
               mutatePageDetails={mutate}
             />
           )}
-          <Box className={styles['tabsWrapper'] ?? ''}>
-            <Tabs
-              value={selectedView}
-              onChange={(value) => router.replace(`?v=${value}`)}
-              className={styles['tabs'] ?? ''}
-            >
-              {/* The "Add View" button lives alongside the Tabs.List (rather than in its own
+          <Container
+            fluid={pageHasViews}
+            size="md"
+            px={0}
+            className={styles['viewsContainer'] ?? ''}
+            data-testid="page-tabs-region"
+          >
+            <Box className={styles['tabsWrapper'] ?? ''}>
+              <Tabs
+                value={selectedView}
+                onChange={(value) => router.replace(`?v=${value}`)}
+                className={styles['tabs'] ?? ''}
+              >
+                {/* The "Add View" button lives alongside the Tabs.List (rather than in its own
                   row at the top of the page, next to the title/breadcrumb) so it's visually
                   and contextually tied to the views it manages. `wrap="wrap"` lets the button
                   drop to its own line below the tab list on narrow viewports instead of
                   squeezing/overlapping the tabs or shrinking them to fit beside it. */}
-              <Group justify="space-between" align="center" wrap="wrap" gap="xs" className={styles['tabsHeader'] ?? ''}>
-                <Tabs.List ref={tabsListReference} className={styles['tabsList'] ?? ''}>
-                  {pageDetails.views?.map((view) => (
-                    // Rendered as a Box wrapping the tab and (when selected) its actions menu as
-                    // siblings, rather than nesting the menu's button inside `Tabs.Tab`'s
-                    // `rightSection` — `Tabs.Tab` itself renders a `<button>`, and nesting another
-                    // interactive control inside it is invalid HTML that assistive technology can
-                    // misannounce or omit (see ViewTabActionsMenu).
-                    <Box key={view.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                      <Tabs.Tab value={view.id}>{view.name}</Tabs.Tab>
-                      {selectedView === view.id && (
-                        <ViewTabActionsMenu
-                          viewName={view.name}
-                          duplicating={duplicatingViewId === view.id}
-                          onDuplicate={() => handleDuplicateView(view)}
-                        />
-                      )}
-                    </Box>
-                  ))}
-                  {hasSubpages && <Tabs.Tab value={SUBPAGES_TAB_VALUE}>Sub Pages</Tabs.Tab>}
-                  <Tabs.Tab value="contents">Contents</Tabs.Tab>
-                </Tabs.List>
-                <Group gap={4} wrap="nowrap">
-                  {tabsOverflowing && pageDetails.views && pageDetails.views.length > 0 && (
-                    <Menu shadow="md" width={220} position="bottom-end">
-                      <Menu.Target>
-                        <ActionIcon variant="default" size="lg" aria-label="More views">
-                          <IconDots size={16} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        {pageDetails.views.map((view) => (
-                          <Menu.Item key={view.id} onClick={() => router.replace(`?v=${view.id}`)}>
-                            {view.name}
-                          </Menu.Item>
-                        ))}
-                      </Menu.Dropdown>
-                    </Menu>
-                  )}
-                  <Button
-                    size="xs"
-                    variant="default"
-                    onClick={() => setShowCreateViewForm(true)}
-                    leftSection={<IconPlus />}
-                  >
-                    Add View
-                  </Button>
+                <Group
+                  justify="space-between"
+                  align="center"
+                  wrap="wrap"
+                  gap="xs"
+                  className={styles['tabsHeader'] ?? ''}
+                >
+                  <Tabs.List ref={tabsListReference} className={styles['tabsList'] ?? ''}>
+                    {pageDetails.views?.map((view) => (
+                      // Rendered as a Box wrapping the tab and (when selected) its actions menu as
+                      // siblings, rather than nesting the menu's button inside `Tabs.Tab`'s
+                      // `rightSection` — `Tabs.Tab` itself renders a `<button>`, and nesting another
+                      // interactive control inside it is invalid HTML that assistive technology can
+                      // misannounce or omit (see ViewTabActionsMenu).
+                      <Box key={view.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        <Tabs.Tab value={view.id}>{view.name}</Tabs.Tab>
+                        {selectedView === view.id && (
+                          <ViewTabActionsMenu
+                            viewName={view.name}
+                            duplicating={duplicatingViewId === view.id}
+                            onDuplicate={() => handleDuplicateView(view)}
+                          />
+                        )}
+                      </Box>
+                    ))}
+                    {hasSubpages && <Tabs.Tab value={SUBPAGES_TAB_VALUE}>Sub Pages</Tabs.Tab>}
+                    <Tabs.Tab value="contents">Contents</Tabs.Tab>
+                  </Tabs.List>
+                  <Group gap={4} wrap="nowrap">
+                    {tabsOverflowing && pageDetails.views && pageDetails.views.length > 0 && (
+                      <Menu shadow="md" width={220} position="bottom-end">
+                        <Menu.Target>
+                          <ActionIcon variant="default" size="lg" aria-label="More views">
+                            <IconDots size={16} />
+                          </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          {pageDetails.views.map((view) => (
+                            <Menu.Item key={view.id} onClick={() => router.replace(`?v=${view.id}`)}>
+                              {view.name}
+                            </Menu.Item>
+                          ))}
+                        </Menu.Dropdown>
+                      </Menu>
+                    )}
+                    <Button
+                      size="xs"
+                      variant="default"
+                      onClick={() => setShowCreateViewForm(true)}
+                      leftSection={<IconPlus />}
+                    >
+                      Add View
+                    </Button>
+                  </Group>
                 </Group>
-              </Group>
-              <Tabs.Panel value="contents" className={styles['tabsPanel'] ?? ''}>
-                <PageDetailEditor
-                  ref={editorReference}
-                  key={pageId}
-                  initialContent={pageDetails.content ?? ''}
-                  onUpdate={updateContent}
-                  pageId={pageId}
-                  workspaceId={workspaceId}
-                />
-              </Tabs.Panel>
+                <Tabs.Panel value="contents" className={styles['tabsPanel'] ?? ''}>
+                  <PageDetailEditor
+                    ref={editorReference}
+                    key={pageId}
+                    initialContent={pageDetails.content ?? ''}
+                    onUpdate={updateContent}
+                    pageId={pageId}
+                    workspaceId={workspaceId}
+                  />
+                </Tabs.Panel>
 
-              {hasSubpages && (
-                <Tabs.Panel value={SUBPAGES_TAB_VALUE} className={styles['tabsPanel'] ?? ''}>
-                  {/* Only mounted while the tab is active (Mantine only renders the active
+                {hasSubpages && (
+                  <Tabs.Panel value={SUBPAGES_TAB_VALUE} className={styles['tabsPanel'] ?? ''}>
+                    {/* Only mounted while the tab is active (Mantine only renders the active
                       panel's children by default), so `usePagesByParent` fires lazily. */}
-                  <PageSubpagesList pageId={pageId} />
-                </Tabs.Panel>
-              )}
+                    <PageSubpagesList pageId={pageId} />
+                  </Tabs.Panel>
+                )}
 
-              {pageDetails.views?.map((view) => (
-                <Tabs.Panel key={view.id} value={view.id} className={styles['tabsPanel'] ?? ''}>
-                  <DataViewRender view={view} onViewChange={() => mutate()} />
-                </Tabs.Panel>
-              ))}
-            </Tabs>
-          </Box>
+                {pageDetails.views?.map((view) => (
+                  <Tabs.Panel key={view.id} value={view.id} className={styles['tabsPanel'] ?? ''}>
+                    <DataViewRender view={view} onViewChange={() => mutate()} />
+                  </Tabs.Panel>
+                ))}
+              </Tabs>
+            </Box>
+          </Container>
         </Stack>
       </Container>
       {showCreateViewForm && (
