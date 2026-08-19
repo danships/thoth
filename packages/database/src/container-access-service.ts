@@ -31,3 +31,41 @@ export async function registerContainerAccessForNewPage(page: NewPageForAccess, 
     createdAt: page.createdAt,
   });
 }
+
+/** Records an explicit access without disturbing a user's favourite metadata. */
+export async function touchContainerAccess(page: NewPageForAccess, userId: string, accessedAt: string): Promise<void> {
+  const repository = await getContainerAccessRepository();
+  const existing = await repository.getOneByQuery(
+    repository.createQuery().eq('containerId', page.id).eq('userId', userId)
+  );
+  if (existing) {
+    await repository.update({
+      ...existing,
+      parentId: page.parentId ?? null,
+      workspaceId: page.workspaceId,
+      lastAccessedAt: accessedAt,
+    });
+    return;
+  }
+  await repository.create({
+    userId,
+    containerId: page.id,
+    parentId: page.parentId ?? null,
+    workspaceId: page.workspaceId,
+    lastAccessedAt: accessedAt,
+    starred: false,
+    starredAt: null,
+    createdAt: accessedAt,
+  });
+}
+
+/** Keeps denormalised parent snapshots correct for every user after a page move. */
+export async function syncContainerAccessParent(
+  page: Pick<NewPageForAccess, 'id' | 'parentId' | 'workspaceId'>
+): Promise<void> {
+  const repository = await getContainerAccessRepository();
+  const rows = await repository.getByQuery(repository.createQuery().eq('containerId', page.id));
+  await Promise.all(
+    rows.map((row) => repository.update({ ...row, parentId: page.parentId ?? null, workspaceId: page.workspaceId }))
+  );
+}

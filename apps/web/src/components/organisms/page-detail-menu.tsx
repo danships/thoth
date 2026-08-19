@@ -18,7 +18,11 @@ import {
   IconUnlink,
   IconBell,
   IconCheck,
+  IconCopy,
+  IconArrowsMove,
 } from '@tabler/icons-react';
+import { PageParentActionModal } from './page-parent-action-modal';
+import type { Page } from '@/types/api';
 import { usePageApps } from '@/lib/hooks/api/use-page-apps';
 import { useNotificationSubscriptions } from '@/lib/hooks/api/use-notification-subscriptions';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
@@ -55,6 +59,8 @@ type PageDetailMenuProperties = {
   onAddChildPage: () => void;
   onMoveToTrash?: () => Promise<void>;
   onViewHistory?: () => void;
+  page: Page;
+  onMoveCopyCompleted: (page: Page, action: 'copy' | 'move') => void;
 };
 
 // The badge shown next to a connected App: where its access comes from. Extracted to a plain
@@ -108,6 +114,8 @@ export function PageDetailMenu({
   onAddChildPage,
   onMoveToTrash,
   onViewHistory,
+  page,
+  onMoveCopyCompleted,
 }: PageDetailMenuProperties) {
   const { data, isLoading, mutate } = usePageApps(pageId);
   const workspace = useCurrentWorkspace();
@@ -116,6 +124,7 @@ export function PageDetailMenu({
   const { showError, showSuccess } = useNotification();
   const fileInputReference = useRef<HTMLInputElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
+  const [parentAction, setParentAction] = useState<'copy' | 'move' | null>(null);
 
   const currentPageRuleKind = subscriptionsData?.subscriptions.find((rule) => rule.containerId === pageId)?.kind;
   // Serializes notification-rule writes: while a mutation for this page is pending, the menu
@@ -312,6 +321,26 @@ export function PageDetailMenu({
           <Menu.Item leftSection={<IconFilePlus size={14} />} onClick={onAddChildPage}>
             Add Child Page
           </Menu.Item>
+          <Menu.Item
+            leftSection={<IconCopy size={14} />}
+            data-testid="page-copy-button"
+            onClick={() => {
+              setMenuOpened(false);
+              setParentAction('copy');
+            }}
+          >
+            Copy page
+          </Menu.Item>
+          <Menu.Item
+            leftSection={<IconArrowsMove size={14} />}
+            data-testid="page-move-button"
+            onClick={() => {
+              setMenuOpened(false);
+              setParentAction('move');
+            }}
+          >
+            Move page
+          </Menu.Item>
 
           <Menu.Item leftSection={<IconFileImport size={14} />} onClick={handleImportClick}>
             Import from Markdown
@@ -433,6 +462,15 @@ export function PageDetailMenu({
         style={{ display: 'none' }}
         onChange={(event) => void handleFileSelected(event)}
       />
+      {parentAction && (
+        <PageParentActionModal
+          action={parentAction}
+          source={page}
+          opened
+          onClose={() => setParentAction(null)}
+          onCompleted={(result) => onMoveCopyCompleted(result, parentAction)}
+        />
+      )}
     </>
   );
 }

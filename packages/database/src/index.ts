@@ -63,7 +63,11 @@ export {
   removeScopedContainer,
   InvalidContainerIdsError,
 } from './app-scope-service.js';
-export { registerContainerAccessForNewPage } from './container-access-service.js';
+export {
+  registerContainerAccessForNewPage,
+  touchContainerAccess,
+  syncContainerAccessParent,
+} from './container-access-service.js';
 export {
   reserveWorkspaceSlug,
   isWorkspaceSlugAvailable,
@@ -178,7 +182,6 @@ export type {
   MuteEvaluation,
 } from './notifications/mute.js';
 
-
 // Re-exported (in addition to `@thoth/database/schemas`) so packages using `moduleResolution:
 // Node10` (which cannot resolve the `exports` map's `./schemas` subpath) — e.g.
 // `@thoth/job-protocol`'s webhook job schemas — can still import it from the package root.
@@ -215,18 +218,14 @@ export type {
   NotificationDelivery,
 } from './types.js';
 // Push-related schema types (THOTH-071) — root re-exports for Node10-resolvable consumers.
-export {
-  pushSubscriptionSchema,
-} from './schemas/entities/push-subscription.js';
+export { pushSubscriptionSchema } from './schemas/entities/push-subscription.js';
 export {
   notificationDeliverySchema,
   notificationDeliveryStatusSchema,
   TERMINAL_NOTIFICATION_DELIVERY_STATUSES,
 } from './schemas/entities/notification-delivery.js';
 export type { NotificationDeliveryStatus } from './schemas/entities/notification-delivery.js';
-export {
-  notificationPushDispositionSchema,
-} from './schemas/entities/notification.js';
+export { notificationPushDispositionSchema } from './schemas/entities/notification.js';
 export type { NotificationPushDisposition } from './schemas/entities/notification.js';
 // Column/webhook-payload shapes also needed via the Node10-resolvable root entry (see the
 // `pageValueSchema` comment above) — `apps/jobs`' dispatch/deliver handlers import these.

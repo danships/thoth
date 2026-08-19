@@ -105,7 +105,7 @@ export default function PageDetailsPage() {
   const editorReference = useRef<PageDetailEditorHandle>(null);
   const tabsListReference = useRef<HTMLDivElement>(null);
 
-  const { showError } = useNotification();
+  const { showError, showSuccess } = useNotification();
   const { updatePage } = useUpdatePage({ mutatePageDetails: mutate });
   const { setPageContent } = useSetPageContent({ mutatePageDetails: mutate });
   const { registerAccess } = useRegisterPageAccess();
@@ -378,6 +378,16 @@ export default function PageDetailsPage() {
               onAddChildPage={() => router.push(`/${workspaceSlug}/pages/${pageId}/create`)}
               onMoveToTrash={handleMoveToTrash}
               onViewHistory={openHistoryDrawer}
+              page={pageDetails.page}
+              onMoveCopyCompleted={(result, action) => {
+                void mutate();
+                mutateGlobal(
+                  (key) =>
+                    typeof key === 'string' &&
+                    (key.includes('/pages/tree') || key.includes('/breadcrumbs') || key.includes('recent=true'))
+                );
+                showSuccess(`${action === 'copy' ? 'Copied' : 'Moved'} "${result.name}"`);
+              }}
             />
           </Group>
           {pageDetails.columns && pageDetails.columns.length > 0 && (

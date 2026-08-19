@@ -1,4 +1,11 @@
 import { createDatabaseContext, setDatabaseContext, resetDatabaseContext } from '@thoth/database';
+export {
+  createContentBaseline,
+  getMinSiblingSortOrder,
+  registerContainerAccessForNewPage,
+  syncContainerAccessParent,
+  touchContainerAccess,
+} from '@thoth/database';
 import {
   getDatabase as getPackageDatabase,
   getContainerRepository as getPackageContainerRepository,
