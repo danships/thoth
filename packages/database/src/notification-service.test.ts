@@ -113,6 +113,21 @@ describe('notification-service', () => {
       expect(result).toEqual({ decision: 'accepted', sourceContainerId: 'near' });
     });
 
+    test('a bridged host-page tree rule accepts while host exclusion wins regardless of ordering', () => {
+      const ancestors = ['data-source', 'host-page', 'root-page'];
+      expect(resolveRulePrecedence(pageId, ancestors, [{ containerId: 'host-page', kind: 'tree' } as NotificationRule])).toEqual({
+        decision: 'accepted', sourceContainerId: 'host-page',
+      });
+      expect(resolveRulePrecedence(pageId, ancestors, [
+        { containerId: null, kind: 'workspace' } as NotificationRule,
+        { containerId: 'host-page', kind: 'exclude_tree' } as NotificationRule,
+      ])).toEqual({ decision: 'excluded' });
+      expect(resolveRulePrecedence(pageId, ancestors, [
+        { containerId: 'host-page', kind: 'exclude_tree' } as NotificationRule,
+        { containerId: null, kind: 'workspace' } as NotificationRule,
+      ])).toEqual({ decision: 'excluded' });
+    });
+
     test('a workspace rule accepts when nothing more specific matches', () => {
       const result = resolveRulePrecedence(pageId, ['ancestor-1'], [
         { containerId: null, kind: 'workspace' } as NotificationRule,

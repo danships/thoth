@@ -9,6 +9,7 @@ import {
   recomputeParentNotificationSummary,
   renderActorLabel,
   renderNotificationTitleBody,
+  resolveLiveAncestorIdsBridgingDataSources,
   resolveNotificationRecipients,
   setNotificationPushSummary,
 } from '@thoth/database';
@@ -27,9 +28,8 @@ const TRAILING_DEBOUNCE_MS = 30_000;
 const MAX_DEBOUNCE_MS = 300_000;
 const DISPATCH_MAX_ATTEMPTS = 1; // Best-effort orchestration; a failed recipient loop iteration doesn't retry the whole burst.
 
-// Bound on how many ancestors are walked to build the current live ancestor chain — well beyond
-// any realistic page nesting depth, purely a defensive circuit-breaker against a corrupted
-// `parentId` cycle.
+// Bound on the total live ancestors collected for notification rule matching, including hosts
+// reached through embedded data sources.
 const MAX_ANCESTOR_WALK = 200;
 
 /** Derived active-dedupe key (THOTH-066 spec): `notification:<workspaceId>:<containerId>:<actor.type>:<actor id>`. */
@@ -69,31 +69,6 @@ export const notificationDispatchCoalescePolicy: JobCoalescePolicy<NotificationD
   maxDebounceMs: MAX_DEBOUNCE_MS,
   merge: mergeNotificationDispatchPayload,
 };
-
-/**
- * Resolves the *current* live ancestor chain of `container` by walking `parentId`, nearest-first
- * — so a page moved between when this dispatch was queued and when it executes is evaluated
- * against its new ancestry (THOTH-066 spec, "Moved page → ancestor rebuild"). Stops at the first
- * missing/root parent, or after `MAX_ANCESTOR_WALK` hops as a defensive circuit-breaker.
- */
-async function resolveLiveAncestorIds(workspaceId: string, startParentId: string | null): Promise<string[]> {
-  const containerRepository = await getContainerRepository();
-  const ancestorIds: string[] = [];
-  let currentParentId = startParentId;
-
-  while (currentParentId && ancestorIds.length < MAX_ANCESTOR_WALK) {
-    const parent = await containerRepository.getOneByQuery(
-      containerRepository.createQuery().eq('id', currentParentId).eq('workspaceId', workspaceId)
-    );
-    if (!parent) {
-      break;
-    }
-    ancestorIds.push(parent.id);
-    currentParentId = parent.parentId;
-  }
-
-  return ancestorIds;
-}
 
 /**
  * `notification.dispatch` — the externally-reachable job submitted by `apps/web`'s
@@ -137,7 +112,11 @@ export const notificationDispatchJobDefinition: JobDefinition<NotificationDispat
       return { skipped: 'workspace-missing' };
     }
 
-    const ancestorIds = await resolveLiveAncestorIds(payload.workspaceId, container.parentId);
+    const ancestorIds = await resolveLiveAncestorIdsBridgingDataSources({
+      workspaceId: payload.workspaceId,
+      container: { id: container.id, type: container.type, parentId: container.parentId },
+      maxAncestors: MAX_ANCESTOR_WALK,
+    });
 
     const recipients = await resolveNotificationRecipients({
       workspaceId: payload.workspaceId,

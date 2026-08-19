@@ -188,6 +188,106 @@ export async function resolvePageEmbeddedContainerIds(pageIds: string[], workspa
 }
 
 /**
+ * Returns every live page that embeds `dataSourceId` through one of its live data views.
+ *
+ * This is the reverse of `resolvePageEmbeddedContainerIds`: a row's `parentId` points to its
+ * data source, while the data source points back to its host page only through
+ * `page.views -> dataView.dataSourceId`. A data source may be embedded by more than one page.
+ */
+export async function resolveHostPageIdsForDataSource(dataSourceId: string, workspaceId: string): Promise<string[]> {
+  const dataViewRepository = await getDataViewRepository();
+  const dataViews = await dataViewRepository.getByQuery(
+    dataViewRepository.createQuery().eq('dataSourceId', dataSourceId).eq('workspaceId', workspaceId)
+  );
+  const dataViewIds = new Set(dataViews.filter((dataView) => !dataView.deletedAt).map((dataView) => dataView.id));
+
+  if (dataViewIds.size === 0) {
+    return [];
+  }
+
+  const containerRepository = await getContainerRepository();
+  const pages = await containerRepository.getByQuery(
+    containerRepository.createQuery().eq('type', 'page').eq('workspaceId', workspaceId)
+  );
+
+  return [
+    ...new Set(
+      pages
+        .filter(
+          (page): page is Extract<Container, { type: 'page' }> =>
+            page.type === 'page' && !page.deletedAt && (page.views ?? []).some((viewId) => dataViewIds.has(viewId))
+        )
+        .map((page) => page.id)
+    ),
+  ];
+}
+
+/**
+ * Resolves the live ancestors of a changed container for notification-rule matching.
+ *
+ * Ancestors are nearest-first (breadth-first by graph hop) and exclude the changed container.
+ * In addition to `parentId`, the walk bridges a data source to every live page that embeds it;
+ * this makes host-page subtree subscriptions cover edits to embedded data-source rows (THOTH-080).
+ */
+export async function resolveLiveAncestorIdsBridgingDataSources(input: {
+  workspaceId: string;
+  container: Pick<Container, 'id' | 'type' | 'parentId'>;
+  maxAncestors?: number;
+}): Promise<string[]> {
+  const maxAncestors = input.maxAncestors ?? 200;
+  const containerRepository = await getContainerRepository();
+  const ancestors: string[] = [];
+  const visited = new Set<string>([input.container.id]);
+  const queued = new Set<string>([input.container.id]);
+  const queue: string[] = [];
+
+  const enqueue = (id: string | null): void => {
+    if (id && !visited.has(id) && !queued.has(id)) {
+      queued.add(id);
+      queue.push(id);
+    }
+  };
+
+  if (input.container.type === 'data-source') {
+    for (const hostPageId of await resolveHostPageIdsForDataSource(input.container.id, input.workspaceId)) {
+      enqueue(hostPageId);
+    }
+  } else {
+    enqueue(input.container.parentId);
+  }
+
+  while (queue.length > 0 && ancestors.length < maxAncestors) {
+    const id = queue.shift();
+    if (!id || visited.has(id)) {
+      continue;
+    }
+    visited.add(id);
+
+    const ancestor = await containerRepository.getOneByQuery(
+      containerRepository.createQuery().eq('id', id).eq('workspaceId', input.workspaceId)
+    );
+    if (!ancestor || ancestor.deletedAt) {
+      continue;
+    }
+
+    ancestors.push(ancestor.id);
+    if (ancestors.length >= maxAncestors) {
+      break;
+    }
+
+    if (ancestor.type === 'data-source') {
+      for (const hostPageId of await resolveHostPageIdsForDataSource(ancestor.id, input.workspaceId)) {
+        enqueue(hostPageId);
+      }
+    } else {
+      enqueue(ancestor.parentId);
+    }
+  }
+
+  return ancestors;
+}
+
+/**
  * Ensures a `workspace-member` row (`role: 'app'`) exists for `toAppOwnerId(app.id)` when
  * `app.attributionMode === 'app'`, and removes it otherwise. This keeps App-attributed content
  * readable through the standard retrievers, which gate on `assertWorkspaceAccess` — without
