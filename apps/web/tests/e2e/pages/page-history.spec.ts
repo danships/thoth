@@ -75,10 +75,9 @@ function agePageHistory(pageId: string): void {
          WHERE "containerId" = ?`
       )
       .run(backdated, backdated, backdated, pageId);
-    database.prepare(`UPDATE container SET contents = json_set(contents, '$.lastUpdated', ?) WHERE id = ?`).run(
-      backdated,
-      pageId
-    );
+    database
+      .prepare(`UPDATE container SET contents = json_set(contents, '$.lastUpdated', ?) WHERE id = ?`)
+      .run(backdated, pageId);
   } finally {
     database.close();
   }
@@ -88,11 +87,7 @@ function agePageHistory(pageId: string): void {
  * would otherwise compete for file locks with the live dev server's own connection across a long
  * shared-suite run) until at least one `consolidated` revision appears for `pageId` — the
  * observable side effect of `history.maintain` actually running — or throws on timeout. */
-async function waitForConsolidation(
-  request: APIRequestContext,
-  pageId: string,
-  timeoutMs = 30_000
-): Promise<void> {
+async function waitForConsolidation(request: APIRequestContext, pageId: string, timeoutMs = 30_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const response = await request.get(`/api/v1/pages/${pageId}/history`, {
@@ -104,7 +99,9 @@ async function waitForConsolidation(
     }
     if (Date.now() > deadline) {
       expect(response.ok()).toBeTruthy();
-      throw new Error(`waitForConsolidation: no consolidated revision appeared for page ${pageId} within ${timeoutMs}ms`);
+      throw new Error(
+        `waitForConsolidation: no consolidated revision appeared for page ${pageId} within ${timeoutMs}ms`
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
@@ -121,7 +118,12 @@ test.describe('page history', () => {
     const noteColumn = SEED.dataSource.columns[0]!;
 
     const pageResponse = await request.post('/api/v1/pages', {
-      data: { name: 'E2E History Column Name Page', emoji: null, parentId: SEED.dataSource.id, workspaceId: SEED.workspace.id },
+      data: {
+        name: 'E2E History Column Name Page',
+        emoji: null,
+        parentId: SEED.dataSource.id,
+        workspaceId: SEED.workspace.id,
+      },
     });
     expect(pageResponse.ok()).toBeTruthy();
     const pageEntity = await getData<PageApi>(pageResponse);
@@ -164,7 +166,12 @@ test.describe('page history', () => {
     const column = await getData<{ id: string; name: string }>(columnResponse);
 
     const pageResponse = await request.post('/api/v1/pages', {
-      data: { name: 'E2E History Deleted Column Page', emoji: null, parentId: dataSource.id, workspaceId: SEED.workspace.id },
+      data: {
+        name: 'E2E History Deleted Column Page',
+        emoji: null,
+        parentId: dataSource.id,
+        workspaceId: SEED.workspace.id,
+      },
     });
     expect(pageResponse.ok()).toBeTruthy();
     const pageEntity = await getData<PageApi>(pageResponse);
@@ -209,6 +216,37 @@ test.describe('page history', () => {
     const rows = page.locator('[class*="revisionRow"]');
     await expect(rows.first()).toBeVisible();
     await expect(rows.first().getByText('Content')).toBeVisible();
+  });
+
+  test('shows only the selected revision change instead of the cumulative diff against live content', async ({
+    page,
+    request,
+  }) => {
+    const pageId = await createPage(request, 'THOTH-084 History Diff Page');
+
+    const baseResponse = await request.post(`/api/v1/pages/${pageId}/content`, { data: { content: 'Base text' } });
+    expect(baseResponse.ok()).toBeTruthy();
+    forceNextSaveToAppend(pageId);
+    const middleResponse = await request.post(`/api/v1/pages/${pageId}/content`, {
+      data: { content: 'Base text\nMiddle-only addition' },
+    });
+    expect(middleResponse.ok()).toBeTruthy();
+    forceNextSaveToAppend(pageId);
+    const finalResponse = await request.post(`/api/v1/pages/${pageId}/content`, {
+      data: { content: 'Base text\nMiddle-only addition\nLater-only addition' },
+    });
+    expect(finalResponse.ok()).toBeTruthy();
+
+    await page.goto(`/${SEED.workspace.slug}/pages/${pageId}`);
+    await openHistoryDrawer(page);
+    const rows = page.locator('[class*="revisionRow"]');
+    // Newest-first rows are sequence 4, then this middle sequence-3 change.
+    await expect(rows.nth(1)).toBeVisible();
+    await rows.nth(1).click();
+
+    const diffPanel = page.locator('[class*="diffPanel"]');
+    await expect(diffPanel).toContainText('Middle-only addition');
+    await expect(diffPanel).not.toContainText('Later-only addition');
   });
 
   test('selecting a content revision shows a diff and can restore it', async ({ page, request }) => {

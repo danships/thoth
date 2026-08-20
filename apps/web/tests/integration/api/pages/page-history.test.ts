@@ -3,6 +3,7 @@ import {
   getBaseUrl,
   getData,
   getOwnerClient,
+  getSecondUserClient,
   SEED,
   agePageHistoryFixture,
   readPageHistoryFixture,
@@ -44,6 +45,119 @@ describe('page history API', () => {
     expect(history.revisions.length).toBe(1);
     expect(history.revisions[0]?.target).toBe('values');
     expect(history.revisions[0]?.changedColumns).toContain(noteColumn.id);
+  });
+
+  test('reconstructs each revision against its immediate predecessor and exposes teammate-authored history', async () => {
+    const owner = await getOwner();
+    const teammate = await getSecondUserClient(getBaseUrl());
+    const noteColumn = SEED.dataSource.columns[0]!;
+
+    const pageResponse = await owner.post('/api/v1/pages', {
+      name: 'THOTH-084 Previous Revision Diff',
+      emoji: null,
+      parentId: SEED.dataSource.id,
+      workspaceId: SEED.workspace.id,
+    });
+    expect(pageResponse.ok).toBe(true);
+    const page = await getData<PageApi>(pageResponse);
+
+    // Content saves alternate authors so they append distinct rows without waiting for the
+    // coalesce window. The middle row must compare only its own change, not the final live body.
+    const firstContentSave = await owner.post(`/api/v1/pages/${page.id}/content`, { content: 'Content first' });
+    expect(firstContentSave.ok).toBe(true);
+    const middleContentSave = await teammate.post(`/api/v1/pages/${page.id}/content`, {
+      content: 'Content first\nContent middle',
+    });
+    expect(middleContentSave.ok).toBe(true);
+    const finalContentSave = await owner.post(`/api/v1/pages/${page.id}/content`, {
+      content: 'Content first\nContent middle\nContent final',
+    });
+    expect(finalContentSave.ok).toBe(true);
+
+    const contentHistoryResponse = await teammate.get(`/api/v1/pages/${page.id}/history`, {
+      params: { target: 'content' },
+    });
+    expect(contentHistoryResponse.ok).toBe(true);
+    const contentHistory = await getData<{ revisions: Array<{ id: string; sequence: number }> }>(
+      contentHistoryResponse
+    );
+    const middleContentRevision = contentHistory.revisions.find((revision) => revision.sequence === 3);
+    const firstContentRevision = contentHistory.revisions.find((revision) => revision.sequence === 1);
+    expect(middleContentRevision).toBeDefined();
+    expect(firstContentRevision).toBeDefined();
+
+    const middleContentResponse = await teammate.get(`/api/v1/pages/${page.id}/history/${middleContentRevision!.id}`);
+    expect(middleContentResponse.ok).toBe(true);
+    const middleContent = await getData<{
+      target: 'content';
+      content: string;
+      previousContent: string;
+      isFirstRevision: boolean;
+    }>(middleContentResponse);
+    expect(middleContent).toMatchObject({
+      target: 'content',
+      content: 'Content first\nContent middle',
+      previousContent: 'Content first',
+      isFirstRevision: false,
+    });
+    expect(middleContent.previousContent).not.toBe('Content first\nContent middle\nContent final');
+
+    const firstContentResponse = await teammate.get(`/api/v1/pages/${page.id}/history/${firstContentRevision!.id}`);
+    expect(firstContentResponse.ok).toBe(true);
+    expect(await getData(firstContentResponse)).toMatchObject({
+      target: 'content',
+      previousContent: '',
+      isFirstRevision: true,
+    });
+
+    // Value revisions always append. The same endpoint must reconstruct the previous value
+    // state rather than returning the page's latest value.
+    const firstValuesSave = await owner.patch(`/api/v1/pages/${page.id}/values`, {
+      [noteColumn.id]: { type: 'string', value: 'Value first' },
+    });
+    expect(firstValuesSave.ok).toBe(true);
+    const middleValuesSave = await teammate.patch(`/api/v1/pages/${page.id}/values`, {
+      [noteColumn.id]: { type: 'string', value: 'Value middle' },
+    });
+    expect(middleValuesSave.ok).toBe(true);
+    const finalValuesSave = await owner.patch(`/api/v1/pages/${page.id}/values`, {
+      [noteColumn.id]: { type: 'string', value: 'Value final' },
+    });
+    expect(finalValuesSave.ok).toBe(true);
+
+    const valuesHistoryResponse = await teammate.get(`/api/v1/pages/${page.id}/history`, {
+      params: { target: 'values' },
+    });
+    expect(valuesHistoryResponse.ok).toBe(true);
+    const valuesHistory = await getData<{ revisions: Array<{ id: string; sequence: number }> }>(valuesHistoryResponse);
+    const middleValuesRevision = valuesHistory.revisions.find((revision) => revision.sequence === 2);
+    const firstValuesRevision = valuesHistory.revisions.find((revision) => revision.sequence === 1);
+    expect(middleValuesRevision).toBeDefined();
+    expect(firstValuesRevision).toBeDefined();
+
+    const middleValuesResponse = await teammate.get(`/api/v1/pages/${page.id}/history/${middleValuesRevision!.id}`);
+    expect(middleValuesResponse.ok).toBe(true);
+    const middleValues = await getData<{
+      target: 'values';
+      values: Record<string, { type: string; value: string }>;
+      previousValues: Record<string, { type: string; value: string }>;
+      isFirstRevision: boolean;
+    }>(middleValuesResponse);
+    expect(middleValues).toMatchObject({
+      target: 'values',
+      values: { [noteColumn.id]: { type: 'string', value: 'Value middle' } },
+      previousValues: { [noteColumn.id]: { type: 'string', value: 'Value first' } },
+      isFirstRevision: false,
+    });
+    expect(middleValues.previousValues).not.toEqual({ [noteColumn.id]: { type: 'string', value: 'Value final' } });
+
+    const firstValuesResponse = await teammate.get(`/api/v1/pages/${page.id}/history/${firstValuesRevision!.id}`);
+    expect(firstValuesResponse.ok).toBe(true);
+    expect(await getData(firstValuesResponse)).toMatchObject({
+      target: 'values',
+      previousValues: {},
+      isFirstRevision: true,
+    });
   });
 
   test('history revision detail returns column id/name metadata for a values revision (THOTH-075)', async () => {

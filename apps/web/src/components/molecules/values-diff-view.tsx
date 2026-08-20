@@ -33,9 +33,9 @@ function formatValue(value: PageValue | undefined): string {
   return String(value.value);
 }
 
-// Per-column before/after table for a `target='values'` revision. `before` is the reconstructed
-// values state at the chosen revision; `after` is the page's current values — only the columns
-// present in either side are shown (columns untouched since are omitted for brevity).
+// Per-column before/after table for a `target='values'` revision. `before` is the immediately
+// preceding values state and `after` is the reconstructed state at the chosen revision — only
+// the columns present in either side are shown (columns untouched since are omitted for brevity).
 export function ValuesDiffView({ before, after, columns }: ValuesDiffViewProperties) {
   const columnIds = [...new Set([...Object.keys(before), ...Object.keys(after)])].toSorted();
   const nameById = new Map(columns.map((column) => [column.id, column.name] as const));
@@ -53,8 +53,8 @@ export function ValuesDiffView({ before, after, columns }: ValuesDiffViewPropert
       <Table.Thead>
         <Table.Tr>
           <Table.Th>Column</Table.Th>
+          <Table.Th>Previous</Table.Th>
           <Table.Th>At this revision</Table.Th>
-          <Table.Th>Current</Table.Th>
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>

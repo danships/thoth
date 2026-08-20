@@ -4387,7 +4387,7 @@
     "/pages/{id}/history/{revisionId}": {
       "get": {
         "operationId": "getPageRevision",
-        "summary": "Reconstruct a page revision and diff it against the current state",
+        "summary": "Reconstruct a page revision and diff it against its previous revision",
         "tags": [
           "Pages"
         ],
@@ -4427,15 +4427,19 @@
                             "content": {
                               "type": "string"
                             },
-                            "currentContent": {
+                            "previousContent": {
                               "type": "string"
+                            },
+                            "isFirstRevision": {
+                              "type": "boolean"
                             }
                           },
                           "required": [
                             "target",
                             "sequence",
                             "content",
-                            "currentContent"
+                            "previousContent",
+                            "isFirstRevision"
                           ],
                           "additionalProperties": false
                         },
@@ -4600,7 +4604,7 @@
                                 ]
                               }
                             },
-                            "currentValues": {
+                            "previousValues": {
                               "type": "object",
                               "propertyNames": {
                                 "type": "string"
@@ -4749,6 +4753,9 @@
                                 ]
                               }
                             },
+                            "isFirstRevision": {
+                              "type": "boolean"
+                            },
                             "columns": {
                               "type": "array",
                               "items": {
@@ -4773,7 +4780,8 @@
                             "target",
                             "sequence",
                             "values",
-                            "currentValues",
+                            "previousValues",
+                            "isFirstRevision",
                             "columns"
                           ],
                           "additionalProperties": false

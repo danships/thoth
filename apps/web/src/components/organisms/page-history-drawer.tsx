@@ -227,15 +227,29 @@ export function PageHistoryDrawer({ pageId, opened, onClose, mutatePageDetails }
         <Box className={styles['diffPanel']}>
           {!selectedRevisionId && (
             <Text c="dimmed" size="sm">
-              Select a revision to view its diff against the current state.
+              Select a revision to view what changed in it.
             </Text>
           )}
           {selectedRevisionId && isLoadingRevision && <Loader size="sm" />}
           {selectedRevisionId && revision && revision.target === 'content' && (
-            <MarkdownDiffView before={revision.content} after={revision.currentContent} />
+            <>
+              {revision.isFirstRevision && (
+                <Text c="dimmed" size="sm" mb="sm">
+                  This is the first recorded revision — shown in full.
+                </Text>
+              )}
+              <MarkdownDiffView before={revision.previousContent} after={revision.content} />
+            </>
           )}
           {selectedRevisionId && revision && revision.target === 'values' && (
-            <ValuesDiffView before={revision.values} after={revision.currentValues} columns={revision.columns} />
+            <>
+              {revision.isFirstRevision && (
+                <Text c="dimmed" size="sm" mb="sm">
+                  This is the first recorded revision — shown in full.
+                </Text>
+              )}
+              <ValuesDiffView before={revision.previousValues} after={revision.values} columns={revision.columns} />
+            </>
           )}
         </Box>
 
