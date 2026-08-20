@@ -9,15 +9,19 @@ import {
 } from '@/lib/database';
 import { buildPageUrlId } from '@/lib/utils/page-url';
 import { getLogger } from '@/lib/logger';
+import { getEnvironment } from '@/lib/environment';
+import { resolveAppUrl } from '@/lib/environment/app-url';
 
 // Plain Next.js route handler (NOT wrapped by `apiRoute`, NOT under `/api`) that powers the
 // `openUrl` on every inbox item (THOTH-066). It resolves the session from the request cookie,
 // verifies the caller owns the notification, re-checks current membership + `AccessGrant` on the
 // page, marks the item read (idempotently), and 303-redirects to the in-app page. It NEVER
 // returns a 500 and NEVER leaks existence — any failure falls through to a safe internal
-// redirect. Every redirect target is an internal relative path (never built from user input).
+// redirect. Every redirect target is an internal relative path (never built from user input) and
+// is resolved against the configured public APP_URL rather than the incoming request origin.
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
-  const redirectTo = (path: string): Response => NextResponse.redirect(new URL(path, request.url), 303);
+  const appUrl = resolveAppUrl(await getEnvironment());
+  const redirectTo = (path: string): Response => NextResponse.redirect(new URL(path, appUrl), 303);
 
   try {
     const session = await getSessionFromCookie(request.headers);

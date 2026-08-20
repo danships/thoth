@@ -99,6 +99,7 @@ export default async function globalSetup({ provide }: Pick<TestProject, 'provid
     BETTER_AUTH_SECRET: 'integration-test-secret-not-for-production',
     LOG_LEVEL: 'error',
     STORAGE_LOCAL_FOLDER: uploadsPath,
+    APP_URL: baseUrl,
     NEXT_TELEMETRY_DISABLED: '1',
     JOB_SOCKET_PATH: socketPath,
     // Shrinks the otherwise-real webhook delivery network timeout/backoff (THOTH-061) so tests
