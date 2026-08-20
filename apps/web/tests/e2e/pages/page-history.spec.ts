@@ -224,23 +224,18 @@ test.describe('page history', () => {
   }) => {
     const pageId = await createPage(request, 'THOTH-084 History Diff Page');
 
-    expect(
-      (await request.post(`/api/v1/pages/${pageId}/content`, { data: { content: 'Base text' } })).ok()
-    ).toBeTruthy();
+    const baseResponse = await request.post(`/api/v1/pages/${pageId}/content`, { data: { content: 'Base text' } });
+    expect(baseResponse.ok()).toBeTruthy();
     forceNextSaveToAppend(pageId);
-    expect(
-      (
-        await request.post(`/api/v1/pages/${pageId}/content`, { data: { content: 'Base text\nMiddle-only addition' } })
-      ).ok()
-    ).toBeTruthy();
+    const middleResponse = await request.post(`/api/v1/pages/${pageId}/content`, {
+      data: { content: 'Base text\nMiddle-only addition' },
+    });
+    expect(middleResponse.ok()).toBeTruthy();
     forceNextSaveToAppend(pageId);
-    expect(
-      (
-        await request.post(`/api/v1/pages/${pageId}/content`, {
-          data: { content: 'Base text\nMiddle-only addition\nLater-only addition' },
-        })
-      ).ok()
-    ).toBeTruthy();
+    const finalResponse = await request.post(`/api/v1/pages/${pageId}/content`, {
+      data: { content: 'Base text\nMiddle-only addition\nLater-only addition' },
+    });
+    expect(finalResponse.ok()).toBeTruthy();
 
     await page.goto(`/${SEED.workspace.slug}/pages/${pageId}`);
     await openHistoryDrawer(page);

@@ -63,17 +63,16 @@ describe('page history API', () => {
 
     // Content saves alternate authors so they append distinct rows without waiting for the
     // coalesce window. The middle row must compare only its own change, not the final live body.
-    expect((await owner.post(`/api/v1/pages/${page.id}/content`, { content: 'Content first' })).ok).toBe(true);
-    expect(
-      (await teammate.post(`/api/v1/pages/${page.id}/content`, { content: 'Content first\nContent middle' })).ok
-    ).toBe(true);
-    expect(
-      (
-        await owner.post(`/api/v1/pages/${page.id}/content`, {
-          content: 'Content first\nContent middle\nContent final',
-        })
-      ).ok
-    ).toBe(true);
+    const firstContentSave = await owner.post(`/api/v1/pages/${page.id}/content`, { content: 'Content first' });
+    expect(firstContentSave.ok).toBe(true);
+    const middleContentSave = await teammate.post(`/api/v1/pages/${page.id}/content`, {
+      content: 'Content first\nContent middle',
+    });
+    expect(middleContentSave.ok).toBe(true);
+    const finalContentSave = await owner.post(`/api/v1/pages/${page.id}/content`, {
+      content: 'Content first\nContent middle\nContent final',
+    });
+    expect(finalContentSave.ok).toBe(true);
 
     const contentHistoryResponse = await teammate.get(`/api/v1/pages/${page.id}/history`, {
       params: { target: 'content' },
@@ -113,27 +112,18 @@ describe('page history API', () => {
 
     // Value revisions always append. The same endpoint must reconstruct the previous value
     // state rather than returning the page's latest value.
-    expect(
-      (
-        await owner.patch(`/api/v1/pages/${page.id}/values`, {
-          [noteColumn.id]: { type: 'string', value: 'Value first' },
-        })
-      ).ok
-    ).toBe(true);
-    expect(
-      (
-        await teammate.patch(`/api/v1/pages/${page.id}/values`, {
-          [noteColumn.id]: { type: 'string', value: 'Value middle' },
-        })
-      ).ok
-    ).toBe(true);
-    expect(
-      (
-        await owner.patch(`/api/v1/pages/${page.id}/values`, {
-          [noteColumn.id]: { type: 'string', value: 'Value final' },
-        })
-      ).ok
-    ).toBe(true);
+    const firstValuesSave = await owner.patch(`/api/v1/pages/${page.id}/values`, {
+      [noteColumn.id]: { type: 'string', value: 'Value first' },
+    });
+    expect(firstValuesSave.ok).toBe(true);
+    const middleValuesSave = await teammate.patch(`/api/v1/pages/${page.id}/values`, {
+      [noteColumn.id]: { type: 'string', value: 'Value middle' },
+    });
+    expect(middleValuesSave.ok).toBe(true);
+    const finalValuesSave = await owner.patch(`/api/v1/pages/${page.id}/values`, {
+      [noteColumn.id]: { type: 'string', value: 'Value final' },
+    });
+    expect(finalValuesSave.ok).toBe(true);
 
     const valuesHistoryResponse = await teammate.get(`/api/v1/pages/${page.id}/history`, {
       params: { target: 'values' },
