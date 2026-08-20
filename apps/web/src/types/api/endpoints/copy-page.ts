@@ -1,0 +1,11 @@
+import { z } from 'zod';
+import { pageSchema } from '../entities';
+import type { DataWrapper } from '../utilities';
+export const COPY_PAGE_ENDPOINT = '/pages/:id/copy';
+export const copyPageParametersSchema = z.object({ id: z.string().min(1) });
+export const copyPageBodySchema = z.object({ parentId: z.string().min(1).nullable() });
+export const copyPageResponseSchema = z.object({ page: pageSchema });
+export type CopyPageParameters = z.infer<typeof copyPageParametersSchema>;
+export type CopyPageBody = z.infer<typeof copyPageBodySchema>;
+export type CopyPageResponse = z.infer<typeof copyPageResponseSchema>;
+export type CopyPageResponseData = DataWrapper<CopyPageResponse>;

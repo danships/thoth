@@ -31,3 +31,47 @@ export async function registerContainerAccessForNewPage(page: NewPageForAccess, 
     createdAt: page.createdAt,
   });
 }
+
+/** Records an explicit access without disturbing a user's favourite metadata. */
+export async function touchContainerAccess(page: NewPageForAccess, userId: string, accessedAt: string): Promise<void> {
+  const repository = await getContainerAccessRepository();
+  const existing = await repository.getOneByQuery(
+    repository.createQuery().eq('containerId', page.id).eq('userId', userId)
+  );
+  if (existing) {
+    await repository.update({
+      ...existing,
+      parentId: page.parentId ?? null,
+      workspaceId: page.workspaceId,
+      lastAccessedAt: accessedAt,
+    });
+    return;
+  }
+  await repository.create({
+    userId,
+    containerId: page.id,
+    parentId: page.parentId ?? null,
+    workspaceId: page.workspaceId,
+    lastAccessedAt: accessedAt,
+    starred: false,
+    starredAt: null,
+    createdAt: accessedAt,
+  });
+}
+
+/** Number of `ContainerAccess` rows updated concurrently by {@link syncContainerAccessParent}. */
+const CONTAINER_ACCESS_SYNC_BATCH_SIZE = 25;
+
+/** Keeps denormalised parent snapshots correct for every user after a page move. */
+export async function syncContainerAccessParent(
+  page: Pick<NewPageForAccess, 'id' | 'parentId' | 'workspaceId'>
+): Promise<void> {
+  const repository = await getContainerAccessRepository();
+  const rows = await repository.getByQuery(repository.createQuery().eq('containerId', page.id));
+  for (let index = 0; index < rows.length; index += CONTAINER_ACCESS_SYNC_BATCH_SIZE) {
+    const batch = rows.slice(index, index + CONTAINER_ACCESS_SYNC_BATCH_SIZE);
+    await Promise.all(
+      batch.map((row) => repository.update({ ...row, parentId: page.parentId ?? null, workspaceId: page.workspaceId }))
+    );
+  }
+}

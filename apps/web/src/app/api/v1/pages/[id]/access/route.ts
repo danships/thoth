@@ -1,6 +1,5 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
-import { getContainerAccessRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
+import { touchContainerAccess } from '@/lib/database';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import type { RegisterPageAccessParameters, RegisterPageAccessResponse } from '@/types/api';
@@ -20,35 +19,14 @@ export const POST = apiRoute<RegisterPageAccessResponse, {}, RegisterPageAccessP
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
     await assertGrantAllowsContainerForSession(session, page);
 
-    const containerAccessRepository = await getContainerAccessRepository();
-    const existing = await containerAccessRepository.getOneByQuery(
-      addUserIdToQuery(containerAccessRepository.createQuery().eq('containerId', page.id), session.user.id)
-    );
-
     const lastAccessedAt = new Date().toISOString();
-
-    const upserted = existing
-      ? await containerAccessRepository.update({
-          ...existing,
-          parentId: page.parentId || null,
-          lastAccessedAt,
-        })
-      : await containerAccessRepository.create({
-          userId: session.user.id,
-          containerId: page.id,
-          parentId: page.parentId || null,
-          workspaceId: page.workspaceId,
-          lastAccessedAt,
-          starred: false,
-          starredAt: null,
-          createdAt: lastAccessedAt,
-        });
+    await touchContainerAccess(page, session.user.id, lastAccessedAt);
 
     return {
-      id: upserted.id,
-      containerId: upserted.containerId,
-      parentId: upserted.parentId || null,
-      lastAccessedAt: upserted.lastAccessedAt,
+      id: page.id,
+      containerId: page.id,
+      parentId: page.parentId || null,
+      lastAccessedAt,
     };
   }
 );
