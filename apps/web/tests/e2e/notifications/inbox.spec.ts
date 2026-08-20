@@ -56,15 +56,15 @@ test.describe('notification inbox', () => {
 
     await page.goto(`/notifications/${SEED.notifications.unread.id}/open`);
 
-    await expect(page).toHaveURL(
-      new RegExp(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`),
-      { timeout: 10_000 }
-    );
+    const baseUrl = process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:3000';
+    await expect(page).toHaveURL(`${baseUrl}/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`, { timeout: 10_000 });
 
     // The item should now be read.
     const listResponse = await request.get('/api/v1/notifications?unreadOnly=true');
     expect(listResponse.ok()).toBeTruthy();
     const body = (await listResponse.json()) as { data: { notifications: { id: string }[] } };
-    expect(body.data.notifications.some((notification) => notification.id === SEED.notifications.unread.id)).toBe(false);
+    expect(body.data.notifications.some((notification) => notification.id === SEED.notifications.unread.id)).toBe(
+      false
+    );
   });
 });
