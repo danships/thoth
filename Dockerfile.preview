@@ -79,7 +79,12 @@ ENV CI=true
 # start as root, see below) drop privileges down to the `nextjs` user right before starting the
 # app, execing in place so it stays PID 1's signal-forwarding process — the same role `su-exec`
 # played on the (now-replaced) Alpine base.
-RUN apt-get update && apt-get install -y --no-install-recommends wget \
+#
+# `libgomp1` (GNU OpenMP runtime) and `libatomic1` are runtime dependencies of onnxruntime-node's
+# prebuilt `libonnxruntime.so.1` (THOTH-086's workspace search indexing, via
+# @huggingface/transformers). `-slim` images don't ship them, so without them dlopen() fails at
+# runtime with `ERR_DLOPEN_FAILED` even though the base is glibc (Debian), not musl.
+RUN apt-get update && apt-get install -y --no-install-recommends wget libgomp1 libatomic1 \
     && rm -rf /var/lib/apt/lists/* && \
     groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs --home-dir /home/nextjs --no-create-home nextjs && \
