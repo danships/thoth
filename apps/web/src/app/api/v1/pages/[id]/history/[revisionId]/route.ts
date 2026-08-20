@@ -1,6 +1,5 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getPageRevisionRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
@@ -21,9 +20,7 @@ export const GET = apiRoute<GetPageRevisionResponse, undefined, GetPageRevisionP
     await assertGrantAllowsContainerForSession(session, page);
 
     const repository = await getPageRevisionRepository();
-    const revision = await repository.getOneByQuery(
-      addUserIdToQuery(repository.createQuery().eq('id', params.revisionId), session.user.id)
-    );
+    const revision = await repository.getOneByQuery(repository.createQuery().eq('id', params.revisionId));
 
     // Never trust `revisionId` alone — it must also belong to this exact page.
     if (!revision || revision.containerId !== params.id) {
@@ -32,8 +29,11 @@ export const GET = apiRoute<GetPageRevisionResponse, undefined, GetPageRevisionP
 
     if (revision.target === 'content') {
       const revisions = await repository.getByQuery(
-        addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
+        repository
+          .createQuery()
+          .eq('containerId', params.id)
           .eq('target', 'content')
+          .lte('sequence', revision.sequence)
           .sort('sequence', 'asc')
       );
 
@@ -41,13 +41,17 @@ export const GET = apiRoute<GetPageRevisionResponse, undefined, GetPageRevisionP
         target: 'content',
         sequence: revision.sequence,
         content: reconstructAt(revisions, revision.sequence),
-        currentContent: page.content ?? '',
+        previousContent: revision.previousSequence === null ? '' : reconstructAt(revisions, revision.previousSequence),
+        isFirstRevision: revision.previousSequence === null,
       };
     }
 
     const valuesRevisions = await repository.getByQuery(
-      addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
+      repository
+        .createQuery()
+        .eq('containerId', params.id)
         .eq('target', 'values')
+        .gt('sequence', revision.previousSequence ?? 0)
         .sort('sequence', 'asc')
     );
 
@@ -70,7 +74,11 @@ export const GET = apiRoute<GetPageRevisionResponse, undefined, GetPageRevisionP
       target: 'values',
       sequence: revision.sequence,
       values: reconstructValuesAt(page.values ?? {}, valuesRevisions, revision.sequence),
-      currentValues: page.values ?? {},
+      previousValues:
+        revision.previousSequence === null
+          ? {}
+          : reconstructValuesAt(page.values ?? {}, valuesRevisions, revision.previousSequence),
+      isFirstRevision: revision.previousSequence === null,
       columns,
     };
   }

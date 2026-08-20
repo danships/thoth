@@ -287,7 +287,7 @@ export const operations = [
     path: '/pages/{id}/history/{revisionId}',
     method: 'get',
     operationId: 'getPageRevision',
-    summary: 'Reconstruct a page revision and diff it against the current state',
+    summary: 'Reconstruct a page revision and diff it against its previous revision',
     tags: ['Pages'],
     auth: 'sessionOrApiKey',
     params: api.getPageRevisionParametersSchema,

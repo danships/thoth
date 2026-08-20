@@ -1,6 +1,5 @@
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { getPageRevisionRepository } from '@/lib/database';
-import { addUserIdToQuery } from '@/lib/database/helpers';
 import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import {
@@ -88,7 +87,9 @@ export const GET = apiRoute<GetPageHistoryResponse, GetPageHistoryQuery, GetPage
     // Ordering, the cursor filter, and the page-size bound are all pushed into the repository
     // query — this fetches at most `limit + 1 + SAFETY_MARGIN` rows instead of the container's
     // entire revision stream.
-    let databaseQuery = addUserIdToQuery(repository.createQuery().eq('containerId', params.id), session.user.id)
+    let databaseQuery = repository
+      .createQuery()
+      .eq('containerId', params.id)
       .sort('createdAt', 'desc')
       .sort('id', 'desc')
       .limit(query.limit + 1 + SAFETY_MARGIN);

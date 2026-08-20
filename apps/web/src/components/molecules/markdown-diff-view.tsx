@@ -25,7 +25,7 @@ export function MarkdownDiffView({ before, after }: MarkdownDiffViewProperties) 
   if (before === after) {
     return (
       <Text c="dimmed" size="sm">
-        No changes between this revision and the current content.
+        No changes between this revision and the previous one.
       </Text>
     );
   }
