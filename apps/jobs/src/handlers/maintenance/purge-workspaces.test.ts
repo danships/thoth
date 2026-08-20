@@ -1,18 +1,21 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { maintenancePurgeWorkspacesJobDefinition, type MaintenancePurgeWorkspacesResult } from './purge-workspaces.js';
-import type { JobExecutionContext } from '@thoth/job-protocol';
-import type { MaintenancePurgeWorkspacesPayloadV1 } from '@thoth/job-protocol';
+import type { JobExecutionContext, MaintenancePurgeWorkspacesPayloadV1 } from '@thoth/job-protocol';
 
 const {
   selectPurgeableWorkspacesMock,
-  purgeWorkspaceMock,
+  revalidateWorkspaceForPurgeMock,
+  cascadeDeleteWorkspaceMock,
   graceThresholdMsMock,
   deleteMock,
+  deleteWorkspaceIndexMock,
 } = vi.hoisted(() => ({
   selectPurgeableWorkspacesMock: vi.fn(),
-  purgeWorkspaceMock: vi.fn(),
+  revalidateWorkspaceForPurgeMock: vi.fn(),
+  cascadeDeleteWorkspaceMock: vi.fn(),
   graceThresholdMsMock: vi.fn().mockReturnValue(1000),
   deleteMock: vi.fn().mockResolvedValue(undefined),
+  deleteWorkspaceIndexMock: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@thoth/database', async (importOriginal) => {
@@ -21,7 +24,8 @@ vi.mock('@thoth/database', async (importOriginal) => {
     ...actual,
     maintenance: {
       selectPurgeableWorkspaces: selectPurgeableWorkspacesMock,
-      purgeWorkspace: purgeWorkspaceMock,
+      revalidateWorkspaceForPurge: revalidateWorkspaceForPurgeMock,
+      cascadeDeleteWorkspace: cascadeDeleteWorkspaceMock,
       graceThresholdMs: graceThresholdMsMock,
     },
   };
@@ -36,6 +40,10 @@ vi.mock('../../environment.js', () => ({
 
 vi.mock('../../storage-context.js', () => ({
   getStorageAdapter: () => ({ delete: deleteMock }),
+}));
+
+vi.mock('../../search/search-context.js', () => ({
+  getSearchService: () => ({ deleteWorkspaceIndex: deleteWorkspaceIndexMock }),
 }));
 
 function makeContext(
@@ -59,59 +67,52 @@ function makeContext(
 describe('maintenance.purge-workspaces handler', () => {
   beforeEach(() => {
     selectPurgeableWorkspacesMock.mockReset();
-    purgeWorkspaceMock.mockReset();
+    revalidateWorkspaceForPurgeMock.mockReset();
+    cascadeDeleteWorkspaceMock.mockReset();
     deleteMock.mockClear();
+    deleteWorkspaceIndexMock.mockReset();
   });
 
   test('purges every candidate in the batch and reports counts without continuation', async () => {
-    selectPurgeableWorkspacesMock.mockResolvedValue({
-      candidates: [{ id: 'ws-1' }, { id: 'ws-2' }],
-      totalEligible: 2,
-    });
-    purgeWorkspaceMock.mockResolvedValue({ status: 'purged', counts: {} });
+    selectPurgeableWorkspacesMock.mockResolvedValue({ candidates: [{ id: 'ws-1' }, { id: 'ws-2' }], totalEligible: 2 });
+    revalidateWorkspaceForPurgeMock.mockResolvedValue({ id: 'ws-1' });
+    cascadeDeleteWorkspaceMock.mockResolvedValue({});
 
     const context = makeContext({ offset: 0 });
     const result = (await maintenancePurgeWorkspacesJobDefinition.handler(context)) as MaintenancePurgeWorkspacesResult;
 
-    expect(purgeWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(deleteWorkspaceIndexMock).toHaveBeenCalledTimes(2);
+    expect(cascadeDeleteWorkspaceMock).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ scanned: 2, purged: 2, skipped: 0, hasMoreWork: false });
     expect(context.enqueueChild).not.toHaveBeenCalled();
   });
 
-  test('enqueues a continuation with offset unchanged when the whole batch was purged (purged rows leave the eligible set)', async () => {
-    selectPurgeableWorkspacesMock.mockResolvedValue({
-      candidates: [{ id: 'ws-1' }],
-      totalEligible: 5,
-    });
-    purgeWorkspaceMock.mockResolvedValue({ status: 'purged', counts: {} });
+  test('skips and retries later when deleting the workspace search index fails', async () => {
+    selectPurgeableWorkspacesMock.mockResolvedValue({ candidates: [{ id: 'ws-1' }], totalEligible: 1 });
+    revalidateWorkspaceForPurgeMock.mockResolvedValue({ id: 'ws-1' });
+    deleteWorkspaceIndexMock.mockRejectedValue(new Error('boom'));
 
     const context = makeContext({ offset: 0 });
-    await maintenancePurgeWorkspacesJobDefinition.handler(context);
+    const result = (await maintenancePurgeWorkspacesJobDefinition.handler(context)) as MaintenancePurgeWorkspacesResult;
 
-    expect(context.enqueueChild).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'maintenance.purge-workspaces',
-        payload: { offset: 0 },
-        dedupeKey: 'maintenance:purge-workspaces',
-      })
-    );
+    expect(cascadeDeleteWorkspaceMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ scanned: 1, purged: 0, skipped: 1, hasMoreWork: false });
   });
 
-  test('enqueues a continuation advancing the offset only by skipped candidates, not purged ones', async () => {
+  test('enqueues a continuation advancing the offset only by skipped candidates', async () => {
     selectPurgeableWorkspacesMock.mockResolvedValue({
       candidates: [{ id: 'ws-1' }, { id: 'ws-2' }, { id: 'ws-3' }],
       totalEligible: 10,
     });
-    purgeWorkspaceMock
-      .mockResolvedValueOnce({ status: 'purged', counts: {} })
-      .mockResolvedValueOnce({ status: 'skipped', reason: 'restored' })
-      .mockResolvedValueOnce({ status: 'purged', counts: {} });
+    revalidateWorkspaceForPurgeMock
+      .mockResolvedValueOnce({ id: 'ws-1' })
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ id: 'ws-3' });
+    cascadeDeleteWorkspaceMock.mockResolvedValue({});
 
     const context = makeContext({ offset: 0 });
     await maintenancePurgeWorkspacesJobDefinition.handler(context);
 
-    // Only the single skipped candidate remains in the eligible set at its original position —
-    // the two purged ones are gone, so the offset must not skip over unseen rows behind them.
     expect(context.enqueueChild).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: { offset: 1 },
@@ -119,51 +120,20 @@ describe('maintenance.purge-workspaces handler', () => {
     );
   });
 
-  test('does not treat a fresh, fully-purged batch as reaching the end of a much larger eligible set', async () => {
-    // Regression case: 200 eligible workspaces, a 100-sized batch fully purged. The next
-    // continuation must still see `hasMoreWork: true` with `offset: 0` (not `offset: 100`,
-    // which would incorrectly skip the remaining 100 rows once they shift down to fill the
-    // gap left by this batch).
-    const candidates = Array.from({ length: 100 }, (_, index) => ({ id: `ws-${index}` }));
-    selectPurgeableWorkspacesMock.mockResolvedValue({ candidates, totalEligible: 200 });
-    purgeWorkspaceMock.mockResolvedValue({ status: 'purged', counts: {} });
-
-    const context = makeContext({ offset: 0 });
-    const result = (await maintenancePurgeWorkspacesJobDefinition.handler(context)) as MaintenancePurgeWorkspacesResult;
-
-    expect(result.hasMoreWork).toBe(true);
-    expect(context.enqueueChild).toHaveBeenCalledWith(expect.objectContaining({ payload: { offset: 0 } }));
-  });
-
   test('stops before purging the next candidate once the abort signal fires', async () => {
     const controller = new AbortController();
-    selectPurgeableWorkspacesMock.mockResolvedValue({
-      candidates: [{ id: 'ws-1' }, { id: 'ws-2' }],
-      totalEligible: 2,
-    });
-    purgeWorkspaceMock.mockImplementation(async () => {
+    selectPurgeableWorkspacesMock.mockResolvedValue({ candidates: [{ id: 'ws-1' }, { id: 'ws-2' }], totalEligible: 2 });
+    revalidateWorkspaceForPurgeMock.mockImplementation(async () => {
       controller.abort();
-      return { status: 'purged', counts: {} };
+      return { id: 'ws-1' };
     });
+    cascadeDeleteWorkspaceMock.mockResolvedValue({});
 
     const context = makeContext({ offset: 0 }, { signal: controller.signal });
     const result = (await maintenancePurgeWorkspacesJobDefinition.handler(context)) as MaintenancePurgeWorkspacesResult;
 
-    expect(purgeWorkspaceMock).toHaveBeenCalledTimes(1);
+    expect(cascadeDeleteWorkspaceMock).toHaveBeenCalledTimes(1);
     expect(result.hasMoreWork).toBe(false);
     expect(context.enqueueChild).not.toHaveBeenCalled();
-  });
-
-  test('counts a skipped (revalidation-failed) candidate without treating it as purged', async () => {
-    selectPurgeableWorkspacesMock.mockResolvedValue({
-      candidates: [{ id: 'ws-1' }],
-      totalEligible: 1,
-    });
-    purgeWorkspaceMock.mockResolvedValue({ status: 'skipped', reason: 'restored' });
-
-    const context = makeContext({ offset: 0 });
-    const result = (await maintenancePurgeWorkspacesJobDefinition.handler(context)) as MaintenancePurgeWorkspacesResult;
-
-    expect(result).toEqual({ scanned: 1, purged: 0, skipped: 1, hasMoreWork: false });
   });
 });

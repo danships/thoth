@@ -9,6 +9,7 @@ import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
 import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
+import { schedulePageSearchSync } from '@/lib/search/notify-service';
 import { reconstructAt, reconstructValuesAt } from '@thoth/shared';
 import { createContentBaseline } from '@thoth/database';
 import type { PageRevision, PageContainer, Container } from '@thoth/database/types';
@@ -174,6 +175,7 @@ export const POST = apiRoute<ForkPageRevisionResponse, undefined, ForkPageRevisi
 
     scheduleNotifyPageChange('page.created', finalPage, toWebhookActor(session));
     scheduleNotificationDispatch('page.created', finalPage, toWebhookActor(session));
+    schedulePageSearchSync(finalPage);
 
     return {
       id: finalPage.id,

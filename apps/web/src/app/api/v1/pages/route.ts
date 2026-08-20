@@ -16,6 +16,7 @@ import { generateKeyBetween } from 'fractional-indexing';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
 import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
+import { schedulePageSearchSync } from '@/lib/search/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { dataViewRetriever } from '@/lib/database/retrievers/data-view-retriever';
@@ -473,6 +474,7 @@ export const POST = apiRoute<CreatePageResponse, {}, {}, CreatePageBody>(
 
     scheduleNotifyPageChange('page.created', createdPage, toWebhookActor(session));
     scheduleNotificationDispatch('page.created', createdPage, toWebhookActor(session));
+    schedulePageSearchSync(createdPage);
 
     const returnValue: CreatePageResponse = {
       id: createdPage.id,

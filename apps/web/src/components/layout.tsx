@@ -7,6 +7,7 @@ import { type PropsWithChildren, type ReactNode, Suspense, useEffect } from 'rea
 import { useAuth } from '@/lib/auth/provider';
 import { WorkspaceMenu } from '@/components/molecules/sidebar/workspace-menu';
 import { AppHeader } from '@/components/molecules/app-header';
+import { useCurrentWorkspace } from '@/lib/store/workspace-context';
 
 type LayoutProperties = PropsWithChildren & {
   sidebar: ReactNode;
@@ -34,6 +35,7 @@ function CloseNavbarOnNavigate({ close }: { close: () => void }) {
 export default function Layout({ children, sidebar }: LayoutProperties) {
   const [opened, { toggle, close }] = useDisclosure();
   const { user, loading } = useAuth();
+  const workspace = useCurrentWorkspace();
   const router = useRouter();
 
   useEffect(() => {
@@ -72,7 +74,12 @@ export default function Layout({ children, sidebar }: LayoutProperties) {
         <CloseNavbarOnNavigate close={close} />
       </Suspense>
       <AppShell.Header>
-        <AppHeader navbarOpened={opened} onToggleNavbar={toggle} showBurger />
+        <AppHeader
+          navbarOpened={opened}
+          onToggleNavbar={toggle}
+          showBurger
+          searchWorkspace={{ id: workspace.id, slug: workspace.slug }}
+        />
       </AppShell.Header>
 
       <AppShell.Navbar p="md" style={{ display: 'flex', flexDirection: 'column' }}>

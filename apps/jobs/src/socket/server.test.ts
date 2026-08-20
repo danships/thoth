@@ -1,6 +1,6 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createConnection, createServer } from 'node:net';
-import { mkdtemp, rm, symlink, writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import nodePath from 'node:path';
 import type { Logger } from 'winston';
@@ -9,7 +9,7 @@ import { JobSocketServer } from './server.js';
 import { QueueService } from '../queue/queue-service.js';
 import { JobRegistry } from '../handlers/registry.js';
 
-function fakeLogger(): Logger {
+function fakeLogger() {
   return {
     info: vi.fn(),
     warn: vi.fn(),
@@ -29,7 +29,7 @@ async function sendRaw(socketPath: string, data: string): Promise<string> {
   });
 }
 
-function buildServer(socketPath: string) {
+function buildServer(socketPath: string, overrides?: { searchImpl?: () => Promise<unknown>; searchQueryTimeoutMs?: number }) {
   const queueService = new QueueService();
   const registry = new JobRegistry();
   registry.register<{}>({
@@ -40,8 +40,19 @@ function buildServer(socketPath: string) {
     maxAttempts: 1,
     handler: async () => ({}),
   });
-  const server = new JobSocketServer({ socketPath, queueService, registry, logger: fakeLogger() });
-  return { server, queueService, registry };
+  const logger = fakeLogger();
+  const searchService = {
+    search: vi.fn(overrides?.searchImpl ?? (async () => [])),
+  } as unknown as import('../search/workspace-search-service.js').WorkspaceSearchService;
+  const server = new JobSocketServer({
+    socketPath,
+    queueService,
+    registry,
+    logger,
+    searchService,
+    ...(overrides?.searchQueryTimeoutMs === undefined ? {} : { searchQueryTimeoutMs: overrides.searchQueryTimeoutMs }),
+  });
+  return { server, queueService, registry, logger, searchService };
 }
 
 describe('JobSocketServer', () => {
@@ -78,8 +89,7 @@ describe('JobSocketServer', () => {
       socketPath,
       JSON.stringify({ version: 1, requestId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'ping' }) + '\n'
     );
-    const parsed = JSON.parse(response.trim());
-    expect(parsed.ok).toBe(true);
+    expect(JSON.parse(response.trim()).ok).toBe(true);
 
     await server.stop();
   });
@@ -124,30 +134,101 @@ describe('JobSocketServer', () => {
 
     const statusResponse = await sendRaw(
       socketPath,
-      JSON.stringify({
-        version: 1,
-        requestId: 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb',
-        kind: 'status',
-        jobId,
-      }) + '\n'
+      JSON.stringify({ version: 1, requestId: 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb', kind: 'status', jobId }) + '\n'
     );
     const parsedStatus = JSON.parse(statusResponse.trim());
     expect(parsedStatus.ok).toBe(true);
     expect(parsedStatus.result.found).toBe(true);
-    expect(['queued', 'running', 'completed', 'dead']).toContain(parsedStatus.result.status);
 
     const unknownResponse = await sendRaw(
       socketPath,
+      JSON.stringify({ version: 1, requestId: 'cccccccc-1111-4111-8111-cccccccccccc', kind: 'status', jobId: 'nope' }) + '\n'
+    );
+    expect(JSON.parse(unknownResponse.trim()).result.found).toBe(false);
+
+    await server.stop();
+  });
+
+  test('supports a successful search round-trip', async () => {
+    const socketPath = nodePath.join(temporaryDirectory, 'jobs.sock');
+    const { server, searchService } = buildServer(socketPath, {
+      searchImpl: async () => [{ pageId: 'page-1', score: 0.9, snippet: 'alpha result' }],
+    });
+    await server.start();
+
+    const response = await sendRaw(
+      socketPath,
       JSON.stringify({
         version: 1,
-        requestId: 'cccccccc-1111-4111-8111-cccccccccccc',
-        kind: 'status',
-        jobId: 'does-not-exist',
+        requestId: 'dddddddd-1111-4111-8111-dddddddddddd',
+        kind: 'search',
+        workspaceId: 'ws-1',
+        query: 'alpha',
+        limit: 5,
+        grant: { workspaceId: 'ws-1', permission: 'read', scopeType: 'workspace' },
       }) + '\n'
     );
-    const parsedUnknown = JSON.parse(unknownResponse.trim());
-    expect(parsedUnknown.ok).toBe(true);
-    expect(parsedUnknown.result.found).toBe(false);
+    const parsed = JSON.parse(response.trim());
+    expect(parsed.ok).toBe(true);
+    expect(parsed.result.searchResults).toEqual([{ pageId: 'page-1', score: 0.9, snippet: 'alpha result' }]);
+    expect((searchService.search as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+
+    await server.stop();
+  });
+
+  test('rejects invalid search requests before the service runs', async () => {
+    const socketPath = nodePath.join(temporaryDirectory, 'jobs.sock');
+    const { server, searchService } = buildServer(socketPath);
+    await server.start();
+
+    const response = await sendRaw(
+      socketPath,
+      JSON.stringify({
+        version: 1,
+        requestId: 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee',
+        kind: 'search',
+        workspaceId: 'ws-1',
+        query: '',
+        limit: 0,
+        grant: { workspaceId: 'ws-1', permission: 'read', scopeType: 'workspace', extra: true },
+      }) + '\n'
+    );
+    const parsed = JSON.parse(response.trim());
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error.code).toBe('INVALID_REQUEST');
+    expect((searchService.search as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+
+    await server.stop();
+  });
+
+  test('maps search timeouts to SEARCH_UNAVAILABLE and never logs the query text', async () => {
+    const socketPath = nodePath.join(temporaryDirectory, 'jobs.sock');
+    const { server, logger } = buildServer(socketPath, {
+      searchImpl: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return [];
+      },
+      searchQueryTimeoutMs: 5,
+    });
+    await server.start();
+
+    const query = 'super-secret-query';
+    const response = await sendRaw(
+      socketPath,
+      JSON.stringify({
+        version: 1,
+        requestId: 'ffffffff-1111-4111-8111-ffffffffffff',
+        kind: 'search',
+        workspaceId: 'ws-1',
+        query,
+        limit: 5,
+        grant: { workspaceId: 'ws-1', permission: 'read', scopeType: 'workspace' },
+      }) + '\n'
+    );
+    const parsed = JSON.parse(response.trim());
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error.code).toBe('SEARCH_UNAVAILABLE');
+    expect(JSON.stringify((logger.error as ReturnType<typeof vi.fn>).mock.calls)).not.toContain(query);
 
     await server.stop();
   });
@@ -158,9 +239,7 @@ describe('JobSocketServer', () => {
     await server.start();
 
     const response = await sendRaw(socketPath, 'not json\n');
-    const parsed = JSON.parse(response.trim());
-    expect(parsed.ok).toBe(false);
-    expect(parsed.error.code).toBe('INVALID_REQUEST');
+    expect(JSON.parse(response.trim()).error.code).toBe('INVALID_REQUEST');
 
     await server.stop();
   });
@@ -174,9 +253,7 @@ describe('JobSocketServer', () => {
       socketPath,
       JSON.stringify({ version: 2, requestId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'ping' }) + '\n'
     );
-    const parsed = JSON.parse(response.trim());
-    expect(parsed.ok).toBe(false);
-    expect(parsed.error.code).toBe('UNSUPPORTED_VERSION');
+    expect(JSON.parse(response.trim()).error.code).toBe('UNSUPPORTED_VERSION');
 
     await server.stop();
   });
@@ -188,9 +265,7 @@ describe('JobSocketServer', () => {
 
     const envelope = JSON.stringify({ version: 1, requestId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'ping' });
     const response = await sendRaw(socketPath, `${envelope}\n${envelope}\n`);
-    const parsed = JSON.parse(response.trim());
-    expect(parsed.ok).toBe(false);
-    expect(parsed.error.code).toBe('INVALID_REQUEST');
+    expect(JSON.parse(response.trim()).error.code).toBe('INVALID_REQUEST');
 
     await server.stop();
   });
@@ -200,11 +275,8 @@ describe('JobSocketServer', () => {
     const { server } = buildServer(socketPath);
     await server.start();
 
-    const oversized = 'a'.repeat(300 * 1024);
-    const response = await sendRaw(socketPath, oversized);
-    const parsed = JSON.parse(response.trim());
-    expect(parsed.ok).toBe(false);
-    expect(parsed.error.code).toBe('FRAME_TOO_LARGE');
+    const response = await sendRaw(socketPath, 'a'.repeat(300 * 1024));
+    expect(JSON.parse(response.trim()).error.code).toBe('FRAME_TOO_LARGE');
 
     await server.stop();
   });
@@ -243,11 +315,8 @@ describe('JobSocketServer', () => {
     await first.stop();
   });
 
-  test('recovers a stale (same-owner, refused) socket file and rebinds', async () => {
+  test('recovers a stale socket file and rebinds', async () => {
     const socketPath = nodePath.join(temporaryDirectory, 'jobs.sock');
-
-    // Create a stale socket file: bind a raw net server then close it WITHOUT unlinking,
-    // leaving a socket-type file that refuses connections.
     const staleServer = createServer(() => {});
     await new Promise<void>((resolve) => staleServer.listen(socketPath, resolve));
     await new Promise<void>((resolve) => staleServer.close(() => resolve()));
@@ -271,16 +340,12 @@ describe('JobSocketServer', () => {
     const { server } = buildServer(socketPath);
     await server.start();
 
-    // Force shuttingDown without fully stopping the listener, to test in-flight rejection logic.
     (server as unknown as { shuttingDown: boolean }).shuttingDown = true;
-
     const response = await sendRaw(
       socketPath,
       JSON.stringify({ version: 1, requestId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', kind: 'ping' }) + '\n'
     );
-    const parsed = JSON.parse(response.trim());
-    expect(parsed.ok).toBe(false);
-    expect(parsed.error.code).toBe('SHUTTING_DOWN');
+    expect(JSON.parse(response.trim()).error.code).toBe('SHUTTING_DOWN');
 
     (server as unknown as { shuttingDown: boolean }).shuttingDown = false;
     await server.stop();

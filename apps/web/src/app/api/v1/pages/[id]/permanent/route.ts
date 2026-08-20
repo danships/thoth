@@ -4,6 +4,7 @@ import { pageRetriever } from '@/lib/database/retrievers/page-retriever';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { getLogger } from '@/lib/logger';
+import { scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import type { PermanentDeletePageParameters } from '@/types/api';
 import { permanentDeletePageParametersSchema } from '@/types/api';
 
@@ -27,5 +28,7 @@ export const DELETE = apiRoute<void, undefined, PermanentDeletePageParameters, {
       pageId: page.id,
       workspaceId: page.workspaceId,
     });
+
+    scheduleWorkspaceSearchReconcile(page.workspaceId);
   }
 );

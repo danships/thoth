@@ -6,6 +6,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { HttpError } from '@/lib/errors/http-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { getLogger } from '@/lib/logger';
+import { scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import type { RestoreDataSourceParameters, RestoreDataSourceResponse } from '@/types/api';
 import { restoreDataSourceParametersSchema } from '@/types/api';
 
@@ -35,6 +36,8 @@ export const POST = apiRoute<RestoreDataSourceResponse, undefined, RestoreDataSo
       dataSourceId: restored.id,
       workspaceId: restored.workspaceId,
     });
+
+    scheduleWorkspaceSearchReconcile(restored.workspaceId);
 
     return {
       id: restored.id,

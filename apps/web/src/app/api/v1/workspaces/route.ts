@@ -8,6 +8,7 @@ import { getSetting, getSettingsForSubjects } from '@/lib/settings/service';
 import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { ConflictError } from '@/lib/errors/conflict-error';
+import { scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import type { CreateWorkspaceBody, CreateWorkspaceResponse, GetWorkspacesResponse } from '@/types/api';
 import { createWorkspaceBodySchema } from '@/types/api';
 
@@ -76,6 +77,8 @@ export const POST = apiRoute<CreateWorkspaceResponse, {}, {}, CreateWorkspaceBod
       scope: 'workspace',
       subjectId: workspace.id,
     });
+
+    scheduleWorkspaceSearchReconcile(workspace.id);
 
     return {
       id: workspace.id,

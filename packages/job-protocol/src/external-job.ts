@@ -15,6 +15,16 @@ import {
   notificationDispatchExternalJobRequestSchema,
   type NotificationDispatchExternalJobRequest,
 } from './notification-job.js';
+import {
+  searchSyncPageExternalJobRequestSchema,
+  searchReconcileWorkspaceExternalJobRequestSchema,
+  searchReconcileWorkspaceTestJobRequestSchema,
+  searchScanWorkspacesTestJobRequestSchema,
+  type SearchSyncPageExternalJobRequest,
+  type SearchReconcileWorkspaceExternalJobRequest,
+  type SearchReconcileWorkspaceTestJobRequest,
+  type SearchScanWorkspacesTestJobRequest,
+} from './search-job.js';
 
 /**
  * External job payload accepted over the Unix-socket IPC boundary (THOTH-059/THOTH-061/THOTH-066).
@@ -101,6 +111,31 @@ export type {
   NotificationActor,
 } from './notification-job.js';
 
+export {
+  searchCursorSchema,
+  searchSyncPagePayloadV1Schema,
+  searchSyncPageExternalJobRequestSchema,
+  searchSyncPageDedupeKey,
+  searchReconcileWorkspacePayloadV1Schema,
+  searchReconcileWorkspaceExternalPayloadV1Schema,
+  searchReconcileWorkspaceExternalJobRequestSchema,
+  searchReconcileWorkspaceTestJobRequestSchema,
+  searchReconcileWorkspaceDedupeKey,
+  searchScanWorkspacesPayloadV1Schema,
+  searchScanWorkspacesTestJobRequestSchema,
+} from './search-job.js';
+export type {
+  SearchCursor,
+  SearchSyncPagePayloadV1,
+  SearchSyncPageExternalJobRequest,
+  SearchReconcileWorkspacePayloadV1,
+  SearchReconcileWorkspaceExternalPayloadV1,
+  SearchReconcileWorkspaceExternalJobRequest,
+  SearchReconcileWorkspaceTestJobRequest,
+  SearchScanWorkspacesPayloadV1,
+  SearchScanWorkspacesTestJobRequest,
+} from './search-job.js';
+
 /** True only inside test runs; gates the only test-only externally-reachable job type. */
 function isTestEnvironment(): boolean {
   return process.env['NODE_ENV'] === 'test';
@@ -110,21 +145,34 @@ const productionExternalJobSchemas = [
   webhookDispatchExternalJobRequestSchema,
   webhookRedeliverExternalJobRequestSchema,
   notificationDispatchExternalJobRequestSchema,
+  searchSyncPageExternalJobRequestSchema,
+  searchReconcileWorkspaceExternalJobRequestSchema,
 ] as const;
 
 /**
- * The externally accepted job schema. Production environments accept exactly the three
- * externally-reachable job types (THOTH-061 webhooks + THOTH-066 notifications); test runs
- * additionally accept `test.noop` plus the internal-only `history.scan`/`history.maintain`
- * types (THOTH-062), so integration/e2e tests can drive real scan/maintenance runs through the
- * actual job service without a production "run maintenance" HTTP endpoint.
+ * The externally accepted job schema. Production environments accept exactly the five
+ * externally-reachable job types (THOTH-061 webhooks + THOTH-066 notifications + THOTH-086
+ * search sync/reconcile); test runs additionally accept `test.noop` plus the internal-only
+ * `history.scan`/`history.maintain`/`search.scan-workspaces` types and the cursor-accepting
+ * `search.reconcile-workspace` test variant, so integration/e2e tests can drive real
+ * scan/maintenance/reconcile runs through the actual job service without a production "run
+ * maintenance" HTTP endpoint.
  */
 export const ExternalJobRequestSchema: z.ZodType<ExternalJobRequest> = isTestEnvironment()
   ? z.discriminatedUnion('type', [
-      ...productionExternalJobSchemas,
+      webhookDispatchExternalJobRequestSchema,
+      webhookRedeliverExternalJobRequestSchema,
+      notificationDispatchExternalJobRequestSchema,
+      searchSyncPageExternalJobRequestSchema,
+      // The test variant fully supersedes the restricted production `search.reconcile-workspace`
+      // schema (same `type` literal) so tests may pass a `cursor` — zod's discriminated union
+      // requires a unique discriminant per member, so the production one is intentionally
+      // omitted from the test-mode union.
+      searchReconcileWorkspaceTestJobRequestSchema,
       TestNoopExternalJobRequestSchema,
       historyScanTestJobRequestSchema,
       historyMaintainTestJobRequestSchema,
+      searchScanWorkspacesTestJobRequestSchema,
     ])
   : z.discriminatedUnion('type', productionExternalJobSchemas);
 
@@ -134,4 +182,9 @@ export type ExternalJobRequest =
   | WebhookRedeliverExternalJobRequest
   | NotificationDispatchExternalJobRequest
   | HistoryScanTestJobRequest
-  | HistoryMaintainTestJobRequest;
+  | HistoryMaintainTestJobRequest
+  | SearchSyncPageExternalJobRequest
+  | SearchReconcileWorkspaceExternalJobRequest
+  | SearchReconcileWorkspaceTestJobRequest
+  | SearchScanWorkspacesTestJobRequest;
+

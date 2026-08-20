@@ -10,6 +10,7 @@ import {
 } from '@thoth/job-protocol';
 import type { QueueService } from '../queue/queue-service.js';
 import type { JobRegistry } from '../handlers/registry.js';
+import type { WorkspaceSearchService } from '../search/workspace-search-service.js';
 import { FrameParser } from './frame-parser.js';
 
 export type JobSocketServerOptions = {
@@ -17,7 +18,9 @@ export type JobSocketServerOptions = {
   queueService: QueueService;
   registry: JobRegistry;
   logger: Logger;
+  searchService: WorkspaceSearchService;
   readTimeoutMs?: number;
+  searchQueryTimeoutMs?: number;
   wake?: () => void;
 };
 
@@ -25,7 +28,6 @@ function currentUid(): number {
   return typeof process.getuid === 'function' ? process.getuid() : 0;
 }
 
-/** True if a connection attempt succeeds (the socket is live and accepting), false otherwise. */
 async function probeSocketIsLive(socketPath: string, timeoutMs = 1000): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = createConnection({ path: socketPath });
@@ -41,18 +43,8 @@ async function probeSocketIsLive(socketPath: string, timeoutMs = 1000): Promise<
   });
 }
 
-/**
- * Validates an existing filesystem entry at `socketPath` before (re)binding, and only unlinks a
- * confirmed-stale, same-owner socket file. Never blindly unlinks — a live socket means another
- * jobs process is already the singleton owner and this process must fail to start, not act as a
- * second worker; a symlink/regular-file/directory/foreign-owned entry is refused outright.
- */
 async function prepareSocketPath(socketPath: string): Promise<void> {
   const parentDirectory = nodePath.dirname(socketPath);
-  // `mkdir` with `recursive: true` only returns the path of the first directory it actually
-  // created; if the parent already existed (e.g. it's a shared system directory like `/tmp`)
-  // it resolves to `undefined` and we must not attempt to chmod it — the process may not own
-  // it (chmod would fail with EPERM) and locking down a shared directory would be unsafe.
   const createdDirectory = await mkdir(parentDirectory, { recursive: true, mode: 0o700 });
   if (createdDirectory) {
     await chmod(parentDirectory, 0o700);
@@ -86,16 +78,9 @@ async function prepareSocketPath(socketPath: string): Promise<void> {
     throw new Error(`Refusing to start: ${socketPath} is already accepting connections (singleton jobs process)`);
   }
 
-  // Confirmed stale (same-owner socket file, connection refused) — safe to remove.
   await unlink(socketPath);
 }
 
-/**
- * Unix-socket IPC server for `@thoth/jobs` (THOTH-059). Accepts exactly one UTF-8 JSON frame per
- * connection, validates it, enqueues/pings, writes exactly one response frame, then closes the
- * connection. Filesystem mode/ownership (parent `0700`, socket `0600`, same-UID trust boundary)
- * is the only access control — there is no TCP fallback or HTTP listener.
- */
 export class JobSocketServer {
   private readonly options: JobSocketServerOptions;
   private server: Server | undefined;
@@ -126,7 +111,6 @@ export class JobSocketServer {
     }
 
     await chmod(this.options.socketPath, 0o600);
-
     this.options.logger.info('job.socket.listening', { socketPath: this.options.socketPath });
   }
 
@@ -153,12 +137,16 @@ export class JobSocketServer {
       socket.destroy();
     }, readTimeoutMs);
 
+    const clearReadTimer = (): void => {
+      clearTimeout(timer);
+    };
+
     const respond = (response: JobResponseEnvelope): void => {
       if (responded) {
         return;
       }
       responded = true;
-      clearTimeout(timer);
+      clearReadTimer();
       socket.end(JSON.stringify(JobResponseEnvelopeSchema.parse(response)) + '\n', () => {
         socket.destroy();
       });
@@ -170,7 +158,6 @@ export class JobSocketServer {
       if (result.status === 'incomplete') {
         return;
       }
-
       if (result.status === 'too-large') {
         respond({
           version: 1,
@@ -180,7 +167,6 @@ export class JobSocketServer {
         });
         return;
       }
-
       if (result.status === 'multiple-frames') {
         respond({
           version: 1,
@@ -195,7 +181,7 @@ export class JobSocketServer {
         return;
       }
 
-      void this.handleFrame(result.line, respond).catch((error: unknown) => {
+      void this.handleFrame(result.line, respond, clearReadTimer).catch((error: unknown) => {
         this.options.logger.error('job.socket.handleFrame.unhandled', {
           message: error instanceof Error ? error.message : 'unknown error',
         });
@@ -204,11 +190,10 @@ export class JobSocketServer {
     });
 
     socket.on('error', () => {
-      clearTimeout(timer);
+      clearReadTimer();
     });
   }
 
-  /** Bounds and normalizes an untrusted `requestId` so it always satisfies the response schema. */
   private static normalizeRequestId(value: unknown): string {
     if (typeof value !== 'string' || value.length === 0) {
       return 'unknown';
@@ -216,7 +201,11 @@ export class JobSocketServer {
     return value.length > 200 ? value.slice(0, 200) : value;
   }
 
-  private async handleFrame(line: string, respond: (response: JobResponseEnvelope) => void): Promise<void> {
+  private async handleFrame(
+    line: string,
+    respond: (response: JobResponseEnvelope) => void,
+    clearReadTimer: () => void
+  ): Promise<void> {
     let parsedJson: unknown;
     try {
       parsedJson = JSON.parse(line);
@@ -254,7 +243,6 @@ export class JobSocketServer {
     }
 
     const request = parsed.data;
-
     if (this.shuttingDown) {
       respond({
         version: 1,
@@ -281,6 +269,57 @@ export class JobSocketServer {
       return;
     }
 
+    if (request.kind === 'search') {
+      clearReadTimer();
+      try {
+        const results = await Promise.race([
+          this.options.searchService.search({
+            workspaceId: request.workspaceId,
+            query: request.query,
+            limit: request.limit,
+            grant:
+              request.grant.scopedContainerIds === undefined
+                ? {
+                    workspaceId: request.grant.workspaceId,
+                    permission: request.grant.permission,
+                    scopeType: request.grant.scopeType,
+                  }
+                : {
+                    workspaceId: request.grant.workspaceId,
+                    permission: request.grant.permission,
+                    scopeType: request.grant.scopeType,
+                    scopedContainerIds: request.grant.scopedContainerIds,
+                  },
+          }),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Search timed out')), this.options.searchQueryTimeoutMs ?? 120_000);
+          }),
+        ]);
+        respond({
+          version: 1,
+          requestId: request.requestId,
+          ok: true,
+          result: { searchResults: results.map((result) => ({ pageId: result.pageId, score: result.score, snippet: result.snippet })) },
+        });
+      } catch (error) {
+        this.options.logger.error('job.socket.search.failed', {
+          workspaceId: request.workspaceId,
+          message: error instanceof Error ? error.message : 'unknown error',
+        });
+        respond({
+          version: 1,
+          requestId: request.requestId,
+          ok: false,
+          error: {
+            code: 'SEARCH_UNAVAILABLE',
+            message: 'Search is temporarily unavailable',
+            retryable: true,
+          },
+        });
+      }
+      return;
+    }
+
     const definition = this.options.registry.get(request.job.type);
     if (!definition) {
       respond({
@@ -294,11 +333,6 @@ export class JobSocketServer {
 
     try {
       const derivedDedupeKey = definition.dedupeKey?.(request.job.payload);
-      // Only fall back to a caller-supplied `dedupeKey` for job types that don't define their
-      // own derivation (e.g. `test.noop`) — production external types (`webhook.dispatch`,
-      // `webhook.redeliver`) never accept a caller-supplied dedupe key in their schema at all
-      // (see `packages/job-protocol/src/webhook-job.ts`), so this fallback can never be abused
-      // to spoof a coalescing key for those types.
       const dedupeKey =
         derivedDedupeKey ??
         ('dedupeKey' in request.job ? (request.job as { dedupeKey?: string }).dedupeKey : undefined);
@@ -319,7 +353,6 @@ export class JobSocketServer {
       });
 
       this.options.wake?.();
-
       respond({
         version: 1,
         requestId: request.requestId,
@@ -336,7 +369,5 @@ export class JobSocketServer {
     }
   }
 }
-
-/** Exposed for tests that need to assert the frame cap without spinning up a real socket. */
 
 export { MAX_FRAME_BYTES } from '@thoth/job-protocol';

@@ -6,6 +6,7 @@ import { NotFoundError } from '@/lib/errors/not-found-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
 import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
+import { schedulePageSearchSync } from '@/lib/search/notify-service';
 import { reconstructAt, reconstructValuesAt } from '@thoth/shared';
 import { recordContentRevision, recordValuesRevision } from '@thoth/database';
 import type { PageValue } from '@/types/schemas/entities/container';
@@ -49,6 +50,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
 
       scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
       scheduleNotificationDispatch('page.updated', updatedPage, toWebhookActor(session));
+      schedulePageSearchSync(updatedPage);
 
       const contentRevisions = await repository.getByQuery(
         repository.createQuery().eq('containerId', params.id).eq('target', 'content').sort('sequence', 'desc').limit(1)
@@ -107,6 +109,7 @@ export const POST = apiRoute<RestorePageRevisionResponse, undefined, RestorePage
 
     scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
     scheduleNotificationDispatch('page.updated', updatedPage, toWebhookActor(session));
+    schedulePageSearchSync(updatedPage);
 
     const newHeadValuesRevisions = await repository.getByQuery(
       repository.createQuery().eq('containerId', params.id).eq('target', 'values').sort('sequence', 'desc').limit(1)

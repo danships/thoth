@@ -65,6 +65,17 @@ export const operations = [
     errorStatuses: [404],
   },
   {
+    path: '/search',
+    method: 'get',
+    operationId: 'getSearchResults',
+    summary: 'Search pages in a workspace',
+    tags: ['Search'],
+    auth: 'sessionOrApiKey',
+    query: api.getSearchResultsQuerySchema,
+    response: api.getSearchResultsResponseSchema,
+    errorStatuses: [400, 404, 503],
+  },
+  {
     path: '/pages/welcome',
     method: 'post',
     operationId: 'createWelcomePage',

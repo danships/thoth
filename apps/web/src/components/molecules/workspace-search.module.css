@@ -1,0 +1,44 @@
+.resultButton {
+  display: block;
+  width: 100%;
+  padding: var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.resultButton:hover,
+.resultButton:focus-visible {
+  background-color: var(--mantine-color-gray-1);
+  outline: none;
+}
+
+.resultContent {
+  display: flex;
+  gap: var(--mantine-spacing-sm);
+  align-items: flex-start;
+}
+
+.resultIcon,
+.resultEmoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--mantine-radius-sm);
+  background-color: var(--mantine-color-gray-1);
+  flex-shrink: 0;
+}
+
+.resultText {
+  min-width: 0;
+  flex: 1;
+}
+
+.snippet {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

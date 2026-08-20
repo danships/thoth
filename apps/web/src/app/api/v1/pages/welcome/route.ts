@@ -6,6 +6,7 @@ import { resolveDefaultWorkspaceId } from '@/lib/database/resolve-workspace';
 import { assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
 import { assertGrantAllowsWrite, grantAllowsContainer, memberToAccessGrant } from '@/lib/auth/access-grant';
 import { NotFoundError } from '@/lib/errors/not-found-error';
+import { schedulePageSearchSync } from '@/lib/search/notify-service';
 import type { CreateWelcomePageBody, CreateWelcomePageResponse } from '@/types/api';
 import { createWelcomePageBodySchema } from '@/types/api';
 import type { PageContainerCreate } from '@thoth/database/types';
@@ -115,6 +116,7 @@ export const POST = apiRoute<CreateWelcomePageResponse, {}, {}, CreateWelcomePag
       // Ensure the welcome page also appears in the ContainerAccess-driven root list from the
       // moment it's created (see `registerContainerAccessForNewPage`).
       await registerContainerAccessForNewPage(createdPage, session.user.id);
+      schedulePageSearchSync(createdPage);
 
       return {
         id: createdPage.id,

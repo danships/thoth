@@ -2,6 +2,10 @@ import { describe, test, expect } from 'vitest';
 import { ExternalJobRequestSchema, TestNoopExternalJobRequestSchema } from './external-job.js';
 import { webhookDispatchExternalJobRequestSchema, webhookRedeliverExternalJobRequestSchema } from './webhook-job.js';
 import { notificationDispatchExternalJobRequestSchema } from './notification-job.js';
+import {
+  searchReconcileWorkspaceExternalJobRequestSchema,
+  searchSyncPageExternalJobRequestSchema,
+} from './search-job.js';
 
 // vitest sets NODE_ENV=test, so ExternalJobRequestSchema resolves to the test-only diagnostic
 // schema here. This test asserts that behaviour explicitly rather than relying on it silently.
@@ -283,5 +287,52 @@ describe('notification.dispatch external schema', () => {
       },
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('search.sync-page / search.reconcile-workspace external job requests (THOTH-086)', () => {
+  test('accepts a valid search.sync-page job', () => {
+    const result = searchSyncPageExternalJobRequestSchema.safeParse({
+      type: 'search.sync-page',
+      payloadVersion: 1,
+      payload: { workspaceId: 'workspace-1', pageId: 'page-1' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('accepts a search.sync-page job even in test environment (production job type)', () => {
+    const result = ExternalJobRequestSchema.safeParse({
+      type: 'search.sync-page',
+      payloadVersion: 1,
+      payload: { workspaceId: 'workspace-1', pageId: 'page-1' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('the production search.reconcile-workspace schema accepts only workspaceId', () => {
+    const result = searchReconcileWorkspaceExternalJobRequestSchema.safeParse({
+      type: 'search.reconcile-workspace',
+      payloadVersion: 1,
+      payload: { workspaceId: 'workspace-1' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('the production search.reconcile-workspace schema rejects a caller-supplied cursor', () => {
+    const result = searchReconcileWorkspaceExternalJobRequestSchema.safeParse({
+      type: 'search.reconcile-workspace',
+      payloadVersion: 1,
+      payload: { workspaceId: 'workspace-1', cursor: { createdAt: new Date().toISOString(), id: 'page-1' } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects unknown fields on search.sync-page (strict)', () => {
+    const result = searchSyncPageExternalJobRequestSchema.safeParse({
+      type: 'search.sync-page',
+      payloadVersion: 1,
+      payload: { workspaceId: 'workspace-1', pageId: 'page-1', priority: 10 },
+    });
+    expect(result.success).toBe(false);
   });
 });

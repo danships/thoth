@@ -6,6 +6,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { ConflictError } from '@/lib/errors/conflict-error';
+import { scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import type {
   CreateSingleSelectOptionBody,
   CreateSingleSelectOptionParameters,
@@ -77,11 +78,12 @@ export const POST = apiRoute<
       const updatedColumn = { ...foundColumn, options: [...foundColumn.options, newOption] };
       const updatedColumns = columns.map((column) => (column.id === params.columnId ? updatedColumn : column));
 
-      await containerRepository.update({
+      const updatedDataSource = await containerRepository.update({
         ...dataSource,
         columns: updatedColumns,
         lastUpdated: new Date().toISOString(),
       });
+      scheduleWorkspaceSearchReconcile(updatedDataSource.workspaceId);
 
       // Verify the write actually stuck — a concurrent creator could have read the same stale
       // snapshot and overwritten this append with its own full-array replace.

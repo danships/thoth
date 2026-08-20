@@ -1,11 +1,13 @@
 import { Burger, Group, Title } from '@mantine/core';
 import Image from 'next/image';
 import { NotificationBell } from './notification-bell';
+import { WorkspaceSearch } from './workspace-search';
 
 type AppHeaderProperties = {
   navbarOpened?: boolean;
   onToggleNavbar?: () => void;
   showBurger?: boolean;
+  searchWorkspace?: { id: string; slug: string };
 };
 
 /**
@@ -14,7 +16,7 @@ type AppHeaderProperties = {
  * `GlobalLayout` (`src/components/global-layout.tsx`, header-only, used by `/workspaces` which
  * isn't scoped to a `[workspaceSlug]`).
  */
-export function AppHeader({ navbarOpened, onToggleNavbar, showBurger = false }: AppHeaderProperties) {
+export function AppHeader({ navbarOpened, onToggleNavbar, showBurger = false, searchWorkspace }: AppHeaderProperties) {
   return (
     <Group h="100%" px="md" justify="space-between" style={{ width: '100%' }}>
       <Group>
@@ -31,6 +33,9 @@ export function AppHeader({ navbarOpened, onToggleNavbar, showBurger = false }: 
         <Title order={5}>Thoth</Title>
       </Group>
       <Group>
+        {searchWorkspace ? (
+          <WorkspaceSearch workspaceId={searchWorkspace.id} workspaceSlug={searchWorkspace.slug} />
+        ) : null}
         <NotificationBell />
       </Group>
     </Group>
