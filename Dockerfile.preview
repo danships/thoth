@@ -14,7 +14,7 @@
 # any other dependency download) happens when the container starts or when
 # `pnpm run db:seed` is executed later via `docker exec` — the preview
 # environment must not perform network installs at runtime.
-FROM node:24.18.0-alpine AS base
+FROM node:24.18.0-slim AS base
 # Set HOME to the same path the `nextjs` runtime user will use *before*
 # `corepack prepare` runs, so corepack's downloaded pnpm shim is cached
 # under `/home/nextjs/.cache` from the very first stage. If HOME were only
@@ -29,7 +29,15 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
 
 FROM base AS deps
-RUN apk add --no-cache python3 make g++
+# The runtime image must be glibc-based (Debian), not Alpine/musl: THOTH-086's workspace search
+# indexing depends on `@huggingface/transformers`, whose `onnxruntime-node` backend ships
+# prebuilt `.node`/`.so` binaries linked against glibc. On musl (Alpine) those fail to load at
+# runtime with `Error loading shared library ld-linux-x86-64.so.2: No such file or directory`
+# (no dynamic loader). musl-compat shims (`gcompat`/`libc6-compat`) do not provide enough of
+# glibc to run these binaries, so every stage — not just the runner — uses the `-slim` (Debian)
+# variant, keeping the native modules built and run against the same libc throughout.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/package.json
@@ -67,11 +75,14 @@ ENV CI=true
 # at build time, because the `nextjs` user has no permission to create new
 # top-level directories under `/` at container runtime.
 #
-# `su-exec` lets the entrypoint (which must start as root, see below) drop
-# privileges down to the `nextjs` user right before starting the app.
-RUN apk add --no-cache wget su-exec && \
-    addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 --home /home/nextjs nextjs && \
+# `setpriv` (from `util-linux`, part of Debian's base install) lets the entrypoint (which must
+# start as root, see below) drop privileges down to the `nextjs` user right before starting the
+# app, execing in place so it stays PID 1's signal-forwarding process — the same role `su-exec`
+# played on the (now-replaced) Alpine base.
+RUN apt-get update && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/* && \
+    groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --home-dir /home/nextjs --no-create-home nextjs && \
     mkdir -p /home/nextjs /data /app/run /app/logs && \
     chmod 0700 /app/run && \
     chown -R nextjs:nodejs /home/nextjs /app /data
@@ -181,7 +192,7 @@ RUN chmod +x /app/docker-entrypoint.sh
 # persistence across container recreations, which Docker creates as
 # root-owned. docker-entrypoint.sh re-asserts ownership of `/data` on every
 # start (cheap, idempotent) and then drops privileges to `nextjs` via
-# `su-exec` before execing the app, so the SQLite file underneath it is
+# `setpriv` before execing the app, so the SQLite file underneath it is
 # always writable by the user the app actually runs as.
 
 WORKDIR /app/apps/web

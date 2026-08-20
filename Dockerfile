@@ -1,10 +1,18 @@
-FROM node:24.18.0-alpine AS base
+# The runtime image must be glibc-based (Debian), not Alpine/musl: THOTH-086's workspace search
+# indexing depends on `@huggingface/transformers`, whose `onnxruntime-node` backend ships
+# prebuilt `.node`/`.so` binaries linked against glibc. On musl (Alpine) those fail to load at
+# runtime with `Error loading shared library ld-linux-x86-64.so.2: No such file or directory`
+# (no dynamic loader). musl-compat shims (`gcompat`/`libc6-compat`) do not provide enough of
+# glibc to run these binaries, so every stage — not just the runner — uses the `-slim` (Debian)
+# variant, keeping the native modules built and run against the same libc throughout.
+FROM node:24.18.0-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
 
 FROM base AS deps
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/package.json
@@ -16,7 +24,8 @@ COPY packages/shared/package.json packages/shared/package.json
 RUN pnpm install --frozen-lockfile --prod
 
 FROM base AS builder
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json apps/web/package.json
@@ -31,13 +40,14 @@ COPY . .
 # (plain `tsc` output) topologically — see the root `build` script.
 RUN pnpm build
 
-FROM node:24.18.0-alpine AS runner
+FROM node:24.18.0-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apk add --no-cache wget && \
-    addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 --home /home/nextjs nextjs && \
+RUN apt-get update && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/* && \
+    groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --home-dir /home/nextjs --no-create-home nextjs && \
     mkdir -p /home/nextjs /app/run /app/logs && \
     chmod 0700 /app/run && \
     chown -R nextjs:nodejs /home/nextjs /app
