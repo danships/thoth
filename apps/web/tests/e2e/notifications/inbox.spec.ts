@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
+import { getNotificationsResponseSchema } from '@/types/api';
 
 // THOTH-066: the per-user notification inbox. Exercises rendering of seeded inbox items, the
 // header bell popover, per-item mark-read, and the `/notifications/{id}/open` navigation route
@@ -51,10 +52,8 @@ test.describe('notification inbox', () => {
 
     const notification = await request.get('/api/v1/notifications');
     expect(notification.ok()).toBeTruthy();
-    const notificationBody = (await notification.json()) as {
-      data: { notifications: { id: string; occurredAt: string }[] };
-    };
-    const unread = notificationBody.data.notifications.find((item) => item.id === SEED.notifications.unread.id);
+    const notificationBody = getNotificationsResponseSchema.parse((await notification.json()).data);
+    const unread = notificationBody.notifications.find((item) => item.id === SEED.notifications.unread.id);
     expect(unread).toBeDefined();
 
     const timestamp = title.locator('xpath=ancestor::a').locator('time[datetime]');
