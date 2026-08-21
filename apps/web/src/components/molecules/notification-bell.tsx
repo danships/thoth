@@ -2,11 +2,12 @@
 
 import { ActionIcon, Anchor, Box, Button, Group, Indicator, Popover, ScrollArea, Stack, Text } from '@mantine/core';
 import { IconBell, IconCheck } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { useNotification } from '@/lib/hooks/use-notification';
 import { useNotificationUnreadCounts } from '@/lib/hooks/api/use-notification-unread-counts';
 import { useNotifications } from '@/lib/hooks/api/use-notifications';
+import { formatNotificationAge } from '@/lib/notifications/relative-time';
 import classes from './notification-bell.module.css';
 
 // Header bell (THOTH-066): an unread-count badge plus a popover of the latest inbox items, each
@@ -15,6 +16,7 @@ import classes from './notification-bell.module.css';
 // header — it is not scoped to a `[workspaceSlug]`.
 export function NotificationBell() {
   const [opened, setOpened] = useState(false);
+  const [nowMs, setNowMs] = useState(Date.now());
   const { showError } = useNotification();
   const { data: unreadCounts, mutate: mutateCounts } = useNotificationUnreadCounts();
   const { items, isLoading, refresh, setItems } = useNotifications({ limit: 10 });
@@ -24,9 +26,19 @@ export function NotificationBell() {
   const handleOpen = (nextOpened: boolean) => {
     setOpened(nextOpened);
     if (nextOpened) {
+      setNowMs(Date.now());
       void refresh();
     }
   };
+
+  useEffect(() => {
+    if (!opened) {
+      return;
+    }
+
+    const interval = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, [opened]);
 
   const handleMarkRead = async (id: string) => {
     try {
@@ -55,31 +67,47 @@ export function NotificationBell() {
     }
     return (
       <Stack gap={4}>
-        {items.map((item) => (
-          <Box key={item.id} className={classes['item']} data-unread={item.readAt === null ? 'true' : undefined}>
-            <Group justify="space-between" gap="xs" wrap="nowrap" align="flex-start">
-              <Anchor href={item.openUrl} className={classes['itemLink']}>
-                <Text size="sm" fw={item.readAt === null ? 600 : 400} lineClamp={2}>
-                  {item.title}
-                </Text>
-                <Text size="xs" c="dimmed" lineClamp={1}>
-                  {item.body}
-                </Text>
-              </Anchor>
-              {item.readAt === null && (
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size="sm"
-                  aria-label="Mark as read"
-                  onClick={() => void handleMarkRead(item.id)}
-                >
-                  <IconCheck size={14} />
-                </ActionIcon>
-              )}
-            </Group>
-          </Box>
-        ))}
+        {items.map((item) => {
+          const age = formatNotificationAge(item.occurredAt, nowMs);
+
+          return (
+            <Box key={item.id} className={classes['item']} data-unread={item.readAt === null ? 'true' : undefined}>
+              <Group justify="space-between" gap="xs" wrap="nowrap" align="flex-start">
+                <Anchor href={item.openUrl} className={classes['itemLink']}>
+                  <Text size="sm" fw={item.readAt === null ? 600 : 400} lineClamp={2}>
+                    {item.title}
+                  </Text>
+                  <Text size="xs" c="dimmed" lineClamp={1}>
+                    {item.body}
+                  </Text>
+                  {age && (
+                    <Text
+                      component="time"
+                      className={classes['timestamp']}
+                      size="xs"
+                      c="dimmed"
+                      dateTime={item.occurredAt}
+                      title={new Date(item.occurredAt).toLocaleString()}
+                    >
+                      {age}
+                    </Text>
+                  )}
+                </Anchor>
+                {item.readAt === null && (
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    aria-label="Mark as read"
+                    onClick={() => void handleMarkRead(item.id)}
+                  >
+                    <IconCheck size={14} />
+                  </ActionIcon>
+                )}
+              </Group>
+            </Box>
+          );
+        })}
       </Stack>
     );
   };
