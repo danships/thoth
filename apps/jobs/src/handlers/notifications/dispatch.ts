@@ -24,8 +24,9 @@ import { getEnvironment } from '../../environment.js';
 import { getLogger } from '../../logger.js';
 import { readNotificationMuteSettingsForUser } from '../../notifications/settings.js';
 
-const TRAILING_DEBOUNCE_MS = 30_000;
-const MAX_DEBOUNCE_MS = 300_000;
+const TRAILING_DEBOUNCE_MS = 3 * 60 * 1000;
+const MAX_DEBOUNCE_MS = 5 * 60 * 1000;
+const MAX_CHANGE_COUNT = 100_000;
 const DISPATCH_MAX_ATTEMPTS = 1; // Best-effort orchestration; a failed recipient loop iteration doesn't retry the whole burst.
 
 // Bound on the total live ancestors collected for notification rule matching, including hosts
@@ -42,7 +43,8 @@ export function notificationDispatchDedupeKey(payload: NotificationDispatchPaylo
  * Merges a newly-arriving `notification.dispatch` payload into an already-queued one sharing
  * the same dedupe key (THOTH-066 merge rules): `page.created` wins over `page.updated` (a
  * created-then-updated burst is still reported as `page.created`), `changeCount` is summed, and
- * `occurredAt` keeps the latest timestamp. Actors never merge — the dedupe key already
+ * `occurredAt` keeps the latest timestamp, and `changeCount` is clamped to the protocol's
+ * maximum so the merged payload remains valid. Actors never merge — the dedupe key already
  * partitions by actor, so `existing`/`incoming` always share the same actor.
  */
 export function mergeNotificationDispatchPayload(
@@ -59,11 +61,16 @@ export function mergeNotificationDispatchPayload(
     containerId: existing.containerId,
     event,
     actor: existing.actor,
-    changeCount: existing.changeCount + incoming.changeCount,
+    changeCount: Math.min(MAX_CHANGE_COUNT, existing.changeCount + incoming.changeCount),
     occurredAt,
   };
 }
 
+/**
+ * The first event is scheduled three minutes in the future. Each matching event received while
+ * the job remains queued moves `runAt` to three minutes after that event, but never later than
+ * five minutes after the first event in the burst.
+ */
 export const notificationDispatchCoalescePolicy: JobCoalescePolicy<NotificationDispatchPayloadV1> = {
   debounceMs: TRAILING_DEBOUNCE_MS,
   maxDebounceMs: MAX_DEBOUNCE_MS,
