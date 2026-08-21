@@ -1,4 +1,5 @@
 import {
+  searchReconcileWorkspaceCoalescePolicy,
   searchReconcileWorkspaceDedupeKey,
   searchReconcileWorkspacePayloadV1Schema,
   type JobDefinition,
@@ -14,6 +15,7 @@ export const searchReconcileWorkspaceJobDefinition: JobDefinition<SearchReconcil
   priority: 3,
   maxAttempts: 3,
   dedupeKey: searchReconcileWorkspaceDedupeKey,
+  coalesce: searchReconcileWorkspaceCoalescePolicy,
   handler: async (context: JobExecutionContext<SearchReconcileWorkspacePayloadV1>) => {
     const result = await getSearchService().reconcileWorkspace(context.payload.workspaceId, context.payload.cursor);
 

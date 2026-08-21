@@ -20,7 +20,11 @@ export async function queryWorkspaceSearchResults(
   const grant = session.appContext ? session.appContext.accessGrant : await memberToAccessGrant(member);
 
   if (grant.workspaceId !== query.workspaceId) {
-    throw new Error('Resolved search grant workspace mismatch');
+    // An App key's grant is bound to the workspace it was issued for; `assertWorkspaceAccess`
+    // above only verifies the *user* behind the key is a member of `query.workspaceId`, so this
+    // is an authorization failure for an App key scoped to a different workspace. Mirror
+    // `assertWorkspaceAccess` and never confirm the target workspace exists.
+    throw new NotFoundError('Workspace not found');
   }
 
   const logger = await getLogger();

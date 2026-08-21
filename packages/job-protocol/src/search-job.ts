@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { JobCoalescePolicy } from './registry.js';
 
 /**
  * Job payloads for THOTH-086 semantic workspace search.
@@ -45,7 +46,7 @@ export const searchSyncPageExternalJobRequestSchema = z
 export type SearchSyncPageExternalJobRequest = z.infer<typeof searchSyncPageExternalJobRequestSchema>;
 
 export function searchSyncPageDedupeKey(payload: { workspaceId: string; pageId: string }): string {
-  return `search:page:${payload.workspaceId}:${payload.pageId}`;
+  return `search:page:${JSON.stringify([payload.workspaceId, payload.pageId])}`;
 }
 
 export const searchReconcileWorkspacePayloadV1Schema = z
@@ -90,6 +91,48 @@ export type SearchReconcileWorkspaceTestJobRequest = z.infer<typeof searchReconc
 export function searchReconcileWorkspaceDedupeKey(payload: { workspaceId: string }): string {
   return `search:workspace:${payload.workspaceId}`;
 }
+
+function compareSearchCursor(left: SearchCursor, right: SearchCursor): number {
+  const createdAtComparison = left.createdAt.localeCompare(right.createdAt);
+  if (createdAtComparison !== 0) {
+    return createdAtComparison;
+  }
+  return left.id.localeCompare(right.id);
+}
+
+/**
+ * Merges a newly-enqueued `search.reconcile-workspace` request into an already-queued one
+ * sharing the same dedupe key. `search.scan-workspaces` re-enqueues every still-existing
+ * workspace on each pass using a cursor-less payload; if a prior batch's continuation is still
+ * queued, a naive payload replacement (the default, coalesce-less enqueue behavior) would reset
+ * progress back to the very first batch, and repeated scans could then prevent
+ * `deleteStaleDocumentsUnlocked` from ever running to completion. Always keep whichever cursor
+ * represents the furthest progress — an absent cursor means "no progress yet" and always loses to
+ * a defined one.
+ */
+export function mergeSearchReconcileWorkspacePayload(
+  existing: SearchReconcileWorkspacePayloadV1,
+  incoming: SearchReconcileWorkspacePayloadV1
+): SearchReconcileWorkspacePayloadV1 {
+  if (!existing.cursor) {
+    return incoming.cursor ? incoming : existing;
+  }
+  if (!incoming.cursor) {
+    return existing;
+  }
+  return compareSearchCursor(incoming.cursor, existing.cursor) > 0 ? incoming : existing;
+}
+
+/**
+ * `search.reconcile-workspace` coalesce policy (see `mergeSearchReconcileWorkspacePayload`).
+ * Zero debounce: this only exists to preserve the furthest cursor across a coalesce, not to
+ * batch/delay continuations — the merged job should still run as soon as it's next due.
+ */
+export const searchReconcileWorkspaceCoalescePolicy: JobCoalescePolicy<SearchReconcileWorkspacePayloadV1> = {
+  debounceMs: 0,
+  maxDebounceMs: 0,
+  merge: mergeSearchReconcileWorkspacePayload,
+};
 
 export const searchScanWorkspacesPayloadV1Schema = z
   .object({

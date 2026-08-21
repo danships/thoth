@@ -1,5 +1,6 @@
 import nodePath from 'node:path';
 import { createDatabaseContext, setDatabaseContext } from '@thoth/database';
+import { searchReconcileWorkspaceExternalPayloadV1Schema } from '@thoth/job-protocol';
 import { getEnvironment } from './environment.js';
 import { createJobRegistry } from './handlers/index.js';
 import { getLogger } from './logger.js';
@@ -21,6 +22,10 @@ async function main(): Promise<void> {
   const databaseContext = createDatabaseContext({ connectionString: environment.DB, skipSync: true });
   setDatabaseContext(databaseContext);
 
+  const queueService = new QueueService();
+  setQueueService(queueService);
+  const registry = createJobRegistry(environment.NODE_ENV);
+
   const searchService = createWorkspaceSearchService({
     storageLocalFolder: environment.STORAGE_LOCAL_FOLDER,
     modelId: environment.SEARCH_MODEL_ID,
@@ -29,12 +34,26 @@ async function main(): Promise<void> {
       : nodePath.resolve(process.cwd(), environment.SEARCH_MODEL_CACHE_DIR),
     indexVersion: environment.SEARCH_INDEX_VERSION,
     logger,
+    enqueueReconcile: async (workspaceId) => {
+      const definition = registry.get('search.reconcile-workspace');
+      if (!definition) {
+        return;
+      }
+      const payload = searchReconcileWorkspaceExternalPayloadV1Schema.parse({ workspaceId });
+      const dedupeKey = definition.dedupeKey?.(payload);
+      await queueService.enqueue({
+        type: definition.type,
+        payloadVersion: definition.payloadVersion,
+        payload,
+        priority: definition.priority,
+        maxAttempts: definition.maxAttempts,
+        ...(dedupeKey === undefined ? {} : { dedupeKey }),
+        ...(definition.coalesce ? { coalesce: definition.coalesce } : {}),
+      });
+    },
   });
   setSearchService(searchService);
 
-  const queueService = new QueueService();
-  setQueueService(queueService);
-  const registry = createJobRegistry(environment.NODE_ENV);
   const runner = new Runner(queueService, registry, {
     concurrency: environment.JOB_CONCURRENCY,
     pollIntervalMs: environment.JOB_POLL_INTERVAL_MS,

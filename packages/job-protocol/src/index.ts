@@ -110,6 +110,8 @@ export {
   searchReconcileWorkspaceExternalJobRequestSchema,
   searchReconcileWorkspaceTestJobRequestSchema,
   searchReconcileWorkspaceDedupeKey,
+  mergeSearchReconcileWorkspacePayload,
+  searchReconcileWorkspaceCoalescePolicy,
   searchScanWorkspacesPayloadV1Schema,
   searchScanWorkspacesTestJobRequestSchema,
 } from './search-job.js';

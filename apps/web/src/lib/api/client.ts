@@ -84,6 +84,7 @@ import type {
   GetPageParentOptionsResponse,
   GetPageParentOptionsQuery,
   GetSearchResultsResponse,
+  GetSearchResultsQueryInput,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -206,7 +207,7 @@ export const api = {
   },
 
   search: {
-    get: (parameters: { workspaceId: string; q: string; limit?: number }, options?: { signal?: AbortSignal }) =>
+    get: (parameters: GetSearchResultsQueryInput, options?: { signal?: AbortSignal }) =>
       apiClient.get<DataWrapper<GetSearchResultsResponse>>('/search', {
         params: parameters,
         ...(options?.signal ? { signal: options.signal } : {}),

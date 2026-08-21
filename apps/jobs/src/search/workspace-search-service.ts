@@ -21,6 +21,11 @@ import {
 import { buildPageSearchDocument, isPageSearchEligible } from './page-document.js';
 
 const INDEX_BATCH_SIZE = 50;
+// Headroom added to `INDEX_BATCH_SIZE` when bounding the cursor-paginated `containerRepository`
+// query in `reconcileWorkspaceUnlocked` below, to tolerate pages that share the cursor's exact
+// `createdAt` (the query filters/sorts by `createdAt` only — `id` isn't a filterable/sortable
+// field on the `container` entity — so ties are resolved locally via `compareCursor`).
+const CURSOR_TIE_BREAK_BUFFER = 500;
 const CHUNK_SIZE = 500;
 const INDEX_NAME = 'index.pb';
 const CHUNKING_CONFIG = { chunkSize: 256, chunkOverlap: 32, keepSeparators: true } as const;
@@ -50,6 +55,14 @@ export type WorkspaceSearchServiceOptions = {
   indexVersion: number;
   logger: Logger;
   embeddings?: EmbeddingsLike;
+  /**
+   * Enqueues a `search.reconcile-workspace` job for a workspace whose index doesn't exist yet.
+   * Used instead of building the index inline inside `search()` (see `searchUnlocked`) — a
+   * synchronous build blocks the request path for as long as embedding every eligible page
+   * takes, which the socket caller then aborts after `searchQueryTimeoutMs` regardless.
+   * Optional purely so tests/callers that never hit a missing index don't need to wire it.
+   */
+  enqueueReconcile?: (workspaceId: string) => Promise<void>;
 };
 
 function compareCursor(left: { createdAt: string; id: string }, right: { createdAt: string; id: string }): number {
@@ -109,6 +122,7 @@ export class WorkspaceSearchService {
   private readonly indexVersion: number;
   private readonly logger: Logger;
   private readonly embeddingsOverride: EmbeddingsLike | undefined;
+  private readonly enqueueReconcile: ((workspaceId: string) => Promise<void>) | undefined;
   private readonly workspaceLocks = new Map<string, Promise<void>>();
   private readonly workspaceIndexes = new Map<string, LocalDocumentIndex>();
   private embeddingsPromise: Promise<EmbeddingsLike> | undefined;
@@ -120,6 +134,7 @@ export class WorkspaceSearchService {
     this.indexVersion = options.indexVersion;
     this.logger = options.logger;
     this.embeddingsOverride = options.embeddings;
+    this.enqueueReconcile = options.enqueueReconcile;
   }
 
   public async warmup(): Promise<void> {
@@ -266,14 +281,36 @@ export class WorkspaceSearchService {
 
     const index = targetIndex ?? (await this.ensureWorkspaceIndexUnlocked(workspaceId));
     const containerRepository = await getContainerRepository();
-    const pages = (await containerRepository.getByQuery(
-      containerRepository.createQuery().eq('workspaceId', workspaceId).eq('type', 'page')
-    )) as PageContainer[];
-    pages.sort(compareCursor);
 
-    const startIndex = cursor ? pages.findIndex((page) => compareCursor(page, cursor) > 0) : 0;
-    const normalizedStartIndex = startIndex === -1 ? pages.length : startIndex;
-    const batch = pages.slice(normalizedStartIndex, normalizedStartIndex + INDEX_BATCH_SIZE);
+    // Bound each call to (at most) one batch's worth of rows plus a tie-break buffer, instead of
+    // loading every page row in the workspace on every batch — the cursor loop previously issued
+    // ~N/50 full-table reads of N rows each for an N-page workspace (THOTH-086 review feedback).
+    let pageQuery = containerRepository
+      .createQuery()
+      .eq('workspaceId', workspaceId)
+      .eq('type', 'page')
+      .sort('createdAt', 'asc')
+      .limit(INDEX_BATCH_SIZE + CURSOR_TIE_BREAK_BUFFER);
+    if (cursor) {
+      pageQuery = pageQuery.gte('createdAt', cursor.createdAt);
+    }
+    const fetchedPages = (await containerRepository.getByQuery(pageQuery)) as PageContainer[];
+    fetchedPages.sort(compareCursor);
+
+    let candidatePages = cursor ? fetchedPages.filter((page) => compareCursor(page, cursor) > 0) : fetchedPages;
+    if (cursor && candidatePages.length === 0 && fetchedPages.length >= INDEX_BATCH_SIZE + CURSOR_TIE_BREAK_BUFFER) {
+      // Extremely unlikely: more pages than the tie-break buffer share the cursor's exact
+      // `createdAt` and none of them sort after it within our bounded fetch window. Fall back to
+      // an unbounded fetch for this one batch to guarantee forward progress instead of silently
+      // stalling the reconcile loop.
+      const allPages = (await containerRepository.getByQuery(
+        containerRepository.createQuery().eq('workspaceId', workspaceId).eq('type', 'page')
+      )) as PageContainer[];
+      allPages.sort(compareCursor);
+      candidatePages = allPages.filter((page) => compareCursor(page, cursor) > 0);
+    }
+
+    const batch = candidatePages.slice(0, INDEX_BATCH_SIZE);
 
     const parentIds = [...new Set(batch.map((page) => page.parentId).filter((parentId): parentId is string => Boolean(parentId)))];
     const parentDataSources = new Map<string, DataSourceContainer>();
@@ -319,7 +356,10 @@ export class WorkspaceSearchService {
       }
     }
 
-    const hasMore = normalizedStartIndex + batch.length < pages.length;
+    // Conservative: there may be more pages either later in the fetched window (past this batch)
+    // or beyond it entirely (the query `limit` above truncated before we could see them).
+    const hasMore =
+      candidatePages.length > batch.length || fetchedPages.length >= INDEX_BATCH_SIZE + CURSOR_TIE_BREAK_BUFFER;
     const nextCursor = hasMore && batch.length > 0 ? { createdAt: batch.at(-1)!.createdAt, id: batch.at(-1)!.id } : undefined;
 
     if (!nextCursor) {
@@ -352,7 +392,14 @@ export class WorkspaceSearchService {
     }
 
     if (!(await pathExists(this.getWorkspaceIndexDir(options.workspaceId)))) {
-      await this.reconcileWorkspaceFullyUnlocked(options.workspaceId);
+      // Never build the index synchronously in the request path (THOTH-086 review feedback): a
+      // large workspace's first search would embed every eligible page while the socket caller
+      // waits, and the caller aborts after `searchQueryTimeoutMs` regardless (default 120s),
+      // producing repeated timeouts and repeated partial embedding work. Kick off a background
+      // reconcile instead and answer with no results for now; later searches (and any
+      // `search.sync-page` jobs in the meantime) will see the index once it exists.
+      await this.enqueueReconcile?.(options.workspaceId);
+      return [];
     }
 
     const index = await this.ensureWorkspaceIndexUnlocked(options.workspaceId);
@@ -505,9 +552,30 @@ export class WorkspaceSearchService {
       this.workspaceIndexes.set(workspaceId, index);
       return index;
     } catch (error) {
+      if (!this.isIndexCorruptionError(error)) {
+        // A transient/environmental failure (e.g. a file-descriptor limit, a permission error,
+        // or a model load failure surfaced from `getEmbeddings`) — not evidence the on-disk
+        // index itself is corrupt. Moving the live index aside here would be destructive and
+        // trigger an unnecessary full re-embed of the workspace once the transient issue clears.
+        throw error;
+      }
       await this.moveAsideCorruptIndex(workspaceId, error instanceof Error ? error.message : 'unknown error');
       return this.rebuildWorkspaceIndexUnlocked(workspaceId);
     }
+  }
+
+  /**
+   * Distinguishes a genuinely corrupt/unreadable on-disk index (a parse/deserialize failure,
+   * or an explicit "index does not exist" from a half-written directory) from a transient or
+   * environmental failure that happens to be thrown from the same call site. Node's fs-layer
+   * errors (permission denied, too many open files, disk full, ...) always carry an errno
+   * `code` and must never be treated as corruption.
+   */
+  private isIndexCorruptionError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+    return typeof (error as NodeJS.ErrnoException).code !== 'string';
   }
 
   private async rebuildWorkspaceIndexUnlocked(workspaceId: string): Promise<LocalDocumentIndex> {
@@ -516,8 +584,14 @@ export class WorkspaceSearchService {
     await mkdir(nodePath.dirname(stagingDirectory), { recursive: true });
 
     const stagingIndex = await this.createIndexInstance(stagingDirectory);
-    await stagingIndex.createIndex({ version: this.indexVersion, metadata_config: { indexed: ['pageId', 'workspaceId', 'lastUpdated', 'dataSourceLastUpdated'] } });
-    await this.reconcileWorkspaceFullyUnlocked(workspaceId, stagingIndex);
+    try {
+      await stagingIndex.createIndex({ version: this.indexVersion, metadata_config: { indexed: ['pageId', 'workspaceId', 'lastUpdated', 'dataSourceLastUpdated'] } });
+      await this.reconcileWorkspaceFullyUnlocked(workspaceId, stagingIndex);
+    } catch (error) {
+      // Never leave a half-built staging directory behind on failure.
+      await rm(stagingDirectory, { recursive: true, force: true });
+      throw error;
+    }
 
     let backupDirectory: string | undefined;
     if (await pathExists(liveDirectory)) {
@@ -573,7 +647,7 @@ export class WorkspaceSearchService {
       return this.embeddingsOverride;
     }
     if (!this.embeddingsPromise) {
-      this.embeddingsPromise = (async () => {
+      const pending = (async () => {
         transformersEnv.cacheDir = this.modelCacheDir;
         transformersEnv.allowRemoteModels = false;
         return TransformersEmbeddings.create({
@@ -584,6 +658,15 @@ export class WorkspaceSearchService {
           normalize: true,
         });
       })();
+      // If model loading fails, don't leave the rejected promise cached — every later index and
+      // search call would otherwise fail with the same error until `clearCaches()` runs. Only
+      // clear it if a concurrent call hasn't already replaced it with a newer attempt.
+      pending.catch(() => {
+        if (this.embeddingsPromise === pending) {
+          this.embeddingsPromise = undefined;
+        }
+      });
+      this.embeddingsPromise = pending;
     }
     return this.embeddingsPromise;
   }

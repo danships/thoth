@@ -271,6 +271,7 @@ export class JobSocketServer {
 
     if (request.kind === 'search') {
       clearReadTimer();
+      let timeoutTimer: NodeJS.Timeout | undefined;
       try {
         const results = await Promise.race([
           this.options.searchService.search({
@@ -292,7 +293,10 @@ export class JobSocketServer {
                   },
           }),
           new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Search timed out')), this.options.searchQueryTimeoutMs ?? 120_000);
+            timeoutTimer = setTimeout(
+              () => reject(new Error('Search timed out')),
+              this.options.searchQueryTimeoutMs ?? 120_000
+            );
           }),
         ]);
         respond({
@@ -316,6 +320,10 @@ export class JobSocketServer {
             retryable: true,
           },
         });
+      } finally {
+        if (timeoutTimer) {
+          clearTimeout(timeoutTimer);
+        }
       }
       return;
     }

@@ -234,5 +234,8 @@ export async function searchWorkspace(options: SearchWorkspaceOptions): Promise<
   if (!response.ok) {
     throw new JobClientError('SERVER_ERROR', response.error.message, response.error.retryable);
   }
-  return response.result.searchResults ?? [];
+  if (response.result.searchResults === undefined) {
+    throw new JobClientError('INVALID_RESPONSE', 'Search response did not include search results', false);
+  }
+  return response.result.searchResults;
 }

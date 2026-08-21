@@ -149,7 +149,10 @@ describe('WorkspaceSearchService', () => {
     } as unknown as Parameters<typeof containerRepository.create>[0]) as Promise<DataSourceContainer>;
   }
 
-  function createService(fakeEmbeddings = createFakeEmbeddings()): WorkspaceSearchService {
+  function createService(
+    fakeEmbeddings = createFakeEmbeddings(),
+    options?: { enqueueReconcile?: (workspaceId: string) => Promise<void> }
+  ): WorkspaceSearchService {
     return new WorkspaceSearchService({
       storageLocalFolder: nodePath.join(temporaryDirectory, 'indexes'),
       modelId: 'fake-model',
@@ -157,6 +160,7 @@ describe('WorkspaceSearchService', () => {
       indexVersion: 1,
       logger: fakeLogger(),
       embeddings: fakeEmbeddings,
+      ...(options?.enqueueReconcile ? { enqueueReconcile: options.enqueueReconcile } : {}),
     });
   }
 
@@ -326,18 +330,40 @@ describe('WorkspaceSearchService', () => {
     ).toEqual(new Set(['ws-a-parent', 'ws-a-child']));
   });
 
-  test('bootstraps a missing index on first search and deletes workspace indexes on request', async () => {
+  test('does not build a missing index inline on search, enqueues a reconcile instead, and deletes workspace indexes on request', async () => {
     await createWorkspace('ws-bootstrap');
-    const service = createService();
+    const enqueuedWorkspaceIds: string[] = [];
+    // Mirrors production: `enqueueReconcile` only pushes a job onto the queue for later,
+    // asynchronous execution — it must never itself run (or block on) a reconcile inline, since
+    // `search()` still holds this workspace's lock while awaiting it.
+    const enqueueReconcile = vi.fn(async (workspaceId: string) => {
+      enqueuedWorkspaceIds.push(workspaceId);
+    });
+    const service = createService(createFakeEmbeddings(), { enqueueReconcile });
     await createPage({ id: 'page-bootstrap', workspaceId: 'ws-bootstrap', content: 'alpha bootstrap' });
 
-    const results = await service.search({
+    // The index doesn't exist yet — `search()` must never build it synchronously in the request
+    // path (it would block the caller for as long as embedding every eligible page takes, and
+    // the caller times out regardless). It should enqueue a reconcile and answer with no results.
+    const firstResults = await service.search({
       workspaceId: 'ws-bootstrap',
       query: 'bootstrap',
       limit: 10,
       grant: workspaceGrant('ws-bootstrap'),
     });
-    expect(results.map((result) => result.pageId)).toEqual(['page-bootstrap']);
+    expect(firstResults).toEqual([]);
+    expect(enqueuedWorkspaceIds).toEqual(['ws-bootstrap']);
+
+    // Simulates the background job runner later picking up the enqueued reconcile.
+    await service.reconcileWorkspace('ws-bootstrap');
+
+    const secondResults = await service.search({
+      workspaceId: 'ws-bootstrap',
+      query: 'bootstrap',
+      limit: 10,
+      grant: workspaceGrant('ws-bootstrap'),
+    });
+    expect(secondResults.map((result) => result.pageId)).toEqual(['page-bootstrap']);
 
     await service.deleteWorkspaceIndex('ws-bootstrap');
     await expect(readdir(nodePath.join(temporaryDirectory, 'indexes', '_search', 'ws-bootstrap'))).rejects.toThrow();

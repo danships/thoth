@@ -35,5 +35,9 @@ export const getSearchResultsResponseSchema = z
   .strict();
 
 export type GetSearchResultsQuery = z.infer<typeof getSearchResultsQuerySchema>;
+// The client-facing input shape (before Zod's `.limit` default is applied) — used by
+// `apps/web/src/lib/api/client.ts` so callers can omit `limit` without duplicating the query
+// contract locally.
+export type GetSearchResultsQueryInput = z.input<typeof getSearchResultsQuerySchema>;
 export type GetSearchResultsResponse = z.infer<typeof getSearchResultsResponseSchema>;
 export type GetSearchResultsResponseData = DataWrapper<GetSearchResultsResponse>;
