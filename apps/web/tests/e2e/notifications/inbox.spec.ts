@@ -52,7 +52,8 @@ test.describe('notification inbox', () => {
 
     const notification = await request.get('/api/v1/notifications');
     expect(notification.ok()).toBeTruthy();
-    const notificationBody = getNotificationsResponseSchema.parse((await notification.json()).data);
+    const notificationJson = await notification.json();
+    const notificationBody = getNotificationsResponseSchema.parse(notificationJson.data);
     const unread = notificationBody.notifications.find((item) => item.id === SEED.notifications.unread.id);
     expect(unread).toBeDefined();
 
