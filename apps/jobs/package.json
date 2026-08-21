@@ -17,13 +17,17 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@thoth/database": "workspace:*",
     "@thoth/job-protocol": "workspace:*",
     "@thoth/shared": "workspace:*",
     "@thoth/storage": "workspace:*",
     "envalid": "^8.2.0",
+    "protobufjs": "^8.7.2",
+    "vectra": "^0.15.0",
     "web-push": "^3.6.7",
     "winston": "^3.19.0",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

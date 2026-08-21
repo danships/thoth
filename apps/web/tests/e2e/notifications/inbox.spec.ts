@@ -42,6 +42,7 @@ test.describe('notification inbox', () => {
     await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
 
     const bell = page.getByRole('button', { name: 'Notifications' });
+    await expect(page.getByRole('button', { name: 'Search pages' })).toBeVisible();
     await expect(bell).toBeVisible();
     await bell.click();
 

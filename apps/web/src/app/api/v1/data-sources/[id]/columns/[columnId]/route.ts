@@ -6,6 +6,7 @@ import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
 import { extractFileIdsFromContent, extractFileIdsFromValues, syncFileUsageForPage } from '@/lib/files/usage';
 import { getLogger } from '@/lib/logger';
+import { scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import type {
   UpdateDataSourceColumnBody,
   UpdateDataSourceColumnParameters,
@@ -63,11 +64,12 @@ export const PATCH = apiRoute<
     const updatedColumn: typeof foundColumn = { ...foundColumn, ...normalizedBody } as typeof foundColumn;
     const updatedColumns = columns.map((column) => (column.id === params.columnId ? updatedColumn : column));
 
-    await containerRepository.update({
+    const updatedDataSource = await containerRepository.update({
       ...dataSource,
       columns: updatedColumns,
       lastUpdated: new Date().toISOString(),
     });
+    scheduleWorkspaceSearchReconcile(updatedDataSource.workspaceId);
     return updatedColumn;
   }
 );
@@ -89,7 +91,12 @@ export const DELETE = apiRoute<void, undefined, UpdateDataSourceColumnParameters
       throw new NotFoundError('Column not found', true);
     }
 
-    await containerRepository.update({ ...dataSource, columns: nextColumns, lastUpdated: new Date().toISOString() });
+    const updatedDataSource = await containerRepository.update({
+      ...dataSource,
+      columns: nextColumns,
+      lastUpdated: new Date().toISOString(),
+    });
+    scheduleWorkspaceSearchReconcile(updatedDataSource.workspaceId);
 
     // A `file` column's cell values are the *only* thing that can reference a file id in
     // `page.values` (THOTH-054) — deleting the column orphans that reference. Reconcile every

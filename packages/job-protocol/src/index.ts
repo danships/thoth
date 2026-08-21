@@ -9,8 +9,11 @@ export {
   PingRequestEnvelopeSchema,
   StatusRequestEnvelopeSchema,
   JobStatusSchema,
+  SearchAccessGrantSchema,
+  SearchRequestEnvelopeSchema,
   JobRequestEnvelopeSchema,
   JobDispositionSchema,
+  SearchResultSchema,
   JobResponseSuccessSchema,
   JobResponseErrorSchema,
   JobResponseEnvelopeSchema,
@@ -21,8 +24,11 @@ export type {
   PingRequestEnvelope,
   StatusRequestEnvelope,
   JobStatusValue,
+  SearchAccessGrant,
+  SearchRequestEnvelope,
   JobRequestEnvelope,
   JobDisposition,
+  SearchResult,
   JobResponseSuccess,
   JobResponseError,
   JobResponseEnvelope,
@@ -94,6 +100,33 @@ export type {
   MaintenancePruneJobsPayloadV1,
 } from './maintenance-job.js';
 
+export {
+  searchCursorSchema,
+  searchSyncPagePayloadV1Schema,
+  searchSyncPageExternalJobRequestSchema,
+  searchSyncPageDedupeKey,
+  searchReconcileWorkspacePayloadV1Schema,
+  searchReconcileWorkspaceExternalPayloadV1Schema,
+  searchReconcileWorkspaceExternalJobRequestSchema,
+  searchReconcileWorkspaceTestJobRequestSchema,
+  searchReconcileWorkspaceDedupeKey,
+  mergeSearchReconcileWorkspacePayload,
+  searchReconcileWorkspaceCoalescePolicy,
+  searchScanWorkspacesPayloadV1Schema,
+  searchScanWorkspacesTestJobRequestSchema,
+} from './search-job.js';
+export type {
+  SearchCursor,
+  SearchSyncPagePayloadV1,
+  SearchSyncPageExternalJobRequest,
+  SearchReconcileWorkspacePayloadV1,
+  SearchReconcileWorkspaceExternalPayloadV1,
+  SearchReconcileWorkspaceExternalJobRequest,
+  SearchReconcileWorkspaceTestJobRequest,
+  SearchScanWorkspacesPayloadV1,
+  SearchScanWorkspacesTestJobRequest,
+} from './search-job.js';
+
 export { RetryableJobError } from './registry.js';
 export type {
   JobStatus,
@@ -112,5 +145,5 @@ export {
   DEFAULT_RESPONSE_TIMEOUT_MS,
 } from './frame.js';
 
-export { JobClientError, pingJobService, enqueueJob, getJobStatus } from './client.js';
-export type { JobClientErrorCode, JobClientOptions } from './client.js';
+export { JobClientError, pingJobService, enqueueJob, getJobStatus, searchWorkspace } from './client.js';
+export type { JobClientErrorCode, JobClientOptions, SearchWorkspaceOptions } from './client.js';

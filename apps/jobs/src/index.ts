@@ -1,53 +1,65 @@
+import nodePath from 'node:path';
+import { createDatabaseContext, setDatabaseContext } from '@thoth/database';
+import { searchReconcileWorkspaceExternalPayloadV1Schema } from '@thoth/job-protocol';
 import { getEnvironment } from './environment.js';
+import { createJobRegistry } from './handlers/index.js';
 import { getLogger } from './logger.js';
-import { resolveJobSocketPath } from './socket/socket-path.js';
-import { QueueService } from './queue/queue-service.js';
 import { setQueueService } from './queue/queue-context.js';
 import { resolveHygieneSweepMaxAgeMs } from './queue/queue-store.js';
-import { createJobRegistry } from './handlers/index.js';
+import { QueueService } from './queue/queue-service.js';
 import { Runner } from './runner/runner.js';
 import { Scheduler, type ScheduleDefinition } from './scheduler/scheduler.js';
+import { setSearchService } from './search/search-context.js';
+import { createWorkspaceSearchService } from './search/workspace-search-service.js';
 import { JobSocketServer } from './socket/server.js';
-import { createDatabaseContext, setDatabaseContext } from '@thoth/database';
+import { resolveJobSocketPath } from './socket/socket-path.js';
 
-/**
- * Process entry point for `@thoth/jobs` (THOTH-059, DB access added THOTH-061). Wires the
- * shared `@thoth/database` context, in-memory queue, runner, scheduler, and Unix-socket server
- * together, then handles SIGTERM/SIGINT for orderly shutdown: reject new IPC, stop
- * schedules/claims, close the socket, wait (bounded) for active work, exit. Deliberately imports
- * no Next.js/`@thoth/web` module and opens no TCP/HTTP port.
- */
 async function main(): Promise<void> {
   const environment = getEnvironment();
   const logger = getLogger();
   const socketPath = resolveJobSocketPath();
 
-  // Always `skipSync: true` (THOTH-058/THOTH-061): schema sync/migrations are exclusively the
-  // job of `packages/database/src/cli/migrate.ts`, run once before either PM2-managed process
-  // starts. A PM2-triggered restart of this process must never re-run migrations.
   const databaseContext = createDatabaseContext({ connectionString: environment.DB, skipSync: true });
   setDatabaseContext(databaseContext);
 
   const queueService = new QueueService();
-  // Registered before the registry is built (THOTH-063): `maintenance.prune-jobs` reads this
-  // singleton at handler execution time (`handlers/maintenance/prune-jobs.ts`) to prune the
-  // queue's own terminal job records — the only handler that needs direct queue access.
   setQueueService(queueService);
   const registry = createJobRegistry(environment.NODE_ENV);
+
+  const searchService = createWorkspaceSearchService({
+    storageLocalFolder: environment.STORAGE_LOCAL_FOLDER,
+    modelId: environment.SEARCH_MODEL_ID,
+    modelCacheDir: nodePath.isAbsolute(environment.SEARCH_MODEL_CACHE_DIR)
+      ? environment.SEARCH_MODEL_CACHE_DIR
+      : nodePath.resolve(process.cwd(), environment.SEARCH_MODEL_CACHE_DIR),
+    indexVersion: environment.SEARCH_INDEX_VERSION,
+    logger,
+    enqueueReconcile: async (workspaceId) => {
+      const definition = registry.get('search.reconcile-workspace');
+      if (!definition) {
+        return;
+      }
+      const payload = searchReconcileWorkspaceExternalPayloadV1Schema.parse({ workspaceId });
+      const dedupeKey = definition.dedupeKey?.(payload);
+      await queueService.enqueue({
+        type: definition.type,
+        payloadVersion: definition.payloadVersion,
+        payload,
+        priority: definition.priority,
+        maxAttempts: definition.maxAttempts,
+        ...(dedupeKey === undefined ? {} : { dedupeKey }),
+        ...(definition.coalesce ? { coalesce: definition.coalesce } : {}),
+      });
+    },
+  });
+  setSearchService(searchService);
+
   const runner = new Runner(queueService, registry, {
     concurrency: environment.JOB_CONCURRENCY,
     pollIntervalMs: environment.JOB_POLL_INTERVAL_MS,
     logger,
   });
 
-  // Production interval schedules (THOTH-062/THOTH-063): `history.scan` runs hourly, discovers
-  // pages with revisions, and fans out bounded `history.maintain` jobs. The four
-  // `maintenance.*` jobs convert the former `scripts/purge-deleted-*.ts` cron scripts into
-  // scheduled handlers — hourly for files (a short grace period, THOTH-040's original cadence),
-  // daily for workspaces/pages (30-day grace periods) and job-record pruning. Disabled under
-  // `NODE_ENV === 'test'`: the process integration suite (`index.integration.test.ts`) asserts
-  // an enqueued `test.noop` produces exactly one terminal job log, and unit/integration tests
-  // exercise every handler directly rather than through wall-clock scheduling.
   const HOUR_MS = 60 * 60 * 1000;
   const DAY_MS = 24 * HOUR_MS;
   const schedules: ScheduleDefinition[] =
@@ -57,11 +69,15 @@ async function main(): Promise<void> {
           {
             type: 'history.scan',
             intervalMs: HOUR_MS,
-            // Below webhook delivery/redeliver, above `history.maintain` itself (matches the
-            // priority wired in `handlers/history/scan.ts`) — the scheduler doesn't own the
-            // queued job's own priority once enqueued, but keeping the values consistent here
-            // avoids confusion.
             priority: 6,
+            maxAttempts: 3,
+            payloadVersion: 1,
+            payload: {},
+          },
+          {
+            type: 'search.scan-workspaces',
+            intervalMs: environment.SEARCH_RECONCILE_INTERVAL_MS,
+            priority: 3,
             maxAttempts: 3,
             payloadVersion: 1,
             payload: {},
@@ -109,42 +125,34 @@ async function main(): Promise<void> {
     queueService,
     registry,
     logger,
+    searchService,
+    searchQueryTimeoutMs: environment.SEARCH_QUERY_TIMEOUT_MS,
     wake: () => runner.wake(),
   });
 
-  // The always-on hygiene sweep must never undercut `maintenance.prune-jobs`' longer,
-  // operator-facing retention policy (THOTH-063) — see `resolveHygieneSweepMaxAgeMs`. Without
-  // this, the default 15-minute `JOB_RETENTION_MS` would evict every terminal record long before
-  // the 7-day/30-day `JOB_COMPLETED_RETENTION_DAYS`/`JOB_DEAD_RETENTION_DAYS` policy ever applies.
   const hygieneSweepMaxAgeMs = resolveHygieneSweepMaxAgeMs({
     hygieneMaxAgeMs: environment.JOB_RETENTION_MS,
     completedMaxAgeMs: environment.JOB_COMPLETED_RETENTION_DAYS * 24 * 60 * 60 * 1000,
     deadMaxAgeMs: environment.JOB_DEAD_RETENTION_DAYS * 24 * 60 * 60 * 1000,
   });
 
-  const retentionInterval = setInterval(
-    () => {
-      void queueService.sweepRetention(hygieneSweepMaxAgeMs, environment.JOB_RETENTION_MAX).then((evicted) => {
-        if (evicted.length > 0) {
-          logger.info('job.retention.evicted', { count: evicted.length });
-        }
-      });
-    },
-    Math.min(environment.JOB_RETENTION_MS, 60_000)
-  );
+  const retentionInterval = setInterval(() => {
+    void queueService.sweepRetention(hygieneSweepMaxAgeMs, environment.JOB_RETENTION_MAX).then((evicted) => {
+      if (evicted.length > 0) {
+        logger.info('job.retention.evicted', { count: evicted.length });
+      }
+    });
+  }, Math.min(environment.JOB_RETENTION_MS, 60_000));
 
   runner.start();
   scheduler.start();
   await server.start();
 
-  logger.info('job.service.ready', { socketPath, concurrency: environment.JOB_CONCURRENCY });
+  if (environment.NODE_ENV !== 'test') {
+    await searchService.warmup();
+  }
 
-  // Notifies PM2 (`wait_ready: true`, see root `pm2.config.js`) that the process has finished
-  // its startup sequence — DB/lease recovery, scheduler init, and the secure socket bind/chmod
-  // above are all complete — only now is it safe for PM2 to consider this instance "up" and
-  // route/allow dependents to rely on it. `process.send` only exists when an IPC channel is
-  // present (i.e. under PM2/a Node parent); plain `node dist/index.js` or `tsx` runs (dev,
-  // `apps/jobs` tests) have no such channel and must not throw here.
+  logger.info('job.service.ready', { socketPath, concurrency: environment.JOB_CONCURRENCY });
   process.send?.('ready');
 
   let shuttingDown = false;
@@ -159,6 +167,7 @@ async function main(): Promise<void> {
     scheduler.stop();
     await server.stop();
     await runner.stop(environment.JOB_SHUTDOWN_TIMEOUT_MS);
+    await searchService.clearCaches();
     await databaseContext.close();
 
     logger.info('job.service.stopped', { signal });
@@ -169,16 +178,6 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
-// Deliberately unconditional (no `import.meta.url === file://${process.argv[1]}` / `require.main
-// === module` style guard): this file is only ever run as this process's own entrypoint — direct
-// `node`/`tsx` invocation, or spawned as a standalone child process by
-// `index.integration.test.ts` — never `import`ed by another module for its side effects. A
-// same-module-URL guard like that is also unsound under `pm2-runtime` fork mode specifically:
-// PM2 spawns apps by launching *its own* `ProcessContainerFork.js` as the process entrypoint and
-// then dynamically imports the target script from inside it, so `process.argv[1]` there is
-// PM2's own internal file, not this one — the guard would evaluate to `false` and silently skip
-// `main()` entirely (no socket bind, no readiness signal) while `wait_ready`/`listen_timeout`
-// still let PM2 mark the app "online" once the timeout elapses.
 try {
   await main();
 } catch (error: unknown) {

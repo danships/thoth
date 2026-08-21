@@ -79,7 +79,12 @@ connection string works for a single-SQLite-file deployment):
 | `WEBHOOK_DELIVERY_TIMEOUT_MS` | No | `5000` | Per-attempt network timeout (ms) for outbound webhook delivery fetches (THOTH-061). |
 | `WEBHOOK_DELIVERY_BACKOFF_BASE_MS` | No | `500` | Base delay (ms) for full-jitter exponential backoff between webhook delivery retry attempts (THOTH-061). |
 | `STORAGE_TYPE` | No | `local` | File-storage backend used by the `maintenance.purge-files` job (THOTH-063). Must match `apps/web`'s `STORAGE_TYPE` in any real deployment — both processes act on the same uploaded-file bytes. |
-| `STORAGE_LOCAL_FOLDER` | No | `data/uploads` | Local storage folder used by `maintenance.purge-files`. Must match `apps/web`'s `STORAGE_LOCAL_FOLDER`. |
+| `STORAGE_LOCAL_FOLDER` | No | `data/uploads` | Local storage folder used by `maintenance.purge-files` **and** as the parent of the search index tree (`<STORAGE_LOCAL_FOLDER>/_search/<workspaceId>`). Must match `apps/web`'s `STORAGE_LOCAL_FOLDER`. |
+| `SEARCH_MODEL_ID` | No | `Xenova/all-MiniLM-L6-v2` | Local embeddings model used by `@thoth/jobs` workspace search. Pre-download it into `SEARCH_MODEL_CACHE_DIR`; runtime search startup disables remote model fetches. |
+| `SEARCH_MODEL_CACHE_DIR` | No | `data/models/search` | Cache directory passed to `@huggingface/transformers` before the search model is first loaded. Relative paths resolve from the `@thoth/jobs` process cwd. |
+| `SEARCH_INDEX_VERSION` | No | `1` | Search index schema/version tag. Bump this whenever the search document formatter, chunking, embedding model/options, or other on-disk search-index assumptions change; the next open rebuilds the workspace index automatically. |
+| `SEARCH_QUERY_TIMEOUT_MS` | No | `120000` | Maximum wall-clock time for one synchronous socket `kind:'search'` request before the jobs process returns `SEARCH_UNAVAILABLE`. |
+| `SEARCH_RECONCILE_INTERVAL_MS` | No | `3600000` | Interval for the scheduled `search.scan-workspaces` reconciliation pass (default hourly). |
 | `WORKSPACE_DELETE_GRACE_PERIOD_DAYS` | No | `30` | Grace period read by the scheduled `maintenance.purge-workspaces` job and by `pnpm workspaces:purge`. Must match `apps/web`'s value of the same name. |
 | `PAGE_DELETE_GRACE_PERIOD_DAYS` | No | `30` | Grace period read by the scheduled `maintenance.purge-pages` job and by `pnpm pages:purge`. Must match `apps/web`'s value of the same name. |
 | `FILES_PURGE_GRACE_PERIOD_HOURS` | No | `24` | Grace period read by the scheduled `maintenance.purge-files` job and by `pnpm files:purge`. Must match `apps/web`'s value of the same name. |
@@ -108,7 +113,10 @@ harness locally/in tests (`scripts/dev.mjs`, `apps/web/tests/integration/global-
 
 Both are PM2 **fork-mode, single-instance** apps (`instances: 1`) — clustering is not supported:
 the current queue is a single in-process instance, and the web/session/SQLite test topology has
-not been designed for multiple concurrent instances of either process. Each restarts
+not been designed for multiple concurrent instances of either process. `@thoth/jobs` also remains a
+required singleton for THOTH-086 search specifically: the Vectra filesystem index under
+`<STORAGE_LOCAL_FOLDER>/_search/<workspaceId>` is a single-writer data structure, so only one jobs
+process may mutate it at a time. Each restarts
 **independently** on crash (PM2's bounded restart policy); a jobs crash/restart does not disrupt
 web (or vice versa) — in-flight leased jobs are recovered by `@thoth/jobs` on its own restart.
 
@@ -120,6 +128,17 @@ first and uses `wait_ready`/`listen_timeout` (jobs signals `process.send('ready'
 startup completes — opening its database connection, lease recovery, scheduler init, and a
 secure `0600`-mode Unix socket bind — see `apps/jobs/src/index.ts`), but web may start listening before jobs finishes binding; this is
 safe because `/api/health` stays `503` until jobs responds to a real `ping`.
+
+
+
+`@thoth/jobs` now also owns semantic workspace search. On non-test startup it warms the configured
+`SEARCH_MODEL_ID` once before reporting readiness; if warmup fails, the process exits non-zero
+rather than serving a half-initialised socket. Page mutations enqueue `search.sync-page` for
+incremental timestamp-based index updates, while the scheduled hourly `search.scan-workspaces` →
+`search.reconcile-workspace` pass repairs drift, removes stale/missing/private/deleted pages using
+`isPageSearchEligible`, and rebuilds version-mismatched/corrupt indexes automatically. Changing the
+page-document formatter, embedding model/options, chunking config, or any other index assumption
+requires bumping `SEARCH_INDEX_VERSION`.
 
 **Health (`GET /api/health`, public, unauthenticated):** returns `200
 { status: 'ok', components: { web: 'ok', jobs: 'ok' } }` only once a short-timeout

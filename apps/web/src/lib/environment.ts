@@ -30,6 +30,7 @@ const environmentSchema = {
   // external purge job (`pnpm files:purge`) permanently removes it, to tolerate in-progress
   // edits that haven't yet synced their `file-usage` rows.
   FILES_PURGE_GRACE_PERIOD_HOURS: num({ default: 24 }),
+  SEARCH_QUERY_TIMEOUT_MS: num({ default: 120_000 }),
   // The public, absolute base URL Thoth is served at (e.g. `https://thoth.example.com`, no
   // trailing slash). Explicitly wired into `better-auth`'s `baseURL`/`trustedOrigins`
   // (`src/lib/auth/config.ts`) instead of relying on request-header inference, which is unsafe

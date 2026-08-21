@@ -60,6 +60,63 @@ describe('JobRequestEnvelopeSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  test('accepts a valid search request', () => {
+    const result = JobRequestEnvelopeSchema.safeParse({
+      version: 1,
+      requestId: randomUUID(),
+      kind: 'search',
+      workspaceId: 'workspace-1',
+      query: 'invoice',
+      limit: 10,
+      grant: { workspaceId: 'workspace-1', permission: 'read', scopeType: 'workspace' },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('rejects a search request whose grant carries too many scoped container ids', () => {
+    const result = JobRequestEnvelopeSchema.safeParse({
+      version: 1,
+      requestId: randomUUID(),
+      kind: 'search',
+      workspaceId: 'workspace-1',
+      query: 'invoice',
+      limit: 10,
+      grant: {
+        workspaceId: 'workspace-1',
+        permission: 'read',
+        scopeType: 'containers',
+        scopedContainerIds: Array.from({ length: 5001 }, (_, index) => `container-${index}`),
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects a search request with a limit outside 1-20', () => {
+    const result = JobRequestEnvelopeSchema.safeParse({
+      version: 1,
+      requestId: randomUUID(),
+      kind: 'search',
+      workspaceId: 'workspace-1',
+      query: 'invoice',
+      limit: 21,
+      grant: { workspaceId: 'workspace-1', permission: 'read', scopeType: 'workspace' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects a search request with a blank query', () => {
+    const result = JobRequestEnvelopeSchema.safeParse({
+      version: 1,
+      requestId: randomUUID(),
+      kind: 'search',
+      workspaceId: 'workspace-1',
+      query: '   ',
+      limit: 10,
+      grant: { workspaceId: 'workspace-1', permission: 'read', scopeType: 'workspace' },
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('JobResponseEnvelopeSchema', () => {

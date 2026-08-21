@@ -6,6 +6,8 @@ import {
   JobRequestEnvelopeSchema,
   type JobRequestEnvelope,
   type JobResponseEnvelope,
+  type SearchAccessGrant,
+  type SearchResult,
 } from './envelope.js';
 import type { ExternalJobRequest } from './external-job.js';
 import { DEFAULT_CONNECT_TIMEOUT_MS, DEFAULT_RESPONSE_TIMEOUT_MS, FRAME_DELIMITER, MAX_FRAME_BYTES } from './frame.js';
@@ -202,4 +204,38 @@ export async function getJobStatus(jobId: string, options: JobClientOptions): Pr
     jobId,
   });
   return sendEnvelope(envelope, options);
+}
+
+export type SearchWorkspaceOptions = JobClientOptions & {
+  workspaceId: string;
+  query: string;
+  limit: number;
+  grant: SearchAccessGrant;
+};
+
+/**
+ * Sends a synchronous `search` request (THOTH-086) and returns the parsed `SearchResult[]` on
+ * success. Unlike `enqueueJob`, this is answered directly rather than durably queued — callers
+ * (the web `GET /api/v1/search` route) should treat any non-`ok` response or thrown
+ * `JobClientError` as search being temporarily unavailable (503), never partial/best-effort
+ * results.
+ */
+export async function searchWorkspace(options: SearchWorkspaceOptions): Promise<SearchResult[]> {
+  const envelope = JobRequestEnvelopeSchema.parse({
+    version: 1,
+    requestId: randomUUID(),
+    kind: 'search',
+    workspaceId: options.workspaceId,
+    query: options.query,
+    limit: options.limit,
+    grant: options.grant,
+  });
+  const response = await sendEnvelope(envelope, options);
+  if (!response.ok) {
+    throw new JobClientError('SERVER_ERROR', response.error.message, response.error.retryable);
+  }
+  if (response.result.searchResults === undefined) {
+    throw new JobClientError('INVALID_RESPONSE', 'Search response did not include search results', false);
+  }
+  return response.result.searchResults;
 }

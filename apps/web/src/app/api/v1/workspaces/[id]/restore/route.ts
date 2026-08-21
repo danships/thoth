@@ -8,6 +8,7 @@ import { NotFoundError } from '@/lib/errors/not-found-error';
 import { HttpError } from '@/lib/errors/http-error';
 import { getSetting } from '@/lib/settings/service';
 import { STORAGE_QUOTA_BYTES_KEY } from '@/lib/settings/definitions';
+import { scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import type { RestoreWorkspaceParameters, RestoreWorkspaceResponse } from '@/types/api';
 import { restoreWorkspaceParametersSchema } from '@/types/api';
 
@@ -75,6 +76,8 @@ export const POST = apiRoute<RestoreWorkspaceResponse, undefined, RestoreWorkspa
       scope: 'workspace',
       subjectId: restored.id,
     });
+
+    scheduleWorkspaceSearchReconcile(restored.id);
 
     return {
       id: restored.id,

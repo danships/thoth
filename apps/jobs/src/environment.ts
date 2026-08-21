@@ -62,6 +62,11 @@ const environmentSchema = {
   // on the same `uploaded-file` rows/bytes.
   STORAGE_TYPE: str({ choices: ['local'], default: 'local' }),
   STORAGE_LOCAL_FOLDER: str({ default: 'data/uploads' }),
+  SEARCH_MODEL_ID: str({ default: 'Xenova/all-MiniLM-L6-v2' }),
+  SEARCH_MODEL_CACHE_DIR: str({ default: 'data/models/search' }),
+  SEARCH_INDEX_VERSION: positiveInt({ default: 1 }),
+  SEARCH_QUERY_TIMEOUT_MS: positiveInt({ default: 120000 }),
+  SEARCH_RECONCILE_INTERVAL_MS: positiveInt({ default: 3600000 }),
   // Grace periods (THOTH-063) — must match `apps/web`'s `WORKSPACE_DELETE_GRACE_PERIOD_DAYS`/
   // `PAGE_DELETE_GRACE_PERIOD_DAYS`/`FILES_PURGE_GRACE_PERIOD_HOURS` in any real deployment,
   // since both processes reason about the same soft-deleted/orphaned rows.

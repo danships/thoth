@@ -3,6 +3,7 @@ import { apiRoute } from '@/lib/api/route-wrapper';
 import { getContainerRepository } from '@/lib/database';
 import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retriever';
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
+import { scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import { z } from 'zod';
 import { Column, columnSchema } from '@/types/schemas/entities/container';
 import { randomUUID } from 'node:crypto';
@@ -27,11 +28,12 @@ export const POST = apiRoute<z.infer<typeof columnSchema>, undefined, { id: stri
               options: body.options.map((o) => ({ id: randomUUID(), label: o.label, color: o.color })),
             }
           : { id: randomUUID(), name: body.name, type: body.type };
-    await containerRepository.update({
+    const updatedDataSource = await containerRepository.update({
       ...dataSource,
       columns: [...(dataSource.columns ?? []), newColumn],
       lastUpdated: new Date().toISOString(),
     } satisfies DataSourceContainer);
+    scheduleWorkspaceSearchReconcile(updatedDataSource.workspaceId);
 
     return newColumn;
   }

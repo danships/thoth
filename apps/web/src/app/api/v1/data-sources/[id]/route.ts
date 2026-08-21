@@ -4,6 +4,7 @@ import { dataSourceRetriever } from '@/lib/database/retrievers/data-source-retri
 import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { getLogger } from '@/lib/logger';
+import { scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import type {
   DeleteDataSourceParameters,
   GetDataSourceResponse,
@@ -122,5 +123,7 @@ export const DELETE = apiRoute<void, undefined, DeleteDataSourceParameters, {}>(
       workspaceId: dataSource.workspaceId,
       deletedViewCount,
     });
+
+    scheduleWorkspaceSearchReconcile(dataSource.workspaceId);
   }
 );

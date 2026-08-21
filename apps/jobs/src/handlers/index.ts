@@ -13,6 +13,11 @@ import {
   maintenancePurgeFilesJobDefinition,
   maintenancePruneJobsJobDefinition,
 } from './maintenance/index.js';
+import {
+  searchSyncPageJobDefinition,
+  searchReconcileWorkspaceJobDefinition,
+  searchScanWorkspacesJobDefinition,
+} from './search/index.js';
 
 /**
  * Builds the internal job registry for this process. The `test.noop` handler is only wired
@@ -40,6 +45,9 @@ export function createJobRegistry(nodeEnvironment: string): JobRegistry {
   registry.register(historyScanJobDefinition);
   registry.register(historyMaintainJobDefinition);
   registry.register(maintenancePurgeWorkspacesJobDefinition);
+  registry.register(searchSyncPageJobDefinition);
+  registry.register(searchReconcileWorkspaceJobDefinition);
+  registry.register(searchScanWorkspacesJobDefinition);
   registry.register(maintenancePurgePagesJobDefinition);
   registry.register(maintenancePurgeFilesJobDefinition);
   registry.register(maintenancePruneJobsJobDefinition);

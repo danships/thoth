@@ -83,6 +83,8 @@ import type {
   MovePageResponse,
   GetPageParentOptionsResponse,
   GetPageParentOptionsQuery,
+  GetSearchResultsResponse,
+  GetSearchResultsQueryInput,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -202,6 +204,14 @@ export const api = {
   dataSources: {
     remove: (id: string) => apiClient.delete(`/data-sources/${id}`),
     restore: (id: string) => apiClient.post<DataWrapper<RestoreDataSourceResponse>>(`/data-sources/${id}/restore`),
+  },
+
+  search: {
+    get: (parameters: GetSearchResultsQueryInput, options?: { signal?: AbortSignal }) =>
+      apiClient.get<DataWrapper<GetSearchResultsResponse>>('/search', {
+        params: parameters,
+        ...(options?.signal ? { signal: options.signal } : {}),
+      }),
   },
 
   // Workspaces API

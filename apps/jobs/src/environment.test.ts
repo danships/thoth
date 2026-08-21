@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import { getEnvironment, resetEnvironmentCacheForTests } from './environment.js';
 
 const REQUIRED_BASE_ENV = {
@@ -13,6 +13,9 @@ const NUMERIC_KEYS = [
   'JOB_RETENTION_MS',
   'JOB_RETENTION_MAX',
   'JOB_SCHEDULER_TICK_MS',
+  'SEARCH_INDEX_VERSION',
+  'SEARCH_QUERY_TIMEOUT_MS',
+  'SEARCH_RECONCILE_INTERVAL_MS',
 ] as const;
 
 function withEnvironment(overrides: Record<string, string>): NodeJS.ProcessEnv {
@@ -30,6 +33,22 @@ describe('jobs environment boundary validation', () => {
     process.env = withEnvironment({});
     try {
       expect(() => getEnvironment()).not.toThrow();
+    } finally {
+      process.env = originalEnvironment;
+    }
+  });
+
+  test('applies search defaults', () => {
+    resetEnvironmentCacheForTests();
+    const originalEnvironment = process.env;
+    process.env = withEnvironment({});
+    try {
+      const environment = getEnvironment();
+      expect(environment.SEARCH_MODEL_ID).toBe('Xenova/all-MiniLM-L6-v2');
+      expect(environment.SEARCH_MODEL_CACHE_DIR).toBe('data/models/search');
+      expect(environment.SEARCH_INDEX_VERSION).toBe(1);
+      expect(environment.SEARCH_QUERY_TIMEOUT_MS).toBe(120000);
+      expect(environment.SEARCH_RECONCILE_INTERVAL_MS).toBe(3600000);
     } finally {
       process.env = originalEnvironment;
     }

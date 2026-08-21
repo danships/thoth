@@ -10,6 +10,7 @@ import { getLogger } from '@/lib/logger';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
 import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
+import { schedulePageSearchSync, scheduleWorkspaceSearchReconcile } from '@/lib/search/notify-service';
 import type {
   DeletePageParameters,
   GetPageDetailsParameters,
@@ -172,6 +173,11 @@ export const PATCH = apiRoute<UpdatePageResponse, undefined, UpdatePageParameter
 
     scheduleNotifyPageChange('page.updated', finalPage, toWebhookActor(session));
     scheduleNotificationDispatch('page.updated', finalPage, toWebhookActor(session));
+    if (affectedPageCount === undefined) {
+      schedulePageSearchSync(finalPage);
+    } else {
+      scheduleWorkspaceSearchReconcile(finalPage.workspaceId);
+    }
 
     return {
       id: finalPage.id,
@@ -207,5 +213,7 @@ export const DELETE = apiRoute<void, undefined, DeletePageParameters, {}>(
       deletedPageCount: result.deletedPageCount,
       deletedViewCount: result.deletedViewCount,
     });
+
+    scheduleWorkspaceSearchReconcile(page.workspaceId);
   }
 );

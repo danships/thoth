@@ -4,6 +4,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
 import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
+import { schedulePageSearchSync } from '@/lib/search/notify-service';
 import { extractFileIdsFromContent, syncFileUsageForPage } from '@/lib/files/usage';
 import { getLogger } from '@/lib/logger';
 import type { ApiKeySession } from '@/lib/auth/session';
@@ -68,6 +69,7 @@ export async function mutatePageContent(
 
   scheduleNotifyPageChange('page.updated', updatedPage, toWebhookActor(session));
   scheduleNotificationDispatch('page.updated', updatedPage, toWebhookActor(session));
+  schedulePageSearchSync(updatedPage);
 
   return {
     content: 'content' in updatedPage ? (updatedPage.content ?? '') : '',

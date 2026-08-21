@@ -6,6 +6,7 @@ import { assertGrantAllowsContainerForSession } from '@/lib/auth/access-grant';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
 import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
+import { schedulePageSearchSync } from '@/lib/search/notify-service';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { recordValuesRevision } from '@thoth/database';
@@ -144,5 +145,6 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
       toWebhookActor(session),
       Math.max(1, Object.keys(valueChanges).length)
     );
+    schedulePageSearchSync(updatedPage);
   }
 );

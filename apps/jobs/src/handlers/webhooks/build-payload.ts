@@ -1,6 +1,5 @@
 import {
   getUploadedFileRepository,
-  type Column,
   type DataSourceContainer,
   type PageContainer,
   type PageValue,
@@ -8,81 +7,9 @@ import {
   type WebhookPayload,
   type WebhookRawValue,
 } from '@thoth/database';
+import { collectFileValueIds, toDisplayValue } from '../../page-values/display-values.js';
 
 export type ValueChangeInput = Record<string, { previous: PageValue | null; new: PageValue | null }>;
-
-/**
- * Resolves a stored `PageValue` to the primitive the payload should carry: for `single-select`,
- * the option's `label` (or `null` if unset/the option no longer exists); for `multi-select`, an
- * array of option labels (stale/deleted ids are filtered out); for `file`, a resolved
- * `{ id, filename, url }` object (`filenamesById` is pre-loaded once per payload since resolving
- * a filename requires a database lookup — see `buildPayload`); otherwise the raw `.value`. The
- * single place internal option ids are turned into human-readable labels.
- */
-function toDisplayValue(
-  column: Column,
-  value: PageValue | null | undefined,
-  filenamesById: Map<string, string | null>
-): WebhookRawValue {
-  if (!value) {
-    return null;
-  }
-  if (column.type === 'single-select' && value.type === 'single-select') {
-    if (!value.value) {
-      return null;
-    }
-    const option = column.options.find((candidate) => candidate.id === value.value);
-    return option?.label ?? null;
-  }
-  if (column.type === 'multi-select' && value.type === 'multi-select') {
-    const optionsById = new Map(column.options.map((option) => [option.id, option] as const));
-    return value.value.map((optionId) => optionsById.get(optionId)?.label).filter((label) => label !== undefined);
-  }
-  if (column.type === 'file' && value.type === 'file') {
-    if (!value.value) {
-      return null;
-    }
-    return {
-      id: value.value,
-      // `undefined` (id never collected) and `null` (collected but the file no longer exists)
-      // both fall back to `null` here — the payload only ever carries `string | null`.
-      filename: filenamesById.get(value.value) ?? null,
-      url: `/api/v1/files/${value.value}/content`,
-    };
-  }
-  if ('value' in value) {
-    return value.value;
-  }
-  return null;
-}
-
-/** Collects every distinct non-null `file` column value id referenced across `values` and
- * `valueChanges`, so their filenames can be batch-resolved once per payload rather than one
- * query per cell. */
-function collectFileValueIds(
-  columnsById: Map<string, Column>,
-  values: Record<string, PageValue> | undefined,
-  valueChanges: ValueChangeInput | undefined
-): string[] {
-  const ids = new Set<string>();
-
-  const collectFrom = (columnId: string, value: PageValue | null | undefined) => {
-    const column = columnsById.get(columnId);
-    if (column?.type === 'file' && value?.type === 'file' && value.value) {
-      ids.add(value.value);
-    }
-  };
-
-  for (const [columnId, value] of Object.entries(values ?? {})) {
-    collectFrom(columnId, value);
-  }
-  for (const [columnId, change] of Object.entries(valueChanges ?? {})) {
-    collectFrom(columnId, change.previous);
-    collectFrom(columnId, change.new);
-  }
-
-  return [...ids];
-}
 
 /**
  * Assembles the outbound webhook body (moved from `apps/web` in THOTH-061 — dispatch now reads

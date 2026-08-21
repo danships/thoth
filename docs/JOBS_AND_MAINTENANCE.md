@@ -14,7 +14,8 @@ the code-level comments in `apps/jobs/src/index.ts`, `apps/jobs/src/environment.
 | `packages/database/src/services/maintenance/` | Auth-free, DB-pure primitives: eligible-row batch queries, workspace cascade deletion, deleted-root permanent deletion, and dangling file-usage resolution. No process/environment/logging concerns — pure functions over a `@thoth/database` context. Does **not** own job-queue pruning — the job queue is in-memory, not a database table (see below). |
 | `apps/jobs/src/queue/` | The in-memory, per-process job queue (`queue-store.ts`/`queue-service.ts`). Owns terminal-job-row pruning (`QueueStore#pruneTerminalByPolicy`, wrapped by `QueueService#pruneTerminalByPolicy`), used exclusively by `maintenance.prune-jobs` — there is no persisted job table for `packages/database` to operate on. |
 | `apps/jobs/src/handlers/maintenance/` | The four scheduled job handlers (`purge-workspaces.ts`, `purge-pages.ts`, `purge-files.ts`, `prune-jobs.ts`). The three purge handlers wrap the `packages/database` primitives above; `prune-jobs.ts` wraps the in-memory queue service instead. Each adds bounded batch/time limits, lease/abort-signal awareness, continuation enqueueing, and structured logging. |
-| `apps/jobs/src/index.ts` | Registers the four production interval schedules (see below) and wires the job registry/queue/storage singletons. |
+| `apps/jobs/src/index.ts` | Registers the production interval schedules (including THOTH-086 search reconciliation) and wires the job registry/queue/storage/search singletons. |
+| `apps/jobs/src/search/` | THOTH-086 page-document formatting, per-workspace Vectra filesystem indexes, embeddings-model lifecycle, synchronous workspace search queries, and mutation/reconciliation helpers. |
 | `scripts/purge-cli-shared.ts` + `scripts/purge-deleted-{workspaces,pages,files}.ts` | Thin manual CLI wrappers over the *same* `@thoth/database` maintenance primitives the workspace/page/file purge job handlers call — not a separate implementation. There is no manual CLI for job pruning, since the queue it prunes is per-process and in-memory. |
 
 Both the scheduled purge job handlers and the manual CLI commands call the same underlying
@@ -31,6 +32,7 @@ Registered once, at `@thoth/jobs` startup, in `apps/jobs/src/index.ts` (disabled
 
 | Job type | Interval | Purpose |
 |----------|----------|---------|
+| `search.scan-workspaces` | hourly by default (`SEARCH_RECONCILE_INTERVAL_MS`) | Cursor-scans live workspaces and enqueues one deduped `search.reconcile-workspace` per workspace so every workspace index is eventually repaired even if a mutation-triggered `search.sync-page` was missed. |
 | `maintenance.purge-files` | hourly | Deletes dangling `file-usage` rows and orphaned uploaded files (storage bytes + DB row) past `FILES_PURGE_GRACE_PERIOD_HOURS`. |
 | `maintenance.purge-pages` | daily | Permanently deletes soft-deleted page/data-view roots past `PAGE_DELETE_GRACE_PERIOD_DAYS`. |
 | `maintenance.purge-workspaces` | daily | Permanently deletes soft-deleted workspaces (and their full cascade) past `WORKSPACE_DELETE_GRACE_PERIOD_DAYS`. |
@@ -128,3 +130,27 @@ by not running `pnpm workspaces:purge` by hand shortly before/after its daily sc
   commands — only `pnpm db:migrate` (the standalone `@thoth/database` migration CLI), run once
   before either PM2-managed process starts. See the root README's "Process topology" section for
   the full PM2 child/startup-ordering reference.
+
+## Search indexing (THOTH-086)
+
+- **Index location:** `@thoth/jobs` stores one filesystem-backed Vectra index per workspace at
+  `<STORAGE_LOCAL_FOLDER>/_search/<workspaceId>`. Corrupt or version-mismatched indexes are moved
+  aside and rebuilt automatically on the next open; changing the page-document formatter, chunking,
+  embedding model/options, or any other index assumption requires bumping `SEARCH_INDEX_VERSION`.
+- **Embeddings model:** on non-test startup, `@thoth/jobs` warms `SEARCH_MODEL_ID` once before it
+  reports readiness. The process sets the Transformers cache directory to `SEARCH_MODEL_CACHE_DIR`
+  and disables remote model downloads at runtime, so operators should provision the model there in
+  advance. A failed warmup is fatal and exits the process rather than serving a half-ready search
+  socket.
+- **Mutation vs reconciliation:** page mutations enqueue `search.sync-page` for incremental,
+  timestamp-based upserts/deletes. The scheduled `search.scan-workspaces` →
+  `search.reconcile-workspace` chain re-scans every live workspace in bounded cursor batches,
+  refreshing only pages whose `lastUpdated` or parent data-source `lastUpdated` changed and deleting
+  stale documents no longer represented by an eligible page row.
+- **Eligibility:** only pages satisfying `isPageSearchEligible(page)` are indexed or kept indexed:
+  `type === 'page'`, `deletedAt === null`, and `isPrivate !== true`. Private or soft-deleted pages
+  are removed from the index on sync/reconcile and are never considered search candidates even if a
+  stale document still exists on disk.
+- **Singleton requirement:** `@thoth/jobs` must remain a single instance. Beyond the in-memory queue
+  semantics, the Vectra filesystem index is a single-writer store — running two jobs processes
+  against the same `<STORAGE_LOCAL_FOLDER>/_search/*` tree risks index corruption.

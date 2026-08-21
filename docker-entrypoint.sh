@@ -54,7 +54,10 @@ if [ "$(id -u)" = '0' ]; then
   # can create that marker file alongside the app's own data.
   chmod 777 /data
   chown nextjs:nodejs /app/apps/web/.env
-  exec su-exec nextjs "$@"
+  # `setpriv` (util-linux, part of the Debian base — see Dockerfile.preview) replaces
+  # `su-exec` (an Alpine-only tool) here: it execs "$@" in place under the target uid/gid,
+  # so it still stays PID 1's signal-forwarding process rather than spawning a child shell.
+  exec setpriv --reuid=nextjs --regid=nodejs --init-groups "$@"
 fi
 
 exec "$@"
