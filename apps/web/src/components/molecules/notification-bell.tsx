@@ -16,7 +16,7 @@ import classes from './notification-bell.module.css';
 // header — it is not scoped to a `[workspaceSlug]`.
 export function NotificationBell() {
   const [opened, setOpened] = useState(false);
-  const [nowMs, setNowMs] = useState(Date.now());
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const { showError } = useNotification();
   const { data: unreadCounts, mutate: mutateCounts } = useNotificationUnreadCounts();
   const { items, isLoading, refresh, setItems } = useNotifications({ limit: 10 });
@@ -36,8 +36,8 @@ export function NotificationBell() {
       return;
     }
 
-    const interval = window.setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => window.clearInterval(interval);
+    const interval = globalThis.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => globalThis.clearInterval(interval);
   }, [opened]);
 
   const handleMarkRead = async (id: string) => {
