@@ -4,6 +4,13 @@ Thoth ships a durable, per-user notification inbox by default (THOTH-066). Brows
 delivery on top of the same inbox is **enabled by default** (`WEB_PUSH_ENABLED` defaults to
 `true`); set `WEB_PUSH_ENABLED=false` to disable it and fall back to inbox-only delivery.
 
+## Notification grouping delay
+
+Inbox creation and Web Push fan-out occur after a shared three-minute trailing debounce. Updates
+from the same actor to the same page in the same workspace are grouped; a continuous burst is
+still dispatched no later than five minutes after its first event. This delay affects notification
+dispatch only — page persistence and outbound app webhooks are not delayed.
+
 ## Subscription ancestry
 
 `tree` subscriptions follow a changed page's live ancestor graph when dispatch runs. In addition

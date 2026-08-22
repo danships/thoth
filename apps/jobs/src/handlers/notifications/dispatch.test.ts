@@ -17,7 +17,13 @@ import {
   type DataSourceContainer,
   type WorkspaceMember,
 } from '@thoth/database';
-import type { JobExecutionContext, NotificationDispatchPayloadV1 } from '@thoth/job-protocol';
+import {
+  notificationDispatchPayloadV1Schema,
+  type JobCoalescePolicy,
+  type JobExecutionContext,
+  type NotificationDispatchPayloadV1,
+} from '@thoth/job-protocol';
+import { QueueService } from '../../queue/queue-service.js';
 import {
   notificationDispatchJobDefinition,
   notificationDispatchDedupeKey,
@@ -41,6 +47,26 @@ function makeContext(
       throw new Error('THOTH-066: notification.dispatch must never enqueue a child job');
     },
   };
+}
+
+/**
+ * Enqueues a `notification.dispatch` job via the definition's own `dedupeKey`/`coalesce`
+ * metadata, mirroring how `@thoth/jobs`' runner and socket server derive these optional fields
+ * under `exactOptionalPropertyTypes`.
+ */
+async function enqueue(queue: QueueService, jobPayload: NotificationDispatchPayloadV1, now: Date) {
+  const dedupeKey = notificationDispatchJobDefinition.dedupeKey?.(jobPayload);
+  return queue.enqueue({
+    type: notificationDispatchJobDefinition.type,
+    payloadVersion: notificationDispatchJobDefinition.payloadVersion,
+    payload: jobPayload,
+    priority: notificationDispatchJobDefinition.priority,
+    maxAttempts: notificationDispatchJobDefinition.maxAttempts,
+    ...(dedupeKey === undefined ? {} : { dedupeKey }),
+    ...(notificationDispatchJobDefinition.coalesce === undefined
+      ? {}
+      : { coalesce: notificationDispatchJobDefinition.coalesce as JobCoalescePolicy<unknown> }),
+  }, now);
 }
 
 describe('mergeNotificationDispatchPayload', () => {
@@ -67,6 +93,20 @@ describe('mergeNotificationDispatchPayload', () => {
     expect(merged.changeCount).toBe(5);
     expect(merged.occurredAt).toBe('2024-01-01T00:05:00.000Z');
   });
+
+  test('clamps accumulated changeCount to the protocol maximum', () => {
+    const existing: NotificationDispatchPayloadV1 = {
+      workspaceId: 'workspace-1', containerId: 'page-1', event: 'page.updated',
+      actor: { type: 'user', userId: 'user-1' }, changeCount: 80_000, occurredAt: '2024-01-01T00:00:00.000Z',
+    };
+    const incoming: NotificationDispatchPayloadV1 = {
+      ...existing, changeCount: 30_000, occurredAt: '2024-01-01T00:01:00.000Z',
+    };
+
+    const merged = mergeNotificationDispatchPayload(existing, incoming);
+    expect(merged.changeCount).toBe(100_000);
+    expect(notificationDispatchPayloadV1Schema.safeParse(merged).success).toBe(true);
+  });
 });
 
 describe('notificationDispatchDedupeKey', () => {
@@ -82,6 +122,64 @@ describe('notificationDispatchDedupeKey', () => {
     const keyForUserB = notificationDispatchDedupeKey({ ...base, actor: { type: 'user', userId: 'user-b' } });
     expect(keyForUserA).not.toBe(keyForUserB);
     expect(keyForUserA).toBe('notification:workspace-1:page-1:user:user-a');
+  });
+});
+
+describe('notification.dispatch queue grouping', () => {
+  const start = new Date('2026-01-01T00:00:00.000Z');
+
+  function payload(overrides: Partial<NotificationDispatchPayloadV1> = {}): NotificationDispatchPayloadV1 {
+    return {
+      workspaceId: 'workspace-1',
+      containerId: 'page-1',
+      event: 'page.updated',
+      actor: { type: 'app', appId: 'app-1', userId: 'author-1' },
+      changeCount: 1,
+      occurredAt: start.toISOString(),
+      ...overrides,
+    };
+  }
+
+  test('trailing-debounces matching app page updates and dispatches the aggregate once due', async () => {
+    const queue = new QueueService();
+    const firstPayload = payload({ changeCount: 2 });
+    const first = await enqueue(queue, firstPayload, start);
+    expect(first.record.runAt).toEqual(new Date(start.getTime() + 180_000));
+
+    const secondAt = new Date(start.getTime() + 60_000);
+    const secondPayload = payload({ changeCount: 3, occurredAt: secondAt.toISOString() });
+    const second = await enqueue(queue, secondPayload, secondAt);
+
+    expect(second.disposition).toBe('coalesced');
+    expect(second.record.id).toBe(first.record.id);
+    expect(queue.all()).toHaveLength(1);
+    expect(second.record.payload).toMatchObject({ changeCount: 5, occurredAt: secondAt.toISOString() });
+    expect(second.record.runAt).toEqual(new Date(start.getTime() + 240_000));
+    await expect(queue.claimNextDue(new Date(start.getTime() + 239_999))).resolves.toBeUndefined();
+    await expect(queue.claimNextDue(new Date(start.getTime() + 240_000))).resolves.toMatchObject({ id: first.record.id });
+  });
+
+  test('caps a continuous matching burst five minutes after its first event', async () => {
+    const queue = new QueueService();
+    await enqueue(queue, payload(), start);
+    await enqueue(queue, payload({ occurredAt: new Date(start.getTime() + 120_000).toISOString() }), new Date(start.getTime() + 120_000));
+    const last = await enqueue(queue, payload({ occurredAt: new Date(start.getTime() + 240_000).toISOString() }), new Date(start.getTime() + 240_000));
+
+    expect(last.record.runAt).toEqual(new Date(start.getTime() + 300_000));
+  });
+
+  test('keeps different pages and app actors in separate queue records', async () => {
+    const queue = new QueueService();
+    const pageOne = payload();
+    const pageTwo = payload({ containerId: 'page-2' });
+    const otherApp = payload({ actor: { type: 'app', appId: 'app-2', userId: 'author-1' } });
+
+    expect(notificationDispatchDedupeKey(pageOne)).not.toBe(notificationDispatchDedupeKey(pageTwo));
+    expect(notificationDispatchDedupeKey(pageOne)).not.toBe(notificationDispatchDedupeKey(otherApp));
+    await enqueue(queue, pageOne, start);
+    await enqueue(queue, pageTwo, start);
+    await enqueue(queue, otherApp, start);
+    expect(queue.all()).toHaveLength(3);
   });
 });
 
@@ -227,6 +325,30 @@ describe('notificationDispatchJobDefinition handler', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.containerId).toBe('page-1');
     expect(rows[0]?.changeCount).toBe(2);
+  });
+
+  test('creates one inbox item with the queued aggregate payload', async () => {
+    await createPage();
+    await createMember('recipient-a');
+    await upsertNotificationRule({ userId: 'recipient-a', workspaceId, containerId: null, kind: 'workspace' });
+    const queue = new QueueService();
+    const firstAt = new Date('2026-01-01T00:00:00.000Z');
+    const firstPayload: NotificationDispatchPayloadV1 = {
+      workspaceId, containerId: 'page-1', event: 'page.updated',
+      actor: { type: 'app', appId: 'app-1', userId: 'author-1' }, changeCount: 2, occurredAt: firstAt.toISOString(),
+    };
+    const first = await enqueue(queue, firstPayload, firstAt);
+    const secondAt = new Date(firstAt.getTime() + 60_000);
+    await enqueue(queue, { ...firstPayload, changeCount: 3, occurredAt: secondAt.toISOString() }, secondAt);
+
+    const queued = queue.get(first.record.id)!;
+    const result = await notificationDispatchJobDefinition.handler(makeContext(
+      queued.payload as NotificationDispatchPayloadV1, queued.id
+    ));
+    expect(result).toEqual({ recipients: 1, created: 1 });
+    const rows = await notificationRepository.getByQuery(notificationRepository.createQuery().eq('sourceJobId', queued.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.changeCount).toBe(5);
   });
 
   test('notifies a tree subscriber when an embedded data-source row changes', async () => {
