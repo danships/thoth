@@ -44,7 +44,7 @@ export async function queryWorkspaceSearchResults(
     candidates = await searchWorkspace({
       socketPath,
       workspaceId: query.workspaceId,
-      query: query.q,
+      query: query.query,
       limit: query.limit,
       grant,
       responseTimeoutMs: environment.SEARCH_QUERY_TIMEOUT_MS,
@@ -65,7 +65,7 @@ export async function queryWorkspaceSearchResults(
       containerRepository.createQuery().eq('id', candidate.pageId).eq('workspaceId', query.workspaceId)
     );
 
-    if (!container || container.type !== 'page' || container.deletedAt !== null || container.isPrivate === true) {
+    if (!container || container.type !== 'page' || container.deletedAt !== null) {
       continue;
     }
 
@@ -78,13 +78,28 @@ export async function queryWorkspaceSearchResults(
       throw error;
     }
 
+    const ancestors: Array<{ id: string; name: string }> = [];
+    let parentId = container.parentId;
+    const seenAncestorIds = new Set<string>();
+    while (parentId && !seenAncestorIds.has(parentId)) {
+      seenAncestorIds.add(parentId);
+      const ancestor = await containerRepository.getOneByQuery(
+        containerRepository.createQuery().eq('id', parentId).eq('workspaceId', query.workspaceId)
+      );
+      if (!ancestor || ancestor.type !== 'page' || ancestor.deletedAt !== null) break;
+      ancestors.unshift({ id: ancestor.id, name: ancestor.name });
+      parentId = ancestor.parentId;
+    }
+
     results.push({
       page: {
         id: container.id,
         name: container.name,
         emoji: container.emoji ?? null,
         parentId: container.parentId ?? null,
+        isPrivate: container.isPrivate,
       },
+      ancestors,
       score: candidate.score,
       snippet: candidate.snippet,
     });

@@ -52,7 +52,6 @@ export * from './get-page-revision';
 export * from './restore-page-revision';
 export * from './fork-page-revision';
 export * from './reorder-page';
-export * from './get-page-parent-options';
 export * from './get-search-results';
 export * from './copy-page';
 export * from './move-page';

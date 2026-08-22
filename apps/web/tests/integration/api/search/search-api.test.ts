@@ -11,7 +11,7 @@ describe('search API auth and validation', () => {
   test('returns 401 without auth', async () => {
     const client = createAnonymousClient(getBaseUrl());
     const response = await client.get('/api/v1/search', {
-      params: { workspaceId: SEED.workspace.id, q: 'root' },
+      params: { workspaceId: SEED.workspace.id, query: 'root', type: 'page', limit: '20' },
     });
     expect(response.status).toBe(401);
   });
@@ -19,20 +19,21 @@ describe('search API auth and validation', () => {
   test('returns 404 for a non-member workspace lookup', async () => {
     const client = await getThirdUserClient(getBaseUrl());
     const response = await client.get('/api/v1/search', {
-      params: { workspaceId: SEED.secondWorkspace.id, q: 'root' },
+      params: { workspaceId: SEED.secondWorkspace.id, query: 'root', type: 'page', limit: '20' },
     });
     expect(response.status).toBe(404);
   });
 
   test.each([
     { workspaceId: SEED.workspace.id },
-    { workspaceId: SEED.workspace.id, q: 'x'.repeat(501) },
-    { q: 'root' },
-    { workspaceId: SEED.workspace.id, q: 'root', limit: '0' },
-    { workspaceId: SEED.workspace.id, q: 'root', limit: '21' },
+    { workspaceId: SEED.workspace.id, query: ' ', type: 'page', limit: '20' },
+    { workspaceId: SEED.workspace.id, query: 'x'.repeat(101), type: 'page', limit: '20' },
+    { query: 'root', type: 'page', limit: '20' },
+    { workspaceId: SEED.workspace.id, query: 'root', type: 'page', limit: '0' },
+    { workspaceId: SEED.workspace.id, query: 'root', type: 'page', limit: '21' },
   ])('returns 400 for invalid query parameters', async (parameters) => {
     const client = await getOwnerClient(getBaseUrl());
-    const response = await client.get('/api/v1/search', { params: parameters });
+    const response = await client.get('/api/v1/search', { params: parameters as Record<string, string> });
     expect(response.status).toBe(400);
   });
 });
@@ -127,10 +128,20 @@ describe('queryWorkspaceSearchResults', () => {
     return { ...routeModule, logger, searchWorkspace, assertContentAccess };
   }
 
-  test('returns matched title/content/value results, excluding private, deleted, and denied pages', async () => {
+  test('returns matched authorized pages, excluding only deleted and denied pages', async () => {
     process.env['JOB_SOCKET_PATH'] = '/workspace/apps/web/test.sock';
     const { queryWorkspaceSearchResults, searchWorkspace, assertContentAccess } = await loadModule({
       rows: [
+        {
+          id: SEED.pages.root.id,
+          workspaceId: SEED.workspace.id,
+          type: 'page',
+          name: SEED.pages.root.name,
+          emoji: null,
+          parentId: null,
+          deletedAt: null,
+          isPrivate: false,
+        },
         {
           id: 'title-page',
           workspaceId: SEED.workspace.id,
@@ -204,25 +215,34 @@ describe('queryWorkspaceSearchResults', () => {
     });
 
     const result = await queryWorkspaceSearchResults(
-      { workspaceId: SEED.workspace.id, q: 'match', limit: 10 },
+      { workspaceId: SEED.workspace.id, query: 'match', type: 'page', limit: 10 },
       { user: { id: SEED.user.id } } as never
     );
 
     expect(result.results).toEqual([
       {
-        page: { id: 'title-page', name: 'Title Match', emoji: '📄', parentId: null },
+        page: { id: 'title-page', name: 'Title Match', emoji: '📄', parentId: null, isPrivate: false },
+        ancestors: [],
         score: 0.98,
         snippet: 'Title snippet',
       },
       {
-        page: { id: 'content-page', name: 'Content Match', emoji: null, parentId: SEED.pages.root.id },
+        page: { id: 'content-page', name: 'Content Match', emoji: null, parentId: SEED.pages.root.id, isPrivate: false },
+        ancestors: [{ id: SEED.pages.root.id, name: SEED.pages.root.name }],
         score: 0.96,
         snippet: 'Content snippet',
       },
       {
-        page: { id: 'value-page', name: 'Value Match', emoji: null, parentId: SEED.dataSource.id },
+        page: { id: 'value-page', name: 'Value Match', emoji: null, parentId: SEED.dataSource.id, isPrivate: false },
+        ancestors: [],
         score: 0.91,
         snippet: 'Value snippet',
+      },
+      {
+        page: { id: 'private-page', name: 'Private Match', emoji: null, parentId: null, isPrivate: true },
+        ancestors: [],
+        score: 0.89,
+        snippet: 'Private snippet',
       },
     ]);
     expect(searchWorkspace).toHaveBeenCalledWith(
@@ -233,7 +253,7 @@ describe('queryWorkspaceSearchResults', () => {
         responseTimeoutMs: 1234,
       })
     );
-    expect(assertContentAccess).toHaveBeenCalledTimes(4);
+    expect(assertContentAccess).toHaveBeenCalledTimes(5);
   });
 
   test.each([
@@ -269,7 +289,7 @@ describe('queryWorkspaceSearchResults', () => {
     } as never;
 
     const result = await queryWorkspaceSearchResults(
-      { workspaceId: SEED.workspace.id, q: 'allowed', limit: 10 },
+      { workspaceId: SEED.workspace.id, query: 'allowed', type: 'page', limit: 10 },
       session
     );
 
@@ -286,7 +306,7 @@ describe('queryWorkspaceSearchResults', () => {
     const { queryWorkspaceSearchResults } = await loadModule({ searchResults: [] });
 
     const result = await queryWorkspaceSearchResults(
-      { workspaceId: SEED.workspace.id, q: 'nothing', limit: 10 },
+      { workspaceId: SEED.workspace.id, query: 'nothing', type: 'page', limit: 10 },
       { user: { id: SEED.user.id } } as never
     );
 
@@ -308,7 +328,7 @@ describe('queryWorkspaceSearchResults', () => {
       searchError: new Error('socket down'),
     });
 
-    const response = await GET(new Request(`http://localhost/api/v1/search?workspaceId=${SEED.workspace.id}&q=root`) as never, {
+    const response = await GET(new Request(`http://localhost/api/v1/search?workspaceId=${SEED.workspace.id}&query=root&type=page&limit=20`) as never, {
       params: Promise.resolve({}),
     });
 
@@ -344,7 +364,7 @@ describe('queryWorkspaceSearchResults', () => {
     });
 
     const result = await queryWorkspaceSearchResults(
-      { workspaceId: SEED.workspace.id, q: 'readable', limit: 10 },
+      { workspaceId: SEED.workspace.id, query: 'readable', type: 'page', limit: 10 },
       {
         user: { id: SEED.user.id },
         appContext: {

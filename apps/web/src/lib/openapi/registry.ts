@@ -122,18 +122,6 @@ export const operations = [
     response: api.getPageDetailsResponseSchema,
   },
   {
-    path: '/pages/{id}/parent-options',
-    method: 'get',
-    operationId: 'getPageParentOptions',
-    summary: 'List writable page parents',
-    tags: ['Pages'],
-    auth: 'sessionOrApiKey',
-    params: api.getPageParentOptionsParametersSchema,
-    query: api.getPageParentOptionsQuerySchema,
-    response: api.getPageParentOptionsResponseSchema,
-    errorStatuses: [400, 403, 404],
-  },
-  {
     path: '/pages/{id}/copy',
     method: 'post',
     operationId: 'copyPage',
