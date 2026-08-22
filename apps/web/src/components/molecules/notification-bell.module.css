@@ -18,3 +18,7 @@
 .itemLink:hover {
   text-decoration: none;
 }
+
+.timestamp {
+  display: block;
+}

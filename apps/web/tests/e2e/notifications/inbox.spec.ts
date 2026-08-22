@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
+import { getNotificationsResponseSchema } from '@/types/api';
 
 // THOTH-066: the per-user notification inbox. Exercises rendering of seeded inbox items, the
 // header bell popover, per-item mark-read, and the `/notifications/{id}/open` navigation route
@@ -46,7 +47,22 @@ test.describe('notification inbox', () => {
     await expect(bell).toBeVisible();
     await bell.click();
 
-    await expect(page.getByText(SEED.notifications.unread.title, { exact: true })).toBeVisible();
+    const title = page.getByText(SEED.notifications.unread.title, { exact: true });
+    await expect(title).toBeVisible();
+
+    const notification = await request.get('/api/v1/notifications');
+    expect(notification.ok()).toBeTruthy();
+    const notificationJson = await notification.json();
+    const notificationBody = getNotificationsResponseSchema.parse(notificationJson.data);
+    const unread = notificationBody.notifications.find((item) => item.id === SEED.notifications.unread.id);
+    expect(unread).toBeDefined();
+
+    const timestamp = title.locator('xpath=ancestor::a').locator('time[datetime]');
+    await expect(timestamp).toHaveAttribute('datetime', unread?.occurredAt ?? '');
+    expect(Date.parse(unread?.occurredAt ?? '')).not.toBeNaN();
+    await expect(timestamp).toHaveText(
+      /^(just now|[1-9]\d* (minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years) ago)$/
+    );
   });
 
   test('the open route redirects to the target page and marks the item read', async ({ page, request }) => {
