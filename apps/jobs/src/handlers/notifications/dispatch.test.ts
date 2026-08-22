@@ -17,7 +17,12 @@ import {
   type DataSourceContainer,
   type WorkspaceMember,
 } from '@thoth/database';
-import { notificationDispatchPayloadV1Schema, type JobExecutionContext, type NotificationDispatchPayloadV1 } from '@thoth/job-protocol';
+import {
+  notificationDispatchPayloadV1Schema,
+  type JobCoalescePolicy,
+  type JobExecutionContext,
+  type NotificationDispatchPayloadV1,
+} from '@thoth/job-protocol';
 import { QueueService } from '../../queue/queue-service.js';
 import {
   notificationDispatchJobDefinition,
@@ -42,6 +47,26 @@ function makeContext(
       throw new Error('THOTH-066: notification.dispatch must never enqueue a child job');
     },
   };
+}
+
+/**
+ * Enqueues a `notification.dispatch` job via the definition's own `dedupeKey`/`coalesce`
+ * metadata, mirroring how `@thoth/jobs`' runner and socket server derive these optional fields
+ * under `exactOptionalPropertyTypes`.
+ */
+async function enqueue(queue: QueueService, jobPayload: NotificationDispatchPayloadV1, now: Date) {
+  const dedupeKey = notificationDispatchJobDefinition.dedupeKey?.(jobPayload);
+  return queue.enqueue({
+    type: notificationDispatchJobDefinition.type,
+    payloadVersion: notificationDispatchJobDefinition.payloadVersion,
+    payload: jobPayload,
+    priority: notificationDispatchJobDefinition.priority,
+    maxAttempts: notificationDispatchJobDefinition.maxAttempts,
+    ...(dedupeKey === undefined ? {} : { dedupeKey }),
+    ...(notificationDispatchJobDefinition.coalesce === undefined
+      ? {}
+      : { coalesce: notificationDispatchJobDefinition.coalesce as JobCoalescePolicy<unknown> }),
+  }, now);
 }
 
 describe('mergeNotificationDispatchPayload', () => {
@@ -113,18 +138,6 @@ describe('notification.dispatch queue grouping', () => {
       occurredAt: start.toISOString(),
       ...overrides,
     };
-  }
-
-  async function enqueue(queue: QueueService, jobPayload: NotificationDispatchPayloadV1, now: Date) {
-    return queue.enqueue({
-      type: notificationDispatchJobDefinition.type,
-      payloadVersion: notificationDispatchJobDefinition.payloadVersion,
-      payload: jobPayload,
-      priority: notificationDispatchJobDefinition.priority,
-      maxAttempts: notificationDispatchJobDefinition.maxAttempts,
-      dedupeKey: notificationDispatchJobDefinition.dedupeKey(jobPayload),
-      coalesce: notificationDispatchJobDefinition.coalesce,
-    }, now);
   }
 
   test('trailing-debounces matching app page updates and dispatches the aggregate once due', async () => {
@@ -324,19 +337,9 @@ describe('notificationDispatchJobDefinition handler', () => {
       workspaceId, containerId: 'page-1', event: 'page.updated',
       actor: { type: 'app', appId: 'app-1', userId: 'author-1' }, changeCount: 2, occurredAt: firstAt.toISOString(),
     };
-    const first = await queue.enqueue({
-      type: notificationDispatchJobDefinition.type, payloadVersion: notificationDispatchJobDefinition.payloadVersion,
-      payload: firstPayload, priority: notificationDispatchJobDefinition.priority,
-      maxAttempts: notificationDispatchJobDefinition.maxAttempts,
-      dedupeKey: notificationDispatchJobDefinition.dedupeKey(firstPayload), coalesce: notificationDispatchJobDefinition.coalesce,
-    }, firstAt);
+    const first = await enqueue(queue, firstPayload, firstAt);
     const secondAt = new Date(firstAt.getTime() + 60_000);
-    await queue.enqueue({
-      type: notificationDispatchJobDefinition.type, payloadVersion: notificationDispatchJobDefinition.payloadVersion,
-      payload: { ...firstPayload, changeCount: 3, occurredAt: secondAt.toISOString() },
-      priority: notificationDispatchJobDefinition.priority, maxAttempts: notificationDispatchJobDefinition.maxAttempts,
-      dedupeKey: notificationDispatchJobDefinition.dedupeKey(firstPayload), coalesce: notificationDispatchJobDefinition.coalesce,
-    }, secondAt);
+    await enqueue(queue, { ...firstPayload, changeCount: 3, occurredAt: secondAt.toISOString() }, secondAt);
 
     const queued = queue.get(first.record.id)!;
     const result = await notificationDispatchJobDefinition.handler(makeContext(
