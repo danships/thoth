@@ -50,7 +50,7 @@ test('copy destination picker reuses recent pages and switches to the shared sea
   expect(searchUrl.searchParams.get('type')).toBe('page');
   expect(searchUrl.searchParams.get('limit')).toBe('20');
 
-  await dialog.getByLabel('New parent').fill('   ');
+  await dialog.getByLabel('New parent').fill(' '.repeat(3));
   await expect(dialog.getByText('Workspace root')).toBeVisible();
   expect(parentOptionsRequests).toEqual([]);
 });

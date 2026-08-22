@@ -43,6 +43,13 @@ function isAbortError(error: unknown): boolean {
   return axios.isCancel(error) || (error instanceof Error && ['AbortError', 'CanceledError'].includes(error.name));
 }
 
+function getSubmitErrorMessage(status: number | undefined, action: 'copy' | 'move'): string {
+  if (status === 409) return 'This page was moved elsewhere. Close and try again.';
+  if (status === 400 && action === 'move') return 'A page cannot be moved into itself or one of its sub-pages.';
+  if (status === 403 || status === 404) return 'That destination is no longer available.';
+  return 'Unable to complete this action. Please try again.';
+}
+
 export function PageParentActionModal({
   action,
   source,
@@ -79,13 +86,12 @@ export function PageParentActionModal({
   }, [combobox, opened]);
 
   useEffect(() => {
+    requestId.current += 1;
     if (!opened || recentMode) {
-      requestId.current += 1;
-      setSearchLoading(false);
       return;
     }
 
-    const currentRequestId = ++requestId.current;
+    const currentRequestId = requestId.current;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setSearchLoading(true);
@@ -141,7 +147,7 @@ export function PageParentActionModal({
     () => [...(scopeType === 'workspace' ? [{ id: null, name: 'Workspace root' }] : []), ...pageChoices],
     [pageChoices, scopeType]
   );
-  const loading = recentMode ? recentLoading : searchLoading;
+  const loading = recentMode ? recentLoading : opened && searchLoading;
   const loadFailed = recentMode ? recentError !== undefined : searchError;
   const label = action === 'copy' ? 'Copy page' : 'Move page';
 
@@ -161,15 +167,7 @@ export function PageParentActionModal({
       onClose();
     } catch (error_: unknown) {
       const status = (error_ as { response?: { status?: number } }).response?.status;
-      setError(
-        status === 409
-          ? 'This page was moved elsewhere. Close and try again.'
-          : status === 400 && action === 'move'
-            ? 'A page cannot be moved into itself or one of its sub-pages.'
-            : status === 403 || status === 404
-              ? 'That destination is no longer available.'
-              : 'Unable to complete this action. Please try again.'
-      );
+      setError(getSubmitErrorMessage(status, action));
     } finally {
       setPending(false);
     }
