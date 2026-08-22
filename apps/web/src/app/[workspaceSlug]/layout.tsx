@@ -45,6 +45,7 @@ export default async function WorkspaceLayout({ children, sidebar, params }: Pro
         name: workspace.name,
         storageQuotaBytes: workspace.storageQuotaBytes ?? DEFAULT_WORKSPACE_STORAGE_QUOTA_BYTES,
         role: membership?.role ?? 'viewer',
+        scopeType: membership?.scopeType ?? 'workspace',
       }}
     >
       <Layout sidebar={sidebar}>{children}</Layout>
