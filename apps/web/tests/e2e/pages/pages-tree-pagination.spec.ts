@@ -156,13 +156,25 @@ test('a root page with more than 10 children shows a "more inside" indicator', a
   await expect(page.getByTestId('pages-tree-scroll-pane').getByText(firstChild.name)).toBeVisible();
   await expect(page.getByText(eleventhChild.name)).not.toBeVisible();
 
-  const moreInsideLink = page.getByRole('link', { name: 'More inside — open page' });
+  // Scoped to the scroll pane (rather than a bare page-wide role query) so this can never
+  // ambiguously match an unrelated "more inside" indicator rendered elsewhere in the sidebar
+  // (e.g. the Recent section) — mirroring `hostLink` above.
+  const moreInsideLink = page
+    .getByTestId('pages-tree-scroll-pane')
+    .getByRole('link', { name: 'More inside — open page' });
   await expect(moreInsideLink).toBeVisible();
   await expect(moreInsideLink).toHaveAttribute(
     'href',
     `/${SEED.workspace.slug}/pages/${SEED.pages.childOverflowHost.id}`
   );
 
-  await moreInsideLink.click();
-  await expect(page).toHaveURL(`/${SEED.workspace.slug}/pages/${SEED.pages.childOverflowHost.id}`);
+  // Scroll the link fully into view and pair the click with `waitForURL` (rather than clicking
+  // and separately asserting via `toHaveURL`) so a slow/CI-scale re-render racing the click
+  // can't leave a stale post-click assertion reading the URL before the client-side navigation
+  // this click triggers has actually landed.
+  await moreInsideLink.scrollIntoViewIfNeeded();
+  await Promise.all([
+    page.waitForURL(`/${SEED.workspace.slug}/pages/${SEED.pages.childOverflowHost.id}`, { timeout: 15_000 }),
+    moreInsideLink.click(),
+  ]);
 });
