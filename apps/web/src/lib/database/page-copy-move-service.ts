@@ -22,10 +22,12 @@ export async function resolveMoveCopyDestination(
     const member = await assertWorkspaceAccess(session.user.id, source.workspaceId);
     const grant = session.appContext?.accessGrant ?? (await memberToAccessGrant(member));
     assertGrantAllowsWrite(grant);
-    if (grant.scopeType !== 'workspace')
-      throw new (await import('@/lib/errors/forbidden-error')).ForbiddenError(
+    if (grant.scopeType !== 'workspace') {
+      const { ForbiddenError } = await import('@/lib/errors/forbidden-error');
+      throw new ForbiddenError(
         'Workspace root is outside the grant scope'
       );
+    }
     return null;
   }
   const repository = await getContainerRepository();
