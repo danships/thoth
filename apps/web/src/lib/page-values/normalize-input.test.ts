@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { BadRequestError } from '@/lib/errors/bad-request-error';
+import type { UpdatePageValuesEntry } from '@/types/api';
 import { normalizePageValueInput } from './normalize-input';
-import type { Column } from '@/types/schemas/entities/container';
+import type { Column, PageValue } from '@/types/schemas/entities/container';
 
 const columns: Record<string, Column> = {
   string: { id: 'string-id', name: 'Text', type: 'string' },
@@ -24,7 +25,7 @@ const columns: Record<string, Column> = {
 };
 
 describe('normalizePageValueInput', () => {
-  test.each([
+  const shorthandCases: Array<[keyof typeof columns, UpdatePageValuesEntry, PageValue]> = [
     ['string', 'text', { type: 'string', value: 'text' }],
     ['number', 12.5, { type: 'number', value: 12.5 }],
     ['boolean', true, { type: 'boolean', value: true }],
@@ -32,15 +33,19 @@ describe('normalizePageValueInput', () => {
     ['single-select', 'option-a', { type: 'single-select', value: 'option-a' }],
     ['multi-select', ['option-a'], { type: 'multi-select', value: ['option-a'] }],
     ['file', 'uploaded-file-id', { type: 'file', value: 'uploaded-file-id' }],
-  ] as const)('normalizes %s shorthand', (type, input, expected) => {
+  ];
+
+  test.each(shorthandCases)('normalizes %s shorthand', (type, input, expected) => {
     expect(normalizePageValueInput(columns[type]!, input)).toEqual(expected);
   });
 
-  test.each([
+  const nullableCases: Array<[keyof typeof columns, UpdatePageValuesEntry, PageValue]> = [
     ['single-select', null, { type: 'single-select', value: null }],
     ['file', null, { type: 'file', value: null }],
     ['multi-select', [], { type: 'multi-select', value: [] }],
-  ] as const)('accepts valid nullable and empty shorthand for %s', (type, input, expected) => {
+  ];
+
+  test.each(nullableCases)('accepts valid nullable and empty shorthand for %s', (type, input, expected) => {
     expect(normalizePageValueInput(columns[type]!, input)).toEqual(expected);
   });
 
@@ -49,7 +54,7 @@ describe('normalizePageValueInput', () => {
     expect(normalizePageValueInput(columns['string']!, input)).toEqual(input);
   });
 
-  test.each([
+  const invalidShorthandCases: Array<[keyof typeof columns, UpdatePageValuesEntry]> = [
     ['number', '12'],
     ['boolean', 'false'],
     ['date', 'not-a-date'],
@@ -57,7 +62,9 @@ describe('normalizePageValueInput', () => {
     ['multi-select', 'option-a'],
     ['string', null],
     ['file', ''],
-  ] as const)('rejects invalid shorthand for %s', (type, input) => {
+  ];
+
+  test.each(invalidShorthandCases)('rejects invalid shorthand for %s', (type, input) => {
     expect(() => normalizePageValueInput(columns[type]!, input)).toThrow(BadRequestError);
   });
 
