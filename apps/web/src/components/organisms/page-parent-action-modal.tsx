@@ -189,6 +189,7 @@ export function PageParentActionModal({
       </Text>
       <Combobox
         store={combobox}
+        withinPortal={false}
         onOptionSubmit={(value) => {
           const choice = choices.find((item) => (item.id ?? '__root__') === value) ?? null;
           setSelectedChoice(choice);
@@ -199,6 +200,7 @@ export function PageParentActionModal({
         <Combobox.Target>
           <TextInput
             label="New parent"
+            autoFocus
             value={inputValue}
             onChange={(event) => {
               setSelectedChoice(null);
