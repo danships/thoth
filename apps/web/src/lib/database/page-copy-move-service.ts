@@ -24,9 +24,7 @@ export async function resolveMoveCopyDestination(
     assertGrantAllowsWrite(grant);
     if (grant.scopeType !== 'workspace') {
       const { ForbiddenError } = await import('@/lib/errors/forbidden-error');
-      throw new ForbiddenError(
-        'Workspace root is outside the grant scope'
-      );
+      throw new ForbiddenError('Workspace root is outside the grant scope');
     }
     return null;
   }
