@@ -129,7 +129,7 @@ export function PageParentActionModal({
               pages.value.data.data.results.map((result: PageSearchResult) => mapChoice(result.page, result.ancestors))
             );
           if (dataViews.status === 'fulfilled')
-            setDataViewSearchChoices(dataViews.value.data.data.results.map(mapDataViewChoice));
+            setDataViewSearchChoices(dataViews.value.data.data.results.map((result) => mapDataViewChoice(result)));
           setSearchError(pageFailure && viewFailure);
           setPartialSearchError((pageFailure || viewFailure) && !(pageFailure && viewFailure));
         })
