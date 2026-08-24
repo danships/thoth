@@ -44,10 +44,10 @@ describe('page values API shorthand payload (THOTH-090)', () => {
     const tags = byType['multi-select']!;
 
     const response = await client.patch(`/api/v1/pages/${page.id}/values`, {
-      [byType.string!.id]: 'Quarterly review',
-      [byType.number!.id]: 9.5,
-      [byType.boolean!.id]: { type: 'boolean', value: true },
-      [byType.date!.id]: '2026-08-24T10:30:00.000Z',
+      [byType['string']!.id]: 'Quarterly review',
+      [byType['number']!.id]: 9.5,
+      [byType['boolean']!.id]: { type: 'boolean', value: true },
+      [byType['date']!.id]: '2026-08-24T10:30:00.000Z',
       [status.id]: status.options![0]!.id,
       [tags.id]: [tags.options![0]!.id],
     });
@@ -56,10 +56,10 @@ describe('page values API shorthand payload (THOTH-090)', () => {
     const detailResponse = await client.get(`/api/v1/pages/${page.id}`, { params: { includeValues: 'true' } });
     const detail = await getData<{ values: Record<string, unknown> }>(detailResponse);
     expect(detail.values).toMatchObject({
-      [byType.string!.id]: { type: 'string', value: 'Quarterly review' },
-      [byType.number!.id]: { type: 'number', value: 9.5 },
-      [byType.boolean!.id]: { type: 'boolean', value: true },
-      [byType.date!.id]: { type: 'date', value: '2026-08-24T10:30:00.000Z' },
+      [byType['string']!.id]: { type: 'string', value: 'Quarterly review' },
+      [byType['number']!.id]: { type: 'number', value: 9.5 },
+      [byType['boolean']!.id]: { type: 'boolean', value: true },
+      [byType['date']!.id]: { type: 'date', value: '2026-08-24T10:30:00.000Z' },
       [status.id]: { type: 'single-select', value: status.options![0]!.id },
       [tags.id]: { type: 'multi-select', value: [tags.options![0]!.id] },
     });
@@ -70,10 +70,10 @@ describe('page values API shorthand payload (THOTH-090)', () => {
     const { page, columns } = await createFixture(client);
     const byType = Object.fromEntries(columns.map((column) => [column.type, column]));
     for (const body of [
-      { [byType.number!.id]: '9.5' },
-      { [byType.boolean!.id]: 'true' },
-      { [byType.date!.id]: 'not-a-date' },
-      { [byType.string!.id]: ['not text'] },
+      { [byType['number']!.id]: '9.5' },
+      { [byType['boolean']!.id]: 'true' },
+      { [byType['date']!.id]: 'not-a-date' },
+      { [byType['string']!.id]: ['not text'] },
       { [byType['multi-select']!.id]: 'not-an-array' },
       { unknownColumn: 'value' },
       { [byType['single-select']!.id]: 'unknown-option' },

@@ -33,7 +33,7 @@ describe('normalizePageValueInput', () => {
     ['multi-select', ['option-a'], { type: 'multi-select', value: ['option-a'] }],
     ['file', 'uploaded-file-id', { type: 'file', value: 'uploaded-file-id' }],
   ] as const)('normalizes %s shorthand', (type, input, expected) => {
-    expect(normalizePageValueInput(columns[type], input)).toEqual(expected);
+    expect(normalizePageValueInput(columns[type]!, input)).toEqual(expected);
   });
 
   test.each([
@@ -41,12 +41,12 @@ describe('normalizePageValueInput', () => {
     ['file', null, { type: 'file', value: null }],
     ['multi-select', [], { type: 'multi-select', value: [] }],
   ] as const)('accepts valid nullable and empty shorthand for %s', (type, input, expected) => {
-    expect(normalizePageValueInput(columns[type], input)).toEqual(expected);
+    expect(normalizePageValueInput(columns[type]!, input)).toEqual(expected);
   });
 
   test('returns a valid legacy value unchanged', () => {
     const input = { type: 'string' as const, value: '' };
-    expect(normalizePageValueInput(columns.string, input)).toEqual(input);
+    expect(normalizePageValueInput(columns['string']!, input)).toEqual(input);
   });
 
   test.each([
@@ -58,16 +58,16 @@ describe('normalizePageValueInput', () => {
     ['string', null],
     ['file', ''],
   ] as const)('rejects invalid shorthand for %s', (type, input) => {
-    expect(() => normalizePageValueInput(columns[type], input)).toThrow(BadRequestError);
+    expect(() => normalizePageValueInput(columns[type]!, input)).toThrow(BadRequestError);
   });
 
   test('rejects a legacy type mismatch', () => {
-    expect(() => normalizePageValueInput(columns.string, { type: 'number', value: 1 })).toThrow(
+    expect(() => normalizePageValueInput(columns['string']!, { type: 'number', value: 1 })).toThrow(
       'Type mismatch for column: string-id'
     );
   });
 
   test('rejects a malformed legacy object', () => {
-    expect(() => normalizePageValueInput(columns.string, { type: 'string' } as never)).toThrow(BadRequestError);
+    expect(() => normalizePageValueInput(columns['string']!, { type: 'string' } as never)).toThrow(BadRequestError);
   });
 });
