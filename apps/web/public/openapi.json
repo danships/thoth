@@ -960,7 +960,7 @@
     "/search": {
       "get": {
         "operationId": "getSearchResults",
-        "summary": "Search pages in a workspace",
+        "summary": "Search pages or data views in a workspace",
         "tags": [
           "Search"
         ],
@@ -989,83 +989,130 @@
                         "results": {
                           "type": "array",
                           "items": {
-                            "type": "object",
-                            "properties": {
-                              "page": {
+                            "oneOf": [
+                              {
                                 "type": "object",
                                 "properties": {
-                                  "id": {
-                                    "type": "string"
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "page"
                                   },
-                                  "name": {
-                                    "type": "string"
-                                  },
-                                  "emoji": {
-                                    "anyOf": [
-                                      {
+                                  "page": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
                                         "type": "string"
                                       },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ]
-                                  },
-                                  "parentId": {
-                                    "anyOf": [
-                                      {
+                                      "name": {
                                         "type": "string"
                                       },
-                                      {
-                                        "type": "null"
+                                      "emoji": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "parentId": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "isPrivate": {
+                                        "type": "boolean"
                                       }
-                                    ]
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "emoji",
+                                      "parentId",
+                                      "isPrivate"
+                                    ],
+                                    "additionalProperties": false
                                   },
-                                  "isPrivate": {
-                                    "type": "boolean"
+                                  "ancestors": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "score": {
+                                    "type": "number"
+                                  },
+                                  "snippet": {
+                                    "type": "string"
                                   }
                                 },
                                 "required": [
-                                  "id",
-                                  "name",
-                                  "emoji",
-                                  "parentId",
-                                  "isPrivate"
+                                  "kind",
+                                  "page",
+                                  "ancestors",
+                                  "score",
+                                  "snippet"
                                 ],
                                 "additionalProperties": false
                               },
-                              "ancestors": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "id": {
-                                      "type": "string"
-                                    },
-                                    "name": {
-                                      "type": "string"
-                                    }
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "data-view"
                                   },
-                                  "required": [
-                                    "id",
-                                    "name"
-                                  ],
-                                  "additionalProperties": false
-                                }
-                              },
-                              "score": {
-                                "type": "number"
-                              },
-                              "snippet": {
-                                "type": "string"
+                                  "dataView": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "dataSourceId": {
+                                        "type": "string"
+                                      },
+                                      "dataSourceName": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "dataSourceId",
+                                      "dataSourceName"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "dataView"
+                                ],
+                                "additionalProperties": false
                               }
-                            },
-                            "required": [
-                              "page",
-                              "ancestors",
-                              "score",
-                              "snippet"
-                            ],
-                            "additionalProperties": false
+                            ]
                           }
                         }
                       },
@@ -1157,7 +1204,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "const": "page"
+              "enum": [
+                "page",
+                "data-view"
+              ]
             }
           },
           {

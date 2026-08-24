@@ -1,9 +1,10 @@
 import { searchWorkspace } from '@thoth/job-protocol';
 import { apiRoute } from '@/lib/api/route-wrapper';
 import { assertContentAccess, assertWorkspaceAccess } from '@/lib/api/server/workspace-access';
-import { memberToAccessGrant } from '@/lib/auth/access-grant';
+import { filterContainersByGrant, memberToAccessGrant } from '@/lib/auth/access-grant';
 import { type ApiKeySession } from '@/lib/auth/session';
-import { getContainerRepository } from '@/lib/database';
+import { getContainerRepository, getDataViewRepository } from '@/lib/database';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import { ServiceUnavailableError } from '@/lib/errors/service-unavailable-error';
 import { ForbiddenError } from '@/lib/errors/forbidden-error';
 import { NotFoundError } from '@/lib/errors/not-found-error';
@@ -27,6 +28,15 @@ export async function queryWorkspaceSearchResults(
     throw new NotFoundError('Workspace not found');
   }
 
+  if (query.type === 'data-view') return queryDataViewSearchResults(query, grant);
+  return queryPageSearchResults(query, session, grant);
+}
+
+async function queryPageSearchResults(
+  query: GetSearchResultsQuery,
+  session: ApiKeySession,
+  grant: Awaited<ReturnType<typeof memberToAccessGrant>>
+): Promise<GetSearchResultsResponse> {
   const logger = await getLogger();
   const socketPath = process.env['JOB_SOCKET_PATH'];
   const environment = await getEnvironment();
@@ -92,6 +102,7 @@ export async function queryWorkspaceSearchResults(
     }
 
     results.push({
+      kind: 'page',
       page: {
         id: container.id,
         name: container.name,
@@ -110,6 +121,53 @@ export async function queryWorkspaceSearchResults(
   }
 
   return { results };
+}
+
+async function queryDataViewSearchResults(
+  query: GetSearchResultsQuery,
+  grant: Awaited<ReturnType<typeof memberToAccessGrant>>
+): Promise<GetSearchResultsResponse> {
+  const dataViewRepository = await getDataViewRepository();
+  const dataViews = (
+    await dataViewRepository.getByQuery(
+      addWorkspaceIdToQuery(dataViewRepository.createQuery().like('name', `*${query.query}*`), query.workspaceId)
+    )
+  ).filter(
+    (view) => view.deletedAt === null && view.name.toLocaleLowerCase().includes(query.query.toLocaleLowerCase())
+  );
+  const sourceIds = [...new Set(dataViews.map((view) => view.dataSourceId))];
+  const containerRepository = await getContainerRepository();
+  const sources =
+    sourceIds.length === 0
+      ? []
+      : await containerRepository.getByQuery(
+          addWorkspaceIdToQuery(containerRepository.createQuery().in('id', sourceIds), query.workspaceId)
+        );
+  const allowed = await filterContainersByGrant(
+    grant,
+    sources.filter((source) => source.type === 'data-source' && source.deletedAt === null)
+  );
+  const sourcesById = new Map(allowed.map((source) => [source.id, source]));
+  const needle = query.query.toLocaleLowerCase();
+  const rank = (name: string) => {
+    const value = name.toLocaleLowerCase();
+    return value === needle ? 0 : value.startsWith(needle) ? 1 : 2;
+  };
+  return {
+    results: dataViews
+      .filter((view) => sourcesById.has(view.dataSourceId))
+      .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+      .slice(0, query.limit)
+      .map((view) => ({
+        kind: 'data-view' as const,
+        dataView: {
+          id: view.id,
+          name: view.name,
+          dataSourceId: view.dataSourceId,
+          dataSourceName: sourcesById.get(view.dataSourceId)!.name,
+        },
+      })),
+  };
 }
 
 export const GET = apiRoute<GetSearchResultsResponse, GetSearchResultsQuery, {}, {}>(

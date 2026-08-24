@@ -81,8 +81,8 @@ import type {
   CopyPageResponse,
   MovePageBody,
   MovePageResponse,
-  GetSearchResultsResponse,
-  GetSearchResultsQueryInput,
+  DataViewSearchResult,
+  PageSearchResult,
 } from '@/types/api';
 
 export const apiClient = axios.create({
@@ -201,9 +201,17 @@ export const api = {
   },
 
   search: {
-    pages: (parameters: GetSearchResultsQueryInput, options?: { signal?: AbortSignal }) =>
-      apiClient.get<DataWrapper<GetSearchResultsResponse>>('/search', {
-        params: parameters,
+    pages: (parameters: { workspaceId: string; query: string; limit: number }, options?: { signal?: AbortSignal }) =>
+      apiClient.get<DataWrapper<{ results: PageSearchResult[] }>>('/search', {
+        params: { ...parameters, type: 'page' },
+        ...(options?.signal ? { signal: options.signal } : {}),
+      }),
+    dataViews: (
+      parameters: { workspaceId: string; query: string; limit: number },
+      options?: { signal?: AbortSignal }
+    ) =>
+      apiClient.get<DataWrapper<{ results: DataViewSearchResult[] }>>('/search', {
+        params: { ...parameters, type: 'data-view' },
         ...(options?.signal ? { signal: options.signal } : {}),
       }),
   },

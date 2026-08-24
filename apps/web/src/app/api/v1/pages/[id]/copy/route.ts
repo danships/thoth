@@ -12,6 +12,7 @@ import { getLogger } from '@/lib/logger';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
+import { schedulePageSearchSync } from '@/lib/search/notify-service';
 import type { PageContainer } from '@thoth/database/types';
 import type { CopyPageParameters, CopyPageBody, CopyPageResponse } from '@/types/api';
 import { copyPageParametersSchema, copyPageBodySchema } from '@/types/api';
@@ -37,9 +38,9 @@ export const POST = apiRoute<CopyPageResponse, {}, CopyPageParameters, CopyPageB
       lastUpdated: now,
       deletedAt: null,
       deletedRootId: null,
-      sortOrder: await destinationSortOrder(source.workspaceId, body.parentId),
-      isPrivate: parent?.isPrivate ?? false,
-      privateRootId: parent?.isPrivate ? (parent.privateRootId ?? parent.id) : null,
+      sortOrder: await destinationSortOrder(source.workspaceId, parent),
+      isPrivate: parent?.type === 'page' ? parent.isPrivate : false,
+      privateRootId: parent?.type === 'page' && parent.isPrivate ? (parent.privateRootId ?? parent.id) : null,
     };
     const copiedContainer = await repository.create(copiedPageData);
     if (copiedContainer.type !== 'page') throw new Error('Created a non-page container');
@@ -54,6 +55,7 @@ export const POST = apiRoute<CopyPageResponse, {}, CopyPageParameters, CopyPageB
     }
     scheduleNotifyPageChange('page.created', copied, toWebhookActor(session));
     scheduleNotificationDispatch('page.created', copied, toWebhookActor(session));
+    schedulePageSearchSync(copied);
     setResponseStatus(201);
     return { page: toPageResponse(copied) };
   }
