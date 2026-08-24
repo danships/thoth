@@ -128,11 +128,10 @@ async function queryDataViewSearchResults(
   grant: Awaited<ReturnType<typeof memberToAccessGrant>>
 ): Promise<GetSearchResultsResponse> {
   const dataViewRepository = await getDataViewRepository();
-  const dataViews = (
-    await dataViewRepository.getByQuery(
-      addWorkspaceIdToQuery(dataViewRepository.createQuery().like('name', `*${query.query}*`), query.workspaceId)
-    )
-  ).filter(
+  const queriedDataViews = await dataViewRepository.getByQuery(
+    addWorkspaceIdToQuery(dataViewRepository.createQuery().like('name', `*${query.query}*`), query.workspaceId)
+  );
+  const dataViews = queriedDataViews.filter(
     (view) => view.deletedAt === null && view.name.toLocaleLowerCase().includes(query.query.toLocaleLowerCase())
   );
   const sourceIds = [...new Set(dataViews.map((view) => view.dataSourceId))];
@@ -151,12 +150,12 @@ async function queryDataViewSearchResults(
   const needle = query.query.toLocaleLowerCase();
   const rank = (name: string) => {
     const value = name.toLocaleLowerCase();
-    return value === needle ? 0 : value.startsWith(needle) ? 1 : 2;
+    return value === needle ? 0 : (value.startsWith(needle) ? 1 : 2);
   };
   return {
     results: dataViews
       .filter((view) => sourcesById.has(view.dataSourceId))
-      .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+      .toSorted((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
       .slice(0, query.limit)
       .map((view) => ({
         kind: 'data-view' as const,
