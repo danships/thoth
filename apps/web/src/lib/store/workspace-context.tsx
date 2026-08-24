@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, type PropsWithChildren } 
 import { $currentWorkspaceId } from './current-workspace-id';
 import { clearExpandedPages } from './tree-expanded-state';
 import { writeLastWorkspaceSlugCookie } from '@/lib/workspace/last-workspace-cookie';
+import type { AppScopeType } from '@thoth/database/types';
 
 export type CurrentWorkspace = {
   id: string;
@@ -11,6 +12,7 @@ export type CurrentWorkspace = {
   name: string;
   storageQuotaBytes: number;
   role: 'owner' | 'editor' | 'viewer' | 'app';
+  scopeType: AppScopeType;
 };
 
 const WorkspaceContext = createContext<CurrentWorkspace | undefined>(undefined);

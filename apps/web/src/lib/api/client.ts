@@ -81,8 +81,6 @@ import type {
   CopyPageResponse,
   MovePageBody,
   MovePageResponse,
-  GetPageParentOptionsResponse,
-  GetPageParentOptionsQuery,
   GetSearchResultsResponse,
   GetSearchResultsQueryInput,
 } from '@/types/api';
@@ -143,10 +141,6 @@ export const api = {
       apiClient.post('/pages/welcome', workspaceId ? { workspaceId } : undefined),
 
     registerAccess: (id: string) => apiClient.post(`/pages/${id}/access`),
-    getParentOptions: (id: string, options: GetPageParentOptionsQuery) =>
-      apiClient.get<DataWrapper<GetPageParentOptionsResponse>>(`/pages/${id}/parent-options`, {
-        params: { action: options.action, query: options.query?.trim() || undefined, limit: options.limit },
-      }),
     copy: (id: string, body: CopyPageBody) => apiClient.post<DataWrapper<CopyPageResponse>>(`/pages/${id}/copy`, body),
     move: (id: string, body: MovePageBody) => apiClient.post<DataWrapper<MovePageResponse>>(`/pages/${id}/move`, body),
 
@@ -207,7 +201,7 @@ export const api = {
   },
 
   search: {
-    get: (parameters: GetSearchResultsQueryInput, options?: { signal?: AbortSignal }) =>
+    pages: (parameters: GetSearchResultsQueryInput, options?: { signal?: AbortSignal }) =>
       apiClient.get<DataWrapper<GetSearchResultsResponse>>('/search', {
         params: parameters,
         ...(options?.signal ? { signal: options.signal } : {}),

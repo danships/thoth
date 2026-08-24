@@ -9,12 +9,21 @@ export const searchResultPageSchema = z
     name: z.string(),
     emoji: z.string().nullable(),
     parentId: z.string().nullable(),
+    isPrivate: z.boolean(),
+  })
+  .strict();
+
+export const searchResultAncestorSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
   })
   .strict();
 
 export const searchResultSchema = z
   .object({
     page: searchResultPageSchema,
+    ancestors: z.array(searchResultAncestorSchema),
     score: z.number(),
     snippet: z.string(),
   })
@@ -23,8 +32,9 @@ export const searchResultSchema = z
 export const getSearchResultsQuerySchema = z
   .object({
     workspaceId: z.string().min(1).max(200),
-    q: z.string().trim().min(1).max(500),
-    limit: z.coerce.number().int().min(1).max(20).default(10),
+    query: z.string().trim().min(1).max(100),
+    type: z.literal('page'),
+    limit: z.coerce.number().int().min(1).max(20),
   })
   .strict();
 

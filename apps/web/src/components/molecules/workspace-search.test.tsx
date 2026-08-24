@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/api/client', () => ({
   api: {
     search: {
-      get: vi.fn(),
+      pages: vi.fn(),
     },
   },
 }));
@@ -101,10 +101,10 @@ describe('WorkspaceSearch', () => {
 
   test('debounces requests, aborts stale ones, clears old results immediately, and navigates on selection', async () => {
     const user = userEvent.setup();
-    const mockedSearchGet = vi.mocked(api.search.get);
+    const mockedSearchGet = vi.mocked(api.search.pages);
     const pending: Array<{
       signal?: AbortSignal;
-      resolve: (value: Awaited<ReturnType<typeof api.search.get>>) => void;
+      resolve: (value: Awaited<ReturnType<typeof api.search.pages>>) => void;
     }> = [];
 
     mockedSearchGet.mockImplementation((_parameters, options) => {
@@ -116,7 +116,7 @@ describe('WorkspaceSearch', () => {
           ...(options?.signal ? { signal: options.signal } : {}),
           resolve,
         });
-      }) as ReturnType<typeof api.search.get>;
+      }) as ReturnType<typeof api.search.pages>;
     });
 
     renderComponent();
@@ -136,7 +136,7 @@ describe('WorkspaceSearch', () => {
           score: 0.99,
           snippet: 'Root snippet',
         },
-      ]) as Awaited<ReturnType<typeof api.search.get>>
+      ]) as Awaited<ReturnType<typeof api.search.pages>>
     );
 
     expect(await screen.findByText('Root Page')).toBeTruthy();
@@ -155,7 +155,7 @@ describe('WorkspaceSearch', () => {
           score: 0.91,
           snippet: 'Final snippet',
         },
-      ]) as Awaited<ReturnType<typeof api.search.get>>
+      ]) as Awaited<ReturnType<typeof api.search.pages>>
     );
 
     const resultButton = await screen.findByRole('button', { name: /Final Page/i });
@@ -169,9 +169,9 @@ describe('WorkspaceSearch', () => {
 
   test('shows empty and error states', async () => {
     const user = userEvent.setup();
-    const mockedSearchGet = vi.mocked(api.search.get);
+    const mockedSearchGet = vi.mocked(api.search.pages);
 
-    mockedSearchGet.mockResolvedValueOnce(makeSearchResponse([]) as Awaited<ReturnType<typeof api.search.get>>);
+    mockedSearchGet.mockResolvedValueOnce(makeSearchResponse([]) as Awaited<ReturnType<typeof api.search.pages>>);
     mockedSearchGet.mockRejectedValueOnce(new Error('socket unavailable'));
 
     renderComponent();

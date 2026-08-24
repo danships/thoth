@@ -57,7 +57,7 @@ export function usePageSearch(
     const controller = new AbortController();
 
     void api.search
-      .get({ workspaceId, q: debouncedQuery, limit: 10 }, { signal: controller.signal })
+      .pages({ workspaceId, query: debouncedQuery, type: 'page', limit: 10 }, { signal: controller.signal })
       .then((response) => {
         setResults(response.data.data.results as SearchResult);
         setInFlightRequestKey((current) => (current === requestKey ? null : current));
