@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import type { APIRequestContext, APIResponse } from '@playwright/test';
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
-import { enqueueJob } from '@thoth/job-protocol';
+import { enqueueJob, getJobStatus } from '@thoth/job-protocol';
 
 async function getData<T = unknown>(response: APIResponse): Promise<T> {
   const body = await response.json();
@@ -83,27 +83,26 @@ function agePageHistory(pageId: string): void {
   }
 }
 
-/** Polls the existing history HTTP API (rather than a raw `better-sqlite3` connection, which
- * would otherwise compete for file locks with the live dev server's own connection across a long
- * shared-suite run) until at least one `consolidated` revision appears for `pageId` — the
- * observable side effect of `history.maintain` actually running — or throws on timeout. */
-async function waitForConsolidation(request: APIRequestContext, pageId: string, timeoutMs = 30_000): Promise<void> {
+async function waitForJobCompletion(jobId: string, timeoutMs = 60_000): Promise<void> {
+  const socketPath = process.env['JOB_SOCKET_PATH'];
+  if (!socketPath) {
+    throw new Error('waitForJobCompletion: JOB_SOCKET_PATH is not configured');
+  }
+
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const response = await request.get(`/api/v1/pages/${pageId}/history`, {
-      params: { target: 'content', limit: '50' },
-    });
-    if (response.ok()) {
-      const history = await getData<{ revisions: Array<{ id: string; kind: string }> }>(response);
-      if (history.revisions.some((revision) => revision.kind === 'consolidated')) return;
+    const response = await getJobStatus(jobId, { socketPath });
+    if (!response.ok) {
+      throw new Error(`waitForJobCompletion: status request failed: ${response.error.message}`);
+    }
+    if (response.result.found && (response.result.status === 'completed' || response.result.status === 'dead')) {
+      expect(response.result.status).toBe('completed');
+      return;
     }
     if (Date.now() > deadline) {
-      expect(response.ok()).toBeTruthy();
-      throw new Error(
-        `waitForConsolidation: no consolidated revision appeared for page ${pageId} within ${timeoutMs}ms`
-      );
+      throw new Error(`waitForJobCompletion: job ${jobId} did not finish within ${timeoutMs}ms`);
     }
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 }
 
@@ -358,8 +357,11 @@ test.describe('page history', () => {
       { socketPath: process.env['JOB_SOCKET_PATH']! }
     );
     expect(enqueueResponse.ok).toBe(true);
+    if (!enqueueResponse.ok || !enqueueResponse.result.jobId) {
+      throw new Error('history.maintain was not accepted by the jobs process');
+    }
 
-    await waitForConsolidation(request, pageId);
+    await waitForJobCompletion(enqueueResponse.result.jobId);
 
     const afterHistoryResponse = await request.get(`/api/v1/pages/${pageId}/history`, {
       params: { target: 'content', limit: '50' },

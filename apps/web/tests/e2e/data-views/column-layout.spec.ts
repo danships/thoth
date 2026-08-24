@@ -146,7 +146,18 @@ test.describe('Data View column layout', () => {
         expect(first?.x).toBe(second?.x);
         expect(first?.y).toBe(second?.y);
       }).toPass({ timeout: 2000 });
+
+      const beforeMove = await alphaHandle.boundingBox();
+      expect(beforeMove).not.toBeNull();
       await page.keyboard.press('ArrowRight');
+      // The keyboard sensor updates the active transform asynchronously. Wait for that
+      // transform before pressing Space to drop; otherwise the drop can commit the pre-move
+      // `over` target even though ArrowRight was accepted.
+      await expect(async () => {
+        const afterMove = await alphaHandle.boundingBox();
+        expect(afterMove).not.toBeNull();
+        expect(afterMove?.x).toBeGreaterThan(beforeMove?.x ?? 0);
+      }).toPass({ timeout: 2000 });
       await page.keyboard.press('Space');
 
       await expect(headers.nth(0)).toContainText('Name');

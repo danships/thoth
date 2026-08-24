@@ -13,7 +13,7 @@ test.describe('workspace search', () => {
   }) => {
     await page.route('**/api/v1/search**', async (route) => {
       const url = new URL(route.request().url());
-      const query = url.searchParams.get('q');
+      const query = url.searchParams.get('query');
 
       if (query === SEED.pages.root.name) {
         await route.fulfill({
@@ -26,7 +26,9 @@ test.describe('workspace search', () => {
                     name: SEED.pages.root.name,
                     emoji: '📄',
                     parentId: null,
+                    isPrivate: false,
                   },
+                  ancestors: [],
                   score: 0.99,
                   snippet: 'Seeded root page snippet',
                 },
