@@ -13,16 +13,18 @@ import { recordValuesRevision } from '@thoth/database';
 import { extractFileIdsFromContent, extractFileIdsFromValues, syncFileUsageForPage } from '@/lib/files/usage';
 import { assertFileAccess } from '@/lib/files/access';
 import { getLogger } from '@/lib/logger';
-import { UpdatePageValuesParameters, updatePageValuesParametersSchema } from '@/types/api';
-import { pageValueSchema } from '@/types/schemas/entities/container';
+import { normalizePageValueInput } from '@/lib/page-values/normalize-input';
+import {
+  UpdatePageValuesBody,
+  UpdatePageValuesParameters,
+  updatePageValuesBodySchema,
+  updatePageValuesParametersSchema,
+} from '@/types/api';
 import type { PageValue } from '@/types/schemas/entities/container';
 import type { ValueChangeInput } from '@/lib/webhooks/notify-service';
-import { z } from 'zod';
 
-const bodySchema = z.record(z.string(), pageValueSchema);
-
-export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.infer<typeof bodySchema>>(
-  { expectedBodySchema: bodySchema, expectedParamsSchema: updatePageValuesParametersSchema },
+export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, UpdatePageValuesBody>(
+  { expectedBodySchema: updatePageValuesBodySchema, expectedParamsSchema: updatePageValuesParametersSchema },
   async ({ body, params }, session) => {
     const containerRepository = await getContainerRepository();
     const page = await pageRetriever.retrievePage(params.id, session.user.id);
@@ -37,15 +39,18 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
     const columns = dataSource.columns ?? [];
     const columnMap = new Map(columns.map((c) => [c.id, c] as const));
 
-    // Validate that provided keys match existing columns and types
-    for (const [columnId, value] of Object.entries(body)) {
+    const normalizedValues: Record<string, PageValue> = {};
+
+    // Validate that provided keys match existing columns, then normalize each value before
+    // applying the existing referential checks. This gives shorthand and canonical input the
+    // exact same persistence and downstream behaviour.
+    for (const [columnId, input] of Object.entries(body)) {
       const column = columnMap.get(columnId);
       if (!column) {
         throw new BadRequestError(`Unknown column: ${columnId}`);
       }
-      if (column.type !== value.type) {
-        throw new BadRequestError(`Type mismatch for column: ${columnId}`);
-      }
+      const value = normalizePageValueInput(column, input);
+      normalizedValues[columnId] = value;
       if (column.type === 'single-select' && value.type === 'single-select' && value.value !== null) {
         const validOptionIds = new Set(column.options.map((option) => option.id));
         if (!validOptionIds.has(value.value)) {
@@ -85,14 +90,14 @@ export const PATCH = apiRoute<void, undefined, UpdatePageValuesParameters, z.inf
       }
     }
 
-    const mergedValues = { ...page.values, ...body };
+    const mergedValues = { ...page.values, ...normalizedValues };
 
     // Capture the raw before/after `PageValue`s (keyed by column id) for changed columns only —
     // The `webhook.dispatch` job's dispatch/build-payload handler (in `@thoth/jobs`) resolves
     // column-id -> name and single-select id -> label
     // centrally, so this stays a dumb diff.
     const valueChanges: ValueChangeInput = {};
-    for (const [columnId, newValue] of Object.entries(body)) {
+    for (const [columnId, newValue] of Object.entries(normalizedValues)) {
       const previousValue: PageValue | null = page.values?.[columnId] ?? null;
       if (JSON.stringify(previousValue) !== JSON.stringify(newValue)) {
         valueChanges[columnId] = { previous: previousValue, new: newValue };
