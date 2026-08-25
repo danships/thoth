@@ -115,6 +115,8 @@ export function PageParentActionModal({
       setSearchLoading(true);
       setSearchError(false);
       setPartialSearchError(false);
+      setPageSearchChoices([]);
+      setDataViewSearchChoices([]);
       void Promise.allSettled([
         api.search.pages({ query: trimmedInput, workspaceId, limit: 10 }, { signal: controller.signal }),
         api.search.dataViews({ query: trimmedInput, workspaceId, limit: 10 }, { signal: controller.signal }),
@@ -158,14 +160,18 @@ export function PageParentActionModal({
     const seen = new Set<string>();
     return choices
       .filter((choice) => {
-        if (choice.destinationParentId === source.id || (action === 'move' && choice.ancestorIds?.includes(source.id)))
+        if (
+          choice.destinationParentId === source.id ||
+          (action === 'move' &&
+            (choice.destinationParentId === source.parentId || choice.ancestorIds?.includes(source.id)))
+        )
           return false;
         if (seen.has(choice.optionId)) return false;
         seen.add(choice.optionId);
         return true;
       })
       .slice(0, recentMode ? 10 : 20);
-  }, [action, recentChoices, recentMode, pageSearchChoices, source.id]);
+  }, [action, recentChoices, recentMode, pageSearchChoices, source.id, source.parentId]);
 
   const dataViewChoices = useMemo(
     () =>
@@ -177,13 +183,13 @@ export function PageParentActionModal({
 
   const choices = useMemo(
     () => [
-      ...(scopeType === 'workspace'
+      ...(scopeType === 'workspace' && (action !== 'move' || source.parentId !== null)
         ? [{ optionId: 'root', destinationParentId: null, kind: 'root' as const, name: 'Workspace root' }]
         : []),
       ...pageChoices,
       ...dataViewChoices,
     ],
-    [dataViewChoices, pageChoices, scopeType]
+    [action, dataViewChoices, pageChoices, scopeType, source.parentId]
   );
   const loading = recentMode ? recentLoading : opened && searchLoading;
   const loadFailed = recentMode ? recentError !== undefined : searchError;

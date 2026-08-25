@@ -115,18 +115,22 @@ export async function cascadeSetPagePrivate(
 }
 
 /**
- * Not yet called from any route — no cross-parent "move"/reparent endpoint exists today
- * (`POST /pages/:id/reorder` only reorders within the existing sibling group). Recorded now so
- * it isn't missed once a move/reparent endpoint is built: whenever a page's `parentId` changes
- * to a parent outside its current private subtree, any `privateRootId` that points at an
- * ancestor no longer among that page's actual ancestors must be cleared — a page's private state
- * should only ever be inherited from a *live* ancestor, never carried over after being detached
- * from it.
+ * Reconciles inherited privacy after a page is reparented. A private destination supplies its
+ * root explicitly, so the moved page and its descendants inherit that same root. When moving
+ * outside a private subtree, an inherited root is only cleared after confirming it is absent
+ * from the new ancestry; independent private roots remain unchanged.
  */
 export async function reconcilePrivateStateOnReparent(
   page: PageContainer,
-  newParentId: string | null
+  newParentId: string | null,
+  destinationPrivateRootId?: string | null
 ): Promise<Partial<PageContainer>> {
+  if (destinationPrivateRootId) {
+    return page.isPrivate && page.privateRootId === destinationPrivateRootId
+      ? {}
+      : { isPrivate: true, privateRootId: destinationPrivateRootId };
+  }
+
   if (!page.privateRootId || page.privateRootId === page.id) {
     return {};
   }

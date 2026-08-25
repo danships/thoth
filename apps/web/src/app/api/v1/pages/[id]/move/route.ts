@@ -38,11 +38,13 @@ export const POST = apiRoute<MovePageResponse, {}, MovePageParameters, MovePageB
     let moved: PageContainer = source;
     if (source.parentId !== body.parentId) {
       const repository = await getContainerRepository();
+      const destinationPrivateRootId =
+        destination?.type === 'page' && destination.isPrivate ? (destination.privateRootId ?? destination.id) : null;
       const updated = await repository.update({
         ...source,
         parentId: body.parentId,
         sortOrder: await destinationSortOrder(source.workspaceId, destination),
-        ...(await reconcilePrivateStateOnReparent(source, body.parentId)),
+        ...(await reconcilePrivateStateOnReparent(source, body.parentId, destinationPrivateRootId)),
         lastUpdated: now,
       });
       if (updated.type !== 'page') throw new Error('Moved a non-page container');
@@ -54,7 +56,11 @@ export const POST = apiRoute<MovePageResponse, {}, MovePageParameters, MovePageB
         );
         for (const descendant of descendants) {
           if (descendant.type !== 'page' || descendant.deletedAt) continue;
-          const privacyPatch = await reconcilePrivateStateOnReparent(descendant, descendant.parentId);
+          const privacyPatch = await reconcilePrivateStateOnReparent(
+            descendant,
+            descendant.parentId,
+            destinationPrivateRootId
+          );
           if (Object.keys(privacyPatch).length > 0)
             await repository.update({ ...descendant, ...privacyPatch, lastUpdated: now });
         }
