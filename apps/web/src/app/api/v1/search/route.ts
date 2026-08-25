@@ -152,7 +152,10 @@ async function queryDataViewSearchResults(
   const needle = query.query.toLocaleLowerCase();
   const rank = (name: string) => {
     const value = name.toLocaleLowerCase();
-    return value === needle ? 0 : (value.startsWith(needle) ? 1 : 2);
+    if (value === needle) {
+      return 0;
+    }
+    return value.startsWith(needle) ? 1 : 2;
   };
   return {
     results: dataViews
