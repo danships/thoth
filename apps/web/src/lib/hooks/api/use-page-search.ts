@@ -4,9 +4,9 @@ import axios from 'axios';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
-import type { GetSearchResultsResponse } from '@/types/api';
+import type { PageSearchResult } from '@/types/api';
 
-type SearchResult = GetSearchResultsResponse['results'];
+type SearchResult = PageSearchResult[];
 
 function isAbortError(error: unknown): boolean {
   return (
@@ -57,9 +57,9 @@ export function usePageSearch(
     const controller = new AbortController();
 
     void api.search
-      .pages({ workspaceId, query: debouncedQuery, type: 'page', limit: 10 }, { signal: controller.signal })
+      .pages({ workspaceId, query: debouncedQuery, limit: 10 }, { signal: controller.signal })
       .then((response) => {
-        setResults(response.data.data.results as SearchResult);
+        setResults(response.data.data.results);
         setInFlightRequestKey((current) => (current === requestKey ? null : current));
       })
       .catch((nextError: unknown) => {

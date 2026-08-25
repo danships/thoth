@@ -62,7 +62,9 @@ test.describe('recent sidebar section and GET /pages?recent filter', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(() => {
-    const baseline = Date.now();
+    // Keep the fixture timestamps behind the real clock: the access request exercised below
+    // must rank above the seeded root entry, rather than losing to a baseline set in the future.
+    const baseline = Date.now() - 10_000;
     const keepFreshIds = [
       SEED.pages.root.id,
       SEED.pages.dataSourceHost.id,

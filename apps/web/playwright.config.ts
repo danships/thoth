@@ -46,7 +46,11 @@ export default defineConfig({
     // owned, isolated `JOB_SOCKET_PATH`, waits for a validated ping, then starts `next dev`.
     // This is the same dual-process (web + jobs) topology as production, so `/api/health` and
     // any future job-backed flow behave the same under Playwright as they do in Docker.
-    command: 'cd ../.. && pnpm run dev',
+    // The test database is deliberately a fixed path so the jobs process, web process, and
+    // Playwright setup project share it. Clear its SQLite sidecars before booting those
+    // processes: the seed script is an upsert and otherwise pages created by a prior run remain
+    // behind, making supposedly isolated E2E cases depend on earlier invocations.
+    command: 'cd ../.. && rm -f /tmp/thoth-e2e.db /tmp/thoth-e2e.db-shm /tmp/thoth-e2e.db-wal && pnpm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,

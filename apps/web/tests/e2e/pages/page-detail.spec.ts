@@ -51,23 +51,26 @@ test('can inline-edit the page title', async ({ page }) => {
   await heading.click();
   await heading.press('ControlOrMeta+A');
   await heading.pressSequentially(SEED.pages.root.name);
-  const [restoreResponse] = await Promise.all([
-    page.waitForResponse(isRenamePatchResponse),
-    heading.press('Enter'),
-  ]);
+  const [restoreResponse] = await Promise.all([page.waitForResponse(isRenamePatchResponse), heading.press('Enter')]);
   expect(restoreResponse.ok()).toBe(true);
   await expect(page.getByRole('heading', { name: SEED.pages.root.name })).toBeVisible();
 });
 
 test('block editor is visible on the Contents tab', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
-  await page.getByRole('tab', { name: 'Contents' }).click();
+  const contentsTab = page.getByRole('tab', { name: 'Contents' });
+  if ((await contentsTab.getAttribute('aria-selected')) !== 'true') {
+    await contentsTab.click();
+  }
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible({ timeout: 10_000 });
 });
 
 test('seeded markdown renders as rich content', async ({ page }) => {
   await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
-  await page.getByRole('tab', { name: 'Contents' }).click();
+  const contentsTabAfterReload = page.getByRole('tab', { name: 'Contents' });
+  if ((await contentsTabAfterReload.getAttribute('aria-selected')) !== 'true') {
+    await contentsTabAfterReload.click();
+  }
   await expect(page.locator('.bn-editor h1', { hasText: SEED.pages.root.contentHeading })).toBeVisible({
     timeout: 10_000,
   });

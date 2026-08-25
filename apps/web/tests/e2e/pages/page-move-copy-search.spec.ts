@@ -39,18 +39,23 @@ test('copy destination picker reuses recent pages and switches to the shared sea
 
   const dialog = page.getByRole('dialog', { name: 'Copy page' });
   await expect(dialog.getByText('Workspace root')).toBeVisible();
-  await expect(dialog.getByLabel('New parent')).toBeVisible();
+  await expect(dialog.getByLabel('Destination')).toBeVisible();
 
-  await dialog.getByLabel('New parent').fill('destination');
+  await dialog.getByLabel('Destination').fill('destination');
   await expect(dialog.getByText('Search destination')).toBeVisible();
-  expect(searchRequests).toHaveLength(1);
-  const searchUrl = new URL(searchRequests[0]!);
+  expect(searchRequests).toHaveLength(2);
+  const searchUrl = new URL(searchRequests.find((url) => new URL(url).searchParams.get('type') === 'page')!);
   expect(searchUrl.searchParams.get('workspaceId')).toBe(SEED.workspace.id);
   expect(searchUrl.searchParams.get('query')).toBe('destination');
   expect(searchUrl.searchParams.get('type')).toBe('page');
-  expect(searchUrl.searchParams.get('limit')).toBe('20');
+  expect(searchUrl.searchParams.get('limit')).toBe('10');
+  expect(
+    new URL(searchRequests.find((url) => new URL(url).searchParams.get('type') === 'data-view')!).searchParams.get(
+      'limit'
+    )
+  ).toBe('10');
 
-  await dialog.getByLabel('New parent').fill(' '.repeat(3));
+  await dialog.getByLabel('Destination').fill(' '.repeat(3));
   await expect(dialog.getByText('Workspace root')).toBeVisible();
   expect(parentOptionsRequests).toEqual([]);
 });

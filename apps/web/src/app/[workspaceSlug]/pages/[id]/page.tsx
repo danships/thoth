@@ -384,7 +384,10 @@ export default function PageDetailsPage() {
                 mutateGlobal(
                   (key) =>
                     typeof key === 'string' &&
-                    (key.includes('/pages/tree') || key.includes('/breadcrumbs') || key.includes('recent=true'))
+                    (key.includes('/pages/tree') ||
+                      key.includes('/breadcrumbs') ||
+                      key.includes('recent=true') ||
+                      (key.includes('/pages?') && (key.includes('dataSourceId=') || key.includes('viewId='))))
                 );
                 showSuccess(`${action === 'copy' ? 'Copied' : 'Moved'} "${result.name}"`);
               }}

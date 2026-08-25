@@ -221,24 +221,28 @@ describe('queryWorkspaceSearchResults', () => {
 
     expect(result.results).toEqual([
       {
+        kind: 'page',
         page: { id: 'title-page', name: 'Title Match', emoji: '📄', parentId: null, isPrivate: false },
         ancestors: [],
         score: 0.98,
         snippet: 'Title snippet',
       },
       {
+        kind: 'page',
         page: { id: 'content-page', name: 'Content Match', emoji: null, parentId: SEED.pages.root.id, isPrivate: false },
         ancestors: [{ id: SEED.pages.root.id, name: SEED.pages.root.name }],
         score: 0.96,
         snippet: 'Content snippet',
       },
       {
+        kind: 'page',
         page: { id: 'value-page', name: 'Value Match', emoji: null, parentId: SEED.dataSource.id, isPrivate: false },
         ancestors: [],
         score: 0.91,
         snippet: 'Value snippet',
       },
       {
+        kind: 'page',
         page: { id: 'private-page', name: 'Private Match', emoji: null, parentId: null, isPrivate: true },
         ancestors: [],
         score: 0.89,

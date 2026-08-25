@@ -9,7 +9,9 @@ test('block editor fills the available viewport height on mobile', async ({ page
 
   const contentsTab = page.getByRole('tab', { name: 'Contents' });
   await expect(contentsTab).toBeVisible();
-  await contentsTab.click();
+  if ((await contentsTab.getAttribute('aria-selected')) !== 'true') {
+    await contentsTab.click();
+  }
   await expect(contentsTab).toHaveAttribute('aria-selected', 'true');
 
   // Use the BlockNote-specific class rather than a generic `[contenteditable]`

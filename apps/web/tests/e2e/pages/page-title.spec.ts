@@ -21,7 +21,7 @@ test.describe('Page titles', () => {
   });
 
   test('page detail title includes the page name', async ({ page }) => {
-    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`);
+    await page.goto(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}?v=contents`);
     await expect(page.getByRole('heading', { name: SEED.pages.root.name })).toBeVisible();
     await expect(page).toHaveTitle(`${SEED.pages.root.name} - Contents :: Thoth`);
   });

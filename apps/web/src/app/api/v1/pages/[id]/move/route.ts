@@ -13,6 +13,10 @@ import { HttpError } from '@/lib/errors/http-error';
 import { scheduleNotifyPageChange } from '@/lib/webhooks/notify-service';
 import { scheduleNotificationDispatch } from '@/lib/notifications/notify-service';
 import { toWebhookActor } from '@/lib/webhooks/actor';
+import { schedulePageSearchSync } from '@/lib/search/notify-service';
+import { reconcilePrivateStateOnReparent } from '@/lib/database/page-visibility-service';
+import { collectDescendantPageIds } from '@/lib/database/soft-delete-service';
+import { addWorkspaceIdToQuery } from '@/lib/database/helpers';
 import type { MovePageParameters, MovePageBody, MovePageResponse } from '@/types/api';
 import { movePageParametersSchema, movePageBodySchema } from '@/types/api';
 import type { PageContainer } from '@thoth/database/types';
@@ -24,9 +28,9 @@ export const POST = apiRoute<MovePageResponse, {}, MovePageParameters, MovePageB
     await assertGrantAllowsContainerForSession(session, source, { mutating: true });
     if (source.parentId !== body.expectedParentId && source.parentId !== body.parentId)
       throw new HttpError('Page was moved elsewhere', 409, true);
-    await resolveMoveCopyDestination(session, source, body.parentId);
+    const destination = await resolveMoveCopyDestination(session, source, body.parentId);
     try {
-      await assertNoMoveCycle(source, body.parentId);
+      await assertNoMoveCycle(source, destination);
     } catch {
       throw new BadRequestError('A page cannot be moved into itself or one of its sub-pages');
     }
@@ -34,14 +38,34 @@ export const POST = apiRoute<MovePageResponse, {}, MovePageParameters, MovePageB
     let moved: PageContainer = source;
     if (source.parentId !== body.parentId) {
       const repository = await getContainerRepository();
+      const destinationPrivateRootId =
+        destination?.type === 'page' && destination.isPrivate ? (destination.privateRootId ?? destination.id) : null;
       const updated = await repository.update({
         ...source,
         parentId: body.parentId,
-        sortOrder: await destinationSortOrder(source.workspaceId, body.parentId),
+        sortOrder: await destinationSortOrder(source.workspaceId, destination),
+        ...(await reconcilePrivateStateOnReparent(source, body.parentId, destinationPrivateRootId)),
         lastUpdated: now,
       });
       if (updated.type !== 'page') throw new Error('Moved a non-page container');
       moved = updated;
+      const descendantIds = await collectDescendantPageIds(source.id, source.workspaceId);
+      if (descendantIds.length > 0) {
+        const descendants = await repository.getByQuery(
+          addWorkspaceIdToQuery(repository.createQuery().eq('type', 'page').in('id', descendantIds), source.workspaceId)
+        );
+        for (const descendant of descendants) {
+          if (descendant.type !== 'page' || descendant.deletedAt) continue;
+          const privacyPatch = await reconcilePrivateStateOnReparent(
+            descendant,
+            descendant.parentId,
+            destinationPrivateRootId
+          );
+          if (Object.keys(privacyPatch).length > 0)
+            await repository.update({ ...descendant, ...privacyPatch, lastUpdated: now });
+        }
+      }
+      schedulePageSearchSync(moved);
     }
     await syncContainerAccessParent(moved);
     await touchContainerAccess(moved, session.user.id, now);

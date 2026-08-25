@@ -160,7 +160,7 @@ test.describe('page favorite toggle', () => {
     await expect(favoriteLink).toBeVisible();
   });
 
-  test('starring a page bumps it to the top of the root pages tree', async ({ page }) => {
+  test('starring a page bumps it to the top of Recent', async ({ page }) => {
     // Star via the API directly (not by visiting the page detail first) so this only exercises
     // the "starring bumps lastAccessedAt" side effect, not the separate "opening a page bumps
     // lastAccessedAt" behavior from `POST /pages/:id/access`.
@@ -171,18 +171,19 @@ test.describe('page favorite toggle', () => {
 
     await page.goto(`/${SEED.workspace.slug}/pages`);
 
-    // The root tree is ordered by lastAccessedAt desc, and starring bumps it to "now" (well
-    // after any of the seeded fixture timestamps), so it should render above the seeded root
-    // page fixture.
-    const favoriteToggleLink = page.getByRole('link', { name: new RegExp(SEED.pages.favoriteToggle.name) }).first();
-    const rootLink = page.getByRole('link', { name: new RegExp(SEED.pages.root.name) }).first();
+    // Root pages are ordered by workspace-scoped `lastUpdated`; Recent is the per-user list
+    // ordered by `lastAccessedAt`, which starring intentionally updates.
+    const recentTree = page.getByTestId('recent-tree');
+    const favoriteToggleLink = recentTree.getByRole('link', { name: new RegExp(SEED.pages.favoriteToggle.name) });
+    const rootLink = recentTree.getByRole('link', { name: new RegExp(SEED.pages.root.name) });
     await expect(favoriteToggleLink).toBeVisible();
     await expect(rootLink).toBeVisible();
 
-    const favoriteToggleBox = await favoriteToggleLink.boundingBox();
-    const rootBox = await rootLink.boundingBox();
-    expect(favoriteToggleBox).not.toBeNull();
-    expect(rootBox).not.toBeNull();
-    expect(favoriteToggleBox!.y).toBeLessThan(rootBox!.y);
+    // Compare DOM order instead of pixels: Recent is independently scrollable, so a valid
+    // item may be outside its viewport and have no bounding box.
+    const linkNames = await recentTree.getByRole('link').allInnerTexts();
+    expect(linkNames.findIndex((name) => name.includes(SEED.pages.favoriteToggle.name))).toBeLessThan(
+      linkNames.findIndex((name) => name.includes(SEED.pages.root.name))
+    );
   });
 });

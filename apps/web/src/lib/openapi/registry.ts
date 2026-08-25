@@ -68,7 +68,7 @@ export const operations = [
     path: '/search',
     method: 'get',
     operationId: 'getSearchResults',
-    summary: 'Search pages in a workspace',
+    summary: 'Search pages or data views in a workspace',
     tags: ['Search'],
     auth: 'sessionOrApiKey',
     query: api.getSearchResultsQuerySchema,

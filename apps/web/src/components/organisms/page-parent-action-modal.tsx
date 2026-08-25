@@ -2,12 +2,12 @@
 
 import axios from 'axios';
 import { Button, Combobox, Group, Loader, Modal, Text, TextInput, useCombobox } from '@mantine/core';
-import { IconLock } from '@tabler/icons-react';
+import { IconLock, IconTable } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { usePagesByRecent } from '@/lib/hooks/api/use-pages';
 import { useCurrentWorkspace } from '@/lib/store/workspace-context';
-import type { GetSearchResultsResponse, Page } from '@/types/api';
+import type { DataViewSearchResult, Page, PageSearchResult } from '@/types/api';
 
 type PageParentActionModalProperties = {
   action: 'copy' | 'move';
@@ -18,7 +18,9 @@ type PageParentActionModalProperties = {
 };
 
 type Choice = {
-  id: string | null;
+  optionId: string;
+  destinationParentId: string | null;
+  kind: 'root' | 'page' | 'data-view';
   name: string;
   path?: string[];
   ancestorIds?: string[];
@@ -30,12 +32,24 @@ function mapChoice(
   ancestors?: Array<{ id: string; name: string }>
 ): Choice {
   return {
-    id: page.id,
+    optionId: `page:${page.id}`,
+    destinationParentId: page.id,
+    kind: 'page',
     name: page.name,
     isPrivate: page.isPrivate,
     ...(ancestors?.length
       ? { path: ancestors.map((ancestor) => ancestor.name), ancestorIds: ancestors.map((ancestor) => ancestor.id) }
       : {}),
+  };
+}
+
+function mapDataViewChoice(result: DataViewSearchResult): Choice {
+  return {
+    optionId: `data-view:${result.dataView.id}`,
+    destinationParentId: result.dataView.dataSourceId,
+    kind: 'data-view',
+    name: result.dataView.name,
+    path: [`Data source: ${result.dataView.dataSourceName}`],
   };
 }
 
@@ -62,9 +76,11 @@ export function PageParentActionModal({
   const { data: recentPages, error: recentError, isLoading: recentLoading, mutate: mutateRecent } = usePagesByRecent();
   const [inputValue, setInputValue] = useState('');
   const [selectedChoice, setSelectedChoice] = useState<Choice | null>(null);
-  const [searchChoices, setSearchChoices] = useState<Choice[]>([]);
+  const [pageSearchChoices, setPageSearchChoices] = useState<Choice[]>([]);
+  const [dataViewSearchChoices, setDataViewSearchChoices] = useState<Choice[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [partialSearchError, setPartialSearchError] = useState(false);
   const [searchRetry, setSearchRetry] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -77,8 +93,10 @@ export function PageParentActionModal({
     if (!previousOpened.current && opened) {
       setInputValue('');
       setSelectedChoice(null);
-      setSearchChoices([]);
+      setPageSearchChoices([]);
+      setDataViewSearchChoices([]);
       setSearchError(false);
+      setPartialSearchError(false);
       setError('');
       combobox.openDropdown();
     }
@@ -96,19 +114,26 @@ export function PageParentActionModal({
     const timer = setTimeout(() => {
       setSearchLoading(true);
       setSearchError(false);
-      void api.search
-        .pages({ query: trimmedInput, workspaceId, type: 'page', limit: 20 }, { signal: controller.signal })
-        .then((response) => {
+      setPartialSearchError(false);
+      setPageSearchChoices([]);
+      setDataViewSearchChoices([]);
+      void Promise.allSettled([
+        api.search.pages({ query: trimmedInput, workspaceId, limit: 10 }, { signal: controller.signal }),
+        api.search.dataViews({ query: trimmedInput, workspaceId, limit: 10 }, { signal: controller.signal }),
+      ])
+        .then((outcomes) => {
           if (requestId.current !== currentRequestId) return;
-          const results = response.data.data.results as GetSearchResultsResponse['results'];
-          setSearchChoices(
-            results.filter((result) => result.page).map((result) => mapChoice(result.page, result.ancestors))
-          );
-        })
-        .catch((nextError: unknown) => {
-          if (requestId.current !== currentRequestId || isAbortError(nextError)) return;
-          setSearchError(true);
-          setSearchChoices([]);
+          const [pages, dataViews] = outcomes;
+          const pageFailure = pages.status === 'rejected' && !isAbortError(pages.reason);
+          const viewFailure = dataViews.status === 'rejected' && !isAbortError(dataViews.reason);
+          if (pages.status === 'fulfilled')
+            setPageSearchChoices(
+              pages.value.data.data.results.map((result: PageSearchResult) => mapChoice(result.page, result.ancestors))
+            );
+          if (dataViews.status === 'fulfilled')
+            setDataViewSearchChoices(dataViews.value.data.data.results.map((result) => mapDataViewChoice(result)));
+          setSearchError(pageFailure && viewFailure);
+          setPartialSearchError((pageFailure || viewFailure) && !(pageFailure && viewFailure));
         })
         .finally(() => {
           if (requestId.current === currentRequestId) setSearchLoading(false);
@@ -125,27 +150,46 @@ export function PageParentActionModal({
     () =>
       (recentPages ?? [])
         .map(({ page }) => mapChoice(page))
-        .filter((choice) => choice.id !== source.id)
-        .filter((choice) => action !== 'move' || choice.id !== source.parentId),
+        .filter((choice) => choice.destinationParentId !== source.id)
+        .filter((choice) => action !== 'move' || choice.destinationParentId !== source.parentId),
     [action, recentPages, source.id, source.parentId]
   );
 
   const pageChoices = useMemo(() => {
-    const choices = recentMode ? recentChoices : searchChoices;
+    const choices = recentMode ? recentChoices : pageSearchChoices;
     const seen = new Set<string>();
     return choices
       .filter((choice) => {
-        if (choice.id === source.id || (action === 'move' && choice.ancestorIds?.includes(source.id))) return false;
-        if (choice.id === null || seen.has(choice.id)) return false;
-        seen.add(choice.id);
+        if (
+          choice.destinationParentId === source.id ||
+          (action === 'move' &&
+            (choice.destinationParentId === source.parentId || choice.ancestorIds?.includes(source.id)))
+        )
+          return false;
+        if (seen.has(choice.optionId)) return false;
+        seen.add(choice.optionId);
         return true;
       })
       .slice(0, recentMode ? 10 : 20);
-  }, [action, recentChoices, recentMode, searchChoices, source.id]);
+  }, [action, recentChoices, recentMode, pageSearchChoices, source.id, source.parentId]);
+
+  const dataViewChoices = useMemo(
+    () =>
+      recentMode
+        ? []
+        : dataViewSearchChoices.filter((choice) => action !== 'move' || choice.destinationParentId !== source.parentId),
+    [action, dataViewSearchChoices, recentMode, source.parentId]
+  );
 
   const choices = useMemo(
-    () => [...(scopeType === 'workspace' ? [{ id: null, name: 'Workspace root' }] : []), ...pageChoices],
-    [pageChoices, scopeType]
+    () => [
+      ...(scopeType === 'workspace' && (action !== 'move' || source.parentId !== null)
+        ? [{ optionId: 'root', destinationParentId: null, kind: 'root' as const, name: 'Workspace root' }]
+        : []),
+      ...pageChoices,
+      ...dataViewChoices,
+    ],
+    [action, dataViewChoices, pageChoices, scopeType, source.parentId]
   );
   const loading = recentMode ? recentLoading : opened && searchLoading;
   const loadFailed = recentMode ? recentError !== undefined : searchError;
@@ -161,8 +205,11 @@ export function PageParentActionModal({
     try {
       const response =
         action === 'copy'
-          ? await api.pages.copy(source.id, { parentId: selectedChoice.id })
-          : await api.pages.move(source.id, { parentId: selectedChoice.id, expectedParentId: source.parentId });
+          ? await api.pages.copy(source.id, { parentId: selectedChoice.destinationParentId })
+          : await api.pages.move(source.id, {
+              parentId: selectedChoice.destinationParentId,
+              expectedParentId: source.parentId,
+            });
       onCompleted(response.data.data.page);
       onClose();
     } catch (error_: unknown) {
@@ -191,7 +238,7 @@ export function PageParentActionModal({
         store={combobox}
         withinPortal={false}
         onOptionSubmit={(value) => {
-          const choice = choices.find((item) => (item.id ?? '__root__') === value) ?? null;
+          const choice = choices.find((item) => item.optionId === value) ?? null;
           setSelectedChoice(choice);
           setInputValue(choice?.name ?? '');
           combobox.closeDropdown();
@@ -199,7 +246,7 @@ export function PageParentActionModal({
       >
         <Combobox.Target>
           <TextInput
-            label="New parent"
+            label="Destination"
             autoFocus
             value={inputValue}
             onChange={(event) => {
@@ -231,23 +278,68 @@ export function PageParentActionModal({
                 </Button>
               </Combobox.Empty>
             )}
+            {!loading && !loadFailed && partialSearchError && (
+              <Combobox.Empty>
+                <Text size="sm">Some destinations could not be loaded.</Text>
+                <Button size="xs" variant="subtle" onClick={() => setSearchRetry((value) => value + 1)}>
+                  Retry
+                </Button>
+              </Combobox.Empty>
+            )}
             {!loading &&
               !loadFailed &&
-              choices.map((choice) => (
-                <Combobox.Option value={choice.id ?? '__root__'} key={choice.id ?? '__root__'}>
+              choices
+                .filter((choice) => choice.kind === 'root')
+                .map((choice) => (
+                  <Combobox.Option value={choice.optionId} key={choice.optionId}>
+                    <Text>{choice.name}</Text>
+                  </Combobox.Option>
+                ))}
+            {!loading && !loadFailed && !recentMode && pageChoices.length > 0 && (
+              <Combobox.Group label="Pages">
+                {pageChoices.map((choice) => (
+                  <Combobox.Option value={choice.optionId} key={choice.optionId}>
+                    <Group gap="xs">
+                      <Text>{choice.name}</Text>
+                      {choice.isPrivate && <IconLock size={13} />}
+                    </Group>
+                    {choice.path?.length ? (
+                      <Text size="xs" c="dimmed">
+                        {choice.path.join(' / ')}
+                      </Text>
+                    ) : null}
+                  </Combobox.Option>
+                ))}
+              </Combobox.Group>
+            )}
+            {!loading &&
+              !loadFailed &&
+              recentMode &&
+              pageChoices.map((choice) => (
+                <Combobox.Option value={choice.optionId} key={choice.optionId}>
                   <Group gap="xs">
                     <Text>{choice.name}</Text>
                     {choice.isPrivate && <IconLock size={13} />}
                   </Group>
-                  {choice.path?.length ? (
-                    <Text size="xs" c="dimmed">
-                      {choice.path.join(' / ')}
-                    </Text>
-                  ) : null}
                 </Combobox.Option>
               ))}
-            {!loading && !loadFailed && pageChoices.length === 0 && (
-              <Combobox.Empty>{recentMode ? 'No recent pages' : 'No matching pages'}</Combobox.Empty>
+            {!loading && !loadFailed && !recentMode && dataViewChoices.length > 0 && (
+              <Combobox.Group label="Data views">
+                {dataViewChoices.map((choice) => (
+                  <Combobox.Option value={choice.optionId} key={choice.optionId}>
+                    <Group gap="xs">
+                      <IconTable size={14} />
+                      <Text>{choice.name}</Text>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {choice.path?.[0]}
+                    </Text>
+                  </Combobox.Option>
+                ))}
+              </Combobox.Group>
+            )}
+            {!loading && !loadFailed && pageChoices.length + dataViewChoices.length === 0 && (
+              <Combobox.Empty>{recentMode ? 'No recent pages' : 'No matching pages or data views'}</Combobox.Empty>
             )}
           </Combobox.Options>
         </Combobox.Dropdown>

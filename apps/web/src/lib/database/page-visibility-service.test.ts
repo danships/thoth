@@ -8,6 +8,7 @@ describe('page-visibility-service', () => {
   let containerRepository: Awaited<ReturnType<(typeof import('@/lib/database'))['getContainerRepository']>>;
   let cascadeSetPagePrivate: (typeof import('./page-visibility-service'))['cascadeSetPagePrivate'];
   let excludePrivateContainers: (typeof import('./page-visibility-service'))['excludePrivateContainers'];
+  let reconcilePrivateStateOnReparent: (typeof import('./page-visibility-service'))['reconcilePrivateStateOnReparent'];
   let BadRequestError: (typeof import('@/lib/errors/bad-request-error'))['BadRequestError'];
 
   const workspaceId = 'workspace-1';
@@ -33,6 +34,7 @@ describe('page-visibility-service', () => {
     containerRepository = await databaseModule.getContainerRepository();
     cascadeSetPagePrivate = pageVisibilityServiceModule.cascadeSetPagePrivate;
     excludePrivateContainers = pageVisibilityServiceModule.excludePrivateContainers;
+    reconcilePrivateStateOnReparent = pageVisibilityServiceModule.reconcilePrivateStateOnReparent;
     BadRequestError = badRequestErrorModule.BadRequestError;
   });
 
@@ -169,6 +171,29 @@ describe('page-visibility-service', () => {
       const afterAttempt = await refetch(child.id);
       expect(afterAttempt.isPrivate).toBe(true);
       expect(afterAttempt.privateRootId).toBe(root.id);
+    });
+  });
+
+  describe('reconcilePrivateStateOnReparent', () => {
+    test('applies the destination private root to a public page', async () => {
+      const destination = await createPage({ isPrivate: true });
+      const publicPage = await createPage({});
+
+      await expect(reconcilePrivateStateOnReparent(publicPage, destination.id, destination.id)).resolves.toEqual({
+        isPrivate: true,
+        privateRootId: destination.id,
+      });
+    });
+
+    test('only clears inherited privacy after its root is removed from the ancestry', async () => {
+      const root = await createPage({ isPrivate: true });
+      const child = await createPage({ parentId: root.id, isPrivate: true, privateRootId: root.id });
+
+      await expect(reconcilePrivateStateOnReparent(child, root.id)).resolves.toEqual({});
+      await expect(reconcilePrivateStateOnReparent(child, null)).resolves.toEqual({
+        isPrivate: false,
+        privateRootId: null,
+      });
     });
   });
 });
