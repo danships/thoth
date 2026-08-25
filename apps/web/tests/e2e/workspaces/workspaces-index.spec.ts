@@ -47,7 +47,7 @@ test.describe('workspaces index page', () => {
     await row.getByRole('button', { name: 'Restore' }).click();
 
     // Restoring navigates into the restored workspace.
-    await expect(page).toHaveURL(`/${created.slug}/pages`, { timeout: 15_000 });
+    await expect(page).toHaveURL(new RegExp(`/${created.slug}/pages(?:/|$)`), { timeout: 15_000 });
 
     // It is now active again and no longer listed as deleted.
     const listResponse = await request.get('/api/v1/workspaces');

@@ -109,7 +109,7 @@ test.describe('page cover', () => {
     const preview = page.getByRole('group', { name: /Cover position/ });
     await expect(preview).toBeVisible();
 
-    await page.getByRole('button', { name: 'Done' }).click();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 
@@ -126,7 +126,7 @@ test.describe('page cover', () => {
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('ArrowDown');
 
-    await page.getByRole('button', { name: 'Done' }).click();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
   });
 

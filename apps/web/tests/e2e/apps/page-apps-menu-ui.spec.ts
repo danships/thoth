@@ -39,6 +39,10 @@ test.describe('page detail Apps menu', () => {
 
     await page.getByRole('button', { name: `Disconnect ${label}` }).click();
 
+    // Disconnecting changes the submenu's height, which can place the pointer outside its
+    // hover target and close it. Reopen the submenu before asserting the updated connection
+    // state instead of relying on that transient hover state.
+    await page.getByRole('menuitem', { name: 'App connections' }).hover();
     await expect(page.getByText('Connect an app')).toBeVisible();
     await expect(page.getByRole('menuitem', { name: new RegExp(label) })).toBeVisible();
   });

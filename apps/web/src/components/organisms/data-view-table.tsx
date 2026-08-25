@@ -39,7 +39,6 @@ import { useReorderPage } from '@/lib/hooks/api/use-reorder-page';
 import { useCreateSingleSelectOption } from '@/lib/hooks/api/use-create-single-select-option';
 import { getRandomSelectColor } from '@/lib/data-source/select-colors';
 import { swrFetcher } from '@/lib/swr/fetcher';
-import { markDragEnded } from '@/lib/dnd/suppress-click-after-drag';
 import {
   resolveDataViewColumnLayout,
   toViewColumnLayoutItems,
@@ -340,7 +339,6 @@ export function DataViewTable({
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    markDragEnded();
     const { active, over } = event;
     if (!over || active.id === over.id) {
       return;

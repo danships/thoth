@@ -18,7 +18,7 @@ async function importMarkdown(page: Page, pageId: string, markdown: string) {
 
   // The page may already have content from other specs sharing the seeded database — confirm
   // the "replace content" prompt if it appears.
-  const replaceButton = page.getByRole('button', { name: 'Replace' });
+  const replaceButton = page.getByRole('button', { name: 'Replace', exact: true });
   if (
     await replaceButton.waitFor({ state: 'visible', timeout: 5000 }).then(
       () => true,
@@ -29,6 +29,13 @@ async function importMarkdown(page: Page, pageId: string, markdown: string) {
   }
 
   await expect(page.getByText('Imported markdown file')).toBeVisible({ timeout: 6000 });
+}
+
+async function showContentsTab(page: Page) {
+  const contentsTab = page.getByRole('tab', { name: 'Contents' });
+  if ((await contentsTab.getAttribute('aria-selected')) !== 'true') {
+    await contentsTab.click();
+  }
 }
 
 test('uploaded image embeds inline and survives a reload', async ({ page }) => {
@@ -48,12 +55,12 @@ test('uploaded image embeds inline and survives a reload', async ({ page }) => {
 
   await importMarkdown(page, SEED.pages.child.id, `![e2e-inline-image](${data.url})`);
 
-  await page.getByRole('tab', { name: 'Contents' }).click();
+  await showContentsTab(page);
   await expect(page.locator(`.bn-editor img[src="${data.url}"]`)).toBeVisible({ timeout: 10_000 });
 
   // Reload: the markdown must round-trip back into the same inline `<img>`.
   await page.reload();
-  await page.getByRole('tab', { name: 'Contents' }).click();
+  await showContentsTab(page);
   await expect(page.locator(`.bn-editor img[src="${data.url}"]`)).toBeVisible({ timeout: 10_000 });
 });
 
@@ -69,10 +76,10 @@ test('a file block inserted via markdown import survives a reload (custom markdo
 
   await importMarkdown(page, SEED.pages.favoriteToggle.id, markdown);
 
-  await page.getByRole('tab', { name: 'Contents' }).click();
+  await showContentsTab(page);
   await expect(page.locator('.bn-editor').getByText(SEED.file.filename).first()).toBeVisible({ timeout: 10_000 });
 
   await page.reload();
-  await page.getByRole('tab', { name: 'Contents' }).click();
+  await showContentsTab(page);
   await expect(page.locator('.bn-editor').getByText(SEED.file.filename).first()).toBeVisible({ timeout: 10_000 });
 });

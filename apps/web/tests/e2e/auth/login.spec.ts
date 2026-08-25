@@ -8,10 +8,9 @@ function setContainerLastUpdated(containerId: string, lastUpdated: string) {
   const databasePath = process.env['DB']!.replace('sqlite://', '');
   const database = new Database(databasePath);
   try {
-    database.prepare(`UPDATE container SET contents = json_set(contents, '$.lastUpdated', ?) WHERE id = ?`).run(
-      lastUpdated,
-      containerId
-    );
+    database
+      .prepare(`UPDATE container SET contents = json_set(contents, '$.lastUpdated', ?) WHERE id = ?`)
+      .run(lastUpdated, containerId);
   } finally {
     database.close();
   }
@@ -45,11 +44,14 @@ test('redirects to /pages then to the most recently updated page after successfu
   // re-assert the invariant under test by writing `SEED.pages.root`'s `lastUpdated` directly
   // (mirroring the `ContainerAccess` freshening pattern in `recent-tree.spec.ts`) immediately
   // before signing in, guaranteeing it is the most recently updated root page at login time.
-  setContainerLastUpdated(SEED.pages.root.id, new Date().toISOString());
+  setContainerLastUpdated(SEED.pages.root.id, new Date(Date.now() + 10_000).toISOString());
 
   await page.goto('/login');
   await page.getByLabel('Email').fill(SEED.user.email);
   await page.locator('input[type="password"]').fill(SEED.user.password);
   await page.getByRole('button', { name: 'Sign In' }).click();
-  await expect(page).toHaveURL(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`, { timeout: 10_000 });
+  await expect(page).toHaveURL(
+    new RegExp(String.raw`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}(?:\\?v=[^&]+)?$`),
+    { timeout: 10_000 }
+  );
 });

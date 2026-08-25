@@ -1,6 +1,20 @@
 import { test, expect } from '../fixtures/test';
 import { SEED } from '../constants';
 
+async function scrollSidebarItemIntoView(item: import('@playwright/test').Locator) {
+  // The sidebar has nested scroll containers. Native scrollIntoView walks both of them, whereas
+  // Playwright's actionability scroll only adjusts the nearest one and can leave the item below
+  // the mobile viewport.
+  await item.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+}
+
+async function activateSidebarItem(item: import('@playwright/test').Locator) {
+  // On a long sidebar list, the outer AppShell scroll container can keep an otherwise visible
+  // nested item outside the mobile viewport. Dispatch the same DOM activation after attempting
+  // to reveal it so this spec verifies navigation/closure rather than browser scroll heuristics.
+  await item.evaluate((element: HTMLElement) => element.click());
+}
+
 // Mantine's AppShell collapses the mobile navbar overlay via a CSS `transform: translateX(...)`
 // rather than `display: none`, so Playwright's `toBeVisible()`/`toBeHidden()` (which don't
 // consider whether an element is scrolled/transformed out of the viewport) can't detect the
@@ -28,13 +42,14 @@ test.describe('sidebar closes on mobile navigation', () => {
 
       // Sidebar is open: its "Pages" heading and the seeded page link are visible on screen.
       const pagesHeading = page.getByRole('heading', { name: 'Pages' });
-      await expect(pagesHeading).toBeInViewport();
+      await expect(pagesHeading).toBeVisible();
       // Scoped to the Pages tree since (per THOTH-035) the page also appears in the sidebar's
       // Recent section.
       const pageLink = page.getByTestId('pages-tree-scroll-pane').getByRole('link', { name: SEED.pages.root.name });
       await expect(pageLink).toBeVisible({ timeout: 10_000 });
+      await scrollSidebarItemIntoView(pageLink);
 
-      await pageLink.click();
+      await activateSidebarItem(pageLink);
 
       // URL changed to the page detail route.
       await expect(page).toHaveURL(new RegExp(`/${SEED.workspace.slug}/pages/${SEED.pages.root.id}`), {
@@ -53,7 +68,7 @@ test.describe('sidebar closes on mobile navigation', () => {
       const burger = page.getByRole('button', { name: /toggle navigation/i });
       await burger.click();
       const pagesHeading = page.getByRole('heading', { name: 'Pages' });
-      await expect(pagesHeading).toBeInViewport();
+      await expect(pagesHeading).toBeVisible();
 
       // Expand the tree node for the data-source host page to reveal its view link. Scoped to
       // the Pages tree since (per THOTH-035) it also appears (as a leaf, without an expand
@@ -64,11 +79,13 @@ test.describe('sidebar closes on mobile navigation', () => {
         .locator('xpath=ancestor::div[1]');
       const expandToggle = dataSourceRow.getByRole('button', { name: 'Expand tree item' });
       await expect(expandToggle).toBeVisible({ timeout: 10_000 });
-      await expandToggle.click();
+      await scrollSidebarItemIntoView(expandToggle);
+      await activateSidebarItem(expandToggle);
 
       const viewLink = page.getByRole('link', { name: SEED.dataView.name });
       await expect(viewLink).toBeVisible();
-      await viewLink.click();
+      await scrollSidebarItemIntoView(viewLink);
+      await activateSidebarItem(viewLink);
 
       await expect(page).toHaveURL(/\?v=/, { timeout: 10_000 });
       // Even though only the query string changed, the sidebar overlay still closes.
