@@ -46,7 +46,7 @@ describe('jobs environment boundary validation', () => {
       const environment = getEnvironment();
       expect(environment.SEARCH_MODEL_ID).toBe('Xenova/all-MiniLM-L6-v2');
       expect(environment.SEARCH_MODEL_CACHE_DIR).toBe('data/models/search');
-      expect(environment.SEARCH_INDEX_VERSION).toBe(1);
+      expect(environment.SEARCH_INDEX_VERSION).toBe(2);
       expect(environment.SEARCH_QUERY_TIMEOUT_MS).toBe(120000);
       expect(environment.SEARCH_RECONCILE_INTERVAL_MS).toBe(3600000);
     } finally {

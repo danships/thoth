@@ -213,6 +213,26 @@ describe('WorkspaceSearchService', () => {
     ).toEqual([]);
   });
 
+  test('replaces a document\'s prior chunks instead of retaining them on a forced re-index', async () => {
+    await createWorkspace('ws-replace-chunks');
+    const service = createService();
+    const page = await createPage({
+      id: 'page-replace-chunks',
+      workspaceId: 'ws-replace-chunks',
+      content: 'alpha beta gamma',
+    });
+
+    await service.syncPage({ workspaceId: page.workspaceId, pageId: page.id });
+    await service.syncPage({ workspaceId: page.workspaceId, pageId: page.id, force: true });
+
+    const index = await (
+      service as unknown as {
+        ensureWorkspaceIndexUnlocked(workspaceId: string): Promise<{ getIndexStats(): Promise<{ items: number }> }>;
+      }
+    ).ensureWorkspaceIndexUnlocked('ws-replace-chunks');
+    await expect(index.getIndexStats()).resolves.toMatchObject({ items: 1 });
+  });
+
   test('skips embeddings work for unchanged, private, and deleted pages', async () => {
     await createWorkspace('ws-skip');
     const fakeEmbeddings = createFakeEmbeddings();
