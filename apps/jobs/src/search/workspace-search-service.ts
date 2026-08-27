@@ -29,6 +29,10 @@ const CURSOR_TIE_BREAK_BUFFER = 500;
 const CHUNK_SIZE = 500;
 const INDEX_NAME = 'index.pb';
 const CHUNKING_CONFIG = { chunkSize: 256, chunkOverlap: 32, keepSeparators: true } as const;
+// `LocalDocumentIndex#deleteDocument()` finds a document's chunks by this internal
+// metadata field. It therefore must remain indexed alongside the fields we filter
+// on ourselves; otherwise document updates append replacement vectors forever.
+const INDEXED_METADATA_FIELDS = ['documentId', 'pageId', 'workspaceId', 'lastUpdated', 'dataSourceLastUpdated'];
 const MAX_SNIPPET_CHARS = 1000;
 
 type SearchCursor = { createdAt: string; id: string };
@@ -537,7 +541,7 @@ export class WorkspaceSearchService {
     const liveDirectory = this.getWorkspaceIndexDir(workspaceId);
     if (!(await pathExists(liveDirectory))) {
       const index = await this.createIndexInstance(liveDirectory);
-      await index.createIndex({ version: this.indexVersion, metadata_config: { indexed: ['pageId', 'workspaceId', 'lastUpdated', 'dataSourceLastUpdated'] } });
+      await index.createIndex({ version: this.indexVersion, metadata_config: { indexed: INDEXED_METADATA_FIELDS } });
       this.workspaceIndexes.set(workspaceId, index);
       return index;
     }
@@ -585,7 +589,7 @@ export class WorkspaceSearchService {
 
     const stagingIndex = await this.createIndexInstance(stagingDirectory);
     try {
-      await stagingIndex.createIndex({ version: this.indexVersion, metadata_config: { indexed: ['pageId', 'workspaceId', 'lastUpdated', 'dataSourceLastUpdated'] } });
+      await stagingIndex.createIndex({ version: this.indexVersion, metadata_config: { indexed: INDEXED_METADATA_FIELDS } });
       await this.reconcileWorkspaceFullyUnlocked(workspaceId, stagingIndex);
     } catch (error) {
       // Never leave a half-built staging directory behind on failure.
