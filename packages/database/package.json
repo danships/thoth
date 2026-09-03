@@ -48,7 +48,7 @@
     "@thoth/shared": "workspace:*",
     "better-sqlite3": "^12.11.1",
     "fractional-indexing": "^4.0.0",
-    "mysql2": "^3.22.5",
+    "mysql2": "^3.23.1",
     "supersave": "1.0.0-beta4",
     "zod": "^4.4.3"
   },
