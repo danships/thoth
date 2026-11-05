@@ -16,6 +16,9 @@ apps/web/tests/*
 # the Docker build's TypeScript check can resolve those imports.
 !apps/web/tests/e2e/constants.ts
 !apps/web/tests/fixtures/seed.ts
+# Co-located unit tests under `apps/web/src` (e.g. `src/lib/database/page-query-service.test.ts`)
+# are part of the same TypeScript check and import this self-contained helper.
+!apps/web/tests/helpers/create-test-database.ts
 playwright-report
 apps/web/playwright-report
 test-results
