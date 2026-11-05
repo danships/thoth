@@ -17,7 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.2.0",
+    "@huggingface/transformers": "^4.3.2",
     "@thoth/database": "workspace:*",
     "@thoth/job-protocol": "workspace:*",
     "@thoth/shared": "workspace:*",
@@ -28,7 +28,7 @@
     "web-push": "^3.6.7",
     "winston": "^3.19.0",
     "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tsconfig/strictest": "^2.0.8",
@@ -37,6 +37,6 @@
     "rimraf": "^6.1.3",
     "tsx": "^4.19.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   }
 }

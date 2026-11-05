@@ -9,7 +9,7 @@ allowBuilds:
   protobufjs: true
   sharp: true
   unrs-resolver: true
-minimumReleaseAge: 1440
+minimumReleaseAge: 4320
 onlyBuiltDependencies:
   - better-sqlite3
   - esbuild
@@ -26,3 +26,7 @@ overrides:
   nanoid: '>=3.3.17'
   js-yaml: '>=4.3.1'
   adm-zip@<0.6.0: '>=0.6.0'
+  vite@>=8.2.0 <8.2.4: '^8.3.5'
+  source-map-js@<1.2.2: '^1.2.2'
+  minimatch@>=10.0.0 <11.0.1: '^11.0.3'
+  glob@>=13.0.0 <14.0.2: '^14.0.3'
