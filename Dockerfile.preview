@@ -14,7 +14,7 @@
 # any other dependency download) happens when the container starts or when
 # `pnpm run db:seed` is executed later via `docker exec` — the preview
 # environment must not perform network installs at runtime.
-FROM node:24.18.0-slim AS base
+FROM node:24.22.2-slim AS base
 # Set HOME to the same path the `nextjs` runtime user will use *before*
 # `corepack prepare` runs, so corepack's downloaded pnpm shim is cached
 # under `/home/nextjs/.cache` from the very first stage. If HOME were only
@@ -26,7 +26,7 @@ FROM node:24.18.0-slim AS base
 ENV HOME=/home/nextjs
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.18.0 --activate
 
 FROM base AS deps
 # The runtime image must be glibc-based (Debian), not Alpine/musl: THOTH-086's workspace search

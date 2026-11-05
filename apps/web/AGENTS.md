@@ -146,7 +146,7 @@ Thoth's authorization model draws a hard line between two kinds of rows:
   `addWorkspaceIdToQuery(query, workspaceId)`, never `addUserIdToQuery`.
 
 - **PER-USER STATE** (`ContainerAccess` — starred/last-accessed) — stays scoped by `userId` via
-  `addUserIdToQuery(query, session.user.id)`. This is the *only* legitimate remaining use of
+  `addUserIdToQuery(query, session.user.id)`. This is the _only_ legitimate remaining use of
   `addUserIdToQuery` for anything resembling a workspace resource.
 
 A member/App scoped to `workspace`/`read_write` (the default for every original owner) is
@@ -203,3 +203,13 @@ Use Playwright for browser/UI interaction coverage. Prefer unit tests for isolat
 
 See the [repository-root AGENTS.md](../../AGENTS.md#skills) for the full list of agent skills
 available for this codebase (they apply across the monorepo, including `apps/web`).
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

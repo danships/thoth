@@ -5,10 +5,10 @@
 # (no dynamic loader). musl-compat shims (`gcompat`/`libc6-compat`) do not provide enough of
 # glibc to run these binaries, so every stage — not just the runner — uses the `-slim` (Debian)
 # variant, keeping the native modules built and run against the same libc throughout.
-FROM node:24.18.0-slim AS base
+FROM node:24.22.2-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.18.0 --activate
 
 FROM base AS deps
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
@@ -40,7 +40,7 @@ COPY . .
 # (plain `tsc` output) topologically — see the root `build` script.
 RUN pnpm build
 
-FROM node:24.18.0-slim AS runner
+FROM node:24.22.2-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
